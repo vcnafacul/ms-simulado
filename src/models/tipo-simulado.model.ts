@@ -5,6 +5,7 @@ export class TipoSimulado {
         public nome: string,
         public duracao: number,
         public quantidadeTotalQuestao: number,
-        public regras: Regra[]
+        public regras: Regra[],
+        public id?: string
     ) { }
 }
