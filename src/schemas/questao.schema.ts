@@ -1,4 +1,7 @@
 import * as mongoose from 'mongoose';
+import { Alternativa } from 'src/enums/alternativa.enum';
+import { Caderno } from 'src/enums/caderno.enum';
+import { EnemArea } from 'src/enums/enem-area.enum';
 
 export const QuestaoSchema = new mongoose.Schema({
   exame: {
@@ -12,12 +15,12 @@ export const QuestaoSchema = new mongoose.Schema({
   },
   caderno: {
     type: String,
-    enum: ['Azul','Amarelo','Rosa','Branco','Cinza'],
+    enum: Caderno,
     require: true
   },
   enemArea: {
     type: String,
-    enum: ['Ciências Humanas','Linguagens','Ciências da Natureza','Matemática'],
+    enum: EnemArea,
     require: true
   },
   frente1: {
@@ -70,7 +73,7 @@ export const QuestaoSchema = new mongoose.Schema({
   },
   alternativa: {
     type: String,
-    enum: ['A','B','C','D','E'],
+    enum: Alternativa,
     required: true,
     select: false
   },

@@ -1,4 +1,5 @@
 import * as mongoose from 'mongoose';
+import { Alternativa } from 'src/enums/alternativa.enum';
 
 export const RelatorioSchema = new mongoose.Schema({
     estudante: {
@@ -18,12 +19,12 @@ export const RelatorioSchema = new mongoose.Schema({
         },
         respostaEstudante: {
             type: String,
-            enum: ['A','B','C','D','E'],
+            enum: Alternativa,
             required: true
         },
         alternativaCorreta: {
             type: String,
-            enum: ['A','B','C','D','E'],
+            enum: Alternativa,
             required: true
         },
         _id : false
