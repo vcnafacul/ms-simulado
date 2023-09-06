@@ -5,7 +5,7 @@ import { Frente } from '../frente/frente.schema';
 import { Materia } from '../materia/materia.schema';
 import { EnemArea } from 'src/enums/enem-area.enum';
 
-@Schema()
+@Schema({ timestamps: true, versionKey: false })
 export class Questao extends BaseSchema {
   @Prop({ ref: Exame.name })
   public exame: Exame;

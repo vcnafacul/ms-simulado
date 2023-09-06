@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { BaseSchema } from 'src/shared/base/base.schema';
 
-@Schema()
+@Schema({ timestamps: true, versionKey: false })
 export class Materia extends BaseSchema {
   @Prop()
   public nome: string;
