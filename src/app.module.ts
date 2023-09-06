@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ExameModule } from './modules/exame/exame.module';
 import { FrenteModule } from './modules/frente/frente.module';
 import { MateriaModule } from './modules/materia/materia.module';
+import { QuestaoModule } from './modules/questao/questao.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { MateriaModule } from './modules/materia/materia.module';
     ExameModule,
     FrenteModule,
     MateriaModule,
+    QuestaoModule,
   ],
   providers: [],
 })
