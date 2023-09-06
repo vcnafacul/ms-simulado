@@ -1,5 +1,4 @@
 import { ApiProperty } from "@nestjs/swagger"
-import { QuestaoOutputDto } from "./questao-output.dto"
 
 
 export class SimuladoDto {

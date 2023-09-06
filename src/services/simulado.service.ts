@@ -19,8 +19,8 @@ export class SimuladoService {
   constructor(
     @InjectModel('Simulado') private readonly simuladoModel: Model<Simulado>,
     @InjectModel('TipoSimulado') private readonly tipoSimuladoModel: Model<TipoSimulado>,
-    @Inject(QuestaoService) private readonly questaoService: QuestaoService,
-    @Inject(RelatorioService) private readonly relatorioService: RelatorioService,
+    private readonly questaoService: QuestaoService,
+    private readonly relatorioService: RelatorioService,
   ) { }
 
 

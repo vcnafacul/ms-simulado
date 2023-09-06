@@ -3,9 +3,10 @@ import { Exame } from '../exame/exame.schema';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Frente } from '../frente/frente.schema';
 import { Materia } from '../materia/materia.schema';
-import { EnemArea } from 'src/enums/enem-area.enum';
+import { EnemArea } from './enums/enem-area.enum';
+import { Types } from 'mongoose';
 
-@Schema({ timestamps: true, versionKey: false })
+@Schema()
 export class Questao extends BaseSchema {
   @Prop({ ref: Exame.name })
   public exame: Exame;
@@ -19,16 +20,16 @@ export class Questao extends BaseSchema {
   @Prop()
   public enemArea: EnemArea;
 
-  @Prop({ ref: Frente.name })
+  @Prop({ ref: Frente.name, type: Types.ObjectId })
   public frente1: Frente;
 
-  @Prop({ ref: Frente.name, required: false })
+  @Prop({ ref: Frente.name, type: Types.ObjectId, required: false })
   public frente2: Frente;
 
-  @Prop({ ref: Frente.name, required: false })
+  @Prop({ ref: Frente.name, type: Types.ObjectId, required: false })
   public frente3: Frente;
 
-  @Prop({ ref: Materia.name })
+  @Prop({ ref: Materia.name, type: Types.ObjectId })
   public materia: Materia;
 
   @Prop()
@@ -68,4 +69,4 @@ export class Questao extends BaseSchema {
   public quantidadeResposta: number;
 }
 
-export const QuestaoSchema = SchemaFactory.createForClass(Materia);
+export const QuestaoSchema = SchemaFactory.createForClass(Questao);

@@ -6,6 +6,7 @@ import { FrenteModule } from './modules/frente/frente.module';
 import { MateriaModule } from './modules/materia/materia.module';
 import { QuestaoModule } from './modules/questao/questao.module';
 import { TipoSimuladoModule } from './modules/tipo-simulado/tipo-simulado.module';
+import { SimuladoModule } from './modules/simulado/simulado.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { TipoSimuladoModule } from './modules/tipo-simulado/tipo-simulado.module
     MateriaModule,
     QuestaoModule,
     TipoSimuladoModule,
+    SimuladoModule,
   ],
   providers: [],
 })

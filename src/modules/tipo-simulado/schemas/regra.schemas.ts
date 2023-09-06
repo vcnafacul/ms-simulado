@@ -1,25 +1,25 @@
 import { Prop } from '@nestjs/mongoose';
-import * as mongoose from 'mongoose';
+import { Types } from 'mongoose';
 import { Frente } from 'src/modules/frente/frente.schema';
 import { Materia } from 'src/modules/materia/materia.schema';
 
 export class Regra {
   @Prop({
-    type: mongoose.Schema.Types.ObjectId,
+    type: Types.ObjectId,
     ref: Materia.name,
     required: true,
   })
-  materia: mongoose.Types.ObjectId;
+  materia: Types.ObjectId;
 
   @Prop({ required: true })
   quantidade: number;
 
   @Prop({
-    type: mongoose.Schema.Types.ObjectId,
+    type: Types.ObjectId,
     ref: Frente.name,
     required: false,
   })
-  frente?: mongoose.Types.ObjectId;
+  frente?: Types.ObjectId;
 
   @Prop({ required: false })
   ano?: number;
