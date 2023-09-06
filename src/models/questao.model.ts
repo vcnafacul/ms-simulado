@@ -1,7 +1,6 @@
-
-import { Frente } from 'src/models/frente.model'
-import { Materia } from 'src/models/materia.model'
-import { Exame } from 'src/modules/exame/exame.schema'
+import { Materia } from 'src/models/materia.model';
+import { Exame } from 'src/modules/exame/exame.schema';
+import { Frente } from 'src/modules/frente/frente.schema';
 
 export class Questao {
   constructor(
@@ -25,6 +24,6 @@ export class Questao {
     public imageId: string,
     public acertos: number,
     public quantidadeSimulado: number,
-    public quantidadeResposta: number
-  ) { }
+    public quantidadeResposta: number,
+  ) {}
 }

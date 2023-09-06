@@ -1,17 +1,15 @@
-import { Injectable } from "@nestjs/common"
-import { Exame } from "./exame.schema";
-import { ExameRepository } from "./exame.repository";
-import { ExameDto } from "./dtos/exame.dto";
+import { Injectable } from '@nestjs/common';
+import { Exame } from './exame.schema';
+import { ExameRepository } from './exame.repository';
+import { ExameDto } from './dtos/exame.dto';
 
 @Injectable()
-export class ExameService{
-  constructor(
-    private readonly repository: ExameRepository,
-  ) { }
+export class ExameService {
+  constructor(private readonly repository: ExameRepository) {}
 
   public async add(item: ExameDto): Promise<Exame> {
     const exame = new Exame();
-    Object.assign(exame, item)
+    Object.assign(exame, item);
     return await this.repository.create(exame);
   }
 
@@ -24,8 +22,7 @@ export class ExameService{
     return this.repository.getAll();
   }
 
-  public async delete(id: string): Promise<Exame> {
-    const exame = this.repository.delete(id);
-    return exame;
+  public async delete(id: string): Promise<void> {
+    await this.repository.delete(id);
   }
 }

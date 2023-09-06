@@ -1,15 +1,15 @@
-import { Prop, Schema } from "@nestjs/mongoose";
+import { Prop, Schema } from '@nestjs/mongoose';
 
-@Schema({timestamps:true})
+@Schema({ timestamps: true })
 export class BaseSchema {
-    public _id: string;
+  public _id: string;
 
-    // @Prop()
-    // public createdAt: Date;
+  // @Prop()
+  // public createdAt: Date;
 
-    // @Prop()
-    // public updatedAt: Date;
+  // @Prop()
+  // public updatedAt: Date;
 
-    @Prop()
-    public deleted: boolean;
+  @Prop()
+  public deleted: boolean;
 }
