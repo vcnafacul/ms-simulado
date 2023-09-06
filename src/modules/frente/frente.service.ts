@@ -27,7 +27,6 @@ export class FrenteService {
 
   public async getAll(): Promise<FrenteDTOOutput[]> {
     const frentes = await this.repository.getAll();
-    console.log(frentes);
     return frentes.map((frente) => ({
       _id: frente._id,
       nome: frente.nome,
