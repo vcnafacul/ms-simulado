@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Exame } from "src/models/exame.model"
 import { Frente } from "src/models/frente.model"
 import { Materia } from "src/models/materia.model"
+import { Exame } from 'src/modules/exame/exame.schema';
 
 export class QuestaoInputDto {
   @ApiProperty()
