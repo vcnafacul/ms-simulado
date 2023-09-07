@@ -27,9 +27,10 @@ export class TipoSimuladoService {
 
   public async getAll(): Promise<TipoSimuladoDTOOutput[]> {
     const tipos = await this.repository.getAll();
-    return tipos.map((tipo) =>
-      Object.assign(new TipoSimuladoDTOOutput(), tipo),
-    );
+    return tipos.map((tipo) => {
+      console.log(tipo);
+      return tipo.toJSON();
+    });
   }
 
   public async delete(id: string): Promise<void> {

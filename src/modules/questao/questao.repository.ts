@@ -10,9 +10,17 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     super(model);
   }
 
+  override async getAll() {
+    return await this.model
+      .find()
+      .select('+alternativa')
+      .populate(['exame', 'frente1', 'frente2', 'frente3', 'materia']);
+  }
+
   override async getById(id: string) {
     return await this.model
       .findById(id)
+      .select('+alternativa')
       .populate(['exame', 'frente1', 'frente2', 'frente3', 'materia']);
   }
 

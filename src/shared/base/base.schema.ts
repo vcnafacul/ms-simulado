@@ -1,9 +1,9 @@
 import { Prop, Schema } from '@nestjs/mongoose';
 
-@Schema({ timestamps: true, versionKey: false })
+@Schema()
 export class BaseSchema {
   public _id?: string;
 
-  @Prop({ required: false, default: false })
+  @Prop({ required: false, default: false, select: false })
   public deleted?: boolean;
 }

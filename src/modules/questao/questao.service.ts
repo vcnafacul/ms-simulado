@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { QuestaoRepository } from './questao.repository';
-import { QuestaoDTOOutput } from './dtos/questao.dto.output';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
 import { Questao } from './questao.schema';
 import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
@@ -10,26 +9,20 @@ import { Regra } from '../tipo-simulado/schemas/regra.schemas';
 export class QuestaoService {
   constructor(private readonly repository: QuestaoRepository) {}
 
-  public async add(item: CreateQuestaoDTOInput): Promise<QuestaoDTOOutput> {
+  public async add(item: CreateQuestaoDTOInput): Promise<Questao> {
     const questao = Object.assign(new Questao(), item);
 
-    return Object.assign(
-      new QuestaoDTOOutput(),
-      await this.repository.create(questao),
-    );
+    return await this.repository.create(questao);
   }
 
-  public async getById(id: string): Promise<QuestaoDTOOutput> {
+  public async getById(id: string): Promise<Questao> {
     const questao = await this.repository.getById(id);
-    const output = new QuestaoDTOOutput();
-    return Object.assign(output, questao) as QuestaoDTOOutput;
+    return questao;
   }
 
-  public async getAll(): Promise<QuestaoDTOOutput[]> {
+  public async getAll(): Promise<Questao[]> {
     const questoes = await this.repository.getAll();
-    return questoes.map((questao) =>
-      Object.assign(new QuestaoDTOOutput(), questao),
-    );
+    return questoes;
   }
 
   public async delete(id: string): Promise<void> {

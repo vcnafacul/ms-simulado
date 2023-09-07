@@ -1,19 +1,32 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Types } from 'mongoose';
+import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
+import { FrenteExist } from 'src/modules/frente/validator/frente-exist.validator';
+import { MateriaExist } from 'src/modules/materia/validator/materia-exist.validator';
+import { Caderno } from 'src/modules/questao/enums/caderno.enum';
 
 export class RegraDTO {
-  @ApiProperty({ type: String })
-  materia: Types.ObjectId;
+  @ApiProperty()
+  @IsString()
+  @MateriaExist({ message: 'materia não existe' })
+  materia: string;
 
-  @ApiProperty({ type: Number })
+  @ApiProperty()
+  @IsNumber()
   quantidade: number;
 
-  @ApiProperty({ type: String, required: false })
-  frente?: Types.ObjectId;
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  @FrenteExist({ message: 'frente não existe' })
+  frente?: string;
 
-  @ApiProperty({ type: Number, required: false })
+  @ApiProperty({ required: false })
+  @IsNumber()
+  @IsOptional()
   ano?: number;
 
-  @ApiProperty({ type: Number, required: false })
-  caderno?: number;
+  @ApiProperty({ enum: Caderno, required: false })
+  @IsEnum(Caderno)
+  @IsOptional()
+  public caderno: Caderno;
 }

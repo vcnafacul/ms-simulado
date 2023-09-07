@@ -4,7 +4,7 @@ import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
 import { BaseSchema } from 'src/shared/base/base.schema';
 import { Types } from 'mongoose';
 
-@Schema()
+@Schema({ timestamps: true, versionKey: false })
 export class Simulado extends BaseSchema {
   @Prop()
   nome: string;

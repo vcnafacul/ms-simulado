@@ -1,12 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Exame } from 'src/modules/exame/exame.schema';
-import { Frente } from 'src/modules/frente/frente.schema';
-import { Materia } from 'src/modules/materia/materia.schema';
 import { Caderno } from '../enums/caderno.enum';
 import { EnemArea } from '../enums/enem-area.enum';
 import { Alternativa } from '../enums/alternativa.enum';
+import { Exame } from 'src/modules/exame/exame.schema';
+import { Frente } from 'src/modules/frente/frente.schema';
+import { Materia } from 'src/modules/materia/materia.schema';
 
-export class QuestaoDTOOutput {
+export class QuestaoDTO {
+  @ApiProperty()
+  public _id?: string;
+
   @ApiProperty()
   exame: Exame;
 
@@ -35,35 +38,26 @@ export class QuestaoDTOOutput {
   public numero: number;
 
   @ApiProperty()
-  public textoQuestao: string;
+  public textoQuestao?: string;
 
   @ApiProperty()
-  public textoAlternativaA: string;
+  public textoAlternativaA?: string;
 
   @ApiProperty()
-  public textoAlternativaB: string;
+  public textoAlternativaB?: string;
 
   @ApiProperty()
-  public textoAlternativaC: string;
+  public textoAlternativaC?: string;
 
   @ApiProperty()
-  public textoAlternativaD: string;
+  public textoAlternativaD?: string;
 
   @ApiProperty()
-  public textoAlternativaE: string;
+  public textoAlternativaE?: string;
 
   @ApiProperty()
   public alternativa: Alternativa;
 
   @ApiProperty()
   public imageId: string;
-
-  @ApiProperty()
-  public acertos: number;
-
-  @ApiProperty()
-  public quantidadeSimulado: number;
-
-  @ApiProperty()
-  public quantidadeResposta: number;
 }

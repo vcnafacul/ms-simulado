@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { MateriaRepository } from './materia.repository';
-import { MateriaDTOOutput } from './dtos/materia.dto.output';
 import { CreateMateriaDTOInput } from './dtos/create.dto.input';
 import { Materia } from './materia.schema';
 
@@ -8,29 +7,17 @@ import { Materia } from './materia.schema';
 export class MateriaService {
   constructor(private readonly repository: MateriaRepository) {}
 
-  public async add(item: CreateMateriaDTOInput): Promise<MateriaDTOOutput> {
+  public async add(item: CreateMateriaDTOInput): Promise<Materia> {
     const materia = Object.assign(new Materia(), item);
-
-    return Object.assign(
-      new MateriaDTOOutput(),
-      await this.repository.create(materia),
-    );
+    return await this.repository.create(materia);
   }
 
-  public async getById(id: string): Promise<MateriaDTOOutput> {
-    const materia = await this.repository.getById(id);
-    const output = new MateriaDTOOutput();
-    output._id = materia._id;
-    output.nome = materia.nome;
-    return output;
+  public async getById(id: string): Promise<Materia> {
+    return await this.repository.getById(id);
   }
 
-  public async getAll(): Promise<MateriaDTOOutput[]> {
-    const materias = await this.repository.getAll();
-    return materias.map((materia) => ({
-      _id: materia._id,
-      nome: materia.nome,
-    }));
+  public async getAll(): Promise<Materia[]> {
+    return await this.repository.getAll();
   }
 
   public async delete(id: string): Promise<void> {

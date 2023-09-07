@@ -5,10 +5,11 @@ import { Frente } from '../frente/frente.schema';
 import { Materia } from '../materia/materia.schema';
 import { EnemArea } from './enums/enem-area.enum';
 import { Types } from 'mongoose';
+import { Status } from './enums/status.enum';
 
-@Schema()
+@Schema({ timestamps: true, versionKey: false })
 export class Questao extends BaseSchema {
-  @Prop({ ref: Exame.name })
+  @Prop({ ref: Exame.name, type: Types.ObjectId })
   public exame: Exame;
 
   @Prop()
@@ -35,22 +36,22 @@ export class Questao extends BaseSchema {
   @Prop()
   public numero: number;
 
-  @Prop()
+  @Prop({ required: false, default: '' })
   public textoQuestao: string;
 
-  @Prop()
+  @Prop({ required: false, default: '' })
   public textoAlternativaA: string;
 
-  @Prop()
+  @Prop({ required: false, default: '' })
   public textoAlternativaB: string;
 
-  @Prop()
+  @Prop({ required: false, default: '' })
   public textoAlternativaC: string;
 
-  @Prop()
+  @Prop({ required: false, default: '' })
   public textoAlternativaD: string;
 
-  @Prop()
+  @Prop({ required: false, default: '' })
   public textoAlternativaE: string;
 
   @Prop({ select: false })
@@ -67,6 +68,9 @@ export class Questao extends BaseSchema {
 
   @Prop({ required: false })
   public quantidadeResposta: number;
+
+  @Prop({ required: false, default: Status.Pending, enum: Status })
+  public status: Status;
 }
 
 export const QuestaoSchema = SchemaFactory.createForClass(Questao);

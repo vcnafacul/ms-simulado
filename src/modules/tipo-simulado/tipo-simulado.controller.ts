@@ -2,7 +2,9 @@ import { Body, Controller, Get, Post, Delete, Param } from '@nestjs/common';
 import { TipoSimuladoService } from './tipo-simulado.service';
 import { TipoSimuladoDTOOutput } from './dtos/tipo-simulado.dto.output';
 import { CreateTipoSimuladoDTOInput } from './dtos/create.dto.input';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Tipo Simulado')
 @Controller('tipo-simulado')
 export class TipoSimuladoController {
   constructor(private readonly service: TipoSimuladoService) {}
