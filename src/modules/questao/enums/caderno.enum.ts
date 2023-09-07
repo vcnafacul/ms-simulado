@@ -1,7 +1,7 @@
 export enum Caderno {
-  'Azul',
-  'Amarelo',
-  'Rosa',
-  'Branco',
-  'Cinza',
+  Azul = 'Azul',
+  Amarelo = 'Amarelo',
+  Rosa = 'Rosa',
+  Branco = 'Branco',
+  Cinza = 'Cinza',
 }

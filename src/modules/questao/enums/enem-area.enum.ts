@@ -1,6 +1,6 @@
 export enum EnemArea {
-  'Ciências Humanas',
-  'Linguagens',
-  'Ciências da Natureza',
-  'Matemática',
+  CienciasHumanas = 'Ciências Humanas',
+  Linguagens = 'Linguagens',
+  BioExatas = 'Ciências da Natureza',
+  Matematica = 'Matemática',
 }
