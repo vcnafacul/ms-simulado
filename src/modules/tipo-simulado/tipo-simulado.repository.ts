@@ -8,7 +8,7 @@ export class TipoSimuladoRepository extends BaseRepository<TipoSimulado> {
     super(model);
   }
 
-  override async getById(id: string) {
+  override async getById(id: string): Promise<TipoSimulado> {
     return await this.model
       .findById(id)
       .populate({

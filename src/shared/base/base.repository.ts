@@ -5,9 +5,7 @@ export class BaseRepository<T> {
   constructor(protected model: Model<T>) {}
 
   async create(item: T): Promise<T> {
-    console.log(item);
     const domain = await this.model.create(item);
-    console.log(domain);
     await domain.save();
     return domain.toObject() as T;
   }
@@ -16,8 +14,12 @@ export class BaseRepository<T> {
     return await this.model.find();
   }
 
-  async getById(id: string) {
+  async getById(id: string): Promise<T> {
     return await this.model.findById(id);
+  }
+
+  async getByFilter(filtro: object) {
+    return await this.model.findOne(filtro);
   }
 
   async delete(id: string) {

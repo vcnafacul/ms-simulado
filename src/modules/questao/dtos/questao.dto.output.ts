@@ -1,10 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Alternativa } from 'src/enums/alternativa.enum';
-import { Caderno } from 'src/enums/caderno.enum';
-import { EnemArea } from 'src/enums/enem-area.enum';
 import { Exame } from 'src/modules/exame/exame.schema';
 import { Frente } from 'src/modules/frente/frente.schema';
 import { Materia } from 'src/modules/materia/materia.schema';
+import { Caderno } from '../enums/caderno.enum';
+import { EnemArea } from '../enums/enem-area.enum';
+import { Alternativa } from '../enums/alternativa.enum';
 
 export class QuestaoDTOOutput {
   @ApiProperty()

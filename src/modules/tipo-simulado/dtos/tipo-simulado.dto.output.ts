@@ -2,6 +2,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import { RegraDTO } from './regra.dto';
 
 export class TipoSimuladoDTOOutput {
+  @ApiProperty()
+  public _id: string;
+
   @ApiProperty() // precisa criar um decorator pra validar que o nome é unico
   public nome: string;
 

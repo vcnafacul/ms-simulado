@@ -36,8 +36,8 @@ export class QuestaoService {
     await this.repository.delete(id);
   }
 
-  public async GetManyByRules(tipo: TipoSimulado): Promise<string[]> {
-    let questoes: string[] = [];
+  public async GetManyByRules(tipo: TipoSimulado): Promise<Questao[]> {
+    let questoes: Questao[] = [];
     if (tipo) {
       await Promise.all(
         tipo.regras.map(async (regra) => {
@@ -61,7 +61,7 @@ export class QuestaoService {
           `Questoes Totais Requeridas: ${tipo.quantidadeTotalQuestao}`,
       );
     }
-    await this.repository.IncrementaSimulado(questoes);
+    await this.repository.IncrementaSimulado(questoes.map((q) => q._id));
     return questoes;
   }
 

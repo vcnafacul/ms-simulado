@@ -16,16 +16,16 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       .populate(['exame', 'frente1', 'frente2', 'frente3', 'materia']);
   }
 
-  async getQuestaoByFiltro(filtro: object, quant: number): Promise<string[]> {
+  async getQuestaoByFiltro(filtro: object, quant: number): Promise<Questao[]> {
     const questoes = await this.model
       .find(filtro)
       .exists('imageId', true)
       .select('_id')
       .sort({ quantidadeSimulado: 1 })
       .limit(quant)
-      .exec(); // Executar a query
+      .exec();
 
-    return questoes.map((questao) => questao._id.toString()); // Converter para array de strings
+    return questoes;
   }
 
   async IncrementaSimulado(questoesId: string[]) {

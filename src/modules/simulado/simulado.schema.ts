@@ -1,8 +1,8 @@
-import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { Questao } from "../questao/questao.schema";
-import { TipoSimulado } from "../tipo-simulado/schemas/tipo-simulado.schema";
-import { BaseSchema } from "src/shared/base/base.schema";
-import { Types } from "mongoose";
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Questao } from '../questao/questao.schema';
+import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
+import { BaseSchema } from 'src/shared/base/base.schema';
+import { Types } from 'mongoose';
 
 @Schema()
 export class Simulado extends BaseSchema {
@@ -18,14 +18,14 @@ export class Simulado extends BaseSchema {
   @Prop({ ref: Questao.name, type: Types.Array })
   questoes: Questao[];
 
-  @Prop()
-  aproveitamento: number;
+  @Prop({ required: false, default: 0 })
+  aproveitamento?: number;
 
-  @Prop()
-  vezesRespondido: number;
+  @Prop({ required: false, default: 0 })
+  vezesRespondido?: number;
 
-  @Prop()
-  bloqueado: boolean;
+  @Prop({ required: false, default: false })
+  bloqueado?: boolean;
 }
 
 export const SimuladoSchema = SchemaFactory.createForClass(Simulado);
