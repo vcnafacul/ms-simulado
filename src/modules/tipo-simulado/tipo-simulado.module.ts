@@ -11,7 +11,8 @@ import { TipoSimuladoSchema } from './schemas/tipo-simulado.schema';
       { name: 'TipoSimulado', schema: TipoSimuladoSchema },
     ]),
   ],
-  providers: [TipoSimuladoService],
-  controllers: [TipoSimuladoController, TipoSimuladoRepository],
+  providers: [TipoSimuladoService, TipoSimuladoRepository],
+  controllers: [TipoSimuladoController],
+  exports: [TipoSimuladoRepository],
 })
 export class TipoSimuladoModule {}

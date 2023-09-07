@@ -9,7 +9,7 @@ import { MateriaRepository } from './materia.repository';
   imports: [
     MongooseModule.forFeature([{ name: 'Materia', schema: MateriaSchema }]),
   ],
-  providers: [MateriaService],
-  controllers: [MateriaController, MateriaRepository],
+  providers: [MateriaService, MateriaRepository],
+  controllers: [MateriaController],
 })
 export class MateriaModule {}

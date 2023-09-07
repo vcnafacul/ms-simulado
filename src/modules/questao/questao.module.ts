@@ -9,7 +9,8 @@ import { MongooseModule } from '@nestjs/mongoose';
   imports: [
     MongooseModule.forFeature([{ name: 'Questao', schema: QuestaoSchema }]),
   ],
-  providers: [QuestaoService],
-  controllers: [QuestaoController, QuestaoRepository],
+  providers: [QuestaoService, QuestaoRepository],
+  controllers: [QuestaoController],
+  exports: [QuestaoService, QuestaoRepository],
 })
 export class QuestaoModule {}
