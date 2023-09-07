@@ -2,7 +2,9 @@ import { Body, Controller, Get, Param, Post, Delete } from '@nestjs/common';
 import { FrenteService } from './frente.service';
 import { FrenteDTOOutput } from './dtos/frente.dto.output';
 import { CreateFrenteDTOInput } from './dtos/create.dto.input';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Frente')
 @Controller('v1/frente')
 export class FrenteController {
   constructor(private readonly service: FrenteService) {}

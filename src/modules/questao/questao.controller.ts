@@ -2,7 +2,9 @@ import { Body, Controller, Get, Param, Post, Delete } from '@nestjs/common';
 import { QuestaoService } from './questao.service';
 import { QuestaoDTOOutput } from './dtos/questao.dto.output';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Questao')
 @Controller('v1/questao')
 export class QuestaoController {
   constructor(private readonly service: QuestaoService) {}

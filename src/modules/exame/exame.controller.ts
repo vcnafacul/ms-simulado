@@ -1,7 +1,9 @@
 import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
 import { ExameService } from './exame.service';
 import { ExameDto } from './dtos/exame.dto';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Exame')
 @Controller('v1/exame')
 export class ExameController {
   constructor(private readonly service: ExameService) {}
