@@ -1,18 +1,17 @@
-import { ApiProperty } from "@nestjs/swagger"
-import { RespostaRelatorio } from "src/models/resposta-relatorio.model"
-import { Simulado } from "src/models/simulado.model"
-
+import { ApiProperty } from '@nestjs/swagger';
+import { RespostaRelatorio } from 'src/models/resposta-relatorio.model';
+import { Simulado } from 'src/modules/simulado/simulado.schema';
 
 export class RelatorioSimuladoDto {
   @ApiProperty()
-  estudante: number
+  estudante: number;
 
   @ApiProperty()
-  simulado: Simulado
+  simulado: Simulado;
 
   @ApiProperty()
-  respostas: RespostaRelatorio[]
+  respostas: RespostaRelatorio[];
 
   @ApiProperty()
-  aproveitamento: number
+  aproveitamento: number;
 }
