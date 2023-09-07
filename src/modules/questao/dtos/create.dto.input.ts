@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Alternativa } from 'src/enums/alternativa.enum';
-import { Caderno } from 'src/enums/caderno.enum';
-import { EnemArea } from 'src/enums/enem-area.enum';
+import { Caderno } from '../enums/caderno.enum';
+import { EnemArea } from '../enums/enem-area.enum';
+import { Alternativa } from '../enums/alternativa.enum';
 
 export class CreateQuestaoDTOInput {
   @ApiProperty()
@@ -32,22 +32,22 @@ export class CreateQuestaoDTOInput {
   public numero: number;
 
   @ApiProperty({ required: false })
-  public textoQuestao: string;
+  public textoQuestao?: string;
 
-  @ApiProperty()
-  public textoAlternativaA: string;
+  @ApiProperty({ required: false })
+  public textoAlternativaA?: string;
 
-  @ApiProperty()
-  public textoAlternativaB: string;
+  @ApiProperty({ required: false })
+  public textoAlternativaB?: string;
 
-  @ApiProperty()
-  public textoAlternativaC: string;
+  @ApiProperty({ required: false })
+  public textoAlternativaC?: string;
 
-  @ApiProperty()
-  public textoAlternativaD: string;
+  @ApiProperty({ required: false })
+  public textoAlternativaD?: string;
 
-  @ApiProperty()
-  public textoAlternativaE: string;
+  @ApiProperty({ required: false })
+  public textoAlternativaE?: string;
 
   @ApiProperty()
   public alternativa: Alternativa;
