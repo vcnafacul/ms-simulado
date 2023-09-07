@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Delete } from '@nestjs/common';
 import { SimuladoService } from './simulado.service';
 import { Simulado } from './simulado.schema';
 import { ApiTags } from '@nestjs/swagger';
+import { CreateSimuladoDTOInput } from './dtos/create.dto.input';
 
 @ApiTags('Simulado')
 @Controller('v1/simulado')
@@ -14,8 +15,8 @@ export class SimuladoController {
   }
 
   @Post()
-  public async post(@Body() idTipo: string): Promise<Simulado> {
-    return await this.service.add(idTipo);
+  public async post(@Body() dto: CreateSimuladoDTOInput): Promise<Simulado> {
+    return await this.service.add(dto);
   }
 
   @Get('toanswer/:id')

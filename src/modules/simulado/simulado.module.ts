@@ -9,6 +9,7 @@ import { QuestaoService } from '../questao/questao.service';
 import { TipoSimuladoSchema } from '../tipo-simulado/schemas/tipo-simulado.schema';
 import { QuestaoRepository } from '../questao/questao.repository';
 import { QuestaoSchema } from '../questao/questao.schema';
+import { TipoSimuladoExistValidator } from '../tipo-simulado/validator/tipo-simulado-exist.validator';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { QuestaoSchema } from '../questao/questao.schema';
     TipoSimuladoRepository,
     QuestaoService,
     QuestaoRepository,
+    TipoSimuladoExistValidator,
   ],
 })
 export class SimuladoModule {}

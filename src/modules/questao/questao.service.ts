@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { QuestaoRepository } from './questao.repository';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
 import { Questao } from './questao.schema';
@@ -34,13 +34,13 @@ export class QuestaoService {
     if (tipo) {
       await Promise.all(
         tipo.regras.map(async (regra) => {
-          const q = await this.GetQuestaoByRegras(regra);
-          questoes = questoes.concat(q);
+          questoes = questoes.concat(await this.GetQuestaoByRegras(regra));
         }),
       );
     } else {
-      throw Error(
+      throw new HttpException(
         `Erro ao Buscar Tipo de Simulado. Verifique que o mesmo existe`,
+        HttpStatus.NOT_FOUND,
       );
     }
 
@@ -48,10 +48,11 @@ export class QuestaoService {
       questoes.length == 0 ||
       tipo!.quantidadeTotalQuestao > questoes.length
     ) {
-      throw Error(
+      throw new HttpException(
         `Não foi possível buscar o numero de questoes determinadas. ` +
           `Questoes Selecionada: ${questoes.length} - ` +
           `Questoes Totais Requeridas: ${tipo.quantidadeTotalQuestao}`,
+        HttpStatus.NOT_FOUND,
       );
     }
     await this.repository.IncrementaSimulado(questoes.map((q) => q._id));
@@ -68,8 +69,8 @@ export class QuestaoService {
 
   private MontaFiltro(regra: Regra) {
     const regras: { [key: string]: any } = {};
-    regras['materia'] = regra.materia._id.toString();
-    if (regra.frente) regras['frente1'] = regra.frente._id.toString();
+    regras['materia'] = regra.materia._id;
+    if (regra.frente) regras['frente1'] = regra.frente._id;
     if (regra.ano) regras['ano'] = regra.ano;
     if (regra.caderno) regras['ano'] = regra.caderno;
     return regras;

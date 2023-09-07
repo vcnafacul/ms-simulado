@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { SimuladoRepository } from './simulado.repository';
 import { QuestaoService } from '../questao/questao.service';
 import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
@@ -9,6 +9,7 @@ import { EnemArea } from '../questao/enums/enem-area.enum';
 import { toPascalCaseSemAcentos } from 'src/utils/string';
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
 import { Caderno } from '../questao/enums/caderno.enum';
+import { CreateSimuladoDTOInput } from './dtos/create.dto.input';
 
 @Injectable()
 export class SimuladoService {
@@ -18,16 +19,16 @@ export class SimuladoService {
     private readonly questaoService: QuestaoService,
   ) {}
 
-  public async add(idTipo: string): Promise<Simulado> {
+  public async add(dto: CreateSimuladoDTOInput): Promise<Simulado> {
     const oldSimulado = await this.repository.getByFilter({
-      tipo: idTipo,
+      tipo: dto.tipoId,
       bloqueado: false,
     });
     if (!!oldSimulado) {
       oldSimulado.bloqueado = true;
       oldSimulado.save();
     }
-    const tipo = await this.tipoSimuladoRepository.getById(idTipo);
+    const tipo = await this.tipoSimuladoRepository.getById(dto.tipoId);
     const questoes = await this.questaoService.GetManyByRules(
       tipo as TipoSimulado,
     );
