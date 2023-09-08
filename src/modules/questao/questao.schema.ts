@@ -8,6 +8,7 @@ import { Types } from 'mongoose';
 import { Status } from './enums/status.enum';
 import { ApiProperty } from '@nestjs/swagger';
 import { Caderno } from './enums/caderno.enum';
+import { Alternativa } from './enums/alternativa.enum';
 
 @Schema({ timestamps: true, versionKey: false })
 export class Questao extends BaseSchema {
@@ -72,7 +73,7 @@ export class Questao extends BaseSchema {
   public textoAlternativaE: string;
 
   @Prop({ select: false })
-  public alternativa: string;
+  public alternativa: Alternativa;
 
   @Prop()
   @ApiProperty()
