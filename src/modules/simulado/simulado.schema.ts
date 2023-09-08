@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Questao, QuestaoSchema } from '../questao/questao.schema';
+import { Questao } from '../questao/questao.schema';
 import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
 import { BaseSchema } from 'src/shared/base/base.schema';
 import { Types } from 'mongoose';
@@ -21,8 +21,7 @@ export class Simulado extends BaseSchema {
 
   @Prop({
     ref: Questao.name,
-    type: Types.ArraySubdocument,
-    schema: QuestaoSchema,
+    type: [Types.ObjectId],
   })
   @ApiProperty({ type: Questao, isArray: true })
   questoes: Questao[];

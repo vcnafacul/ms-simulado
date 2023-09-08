@@ -10,17 +10,15 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
     super(model);
   }
 
-  override async getById(
-    id: string,
-    bloqueado?: boolean,
-  ): Promise<Simulado | null> {
+  async getById(id: string): Promise<Simulado | null> {
     return await this.model
-      .findOne({ id, bloqueado })
-      .populate(['tipo', 'questoes'])
+      .findById(id)
+      .populate('tipo')
       .populate({
         path: 'questoes',
         populate: ['frente1', 'frente2', 'frente3', 'materia'],
-      });
+      })
+      .exec();
   }
 
   override async delete(id: string) {
