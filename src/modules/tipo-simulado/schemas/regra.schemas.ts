@@ -1,4 +1,5 @@
 import { Prop } from '@nestjs/mongoose';
+import { ApiProperty } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { Frente } from 'src/modules/frente/frente.schema';
 import { Materia } from 'src/modules/materia/materia.schema';
@@ -9,9 +10,11 @@ export class Regra {
     ref: Materia.name,
     required: true,
   })
-  materia: Types.ObjectId;
+  @ApiProperty()
+  materia: Materia;
 
   @Prop({ required: true })
+  @ApiProperty()
   quantidade: number;
 
   @Prop({
@@ -19,11 +22,14 @@ export class Regra {
     ref: Frente.name,
     required: false,
   })
-  frente?: Types.ObjectId;
+  @ApiProperty()
+  frente?: Frente;
 
   @Prop({ required: false })
+  @ApiProperty()
   ano?: number;
 
   @Prop({ required: false })
+  @ApiProperty()
   caderno?: number;
 }

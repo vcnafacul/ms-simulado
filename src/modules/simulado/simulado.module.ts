@@ -2,21 +2,24 @@ import { Module } from '@nestjs/common';
 import { SimuladoService } from './simulado.service';
 import { SimuladoController } from './simulado.controller';
 import { MongooseModule } from '@nestjs/mongoose';
-import { SimuladoSchema } from './simulado.schema';
+import { Simulado, SimuladoSchema } from './simulado.schema';
 import { SimuladoRepository } from './simulado.repository';
 import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
 import { QuestaoService } from '../questao/questao.service';
-import { TipoSimuladoSchema } from '../tipo-simulado/schemas/tipo-simulado.schema';
+import {
+  TipoSimulado,
+  TipoSimuladoSchema,
+} from '../tipo-simulado/schemas/tipo-simulado.schema';
 import { QuestaoRepository } from '../questao/questao.repository';
-import { QuestaoSchema } from '../questao/questao.schema';
+import { Questao, QuestaoSchema } from '../questao/questao.schema';
 import { TipoSimuladoExistValidator } from '../tipo-simulado/validator/tipo-simulado-exist.validator';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
-      { name: 'Simulado', schema: SimuladoSchema },
-      { name: 'TipoSimulado', schema: TipoSimuladoSchema },
-      { name: 'Questao', schema: QuestaoSchema },
+      { name: Simulado.name, schema: SimuladoSchema },
+      { name: TipoSimulado.name, schema: TipoSimuladoSchema },
+      { name: Questao.name, schema: QuestaoSchema },
     ]),
   ],
   controllers: [SimuladoController],

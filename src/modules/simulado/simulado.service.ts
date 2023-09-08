@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { SimuladoRepository } from './simulado.repository';
 import { QuestaoService } from '../questao/questao.service';
 import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
@@ -42,24 +42,27 @@ export class SimuladoService {
   }
 
   public async getDefaults() {
-    const tipoDefaults: string[] = Object.keys(EnemArea);
+    const tipoDefaults: string[] = Object.values(EnemArea);
     const result: { [key: string]: string } = {};
     await Promise.all(
       tipoDefaults.map(async (tipoNome) => {
+        console.log(new RegExp(tipoNome, 'i'));
         const tipo = await this.tipoSimuladoRepository.getByFilter({
           nome: new RegExp(tipoNome, 'i'),
         });
-        /* .select('_id'); */
-        const simulado = await this.repository.getByFilter({
-          tipo: tipo._id.toString() || '',
-          bloqueado: false,
-        });
-
-        if (simulado) {
-          const key = toPascalCaseSemAcentos(
-            simulado?.descricao.replace('Simulado de', ''),
-          );
-          result[key] = simulado._id;
+        console.log(tipo._id);
+        if (tipo) {
+          const simulado = await this.repository.getByFilter({
+            tipo: tipo._id || '',
+            bloqueado: false,
+          });
+          console.log(simulado);
+          if (simulado) {
+            const key = toPascalCaseSemAcentos(
+              simulado?.descricao.replace('Simulado de', ''),
+            );
+            result[key] = simulado._id;
+          }
         }
       }),
     );
@@ -84,6 +87,7 @@ export class SimuladoService {
     try {
       return await this.GetNewSimulado(simuladoId);
     } catch (error) {
+      console.log(error);
       return null;
     }
   }
@@ -98,7 +102,8 @@ export class SimuladoService {
     id: string,
     inicio: Date,
   ): Promise<SimuladoAnswerDTOOutput> {
-    const simulado = await this.repository.getById(id, false);
+    const simulado = await this.repository.getById(id);
+    console.log(simulado);
     return !simulado
       ? null
       : {

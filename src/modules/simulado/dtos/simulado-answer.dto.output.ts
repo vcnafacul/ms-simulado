@@ -8,7 +8,7 @@ export class SimuladoAnswerDTOOutput {
   @ApiProperty()
   tipo: string;
 
-  @ApiProperty()
+  @ApiProperty({ type: QuestaoAnswerDTOOutput, isArray: true })
   questoes: QuestaoAnswerDTOOutput[];
 
   @ApiProperty()

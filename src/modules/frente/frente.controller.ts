@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Delete } from '@nestjs/common';
 import { FrenteService } from './frente.service';
 import { CreateFrenteDTOInput } from './dtos/create.dto.input';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Frente } from './frente.schema';
 
 @ApiTags('Frente')
@@ -10,16 +10,34 @@ export class FrenteController {
   constructor(private readonly service: FrenteService) {}
 
   @Get()
+  @ApiResponse({
+    status: 200,
+    description: 'lista de exames cadastrados e validos',
+    type: Frente,
+    isArray: true,
+  })
   public async getAll(): Promise<Frente[]> {
     return await this.service.getAll();
   }
 
   @Post()
+  @ApiResponse({
+    status: 200,
+    description: 'lista de exames cadastrados e validos',
+    type: Frente,
+    isArray: false,
+  })
   public async post(@Body() model: CreateFrenteDTOInput): Promise<Frente> {
     return await this.service.add(model);
   }
 
   @Get(':id')
+  @ApiResponse({
+    status: 200,
+    description: 'lista de exames cadastrados e validos',
+    type: Frente,
+    isArray: false,
+  })
   public async getById(@Param('id') id: string): Promise<Frente> {
     return await this.service.getById(id);
   }
