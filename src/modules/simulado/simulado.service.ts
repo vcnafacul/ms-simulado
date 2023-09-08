@@ -46,17 +46,14 @@ export class SimuladoService {
     const result: { [key: string]: string } = {};
     await Promise.all(
       tipoDefaults.map(async (tipoNome) => {
-        console.log(new RegExp(tipoNome, 'i'));
         const tipo = await this.tipoSimuladoRepository.getByFilter({
           nome: new RegExp(tipoNome, 'i'),
         });
-        console.log(tipo._id);
         if (tipo) {
           const simulado = await this.repository.getByFilter({
             tipo: tipo._id || '',
             bloqueado: false,
           });
-          console.log(simulado);
           if (simulado) {
             const key = toPascalCaseSemAcentos(
               simulado?.descricao.replace('Simulado de', ''),
@@ -87,7 +84,6 @@ export class SimuladoService {
     try {
       return await this.GetNewSimulado(simuladoId);
     } catch (error) {
-      console.log(error);
       return null;
     }
   }
@@ -103,7 +99,6 @@ export class SimuladoService {
     inicio: Date,
   ): Promise<SimuladoAnswerDTOOutput> {
     const simulado = await this.repository.getById(id);
-    console.log(simulado);
     return !simulado
       ? null
       : {
