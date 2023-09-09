@@ -10,6 +10,7 @@ import { toPascalCaseSemAcentos } from 'src/utils/string';
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
 import { Caderno } from '../questao/enums/caderno.enum';
 import { CreateSimuladoDTOInput } from './dtos/create.dto.input';
+import { AnswerSimulado } from './dtos/answer-simulado.dto.input';
 
 @Injectable()
 export class SimuladoService {
@@ -86,6 +87,22 @@ export class SimuladoService {
     } catch (error) {
       return null;
     }
+  }
+
+  public async answer(answer: AnswerSimulado) {
+    const simulado = await this.repository.answer(answer.idSimulado);
+
+    const relatorio = simulado?.questoes.map((questao) => {
+      const resposta = answer.respostas.find(
+        (r) => r.questao === questao._id.toString(),
+      );
+      return {
+        questao: questao._id,
+        respostaEstudante: resposta?.alternativaEstudante,
+        alternativaCorreta: questao.alternativa,
+      };
+    });
+    console.log(relatorio);
   }
 
   private async GetNewSimulado(id: string) {

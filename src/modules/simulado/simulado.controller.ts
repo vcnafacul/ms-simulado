@@ -4,6 +4,7 @@ import { Simulado } from './simulado.schema';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CreateSimuladoDTOInput } from './dtos/create.dto.input';
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
+import { AnswerSimulado } from './dtos/answer-simulado.dto.input';
 
 @ApiTags('Simulado')
 @Controller('v1/simulado')
@@ -41,6 +42,11 @@ export class SimuladoController {
   })
   public async getToAnswer(@Param('id') id: string) {
     return await this.service.getToAnswer(id);
+  }
+
+  @Post('answer')
+  public async answer(@Body() answer: AnswerSimulado) {
+    return await this.service.answer(answer);
   }
 
   @Get('default')

@@ -30,4 +30,11 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
       throw new NotFoundException(`Registro com ID ${id} não encontrado.`);
     }
   }
+
+  async answer(id: string) {
+    return await this.model
+      .findById(id)
+      .populate({ path: 'questoes', select: 'alternativa' })
+      .exec();
+  }
 }
