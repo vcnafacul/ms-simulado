@@ -4,6 +4,7 @@ import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
 import { Questao } from './questao.schema';
 import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
 import { Regra } from '../tipo-simulado/schemas/regra.schemas';
+import { ReportDTO } from './dtos/report.dto.input';
 
 @Injectable()
 export class QuestaoService {
@@ -42,9 +43,12 @@ export class QuestaoService {
         await this.getQuestoes(tipo.quantidadeTotalQuestao - questoes.length),
       );
     }
-    console.log(questoes);
     await this.repository.IncrementaSimulado(questoes.map((q) => q._id));
     return questoes;
+  }
+
+  public async report(reportDTO: ReportDTO) {
+    console.log(reportDTO);
   }
 
   private async getQuestaoByRegras(regra: Regra) {
@@ -53,7 +57,6 @@ export class QuestaoService {
   }
 
   private async getQuestoes(amount: number) {
-    console.log(amount);
     return await this.getQuestoesByFiltro({}, amount);
   }
 

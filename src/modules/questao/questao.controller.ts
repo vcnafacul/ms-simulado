@@ -3,6 +3,7 @@ import { QuestaoService } from './questao.service';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Questao } from './questao.schema';
+import { ReportDTO } from './dtos/report.dto.input';
 /* import { Questao } from './questao.schema'; */
 
 @ApiTags('Questao')
@@ -46,5 +47,10 @@ export class QuestaoController {
   @Delete(':id')
   public async delete(@Param('id') id: string): Promise<void> {
     return await this.service.delete(id);
+  }
+
+  @Post('report')
+  public async report(@Body() reportDTO: ReportDTO) {
+    await this.service.report(reportDTO);
   }
 }
