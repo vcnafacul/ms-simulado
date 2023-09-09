@@ -46,7 +46,7 @@ export class SimuladoController {
 
   @Post('answer')
   public async answer(@Body() answer: AnswerSimulado) {
-    return await this.service.answer(answer);
+    await this.service.answer(answer);
   }
 
   @Get('default')
