@@ -29,42 +29,48 @@ export class QuestaoService {
     await this.repository.delete(id);
   }
 
-  public async GetManyByRules(tipo: TipoSimulado): Promise<Questao[]> {
+  public async GeyManyQuestao(tipo: TipoSimulado): Promise<Questao[]> {
     let questoes: Questao[] = [];
-    if (tipo) {
-      await Promise.all(
-        tipo.regras.map(async (regra) => {
-          questoes = questoes.concat(await this.GetQuestaoByRegras(regra));
-        }),
-      );
-    } else {
-      throw new HttpException(
-        `Erro ao Buscar Tipo de Simulado. Verifique que o mesmo existe`,
-        HttpStatus.NOT_FOUND,
-      );
-    }
+    await Promise.all(
+      tipo.regras.map(async (regra) => {
+        questoes = questoes.concat(await this.getQuestaoByRegras(regra));
+      }),
+    );
 
-    if (
-      questoes.length == 0 ||
-      tipo!.quantidadeTotalQuestao > questoes.length
-    ) {
-      throw new HttpException(
-        `Não foi possível buscar o numero de questoes determinadas. ` +
-          `Questoes Selecionada: ${questoes.length} - ` +
-          `Questoes Totais Requeridas: ${tipo.quantidadeTotalQuestao}`,
-        HttpStatus.NOT_FOUND,
+    if (tipo.quantidadeTotalQuestao > questoes.length) {
+      questoes = questoes.concat(
+        await this.getQuestoes(tipo.quantidadeTotalQuestao - questoes.length),
       );
     }
+    console.log(questoes);
     await this.repository.IncrementaSimulado(questoes.map((q) => q._id));
     return questoes;
   }
 
-  private async GetQuestaoByRegras(regra: Regra) {
+  private async getQuestaoByRegras(regra: Regra) {
     const regras = this.MontaFiltro(regra);
-    return await this.repository.getQuestaoByFiltro(
-      regras,
-      regra.quantidade as number,
-    );
+    return await this.getQuestoesByFiltro(regras, regra.quantidade as number);
+  }
+
+  private async getQuestoes(amount: number) {
+    console.log(amount);
+    return await this.getQuestoesByFiltro({}, amount);
+  }
+
+  private async getQuestoesByFiltro(
+    regras: { [key: string]: any },
+    amount: number,
+  ) {
+    const questoes = await this.repository.getQuestaoByFiltro(regras, amount);
+    if (questoes.length != amount) {
+      throw new HttpException(
+        `Não foi possível buscar o numero de questoes determinadas. ` +
+          `Questoes Selecionada: ${questoes.length} - ` +
+          `Questoes Totais Requeridas: ${amount}`,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    return questoes;
   }
 
   private MontaFiltro(regra: Regra) {

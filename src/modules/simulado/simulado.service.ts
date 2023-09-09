@@ -29,7 +29,7 @@ export class SimuladoService {
       oldSimulado.save();
     }
     const tipo = await this.tipoSimuladoRepository.getById(dto.tipoId);
-    const questoes = await this.questaoService.GetManyByRules(
+    const questoes = await this.questaoService.GeyManyQuestao(
       tipo as TipoSimulado,
     );
     const simulado = await this.repository.create({
