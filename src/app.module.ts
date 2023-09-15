@@ -1,8 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { AllSchemas } from './schemas/_index';
-
+import { ExameModule } from './modules/exame/exame.module';
+import { FrenteModule } from './modules/frente/frente.module';
+import { MateriaModule } from './modules/materia/materia.module';
+import { QuestaoModule } from './modules/questao/questao.module';
+import { TipoSimuladoModule } from './modules/tipo-simulado/tipo-simulado.module';
+import { SimuladoModule } from './modules/simulado/simulado.module';
 
 @Module({
   imports: [
@@ -10,9 +14,13 @@ import { AllSchemas } from './schemas/_index';
       isGlobal: true,
     }),
     MongooseModule.forRoot(process.env.MONGODB),
-    MongooseModule.forFeature(AllSchemas),
+    ExameModule,
+    FrenteModule,
+    MateriaModule,
+    QuestaoModule,
+    TipoSimuladoModule,
+    SimuladoModule,
   ],
-  controllers: [],
   providers: [],
 })
 export class AppModule {}

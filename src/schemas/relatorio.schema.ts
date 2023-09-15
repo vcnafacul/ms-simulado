@@ -1,40 +1,45 @@
 import * as mongoose from 'mongoose';
-import { Alternativa } from 'src/enums/alternativa.enum';
+import { Alternativa } from 'src/modules/questao/enums/alternativa.enum';
 
-export const RelatorioSchema = new mongoose.Schema({
+export const RelatorioSchema = new mongoose.Schema(
+  {
     estudante: {
-        type: Number,
-        require: true
+      type: Number,
+      require: true,
     },
     simulado: {
-        type: mongoose.Schema.Types.ObjectId,
-        require: true,
-        ref: 'Simulado'
+      type: mongoose.Schema.Types.ObjectId,
+      require: true,
+      ref: 'Simulado',
     },
-    respostas: [{
+    respostas: [
+      {
         questao: {
-            type: mongoose.Schema.Types.ObjectId,
-            require: true,
-            ref: 'Questao'
+          type: mongoose.Schema.Types.ObjectId,
+          require: true,
+          ref: 'Questao',
         },
         respostaEstudante: {
-            type: String,
-            enum: Alternativa,
-            required: true
+          type: String,
+          enum: Alternativa,
+          required: true,
         },
         alternativaCorreta: {
-            type: String,
-            enum: Alternativa,
-            required: true
+          type: String,
+          enum: Alternativa,
+          required: true,
         },
-        _id : false
-    }],
+        _id: false,
+      },
+    ],
     aproveitamento: {
-        type: Number,
-        require: false,
-        default: 0
-    }
-},{
+      type: Number,
+      require: false,
+      default: 0,
+    },
+  },
+  {
     timestamps: true,
-    versionKey: false
-});
+    versionKey: false,
+  },
+);
