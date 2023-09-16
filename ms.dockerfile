@@ -10,4 +10,4 @@ ENV NODE_ENV=$NODE_ENV
 
 RUN yarn
 
-CMD ./node_modules/pm2/bin/pm2-runtime src/server.js --name msSimulado
+CMD ./node_modules/pm2/bin/pm2-runtime src/main.js --name msSimulado
