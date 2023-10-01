@@ -3,6 +3,7 @@ import { BaseRepository } from 'src/shared/base/base.repository';
 import { Questao } from './questao.schema';
 import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
+import { Status } from './enums/status.enum';
 
 @Injectable()
 export class QuestaoRepository extends BaseRepository<Questao> {
@@ -10,11 +11,16 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     super(model);
   }
 
-  override async getAll() {
-    return await this.model
+  override async getAll(status?: Status) {
+    const query = this.model
       .find()
       .select('+alternativa')
       .populate(['exame', 'frente1', 'frente2', 'frente3', 'materia']);
+
+    if (!!status) {
+      query.where({ status: status });
+    }
+    return await query;
   }
 
   override async getById(id: string) {
