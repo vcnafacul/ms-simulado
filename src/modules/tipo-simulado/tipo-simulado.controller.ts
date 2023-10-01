@@ -5,7 +5,7 @@ import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { TipoSimulado } from './schemas/tipo-simulado.schema';
 
 @ApiTags('Tipo Simulado')
-@Controller('tipo-simulado')
+@Controller('v1/tipo-simulado')
 export class TipoSimuladoController {
   constructor(private readonly service: TipoSimuladoService) {}
 
