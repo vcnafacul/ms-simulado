@@ -5,6 +5,7 @@ import { Questao } from './questao.schema';
 import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
 import { Regra } from '../tipo-simulado/schemas/regra.schemas';
 import { ReportDTO } from './dtos/report.dto.input';
+import { Status } from './enums/status.enum';
 
 @Injectable()
 export class QuestaoService {
@@ -21,8 +22,8 @@ export class QuestaoService {
     return questao;
   }
 
-  public async getAll(): Promise<Questao[]> {
-    const questoes = await this.repository.getAll();
+  public async getAll(status?: Status): Promise<Questao[]> {
+    const questoes = await this.repository.getAll(status);
     return questoes;
   }
 

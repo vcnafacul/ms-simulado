@@ -4,6 +4,7 @@ import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Questao } from './questao.schema';
 import { ReportDTO } from './dtos/report.dto.input';
+import { Status } from './enums/status.enum';
 /* import { Questao } from './questao.schema'; */
 
 @ApiTags('Questao')
@@ -11,15 +12,15 @@ import { ReportDTO } from './dtos/report.dto.input';
 export class QuestaoController {
   constructor(private readonly service: QuestaoService) {}
 
-  @Get()
+  @Get(':status')
   @ApiResponse({
     status: 200,
     description: 'exame cadastrados e valido',
     type: Questao,
     isArray: true,
   })
-  public async getAll(): Promise<Questao[]> {
-    return await this.service.getAll();
+  public async getAll(@Param('status') status: Status): Promise<Questao[]> {
+    return await this.service.getAll(status);
   }
 
   @Post()
