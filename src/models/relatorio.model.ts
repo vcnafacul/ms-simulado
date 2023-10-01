@@ -1,4 +1,4 @@
-import { Simulado } from 'src/modules/simulado/simulado.schema';
+import { Simulado } from 'src/modules/simulado/schemas/simulado.schema';
 import { RespostaRelatorio } from './resposta-relatorio.model';
 
 export class Relatorio {

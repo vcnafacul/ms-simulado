@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Simulado } from './simulado.schema';
+import { Simulado } from '../schemas/simulado.schema';
 import { Model } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
 

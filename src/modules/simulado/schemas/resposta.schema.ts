@@ -1,13 +1,17 @@
+import { Prop } from '@nestjs/mongoose';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsString } from 'class-validator';
 import { Alternativa } from 'src/modules/questao/enums/alternativa.enum';
 
-export class AnswerDTO {
+export class Resposta {
+  @Prop()
   @ApiProperty()
-  @IsString()
   questao: string;
 
+  @Prop()
   @ApiProperty({ enum: Alternativa })
-  @IsEnum(Alternativa)
   alternativaEstudante: Alternativa;
+
+  @Prop()
+  @ApiProperty({ enum: Alternativa })
+  alternativaCorreta: Alternativa;
 }

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Answer } from './answer.dto.input';
+import { AnswerDTO } from './answer.dto.input';
 import { IsArray, IsNumber, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -12,9 +12,9 @@ export class AnswerSimulado {
   @IsString()
   idSimulado: string;
 
-  @ApiProperty({ type: Answer, isArray: true })
+  @ApiProperty({ type: AnswerDTO, isArray: true })
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => Answer)
-  respostas: Answer[];
+  @Type(() => AnswerDTO)
+  respostas: AnswerDTO[];
 }

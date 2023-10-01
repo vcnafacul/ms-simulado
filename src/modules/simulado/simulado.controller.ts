@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post, Delete } from '@nestjs/common';
 import { SimuladoService } from './simulado.service';
-import { Simulado } from './simulado.schema';
+import { Simulado } from './schemas/simulado.schema';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CreateSimuladoDTOInput } from './dtos/create.dto.input';
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
