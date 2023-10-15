@@ -1,22 +1,25 @@
 import { Injectable } from '@nestjs/common';
-import { SimuladoRepository } from './simulado.repository';
+import { SimuladoRepository } from './repository/simulado.repository';
 import { QuestaoService } from '../questao/questao.service';
 import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
 import { getDateNow } from 'src/utils/date';
 import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
-import { Simulado } from './simulado.schema';
+import { Simulado } from './schemas/simulado.schema';
 import { EnemArea } from '../questao/enums/enem-area.enum';
 import { toPascalCaseSemAcentos } from 'src/utils/string';
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
 import { Caderno } from '../questao/enums/caderno.enum';
 import { CreateSimuladoDTOInput } from './dtos/create.dto.input';
 import { AnswerSimulado } from './dtos/answer-simulado.dto.input';
+import { RespostaRepository } from './repository/resposta.repository';
+import { RespostaSimulado } from './schemas/resposta-simulado.schema';
 
 @Injectable()
 export class SimuladoService {
   constructor(
     private readonly repository: SimuladoRepository,
     private readonly tipoSimuladoRepository: TipoSimuladoRepository,
+    private readonly respostaRepository: RespostaRepository,
     private readonly questaoService: QuestaoService,
   ) {}
 
@@ -92,17 +95,22 @@ export class SimuladoService {
   public async answer(answer: AnswerSimulado) {
     const simulado = await this.repository.answer(answer.idSimulado);
 
-    const relatorio = simulado?.questoes.map((questao) => {
+    const respostas = simulado?.questoes.map((questao) => {
       const resposta = answer.respostas.find(
         (r) => r.questao === questao._id.toString(),
       );
       return {
-        questao: questao._id,
-        respostaEstudante: resposta?.alternativaEstudante,
+        questao: questao._id.toString(),
+        alternativaEstudante: resposta?.alternativaEstudante,
         alternativaCorreta: questao.alternativa,
       };
     });
-    console.log(relatorio);
+    const respostaSimulado: RespostaSimulado = {
+      idEstudante: answer.idEstudante,
+      idSimulado: answer.idSimulado,
+      respostas: respostas,
+    };
+    await this.respostaRepository.create(respostaSimulado);
   }
 
   private async GetNewSimulado(id: string) {

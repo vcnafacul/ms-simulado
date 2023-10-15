@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Questao } from '../questao/questao.schema';
-import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
+import { Questao } from '../../questao/questao.schema';
+import { TipoSimulado } from '../../tipo-simulado/schemas/tipo-simulado.schema';
 import { BaseSchema } from 'src/shared/base/base.schema';
 import { Types } from 'mongoose';
 import { ApiProperty } from '@nestjs/swagger';

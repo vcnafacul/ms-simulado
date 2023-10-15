@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { RespostaRelatorio } from 'src/models/resposta-relatorio.model';
-import { Simulado } from 'src/modules/simulado/simulado.schema';
+import { Simulado } from 'src/modules/simulado/schemas/simulado.schema';
 
 export class RelatorioSimuladoDto {
   @ApiProperty()
