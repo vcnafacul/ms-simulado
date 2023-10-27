@@ -6,10 +6,18 @@ import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
 import { Regra } from '../tipo-simulado/schemas/regra.schemas';
 import { ReportDTO } from './dtos/report.dto.input';
 import { Status } from './enums/status.enum';
+import { ExameRepository } from '../exame/exame.repository';
+import { MateriaRepository } from '../materia/materia.repository';
+import { FrenteRepository } from '../frente/frente.repository';
 
 @Injectable()
 export class QuestaoService {
-  constructor(private readonly repository: QuestaoRepository) {}
+  constructor(
+    private readonly repository: QuestaoRepository,
+    private readonly exameRepository: ExameRepository,
+    private readonly materiaRepository: MateriaRepository,
+    private readonly frenteRepository: FrenteRepository,
+  ) {}
 
   public async add(item: CreateQuestaoDTOInput): Promise<Questao> {
     const questao = Object.assign(new Questao(), item);
@@ -50,6 +58,13 @@ export class QuestaoService {
 
   public async report(reportDTO: ReportDTO) {
     console.log(reportDTO);
+  }
+
+  public async getInfos() {
+    const exames = await this.exameRepository.getAll();
+    const materias = await this.materiaRepository.getAll();
+    const frentes = await this.frenteRepository.getAll();
+    return { exames, materias, frentes };
   }
 
   private async getQuestaoByRegras(regra: Regra) {
