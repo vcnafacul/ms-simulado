@@ -12,6 +12,17 @@ import { Status } from './enums/status.enum';
 export class QuestaoController {
   constructor(private readonly service: QuestaoService) {}
 
+  @Get('infos')
+  @ApiResponse({
+    status: 200,
+    description: 'exame cadastrados e valido',
+    type: Questao,
+    isArray: true,
+  })
+  public async getInfos() {
+    return await this.service.getInfos();
+  }
+
   @Get(':status')
   @ApiResponse({
     status: 200,
