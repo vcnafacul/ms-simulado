@@ -9,6 +9,7 @@ import { Status } from './enums/status.enum';
 import { ExameRepository } from '../exame/exame.repository';
 import { MateriaRepository } from '../materia/materia.repository';
 import { FrenteRepository } from '../frente/frente.repository';
+import { UpdateDTOInput } from './dtos/update.dto.input';
 
 @Injectable()
 export class QuestaoService {
@@ -65,6 +66,14 @@ export class QuestaoService {
     const materias = await this.materiaRepository.getAll();
     const frentes = await this.frenteRepository.getAll();
     return { exames, materias, frentes };
+  }
+
+  public async updateStatus(id: string, status: Status) {
+    await this.repository.UpdateStatus(id, status);
+  }
+
+  public async updateQuestion(question: UpdateDTOInput) {
+    await this.repository.updateQuestion(question);
   }
 
   private async getQuestaoByRegras(regra: Regra) {

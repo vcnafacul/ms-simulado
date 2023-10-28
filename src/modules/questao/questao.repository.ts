@@ -4,6 +4,7 @@ import { Questao } from './questao.schema';
 import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { Status } from './enums/status.enum';
+import { UpdateDTOInput } from './dtos/update.dto.input';
 
 @Injectable()
 export class QuestaoRepository extends BaseRepository<Questao> {
@@ -49,5 +50,13 @@ export class QuestaoRepository extends BaseRepository<Questao> {
         $inc: { quantidadeSimulado: 1 },
       },
     );
+  }
+
+  async UpdateStatus(_id: string, status: Status) {
+    await this.model.updateOne({ _id }, { status });
+  }
+
+  async updateQuestion(question: UpdateDTOInput) {
+    await this.model.updateOne({ _id: question.id }, { ...question });
   }
 }

@@ -1,10 +1,19 @@
-import { Body, Controller, Get, Param, Post, Delete } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Delete,
+  Patch,
+} from '@nestjs/common';
 import { QuestaoService } from './questao.service';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Questao } from './questao.schema';
 import { ReportDTO } from './dtos/report.dto.input';
 import { Status } from './enums/status.enum';
+import { UpdateDTOInput } from './dtos/update.dto.input';
 /* import { Questao } from './questao.schema'; */
 
 @ApiTags('Questao')
@@ -64,5 +73,18 @@ export class QuestaoController {
   @Post('report')
   public async report(@Body() reportDTO: ReportDTO) {
     await this.service.report(reportDTO);
+  }
+
+  @Patch(':id/:status')
+  public async updateStatus(
+    @Param('id') id: string,
+    @Param('status') status: Status,
+  ) {
+    await this.service.updateStatus(id, status);
+  }
+
+  @Patch()
+  public async updateQuestion(@Body() question: UpdateDTOInput) {
+    await this.service.updateQuestion(question);
   }
 }
