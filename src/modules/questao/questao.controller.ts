@@ -83,6 +83,12 @@ export class QuestaoController {
   }
 
   @Patch()
+  @ApiResponse({
+    status: 200,
+    description: 'update questao',
+    type: Questao,
+    isArray: false,
+  })
   public async updateQuestion(@Body() question: UpdateDTOInput) {
     await this.service.updateQuestion(question);
   }
