@@ -60,4 +60,7 @@ export class QuestaoDTO {
 
   @ApiProperty()
   public imageId: string;
+
+  @ApiProperty()
+  public edicao: string;
 }

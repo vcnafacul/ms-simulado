@@ -14,7 +14,6 @@ import { Questao } from './questao.schema';
 import { ReportDTO } from './dtos/report.dto.input';
 import { Status } from './enums/status.enum';
 import { UpdateDTOInput } from './dtos/update.dto.input';
-/* import { Questao } from './questao.schema'; */
 
 @ApiTags('Questao')
 @Controller('v1/questao')
@@ -35,7 +34,7 @@ export class QuestaoController {
   @Get(':status')
   @ApiResponse({
     status: 200,
-    description: 'exame cadastrados e valido',
+    description: 'get gestões por status',
     type: Questao,
     isArray: true,
   })
