@@ -12,15 +12,14 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     super(model);
   }
 
-  override async getAll(status?: Status) {
+  override async getAll(status: Status = Status.Pending) {
     const query = this.model
       .find()
       .select('+alternativa')
       .populate(['exame', 'frente1', 'frente2', 'frente3', 'materia']);
 
-    if (!!status) {
-      query.where({ status: status });
-    }
+    query.where({ status: status });
+
     return await query;
   }
 
