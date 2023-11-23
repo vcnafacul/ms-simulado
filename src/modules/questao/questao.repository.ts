@@ -18,7 +18,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       .select('+alternativa')
       .populate(['exame', 'frente1', 'frente2', 'frente3', 'materia']);
 
-    if (!!status) {
+    if (status !== undefined && status !== null) {
       query.where({ status: status });
     }
     return await query;
