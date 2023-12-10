@@ -5,5 +5,5 @@ import { IsString } from 'class-validator';
 export class UpdateDTOInput extends PartialType(CreateQuestaoDTOInput) {
   @IsString()
   @ApiProperty()
-  _id: number;
+  _id: string;
 }
