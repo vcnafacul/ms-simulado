@@ -1,23 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Caderno } from '../enums/caderno.enum';
 import { EnemArea } from '../enums/enem-area.enum';
 import { Alternativa } from '../enums/alternativa.enum';
-import { Exame } from 'src/modules/exame/exame.schema';
 import { Frente } from 'src/modules/frente/frente.schema';
 import { Materia } from 'src/modules/materia/materia.schema';
+import { Prova } from 'src/modules/prova/prova.schema';
 
 export class QuestaoDTO {
   @ApiProperty()
   public _id?: string;
-
-  @ApiProperty()
-  exame: Exame;
-
-  @ApiProperty()
-  public ano: number;
-
-  @ApiProperty()
-  public caderno: Caderno;
 
   @ApiProperty()
   public enemArea: EnemArea;
@@ -62,5 +52,5 @@ export class QuestaoDTO {
   public imageId: string;
 
   @ApiProperty()
-  public edicao: string;
+  public prova: Prova;
 }

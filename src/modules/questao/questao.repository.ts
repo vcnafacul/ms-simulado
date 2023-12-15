@@ -24,7 +24,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     return await this.model
       .findById(id)
       .select('+alternativa')
-      .populate(['exame', 'frente1', 'frente2', 'frente3', 'materia']);
+      .populate(['frente1', 'frente2', 'frente3', 'materia', 'prova']);
   }
 
   async getQuestaoByFiltro(filtro: object, quant: number): Promise<Questao[]> {

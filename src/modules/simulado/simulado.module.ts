@@ -24,6 +24,8 @@ import { FrenteRepository } from '../frente/frente.repository';
 import { Exame, ExameSchema } from '../exame/exame.schema';
 import { Frente, FrenteSchema } from '../frente/frente.schema';
 import { Materia, MateriaSchema } from '../materia/materia.schema';
+import { ProvaRepository } from '../prova/prova.repository';
+import { Prova, ProvaSchema } from '../prova/prova.schema';
 
 @Module({
   imports: [
@@ -35,6 +37,7 @@ import { Materia, MateriaSchema } from '../materia/materia.schema';
       { name: Exame.name, schema: ExameSchema },
       { name: Frente.name, schema: FrenteSchema },
       { name: Materia.name, schema: MateriaSchema },
+      { name: Prova.name, schema: ProvaSchema },
     ]),
   ],
   controllers: [SimuladoController],
@@ -49,6 +52,7 @@ import { Materia, MateriaSchema } from '../materia/materia.schema';
     ExameRepository,
     MateriaRepository,
     FrenteRepository,
+    ProvaRepository,
   ],
 })
 export class SimuladoModule {}

@@ -13,6 +13,8 @@ import { MateriaRepository } from '../materia/materia.repository';
 import { Exame, ExameSchema } from '../exame/exame.schema';
 import { Frente, FrenteSchema } from '../frente/frente.schema';
 import { Materia, MateriaSchema } from '../materia/materia.schema';
+import { ProvaRepository } from '../prova/prova.repository';
+import { Prova, ProvaSchema } from '../prova/prova.schema';
 
 @Module({
   imports: [
@@ -21,6 +23,7 @@ import { Materia, MateriaSchema } from '../materia/materia.schema';
       { name: Frente.name, schema: FrenteSchema },
       { name: Materia.name, schema: MateriaSchema },
       { name: Questao.name, schema: QuestaoSchema },
+      { name: Prova.name, schema: ProvaSchema },
     ]),
   ],
   providers: [
@@ -32,6 +35,7 @@ import { Materia, MateriaSchema } from '../materia/materia.schema';
     ExameExistValidator,
     FrenteExistValidator,
     MateriaExistValidator,
+    ProvaRepository,
   ],
   controllers: [QuestaoController],
   exports: [QuestaoService, QuestaoRepository],
