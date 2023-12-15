@@ -45,7 +45,7 @@ export class QuestaoController {
   @Post()
   @ApiResponse({
     status: 200,
-    description: 'exame cadastrados e valido',
+    description: 'cadastro de questao',
     type: Questao,
     isArray: false,
   })

@@ -7,6 +7,7 @@ import { MateriaModule } from './modules/materia/materia.module';
 import { QuestaoModule } from './modules/questao/questao.module';
 import { TipoSimuladoModule } from './modules/tipo-simulado/tipo-simulado.module';
 import { SimuladoModule } from './modules/simulado/simulado.module';
+import { ProvaModule } from './modules/prova/prova.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { SimuladoModule } from './modules/simulado/simulado.module';
     QuestaoModule,
     TipoSimuladoModule,
     SimuladoModule,
+    ProvaModule,
   ],
   providers: [],
 })

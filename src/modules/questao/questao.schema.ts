@@ -1,5 +1,4 @@
 import { BaseSchema } from 'src/shared/base/base.schema';
-import { Exame } from '../exame/exame.schema';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Frente } from '../frente/frente.schema';
 import { Materia } from '../materia/materia.schema';
@@ -7,23 +6,11 @@ import { EnemArea } from './enums/enem-area.enum';
 import { Types } from 'mongoose';
 import { Status } from './enums/status.enum';
 import { ApiProperty } from '@nestjs/swagger';
-import { Caderno } from './enums/caderno.enum';
 import { Alternativa } from './enums/alternativa.enum';
+import { Prova } from '../prova/prova.schema';
 
 @Schema({ timestamps: true, versionKey: false })
 export class Questao extends BaseSchema {
-  @Prop({ ref: Exame.name, type: Types.ObjectId })
-  @ApiProperty()
-  public exame: Exame;
-
-  @Prop()
-  @ApiProperty()
-  public ano: number;
-
-  @Prop()
-  @ApiProperty({ enum: Caderno })
-  public caderno: Caderno;
-
   @Prop()
   @ApiProperty({ enum: EnemArea })
   public enemArea: EnemArea;
@@ -94,6 +81,10 @@ export class Questao extends BaseSchema {
   @Prop({ required: false, default: Status.Pending, enum: Status })
   @ApiProperty()
   public status: Status;
+
+  @Prop({ ref: Prova.name, type: Types.ObjectId })
+  @ApiProperty()
+  public prova: Prova;
 }
 
 export const QuestaoSchema = SchemaFactory.createForClass(Questao);

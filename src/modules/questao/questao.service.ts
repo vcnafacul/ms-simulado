@@ -6,15 +6,17 @@ import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
 import { Regra } from '../tipo-simulado/schemas/regra.schemas';
 import { ReportDTO } from './dtos/report.dto.input';
 import { Status } from './enums/status.enum';
-import { ExameRepository } from '../exame/exame.repository';
 import { MateriaRepository } from '../materia/materia.repository';
 import { FrenteRepository } from '../frente/frente.repository';
 import { UpdateDTOInput } from './dtos/update.dto.input';
+import { ProvaRepository } from '../prova/prova.repository';
+import { ExameRepository } from '../exame/exame.repository';
 
 @Injectable()
 export class QuestaoService {
   constructor(
     private readonly repository: QuestaoRepository,
+    private readonly provaRepository: ProvaRepository,
     private readonly exameRepository: ExameRepository,
     private readonly materiaRepository: MateriaRepository,
     private readonly frenteRepository: FrenteRepository,
@@ -62,13 +64,27 @@ export class QuestaoService {
   }
 
   public async getInfos() {
+    const provas = await this.provaRepository.getAll();
     const exames = await this.exameRepository.getAll();
     const materias = await this.materiaRepository.getAll();
     const frentes = await this.frenteRepository.getAll();
-    return { exames, materias, frentes };
+    return { provas, exames, materias, frentes };
   }
 
   public async updateStatus(id: string, status: Status) {
+    const question = await this.repository.getById(id);
+    if (!question.prova && status === Status.Approved) {
+      throw new HttpException(
+        'Para aprovar, a prova não pode ser nula',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (status === Status.Approved) {
+      const prova = await this.provaRepository.getById(question.prova._id);
+      prova.totalQuestaoCadastradas += 1;
+      console.log(prova);
+      this.provaRepository.update(prova);
+    }
     await this.repository.UpdateStatus(id, status);
   }
 

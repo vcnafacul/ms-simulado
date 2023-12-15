@@ -8,7 +8,6 @@ import { Simulado } from './schemas/simulado.schema';
 import { EnemArea } from '../questao/enums/enem-area.enum';
 import { toPascalCaseSemAcentos } from 'src/utils/string';
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
-import { Caderno } from '../questao/enums/caderno.enum';
 import { CreateSimuladoDTOInput } from './dtos/create.dto.input';
 import { AnswerSimulado } from './dtos/answer-simulado.dto.input';
 import { RespostaRepository } from './repository/resposta.repository';
@@ -133,9 +132,6 @@ export class SimuladoService {
           tipo: simulado.tipo._id,
           questoes: simulado.questoes.map((q) => ({
             _id: q._id,
-            exame: q.exame,
-            ano: q.ano,
-            caderno: q.caderno as unknown as Caderno,
             enemArea: q.enemArea,
             frente1: q.frente1,
             frente2: q.frente2,
@@ -143,6 +139,7 @@ export class SimuladoService {
             materia: q.materia,
             numero: q.numero,
             imageId: q.imageId,
+            prova: q.prova,
           })),
           inicio: inicio,
           duracao: simulado.tipo.duracao,
