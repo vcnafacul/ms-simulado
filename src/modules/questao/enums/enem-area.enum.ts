@@ -3,6 +3,6 @@ export enum EnemArea {
   Linguagens = 'Linguagens',
   BioExatas = 'Ciências da Natureza',
   Matematica = 'Matematica',
-  Enem1 = 'Enem1',
-  Enem2 = 'Enem2',
+  Enem1 = 'Enem Dia 1',
+  Enem2 = 'Enem Dia 2',
 }

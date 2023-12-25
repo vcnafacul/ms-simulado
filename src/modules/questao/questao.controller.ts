@@ -50,7 +50,7 @@ export class QuestaoController {
     isArray: false,
   })
   public async post(@Body() model: CreateQuestaoDTOInput): Promise<Questao> {
-    return await this.service.add(model);
+    return await this.service.create(model);
   }
 
   @Get(':id')

@@ -5,24 +5,40 @@ import { ProvaController } from './prova.controller';
 import { ProvaService } from './prova.service';
 import { ProvaRepository } from './prova.repository';
 import { ProvaExistValidator } from './validator/prova-exist.validator';
-import { Questao, QuestaoSchema } from '../questao/questao.schema';
-import { ExameRepository } from '../exame/exame.repository';
-import { Exame, ExameSchema } from '../exame/exame.schema';
+import {
+  RespostaSimulado,
+  RespostaSimuladoSchema,
+} from '../simulado/schemas/resposta-simulado.schema';
+import { MateriaModule } from '../materia/materia.module';
+import { FrenteModule } from '../frente/frente.module';
+import { QuestaoModule } from '../questao/questao.module';
+import { SimuladoModule } from '../simulado/simulado.module';
+import { ExameModule } from '../exame/exame.module';
+import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
+import {
+  TipoSimulado,
+  TipoSimuladoSchema,
+} from '../tipo-simulado/schemas/tipo-simulado.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Prova.name, schema: ProvaSchema },
-      { name: Questao.name, schema: QuestaoSchema },
-      { name: Exame.name, schema: ExameSchema },
+      { name: RespostaSimulado.name, schema: RespostaSimuladoSchema },
+      { name: TipoSimulado.name, schema: TipoSimuladoSchema },
     ]),
+    ExameModule,
+    QuestaoModule,
+    MateriaModule,
+    FrenteModule,
+    SimuladoModule,
   ],
   controllers: [ProvaController],
   providers: [
     ProvaService,
     ProvaRepository,
     ProvaExistValidator,
-    ExameRepository,
+    TipoSimuladoRepository,
   ],
   exports: [ProvaService, ProvaRepository],
 })

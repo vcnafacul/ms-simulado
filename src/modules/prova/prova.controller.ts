@@ -11,19 +11,19 @@ export class ProvaController {
 
   @Post()
   @ApiResponse({
-    status: 200,
-    description: 'cadastro de questao',
+    status: 201,
+    description: 'cria prova',
     type: Prova,
     isArray: false,
   })
   public async post(@Body() dto: CreateProvaDTOInput): Promise<Prova> {
-    return await this.service.add(dto);
+    return await this.service.create(dto);
   }
 
   @Get()
   @ApiResponse({
     status: 200,
-    description: 'get gestões por status',
+    description: 'busca todas as provas',
     type: Prova,
     isArray: true,
   })
@@ -34,11 +34,22 @@ export class ProvaController {
   @Get(':id')
   @ApiResponse({
     status: 200,
-    description: 'exame cadastrados e valido',
+    description: 'busca prova por id',
     type: Prova,
     isArray: false,
   })
   public async getById(@Param('id') id: string): Promise<Prova> {
     return await this.service.getById(id);
+  }
+
+  @Get('missing/:id')
+  @ApiResponse({
+    status: 200,
+    description: 'buscas quais questões faltam',
+    type: Prova,
+    isArray: false,
+  })
+  public async getMissing(@Param('id') id: string): Promise<number[]> {
+    return await this.service.getMissingNumber(id);
   }
 }

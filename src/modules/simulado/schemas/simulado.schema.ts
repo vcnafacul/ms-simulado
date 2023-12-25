@@ -20,7 +20,7 @@ export class Simulado extends BaseSchema {
   tipo: TipoSimulado;
 
   @Prop({
-    ref: Questao.name,
+    ref: 'Questao',
     type: [Types.ObjectId],
   })
   @ApiProperty({ type: Questao, isArray: true })
@@ -34,7 +34,7 @@ export class Simulado extends BaseSchema {
   @ApiProperty()
   vezesRespondido?: number;
 
-  @Prop({ required: false, default: false })
+  @Prop({ required: false, default: true })
   @ApiProperty()
   bloqueado?: boolean;
 }

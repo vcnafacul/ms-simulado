@@ -1,72 +1,42 @@
 import { Injectable } from '@nestjs/common';
 import { SimuladoRepository } from './repository/simulado.repository';
-import { QuestaoService } from '../questao/questao.service';
-import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
-import { getDateNow } from 'src/utils/date';
 import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
 import { Simulado } from './schemas/simulado.schema';
-import { EnemArea } from '../questao/enums/enem-area.enum';
-import { toPascalCaseSemAcentos } from 'src/utils/string';
+// import { EnemArea } from '../questao/enums/enem-area.enum';
+// import { toPascalCaseSemAcentos } from 'src/utils/string';
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
-import { CreateSimuladoDTOInput } from './dtos/create.dto.input';
 import { AnswerSimulado } from './dtos/answer-simulado.dto.input';
 import { RespostaRepository } from './repository/resposta.repository';
 import { RespostaSimulado } from './schemas/resposta-simulado.schema';
+import { Prova } from '../prova/prova.schema';
+import { Questao } from '../questao/questao.schema';
+import { EnemArea } from '../questao/enums/enem-area.enum';
 
 @Injectable()
 export class SimuladoService {
   constructor(
     private readonly repository: SimuladoRepository,
     private readonly tipoSimuladoRepository: TipoSimuladoRepository,
-    private readonly respostaRepository: RespostaRepository,
-    private readonly questaoService: QuestaoService,
+    private readonly respostaRepository: RespostaRepository, // private readonly questaoService: QuestaoService,
   ) {}
 
-  public async add(dto: CreateSimuladoDTOInput): Promise<Simulado> {
-    const oldSimulado = await this.repository.getByFilter({
-      tipo: dto.tipoId,
-      bloqueado: false,
-    });
-    if (!!oldSimulado) {
-      oldSimulado.bloqueado = true;
-      oldSimulado.save();
+  public async createByProva(prova: Prova) {
+    const arratSimulado: Simulado[] = [];
+    const simulado = new Simulado();
+    simulado.tipo = prova.tipo;
+    simulado.nome = `${prova.tipo.nome} ${prova.ano}`;
+    simulado.questoes = prova.questoes;
+    if (prova.tipo.nome === EnemArea.Enem1) {
+      arratSimulado.push(await this.createArea(simulado, EnemArea.Linguagens));
+      arratSimulado.push(
+        await this.createArea(simulado, EnemArea.CienciasHumanas),
+      );
+    } else if (prova.tipo.nome === EnemArea.Enem2) {
+      arratSimulado.push(await this.createArea(simulado, EnemArea.BioExatas));
+      arratSimulado.push(await this.createArea(simulado, EnemArea.Matematica));
     }
-    const tipo = await this.tipoSimuladoRepository.getById(dto.tipoId);
-    const questoes = await this.questaoService.GeyManyQuestao(
-      tipo as TipoSimulado,
-    );
-    const simulado = await this.repository.create({
-      nome: `${tipo?.nome} ${getDateNow()}`,
-      descricao: `Simulado de ${tipo?.nome}`,
-      tipo: tipo,
-      questoes: questoes,
-    });
-    return simulado;
-  }
-
-  public async getDefaults() {
-    const tipoDefaults: string[] = Object.values(EnemArea);
-    const result: { [key: string]: string } = {};
-    await Promise.all(
-      tipoDefaults.map(async (tipoNome) => {
-        const tipo = await this.tipoSimuladoRepository.getByFilter({
-          nome: new RegExp(tipoNome, 'i'),
-        });
-        if (tipo) {
-          const simulado = await this.repository.getByFilter({
-            tipo: tipo._id || '',
-            bloqueado: false,
-          });
-          if (simulado) {
-            const key = toPascalCaseSemAcentos(
-              simulado?.descricao.replace('Simulado de', ''),
-            );
-            result[key] = simulado._id;
-          }
-        }
-      }),
-    );
-    return result;
+    arratSimulado.push(await this.repository.create(simulado));
+    return arratSimulado;
   }
 
   public async getById(id: string): Promise<Simulado | null> {
@@ -85,10 +55,78 @@ export class SimuladoService {
     simuladoId: string,
   ): Promise<SimuladoAnswerDTOOutput> {
     try {
-      return await this.GetNewSimulado(simuladoId);
+      return await this.GetSimulado(simuladoId);
     } catch (error) {
       return null;
     }
+  }
+
+  public async addQuestionSimulados(
+    simulados: Simulado[],
+    question: Questao,
+    nomeProva: string,
+  ) {
+    const promise = Promise.all(
+      simulados.map((sml) => {
+        if (
+          sml.nome.includes(question.enemArea) ||
+          sml.nome === nomeProva.substring(0, 15)
+        ) {
+          this.addQuestion(sml._id, question);
+        }
+      }),
+    );
+    await promise;
+  }
+
+  public async removeQuestionSimulados(
+    simulados: Simulado[],
+    question: Questao,
+    nomeProva: string,
+  ) {
+    const promise = Promise.all(
+      simulados.map((sml) => {
+        if (
+          sml.nome.includes(question.enemArea) ||
+          sml.nome === nomeProva.substring(0, 15)
+        ) {
+          this.removeQuestion(sml._id, question);
+        }
+      }),
+    );
+    await promise;
+  }
+
+  public async addQuestion(id: string, question: Questao) {
+    const simulado = await this.repository.getById(id);
+    simulado.questoes.push(question);
+    if (simulado.tipo.quantidadeTotalQuestao === simulado.questoes.length) {
+      simulado.bloqueado = false;
+    }
+    this.repository.update(simulado);
+  }
+
+  public async removeQuestion(id: string, oldQuestao: Questao) {
+    const simulado = await this.repository.getById(id);
+    const index = simulado.questoes.findIndex(
+      (questao) => questao._id.toString() === oldQuestao._id.toString(),
+    );
+    if (index !== -1) {
+      simulado.questoes.splice(index, 1);
+      simulado.bloqueado = true;
+      await this.repository.update(simulado);
+    }
+  }
+
+  private async createArea(simulado: Simulado, nome: string) {
+    const simuladoArea = new Simulado();
+    const tipoLinguagem = await this.tipoSimuladoRepository.getByFilter({
+      nome,
+    });
+    simuladoArea.tipo = tipoLinguagem;
+    simuladoArea.nome = `${simulado.nome} - ${nome}`;
+    simuladoArea.questoes = [];
+    return await this.repository.create(simuladoArea);
   }
 
   public async answer(answer: AnswerSimulado) {
@@ -112,7 +150,7 @@ export class SimuladoService {
     await this.respostaRepository.create(respostaSimulado);
   }
 
-  private async GetNewSimulado(id: string) {
+  private async GetSimulado(id: string) {
     const inicio = new Date(new Date().getTime() + 5);
     const simulado = await this.GetSimuladoById(id, inicio);
     return simulado;
