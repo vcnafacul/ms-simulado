@@ -25,10 +25,6 @@ export class CreateProvaDTOInput {
   @IsString()
   tipo: string;
 
-  @ApiProperty({ required: false, default: 0 })
-  @IsNumber()
-  totalQuestao: number;
-
   @ApiProperty()
   @IsString()
   filename: string;
