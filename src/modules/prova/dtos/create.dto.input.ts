@@ -21,6 +21,10 @@ export class CreateProvaDTOInput {
   @ExameExist({ message: 'exame não existe' })
   exame: string;
 
+  @ApiProperty()
+  @IsString()
+  tipo: string;
+
   @ApiProperty({ required: false, default: 0 })
   @IsNumber()
   totalQuestao: number;

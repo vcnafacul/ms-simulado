@@ -11,21 +11,34 @@ import { FrenteRepository } from '../frente/frente.repository';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { ProvaRepository } from '../prova/prova.repository';
 import { ExameRepository } from '../exame/exame.repository';
+import { ProvaService } from '../prova/prova.service';
+import { SimuladoService } from '../simulado/simulado.service';
 
 @Injectable()
 export class QuestaoService {
   constructor(
     private readonly repository: QuestaoRepository,
+    private readonly provaService: ProvaService,
+    private readonly simuladoService: SimuladoService,
     private readonly provaRepository: ProvaRepository,
     private readonly exameRepository: ExameRepository,
     private readonly materiaRepository: MateriaRepository,
     private readonly frenteRepository: FrenteRepository,
   ) {}
 
-  public async add(item: CreateQuestaoDTOInput): Promise<Questao> {
-    const questao = Object.assign(new Questao(), item);
-
-    return await this.repository.create(questao);
+  public async create(item: CreateQuestaoDTOInput): Promise<Questao> {
+    const newQuestion = Object.assign(new Questao(), item);
+    if (!(await this.provaService.verifyNumber(item.prova, newQuestion))) {
+      const questao = await this.repository.create(
+        Object.assign(new Questao(), item),
+      );
+      await this.provaService.addQuestion(item.prova, questao);
+      return questao;
+    }
+    throw new HttpException(
+      `Possível questão já cadastrada com número ${item.numero}.`,
+      HttpStatus.CONFLICT,
+    );
   }
 
   public async getById(id: string): Promise<Questao> {
@@ -73,22 +86,95 @@ export class QuestaoService {
 
   public async updateStatus(id: string, status: Status) {
     const question = await this.repository.getById(id);
+    if (question.status === status) {
+      throw new HttpException(
+        'Não houve alteração de status',
+        HttpStatus.NOT_MODIFIED,
+      );
+    }
     if (!question.prova && status === Status.Approved) {
       throw new HttpException(
         'Para aprovar, a prova não pode ser nula',
         HttpStatus.BAD_REQUEST,
       );
     }
+    const prova = await this.provaRepository.getById(question.prova._id);
     if (status === Status.Approved) {
-      const prova = await this.provaRepository.getById(question.prova._id);
-      prova.totalQuestaoCadastradas += 1;
-      console.log(prova);
-      this.provaRepository.update(prova);
+      prova.totalQuestaoValidadas += 1;
+      await this.simuladoService.addQuestionSimulados(
+        prova.simulado,
+        question,
+        prova.nome,
+      );
+    } else {
+      prova.totalQuestaoValidadas -= 1;
+      await this.simuladoService.removeQuestionSimulados(
+        prova.simulado,
+        question,
+        prova.nome,
+      );
     }
     await this.repository.UpdateStatus(id, status);
+    await this.provaRepository.update(prova);
   }
 
   public async updateQuestion(question: UpdateDTOInput) {
+    const questao = await this.repository.getById(question._id);
+    if (!questao.prova) {
+      if (!question.prova) {
+        throw new HttpException(
+          'Para  editar uma questão, uma prova deve ser definida',
+          HttpStatus.CONFLICT,
+        );
+      }
+      if (
+        await this.provaService.verifyNumber(question.prova, {
+          ...questao.toJSON(),
+          numero: question.numero,
+        })
+      ) {
+        throw new HttpException(
+          `Possível questão já cadastrada com número ${question.numero}.`,
+          HttpStatus.CONFLICT,
+        );
+      }
+      await this.provaService.addQuestion(question.prova, questao);
+      const prova = await this.provaRepository.getById(question.prova);
+      await this.simuladoService.addQuestionSimulados(
+        prova.simulado,
+        questao,
+        prova.nome,
+      );
+    } else if (
+      question.prova !== undefined &&
+      question.prova !== questao.prova._id.toString()
+    ) {
+      if (
+        await this.provaService.verifyNumber(question.prova, {
+          ...questao.toJSON(),
+          numero: question.numero,
+        })
+      ) {
+        throw new HttpException(
+          `Possível questão já cadastrada com número ${question.numero}.`,
+          HttpStatus.CONFLICT,
+        );
+      }
+      await this.provaService.removeQuestion(questao.prova._id, questao);
+      const oldProva = await this.provaRepository.getById(questao.prova._id);
+      await this.simuladoService.removeQuestionSimulados(
+        oldProva.simulado,
+        questao,
+        oldProva.nome,
+      );
+      await this.provaService.addQuestion(question.prova, questao);
+      const newProva = await this.provaRepository.getById(question.prova);
+      await this.simuladoService.addQuestionSimulados(
+        newProva.simulado,
+        questao,
+        newProva.nome,
+      );
+    }
     await this.repository.updateQuestion(question);
   }
 
@@ -122,7 +208,6 @@ export class QuestaoService {
     regras['materia'] = regra.materia._id;
     if (regra.frente) regras['frente1'] = regra.frente._id;
     if (regra.ano) regras['ano'] = regra.ano;
-    if (regra.caderno) regras['ano'] = regra.caderno;
     return regras;
   }
 }

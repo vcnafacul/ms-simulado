@@ -2,7 +2,6 @@ import { Body, Controller, Get, Param, Post, Delete } from '@nestjs/common';
 import { SimuladoService } from './simulado.service';
 import { Simulado } from './schemas/simulado.schema';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
-import { CreateSimuladoDTOInput } from './dtos/create.dto.input';
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
 import { AnswerSimulado } from './dtos/answer-simulado.dto.input';
 
@@ -14,7 +13,7 @@ export class SimuladoController {
   @Get()
   @ApiResponse({
     status: 200,
-    description: 'materias cadastradas e validas',
+    description: 'buscar todos simulados cadastrados',
     type: Simulado,
     isArray: true,
   })
@@ -22,21 +21,10 @@ export class SimuladoController {
     return await this.service.getAll();
   }
 
-  @Post()
-  @ApiResponse({
-    status: 200,
-    description: 'materias cadastradas e validas',
-    type: Simulado,
-    isArray: false,
-  })
-  public async post(@Body() dto: CreateSimuladoDTOInput): Promise<Simulado> {
-    return await this.service.add(dto);
-  }
-
   @Get('toanswer/:id')
   @ApiResponse({
     status: 200,
-    description: 'materias cadastradas e validas',
+    description: 'get simuldo para responder por id',
     type: SimuladoAnswerDTOOutput,
     isArray: false,
   })
@@ -49,25 +37,10 @@ export class SimuladoController {
     await this.service.answer(answer);
   }
 
-  @Get('default')
-  @ApiResponse({
-    status: 200,
-    description: 'materias cadastradas e validas',
-    schema: {
-      type: 'object',
-      additionalProperties: {
-        type: 'string',
-      },
-    },
-  })
-  public async getDefaults() {
-    return await this.service.getDefaults();
-  }
-
   @Get(':id')
   @ApiResponse({
     status: 200,
-    description: 'materias cadastradas e validas',
+    description: 'get simulado by ID',
     type: Simulado,
     isArray: false,
   })

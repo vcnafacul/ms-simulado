@@ -3,22 +3,24 @@ import { BaseSchema } from 'src/shared/base/base.schema';
 import { Edicao } from './enums/edicao.enum';
 import { Exame } from '../exame/exame.schema';
 import { Types } from 'mongoose';
-import { ApiProperty } from '@nestjs/swagger';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
+import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
+import { Questao } from '../questao/questao.schema';
+import { Simulado } from '../simulado/schemas/simulado.schema';
 
 @Schema({ timestamps: true, versionKey: false })
 export class Prova extends BaseSchema {
-  constructor(item: CreateProvaDTOInput, exame: Exame) {
+  constructor(item: CreateProvaDTOInput, exame: Exame, tipo: TipoSimulado) {
     super();
     this.edicao = item.edicao;
     this.exame = exame;
+    this.tipo = tipo;
     this.ano = item.ano;
     this.filename = item.filename;
     this.aplicacao = item.aplicacao;
     this.totalQuestao = item.totalQuestao;
   }
   @Prop({ enum: Edicao })
-  @ApiProperty()
   public edicao: Edicao;
 
   @Prop()
@@ -29,6 +31,18 @@ export class Prova extends BaseSchema {
 
   @Prop({ ref: Exame.name, type: Types.ObjectId })
   public exame: Exame;
+
+  @Prop({ ref: TipoSimulado.name, type: Types.ObjectId })
+  public tipo: TipoSimulado;
+
+  @Prop({ ref: Simulado.name, type: [Types.ObjectId] })
+  public simulado: Simulado[];
+
+  @Prop({
+    ref: 'Questao',
+    type: [Types.ObjectId],
+  })
+  questoes: Questao[];
 
   @Prop()
   public nome: string;

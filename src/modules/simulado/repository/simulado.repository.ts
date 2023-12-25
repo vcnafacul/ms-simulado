@@ -37,4 +37,12 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
       .populate({ path: 'questoes', select: 'alternativa' })
       .exec();
   }
+
+  override async getAll() {
+    return await this.model.find().populate(['tipo']);
+  }
+
+  async update(simulado: Simulado) {
+    await this.model.updateOne({ _id: simulado._id }, simulado);
+  }
 }

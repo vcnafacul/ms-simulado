@@ -28,8 +28,4 @@ export class Regra {
   @Prop({ required: false })
   @ApiProperty()
   ano?: number;
-
-  @Prop({ required: false })
-  @ApiProperty()
-  caderno?: number;
 }
