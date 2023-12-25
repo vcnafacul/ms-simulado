@@ -30,7 +30,7 @@ export class ProvaService {
     prova.aplicacao = item.aplicacao;
     prova.exame = exame;
     prova.edicao = item.edicao;
-    prova.totalQuestao = item.totalQuestao;
+    prova.totalQuestao = tipo.quantidadeTotalQuestao;
     prova.questoes = [];
     prova.simulado = await this.simuladoService.createByProva(prova);
     const newProva = await this.repository.create(prova);
