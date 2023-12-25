@@ -18,7 +18,8 @@ export class Prova extends BaseSchema {
     this.ano = item.ano;
     this.filename = item.filename;
     this.aplicacao = item.aplicacao;
-    this.totalQuestao = item.totalQuestao;
+    this.totalQuestao = tipo.quantidadeTotalQuestao;
+    this.questoes = [];
   }
   @Prop({ enum: Edicao })
   public edicao: Edicao;

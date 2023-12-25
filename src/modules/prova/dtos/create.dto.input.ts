@@ -22,12 +22,8 @@ export class CreateProvaDTOInput {
   exame: string;
 
   @ApiProperty()
-  @IsString()
+  @IsString() //Verificar se o tipo existe
   tipo: string;
-
-  @ApiProperty({ required: false, default: 0 })
-  @IsNumber()
-  totalQuestao: number;
 
   @ApiProperty()
   @IsString()

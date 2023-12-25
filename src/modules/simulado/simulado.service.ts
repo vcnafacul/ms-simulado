@@ -120,10 +120,10 @@ export class SimuladoService {
 
   private async createArea(simulado: Simulado, nome: string) {
     const simuladoArea = new Simulado();
-    const tipoLinguagem = await this.tipoSimuladoRepository.getByFilter({
+    const tipo = await this.tipoSimuladoRepository.getByFilter({
       nome,
     });
-    simuladoArea.tipo = tipoLinguagem;
+    simuladoArea.tipo = tipo;
     simuladoArea.nome = `${simulado.nome} - ${nome}`;
     simuladoArea.questoes = [];
     return await this.repository.create(simuladoArea);
