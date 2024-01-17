@@ -13,6 +13,8 @@ import { ProvaRepository } from '../prova/prova.repository';
 import { ExameRepository } from '../exame/exame.repository';
 import { ProvaService } from '../prova/prova.service';
 import { SimuladoService } from '../simulado/simulado.service';
+import { Paginate } from 'src/shared/paginate/paginate';
+import { PaginateQuery } from 'src/shared/paginate/paginate-query';
 
 @Injectable()
 export class QuestaoService {
@@ -46,9 +48,26 @@ export class QuestaoService {
     return questao;
   }
 
-  public async getAll(status?: Status): Promise<Questao[]> {
-    const questoes = await this.repository.getAll(status);
-    return questoes;
+  public async getAll(
+    query: PaginateQuery,
+    status: Status,
+  ): Promise<Paginate<Questao>> {
+    const realPage = query.page <= 0 ? 1 : query.page;
+    const limit: number = query.limit;
+    const skip = (realPage - 1) * limit;
+    const questoes = await this.repository.paginate(
+      skip,
+      limit,
+      ['+alternativa'],
+      { status },
+    );
+    const result = {
+      data: questoes.data,
+      totalCount: questoes.totalCount,
+      limit: limit,
+      page: realPage,
+    };
+    return result;
   }
 
   public async delete(id: string): Promise<void> {

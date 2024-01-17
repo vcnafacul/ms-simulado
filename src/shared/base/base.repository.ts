@@ -32,4 +32,22 @@ export class BaseRepository<T> {
       throw new NotFoundException(`Registro com ID ${id} não encontrado.`);
     }
   }
+
+  async paginate(
+    skip: number,
+    limit: number,
+    select: string[] = [],
+    where?: object,
+  ) {
+    const totalCount = await this.model.countDocuments({}).exec();
+    const query = this.model.find().limit(limit).skip(skip).select(select);
+    if (where) {
+      query.where(where);
+    }
+    const data = await query.exec();
+    return {
+      totalCount,
+      data,
+    };
+  }
 }

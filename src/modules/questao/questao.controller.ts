@@ -6,6 +6,7 @@ import {
   Post,
   Delete,
   Patch,
+  Query,
 } from '@nestjs/common';
 import { QuestaoService } from './questao.service';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
@@ -14,6 +15,8 @@ import { Questao } from './questao.schema';
 import { ReportDTO } from './dtos/report.dto.input';
 import { Status } from './enums/status.enum';
 import { UpdateDTOInput } from './dtos/update.dto.input';
+import { Paginate } from 'src/shared/paginate/paginate';
+import { PaginateQuery } from 'src/shared/paginate/paginate-query';
 
 @ApiTags('Questao')
 @Controller('v1/questao')
@@ -38,8 +41,11 @@ export class QuestaoController {
     type: Questao,
     isArray: true,
   })
-  public async getAll(@Param('status') status: Status): Promise<Questao[]> {
-    return await this.service.getAll(status);
+  public async getPaginateAll(
+    @Query() query: PaginateQuery,
+    @Param('status') status: Status,
+  ): Promise<Paginate<Questao>> {
+    return await this.service.getAll(query, status);
   }
 
   @Post()
