@@ -139,12 +139,6 @@ export class QuestaoService {
         );
       }
       await this.provaService.addQuestion(question.prova, questao);
-      const prova = await this.provaRepository.getById(question.prova);
-      await this.simuladoService.addQuestionSimulados(
-        prova.simulado,
-        questao,
-        prova.nome,
-      );
     } else if (
       question.prova !== undefined &&
       question.prova !== questao.prova._id.toString()
