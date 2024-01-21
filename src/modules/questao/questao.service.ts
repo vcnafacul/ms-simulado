@@ -94,30 +94,19 @@ export class QuestaoService {
         HttpStatus.NOT_MODIFIED,
       );
     }
-    if (!question.prova && status === Status.Approved) {
+    if (!question.prova) {
       throw new HttpException(
-        'Para aprovar, a prova não pode ser nula',
+        'Para aprovar ou rejeitar, a prova não pode ser nula',
         HttpStatus.BAD_REQUEST,
       );
     }
     const prova = await this.provaRepository.getById(question.prova._id);
     if (status === Status.Approved) {
-      prova.totalQuestaoValidadas += 1;
-      await this.simuladoService.addQuestionSimulados(
-        prova.simulado,
-        question,
-        prova.nome,
-      );
+      await this.provaService.addQuestion(prova._id, question);
     } else {
-      prova.totalQuestaoValidadas -= 1;
-      await this.simuladoService.removeQuestionSimulados(
-        prova.simulado,
-        question,
-        prova.nome,
-      );
+      await this.provaService.removeQuestion(prova._id, question);
     }
     await this.repository.UpdateStatus(id, status);
-    await this.provaRepository.update(prova);
     await this.auditLogService.create({
       user: userId,
       entityId: question?._id,
