@@ -11,7 +11,6 @@ import { QuestaoService } from './questao.service';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Questao } from './questao.schema';
-import { ReportDTO } from './dtos/report.dto.input';
 import { Status } from './enums/status.enum';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 

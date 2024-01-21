@@ -166,19 +166,7 @@ export class QuestaoService {
         );
       }
       await this.provaService.removeQuestion(questao.prova._id, questao);
-      const oldProva = await this.provaRepository.getById(questao.prova._id);
-      await this.simuladoService.removeQuestionSimulados(
-        oldProva.simulado,
-        questao,
-        oldProva.nome,
-      );
       await this.provaService.addQuestion(question.prova, questao);
-      const newProva = await this.provaRepository.getById(question.prova);
-      await this.simuladoService.addQuestionSimulados(
-        newProva.simulado,
-        questao,
-        newProva.nome,
-      );
     }
     await this.repository.updateQuestion(question);
   }

@@ -82,6 +82,11 @@ export class ProvaService {
       }
       await this.repository.update(prova);
     }
+    await this.simuladoService.removeQuestionSimulados(
+      prova.simulado,
+      oldQuestao,
+      prova.nome,
+    );
   }
 
   public async getMissingNumber(id: string) {
