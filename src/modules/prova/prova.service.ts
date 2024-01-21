@@ -62,6 +62,11 @@ export class ProvaService {
       prova.totalQuestaoValidadas += 1;
     }
     this.repository.update(prova);
+    await this.simuladoService.addQuestionSimulados(
+      prova.simulado,
+      question,
+      prova.nome,
+    );
   }
 
   public async removeQuestion(id: string, oldQuestao: Questao) {
@@ -77,6 +82,11 @@ export class ProvaService {
       }
       await this.repository.update(prova);
     }
+    await this.simuladoService.removeQuestionSimulados(
+      prova.simulado,
+      oldQuestao,
+      prova.nome,
+    );
   }
 
   public async getMissingNumber(id: string) {

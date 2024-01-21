@@ -23,6 +23,7 @@ import {
   RespostaSimulado,
   RespostaSimuladoSchema,
 } from '../simulado/schemas/resposta-simulado.schema';
+import { AuditLogModule } from '../auditLog/auditLog.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import {
     ExameModule,
     FrenteModule,
     MateriaModule,
+    AuditLogModule,
   ],
   providers: [
     QuestaoService,

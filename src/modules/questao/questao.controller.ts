@@ -11,7 +11,6 @@ import { QuestaoService } from './questao.service';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Questao } from './questao.schema';
-import { ReportDTO } from './dtos/report.dto.input';
 import { Status } from './enums/status.enum';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 
@@ -56,7 +55,7 @@ export class QuestaoController {
   @Get(':id')
   @ApiResponse({
     status: 200,
-    description: 'exame cadastrados e valido',
+    description: 'buscar questão por id',
     type: Questao,
     isArray: false,
   })
@@ -69,17 +68,13 @@ export class QuestaoController {
     return await this.service.delete(id);
   }
 
-  @Post('report')
-  public async report(@Body() reportDTO: ReportDTO) {
-    await this.service.report(reportDTO);
-  }
-
   @Patch(':id/:status')
   public async updateStatus(
     @Param('id') id: string,
     @Param('status') status: Status,
+    @Body() body: { message: string; userId: number },
   ) {
-    await this.service.updateStatus(id, status);
+    await this.service.updateStatus(id, status, body.userId, body.message);
   }
 
   @Patch()

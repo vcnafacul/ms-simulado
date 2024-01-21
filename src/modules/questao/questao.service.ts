@@ -4,7 +4,6 @@ import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
 import { Questao } from './questao.schema';
 import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
 import { Regra } from '../tipo-simulado/schemas/regra.schemas';
-import { ReportDTO } from './dtos/report.dto.input';
 import { Status } from './enums/status.enum';
 import { MateriaRepository } from '../materia/materia.repository';
 import { FrenteRepository } from '../frente/frente.repository';
@@ -13,6 +12,7 @@ import { ProvaRepository } from '../prova/prova.repository';
 import { ExameRepository } from '../exame/exame.repository';
 import { ProvaService } from '../prova/prova.service';
 import { SimuladoService } from '../simulado/simulado.service';
+import { AuditLogService } from '../auditLog/auditLog.service';
 
 @Injectable()
 export class QuestaoService {
@@ -24,6 +24,7 @@ export class QuestaoService {
     private readonly exameRepository: ExameRepository,
     private readonly materiaRepository: MateriaRepository,
     private readonly frenteRepository: FrenteRepository,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   public async create(item: CreateQuestaoDTOInput): Promise<Questao> {
@@ -72,10 +73,6 @@ export class QuestaoService {
     return questoes;
   }
 
-  public async report(reportDTO: ReportDTO) {
-    console.log(reportDTO);
-  }
-
   public async getInfos() {
     const provas = await this.provaRepository.getAll();
     const exames = await this.exameRepository.getAll();
@@ -84,7 +81,12 @@ export class QuestaoService {
     return { provas, exames, materias, frentes };
   }
 
-  public async updateStatus(id: string, status: Status) {
+  public async updateStatus(
+    id: string,
+    status: Status,
+    userId: number,
+    message?: string,
+  ) {
     const question = await this.repository.getById(id);
     if (question.status === status) {
       throw new HttpException(
@@ -92,30 +94,28 @@ export class QuestaoService {
         HttpStatus.NOT_MODIFIED,
       );
     }
-    if (!question.prova && status === Status.Approved) {
+    if (!question.prova) {
       throw new HttpException(
-        'Para aprovar, a prova não pode ser nula',
+        'Para aprovar ou rejeitar, a prova não pode ser nula',
         HttpStatus.BAD_REQUEST,
       );
     }
     const prova = await this.provaRepository.getById(question.prova._id);
     if (status === Status.Approved) {
-      prova.totalQuestaoValidadas += 1;
-      await this.simuladoService.addQuestionSimulados(
-        prova.simulado,
-        question,
-        prova.nome,
-      );
+      await this.provaService.addQuestion(prova._id, question);
     } else {
-      prova.totalQuestaoValidadas -= 1;
-      await this.simuladoService.removeQuestionSimulados(
-        prova.simulado,
-        question,
-        prova.nome,
-      );
+      await this.provaService.removeQuestion(prova._id, question);
     }
     await this.repository.UpdateStatus(id, status);
-    await this.provaRepository.update(prova);
+    await this.auditLogService.create({
+      user: userId,
+      entityId: question?._id,
+      entityType: 'Questao',
+      changes: JSON.stringify({
+        status,
+        message,
+      }),
+    });
   }
 
   public async updateQuestion(question: UpdateDTOInput) {
@@ -139,12 +139,6 @@ export class QuestaoService {
         );
       }
       await this.provaService.addQuestion(question.prova, questao);
-      const prova = await this.provaRepository.getById(question.prova);
-      await this.simuladoService.addQuestionSimulados(
-        prova.simulado,
-        questao,
-        prova.nome,
-      );
     } else if (
       question.prova !== undefined &&
       question.prova !== questao.prova._id.toString()
@@ -161,19 +155,7 @@ export class QuestaoService {
         );
       }
       await this.provaService.removeQuestion(questao.prova._id, questao);
-      const oldProva = await this.provaRepository.getById(questao.prova._id);
-      await this.simuladoService.removeQuestionSimulados(
-        oldProva.simulado,
-        questao,
-        oldProva.nome,
-      );
       await this.provaService.addQuestion(question.prova, questao);
-      const newProva = await this.provaRepository.getById(question.prova);
-      await this.simuladoService.addQuestionSimulados(
-        newProva.simulado,
-        questao,
-        newProva.nome,
-      );
     }
     await this.repository.updateQuestion(question);
   }
