@@ -26,7 +26,7 @@ export class ProvaService {
     if (!!hasProva) {
       throw new HttpException('Prova já esta cadastrada', HttpStatus.CONFLICT);
     }
-    prova.simulado = await this.simuladoService.createByProva(prova);
+    await this.simuladoService.createByProva(prova);
     const newProva = await this.repository.create(prova);
     return newProva;
   }
