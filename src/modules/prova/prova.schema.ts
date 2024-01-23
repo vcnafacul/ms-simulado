@@ -7,6 +7,7 @@ import { CreateProvaDTOInput } from './dtos/create.dto.input';
 import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
 import { Questao } from '../questao/questao.schema';
 import { Simulado } from '../simulado/schemas/simulado.schema';
+import { ObjectId } from 'bson';
 
 @Schema({ timestamps: true, versionKey: false })
 export class Prova extends BaseSchema {
@@ -36,7 +37,7 @@ export class Prova extends BaseSchema {
   @Prop({ ref: TipoSimulado.name, type: Types.ObjectId })
   public tipo: TipoSimulado;
 
-  @Prop({ ref: Simulado.name, type: [Types.ObjectId] })
+  @Prop({ ref: Simulado.name, type: [ObjectId] })
   public simulado: Simulado[];
 
   @Prop({
