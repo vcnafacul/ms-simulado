@@ -24,19 +24,13 @@ export class SimuladoService {
     prova.simulado = [];
     const mainName = `${prova.tipo.nome} ${prova.ano}`;
     if (prova.tipo.nome === EnemArea.Enem1) {
+      prova.simulado.push(await this.createArea(mainName, EnemArea.Linguagens));
       prova.simulado.push(
-        await this.createArea(`${mainName} ${EnemArea.Linguagens}`),
-      );
-      prova.simulado.push(
-        await this.createArea(`${mainName} ${EnemArea.CienciasHumanas}`),
+        await this.createArea(mainName, EnemArea.CienciasHumanas),
       );
     } else if (prova.tipo.nome === EnemArea.Enem2) {
-      prova.simulado.push(
-        await this.createArea(`${mainName} ${EnemArea.BioExatas}`),
-      );
-      prova.simulado.push(
-        await this.createArea(`${mainName} ${EnemArea.Matematica}`),
-      );
+      prova.simulado.push(await this.createArea(mainName, EnemArea.BioExatas));
+      prova.simulado.push(await this.createArea(mainName, EnemArea.Matematica));
     }
     prova.simulado.push(
       await this.repository.create({
@@ -127,13 +121,13 @@ export class SimuladoService {
     }
   }
 
-  private async createArea(nome: string) {
+  private async createArea(defaultName: string, nameTipo: string) {
     const simuladoArea = new Simulado();
     const tipo = await this.tipoSimuladoRepository.getByFilter({
-      nome,
+      nameTipo,
     });
     simuladoArea.tipo = tipo;
-    simuladoArea.nome = nome;
+    simuladoArea.nome = `${defaultName} ${nameTipo}`;
     simuladoArea.questoes = [];
     return await this.repository.create(simuladoArea);
   }
