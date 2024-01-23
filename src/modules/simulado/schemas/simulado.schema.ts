@@ -2,7 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Questao } from '../../questao/questao.schema';
 import { TipoSimulado } from '../../tipo-simulado/schemas/tipo-simulado.schema';
 import { BaseSchema } from 'src/shared/base/base.schema';
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { ApiProperty } from '@nestjs/swagger';
 
 @Schema({ timestamps: true, versionKey: false })
@@ -19,10 +19,7 @@ export class Simulado extends BaseSchema {
   @ApiProperty()
   tipo: TipoSimulado;
 
-  @Prop({
-    ref: 'Questao',
-    type: [Types.ObjectId],
-  })
+  @Prop({ type: [{ ref: 'Questao', type: mongoose.Schema.Types.ObjectId }] })
   @ApiProperty({ type: Questao, isArray: true })
   questoes: Questao[];
 
