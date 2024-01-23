@@ -21,22 +21,30 @@ export class SimuladoService {
   ) {}
 
   public async createByProva(prova: Prova) {
-    const arratSimulado: Simulado[] = [];
-    const simulado = new Simulado();
-    simulado.tipo = prova.tipo;
-    simulado.nome = `${prova.tipo.nome} ${prova.ano}`;
-    simulado.questoes = prova.questoes;
+    const mainName = `${prova.tipo.nome} ${prova.ano}`;
     if (prova.tipo.nome === EnemArea.Enem1) {
-      arratSimulado.push(await this.createArea(simulado, EnemArea.Linguagens));
-      arratSimulado.push(
-        await this.createArea(simulado, EnemArea.CienciasHumanas),
+      prova.simulado.push(
+        await this.createArea(`${mainName} ${EnemArea.Linguagens}`),
+      );
+      prova.simulado.push(
+        await this.createArea(`${mainName} ${EnemArea.CienciasHumanas}`),
       );
     } else if (prova.tipo.nome === EnemArea.Enem2) {
-      arratSimulado.push(await this.createArea(simulado, EnemArea.BioExatas));
-      arratSimulado.push(await this.createArea(simulado, EnemArea.Matematica));
+      prova.simulado.push(
+        await this.createArea(`${mainName} ${EnemArea.BioExatas}`),
+      );
+      prova.simulado.push(
+        await this.createArea(`${mainName} ${EnemArea.Matematica}`),
+      );
     }
-    arratSimulado.push(await this.repository.create(simulado));
-    return arratSimulado;
+    prova.simulado.push(
+      await this.repository.create({
+        nome: mainName,
+        tipo: prova.tipo,
+        questoes: [],
+        descricao: prova.exame.nome,
+      }),
+    );
   }
 
   public async getById(id: string): Promise<Simulado | null> {
@@ -118,13 +126,13 @@ export class SimuladoService {
     }
   }
 
-  private async createArea(simulado: Simulado, nome: string) {
+  private async createArea(nome: string) {
     const simuladoArea = new Simulado();
     const tipo = await this.tipoSimuladoRepository.getByFilter({
       nome,
     });
     simuladoArea.tipo = tipo;
-    simuladoArea.nome = `${simulado.nome} - ${nome}`;
+    simuladoArea.nome = nome;
     simuladoArea.questoes = [];
     return await this.repository.create(simuladoArea);
   }
