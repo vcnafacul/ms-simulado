@@ -21,6 +21,7 @@ export class SimuladoService {
   ) {}
 
   public async createByProva(prova: Prova) {
+    prova.simulado = [];
     const mainName = `${prova.tipo.nome} ${prova.ano}`;
     if (prova.tipo.nome === EnemArea.Enem1) {
       prova.simulado.push(
