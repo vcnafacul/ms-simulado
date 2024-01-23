@@ -41,7 +41,7 @@ export class Prova extends BaseSchema {
   })
   public simulado: Simulado[];
 
-  @Prop({ ref: 'Questao', type: [Types.ObjectId] })
+  @Prop({ type: [{ ref: 'Questao', type: mongoose.Schema.Types.ObjectId }] })
   questoes: Questao[];
 
   @Prop()
