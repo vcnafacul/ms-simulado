@@ -194,10 +194,6 @@ export class SimuladoService {
     const tipo = await this.tipoSimuladoRepository.getByFilter({
       nome: nomeTipo,
     });
-    const simulados = await this.repository.getAvailable(tipo._id);
-    return simulados.map((simulado) => ({
-      nome: simulado.nome,
-      simuladoId: simulado._id,
-    }));
+    return await this.repository.getAvailable(tipo._id);
   }
 }

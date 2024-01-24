@@ -47,6 +47,9 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
   }
 
   async getAvailable(tipo: string) {
-    return await this.model.find().where({ tipo, bloqueado: false });
+    return await this.model
+      .find()
+      .where({ tipo, bloqueado: false })
+      .select(['nome', '_id']);
   }
 }

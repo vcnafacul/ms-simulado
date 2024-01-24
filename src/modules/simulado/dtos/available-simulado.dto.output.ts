@@ -5,5 +5,5 @@ export class AvailableSimuladoDTOoutput {
   nome: string;
 
   @ApiProperty()
-  simuladoId: string;
+  _id: string;
 }
