@@ -45,4 +45,8 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
   async update(simulado: Simulado) {
     await this.model.updateOne({ _id: simulado._id }, simulado);
   }
+
+  async getAvailable(tipo: string) {
+    return await this.model.find().where({ tipo, bloqueado: false });
+  }
 }

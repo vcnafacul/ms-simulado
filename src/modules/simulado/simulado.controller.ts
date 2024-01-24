@@ -1,9 +1,18 @@
-import { Body, Controller, Get, Param, Post, Delete } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Delete,
+  Query,
+} from '@nestjs/common';
 import { SimuladoService } from './simulado.service';
 import { Simulado } from './schemas/simulado.schema';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
 import { AnswerSimulado } from './dtos/answer-simulado.dto.input';
+import { AvailableSimuladoDTOoutput } from './dtos/available-simulado.dto.output';
 
 @ApiTags('Simulado')
 @Controller('v1/simulado')
@@ -35,6 +44,13 @@ export class SimuladoController {
   @Post('answer')
   public async answer(@Body() answer: AnswerSimulado) {
     await this.service.answer(answer);
+  }
+
+  @Get('available')
+  public async getAvailable(
+    @Query('tipo') tipo: string,
+  ): Promise<AvailableSimuladoDTOoutput[]> {
+    return await this.service.getAvailable(tipo);
   }
 
   @Get(':id')

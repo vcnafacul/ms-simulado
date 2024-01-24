@@ -11,6 +11,7 @@ import { RespostaSimulado } from './schemas/resposta-simulado.schema';
 import { Prova } from '../prova/prova.schema';
 import { Questao } from '../questao/questao.schema';
 import { EnemArea } from '../questao/enums/enem-area.enum';
+import { AvailableSimuladoDTOoutput } from './dtos/available-simulado.dto.output';
 
 @Injectable()
 export class SimuladoService {
@@ -185,5 +186,18 @@ export class SimuladoService {
           inicio: inicio,
           duracao: simulado.tipo.duracao,
         };
+  }
+
+  public async getAvailable(
+    nomeTipo: string,
+  ): Promise<AvailableSimuladoDTOoutput[]> {
+    const tipo = await this.tipoSimuladoRepository.getByFilter({
+      nome: nomeTipo,
+    });
+    const simulados = await this.repository.getAvailable(tipo._id);
+    return simulados.map((simulado) => ({
+      nome: simulado.nome,
+      simuladoId: simulado._id,
+    }));
   }
 }
