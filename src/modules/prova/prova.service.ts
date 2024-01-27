@@ -62,11 +62,6 @@ export class ProvaService {
       prova.totalQuestaoValidadas += 1;
     }
     this.repository.update(prova);
-    await this.simuladoService.addQuestionSimulados(
-      prova.simulado,
-      question,
-      prova.nome,
-    );
   }
 
   public async removeQuestion(id: string, oldQuestao: Questao) {
@@ -82,9 +77,26 @@ export class ProvaService {
       }
       await this.repository.update(prova);
     }
+  }
+
+  public async approvedQuestion(id: string, question: Questao) {
+    const prova = await this.repository.getById(id);
+    prova.totalQuestaoValidadas++;
+    await this.repository.update(prova);
+    await this.simuladoService.addQuestionSimulados(
+      prova.simulado,
+      question,
+      prova.nome,
+    );
+  }
+
+  public async refuseQuestion(id: string, question: Questao) {
+    const prova = await this.repository.getById(id);
+    prova.totalQuestaoValidadas--;
+    await this.repository.update(prova);
     await this.simuladoService.removeQuestionSimulados(
       prova.simulado,
-      oldQuestao,
+      question,
       prova.nome,
     );
   }
