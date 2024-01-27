@@ -1,5 +1,5 @@
 export enum Edicao {
   Regular = 'Regular',
   Digital = 'Digital',
-  Replicacao = 'Replicacao',
+  Replicacao = 'Reaplicação/PPL',
 }
