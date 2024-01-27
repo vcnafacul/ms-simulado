@@ -102,9 +102,9 @@ export class QuestaoService {
     }
     const prova = await this.provaRepository.getById(question.prova._id);
     if (status === Status.Approved) {
-      await this.provaService.addQuestion(prova._id, question);
+      await this.provaService.approvedQuestion(prova._id, question);
     } else {
-      await this.provaService.removeQuestion(prova._id, question);
+      await this.provaService.refuseQuestion(prova._id, question);
     }
     await this.repository.UpdateStatus(id, status);
     await this.auditLogService.create({
