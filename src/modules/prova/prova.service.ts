@@ -47,10 +47,11 @@ export class ProvaService {
 
   public async verifyNumber(id: string, questao: Questao): Promise<boolean> {
     const prova = await this.repository.getProvaWithQuestion(id);
-    return prova.questoes.some(
-      (quest) =>
-        quest.numero === questao.numero ||
-        quest._id.toString() === questao._id.toString(),
+    console.log(questao._id);
+    return prova.questoes.some((quest) =>
+      quest.numero === questao.numero || questao._id
+        ? quest._id.toString() === questao._id.toString()
+        : false,
     );
   }
 
