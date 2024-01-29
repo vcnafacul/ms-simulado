@@ -120,6 +120,7 @@ export class QuestaoService {
 
   public async updateQuestion(question: UpdateDTOInput) {
     const questao = await this.repository.getById(question._id);
+    // Não existia prova antes
     if (!questao.prova) {
       if (!question.prova) {
         throw new HttpException(
@@ -139,23 +140,27 @@ export class QuestaoService {
         );
       }
       await this.provaService.addQuestion(question.prova, questao);
-    } else if (
-      question.prova !== undefined &&
-      question.prova !== questao.prova._id.toString()
-    ) {
+    } else if (question.prova !== undefined) {
+      // Está alterando a prova da questão?
       if (
-        await this.provaService.verifyNumber(question.prova, {
-          ...questao.toJSON(),
-          numero: question.numero,
-        })
+        question.prova !== questao.prova._id ||
+        question.numero !== questao.numero
       ) {
-        throw new HttpException(
-          `Possível questão já cadastrada com número ${question.numero}.`,
-          HttpStatus.CONFLICT,
-        );
+        if (
+          await this.provaService.verifyNumber(question.prova, {
+            ...questao.toJSON(),
+            numero: question.numero,
+          })
+        ) {
+          throw new HttpException(
+            `Possível questão já cadastrada com número ${question.numero}.`,
+            HttpStatus.CONFLICT,
+          );
+        }
+        await this.provaService.removeQuestion(questao.prova._id, questao);
+        await this.provaService.addQuestion(question.prova, questao);
       }
-      await this.provaService.removeQuestion(questao.prova._id, questao);
-      await this.provaService.addQuestion(question.prova, questao);
+      await this.repository.updateQuestion(question);
     }
     await this.repository.updateQuestion(question);
   }
