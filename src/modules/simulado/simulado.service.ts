@@ -65,6 +65,21 @@ export class SimuladoService {
     }
   }
 
+  public confirmAddQuestionSimulados(
+    simulados: Simulado[],
+    question: Questao,
+    nomeProva: string,
+  ): boolean {
+    return simulados.some((sml) => {
+      if (
+        sml.nome.includes(question.enemArea) ||
+        sml.nome === nomeProva.substring(0, 15)
+      ) {
+        return sml.tipo.quantidadeTotalQuestao === sml.questoes.length;
+      }
+    });
+  }
+
   public async addQuestionSimulados(
     simulados: Simulado[],
     question: Questao,
