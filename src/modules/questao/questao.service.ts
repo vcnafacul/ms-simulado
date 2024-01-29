@@ -13,6 +13,7 @@ import { ExameRepository } from '../exame/exame.repository';
 import { ProvaService } from '../prova/prova.service';
 import { SimuladoService } from '../simulado/simulado.service';
 import { AuditLogService } from '../auditLog/auditLog.service';
+import { EnemArea } from './enums/enem-area.enum';
 
 @Injectable()
 export class QuestaoService {
@@ -120,6 +121,22 @@ export class QuestaoService {
 
   public async updateQuestion(question: UpdateDTOInput) {
     const questao = await this.repository.getById(question._id);
+    if (question.prova) {
+      const prova = await this.provaService.getById(question.prova);
+      if (
+        (prova.nome.includes('Dia 1') &&
+          ![EnemArea.CienciasHumanas, EnemArea.Linguagens].includes(
+            questao.enemArea,
+          )) ||
+        (prova.nome.includes('Dia 2') &&
+          ![EnemArea.BioExatas, EnemArea.Matematica].includes(questao.enemArea))
+      ) {
+        throw new HttpException(
+          'Area do conhecimento não coincide com a prova',
+          HttpStatus.CONFLICT,
+        );
+      }
+    }
     // Não existia prova antes
     if (!questao.prova) {
       if (!question.prova) {
