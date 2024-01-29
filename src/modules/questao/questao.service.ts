@@ -87,35 +87,42 @@ export class QuestaoService {
     userId: number,
     message?: string,
   ) {
-    const question = await this.repository.getById(id);
-    if (question.status === status) {
+    try {
+      const question = await this.repository.getById(id);
+      if (question.status === status) {
+        throw new HttpException(
+          'Não houve alteração de status',
+          HttpStatus.NOT_MODIFIED,
+        );
+      }
+      if (!question.prova) {
+        throw new HttpException(
+          'Para aprovar ou rejeitar, a prova não pode ser nula',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      const prova = await this.provaRepository.getById(question.prova._id);
+      if (status === Status.Approved) {
+        await this.provaService.approvedQuestion(prova._id, question);
+      } else {
+        await this.provaService.refuseQuestion(prova._id, question);
+      }
+      await this.repository.UpdateStatus(id, status);
+      await this.auditLogService.create({
+        user: userId,
+        entityId: question?._id,
+        entityType: 'Questao',
+        changes: JSON.stringify({
+          status,
+          message,
+        }),
+      });
+    } catch (error: any) {
       throw new HttpException(
-        'Não houve alteração de status',
-        HttpStatus.NOT_MODIFIED,
+        `Não foi possível atualizar a questão.  ${error.message}`,
+        error.status,
       );
     }
-    if (!question.prova) {
-      throw new HttpException(
-        'Para aprovar ou rejeitar, a prova não pode ser nula',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-    const prova = await this.provaRepository.getById(question.prova._id);
-    if (status === Status.Approved) {
-      await this.provaService.approvedQuestion(prova._id, question);
-    } else {
-      await this.provaService.refuseQuestion(prova._id, question);
-    }
-    await this.repository.UpdateStatus(id, status);
-    await this.auditLogService.create({
-      user: userId,
-      entityId: question?._id,
-      entityType: 'Questao',
-      changes: JSON.stringify({
-        status,
-        message,
-      }),
-    });
   }
 
   public async updateQuestion(question: UpdateDTOInput) {

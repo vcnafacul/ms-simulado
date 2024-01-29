@@ -82,6 +82,18 @@ export class ProvaService {
 
   public async approvedQuestion(id: string, question: Questao) {
     const prova = await this.repository.getById(id);
+    if (
+      this.simuladoService.confirmAddQuestionSimulados(
+        prova.simulado,
+        question,
+        prova.nome,
+      )
+    ) {
+      throw new HttpException(
+        'Não é possível inserir questões no simulado. Verifique se os simulados já estão completos',
+        HttpStatus.CONFLICT,
+      );
+    }
     prova.totalQuestaoValidadas++;
     await this.repository.update(prova);
     await this.simuladoService.addQuestionSimulados(
