@@ -15,7 +15,7 @@ export class ProvaRepository extends BaseRepository<Prova> {
   }
 
   async getProvaWithQuestion(id: string): Promise<Prova> {
-    return (await this.model.findById(id)).populate(['questoes']);
+    return await this.model.findById(id).populate('questoes', 'numero').exec();
   }
 
   async getById(id: string): Promise<Prova> {

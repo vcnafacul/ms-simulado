@@ -47,12 +47,15 @@ export class ProvaService {
 
   public async verifyNumber(id: string, questao: Questao): Promise<boolean> {
     const prova = await this.repository.getProvaWithQuestion(id);
-    console.log(questao._id);
-    return prova.questoes.some((quest) =>
-      quest.numero === questao.numero || questao._id
-        ? quest._id.toString() === questao._id.toString()
-        : false,
-    );
+    if (
+      questao._id &&
+      prova.questoes.some(
+        (quest) => quest._id.toString() === questao._id.toString(),
+      )
+    ) {
+      return false;
+    }
+    return prova.questoes.some((quest) => quest.numero === questao.numero);
   }
 
   public async addQuestion(id: string, question: Questao) {
@@ -104,8 +107,13 @@ export class ProvaService {
 
   public async getMissingNumber(id: string) {
     const prova = await this.repository.getProvaWithQuestion(id);
+    const day1 = prova.nome.includes('Dia 1');
     const missingQuestion = [];
-    for (let index = 1; index <= prova.totalQuestao; index++) {
+    for (
+      let index = day1 ? 1 : 91;
+      index <= (day1 ? prova.totalQuestao : prova.totalQuestao + 90);
+      index++
+    ) {
       if (!prova.questoes.find((quest) => quest.numero === index)) {
         missingQuestion.push(index);
       }
