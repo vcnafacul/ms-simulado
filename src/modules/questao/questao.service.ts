@@ -11,16 +11,13 @@ import { UpdateDTOInput } from './dtos/update.dto.input';
 import { ProvaRepository } from '../prova/prova.repository';
 import { ExameRepository } from '../exame/exame.repository';
 import { ProvaService } from '../prova/prova.service';
-import { SimuladoService } from '../simulado/simulado.service';
 import { AuditLogService } from '../auditLog/auditLog.service';
-import { EnemArea } from './enums/enem-area.enum';
 
 @Injectable()
 export class QuestaoService {
   constructor(
     private readonly repository: QuestaoRepository,
     private readonly provaService: ProvaService,
-    private readonly simuladoService: SimuladoService,
     private readonly provaRepository: ProvaRepository,
     private readonly exameRepository: ExameRepository,
     private readonly materiaRepository: MateriaRepository,
@@ -30,7 +27,9 @@ export class QuestaoService {
 
   public async create(item: CreateQuestaoDTOInput): Promise<Questao> {
     const newQuestion = Object.assign(new Questao(), item);
-    if (!(await this.provaService.verifyNumber(item.prova, newQuestion))) {
+    if (
+      !(await this.provaService.verifyNumber(item.prova, newQuestion.numero))
+    ) {
       const questao = await this.repository.create(
         Object.assign(new Questao(), item),
       );
@@ -104,10 +103,11 @@ export class QuestaoService {
       }
       const prova = await this.provaRepository.getById(question.prova._id);
       if (status === Status.Approved) {
-        await this.provaService.approvedQuestion(prova._id, question);
+        await this.provaService.approvedQuestion(prova._id, question, prova);
       } else {
-        await this.provaService.refuseQuestion(prova._id, question);
+        await this.provaService.refuseQuestion(prova._id, question, prova);
       }
+      await this.provaRepository.update(prova);
       await this.repository.UpdateStatus(id, status);
       await this.auditLogService.create({
         user: userId,
@@ -128,23 +128,22 @@ export class QuestaoService {
 
   public async updateQuestion(question: UpdateDTOInput) {
     const questao = await this.repository.getById(question._id);
-    if (question.prova) {
-      const prova = await this.provaService.getById(question.prova);
-      if (
-        (prova.nome.includes('Dia 1') &&
-          ![EnemArea.CienciasHumanas, EnemArea.Linguagens].includes(
-            question.enemArea,
-          )) ||
-        (prova.nome.includes('Dia 2') &&
-          ![EnemArea.BioExatas, EnemArea.Matematica].includes(
-            question.enemArea,
-          ))
-      ) {
-        throw new HttpException(
-          'Area do conhecimento não coincide com a prova',
-          HttpStatus.CONFLICT,
-        );
-      }
+    if (question.prova)
+      this.provaService.ValidatorProvaWithEnemArea(
+        question.prova,
+        question.enemArea,
+      );
+    if (
+      (question.prova && !questao.prova) ||
+      (question.prova &&
+        (question.prova !== questao.prova._id.toString() ||
+          question.numero !== questao.numero))
+    ) {
+      await this.provaService.ValidatorProvaWithInfoQuestion(
+        question.prova,
+        question.numero,
+        question._id,
+      );
     }
     // Não existia prova antes
     if (!questao.prova) {
@@ -154,40 +153,27 @@ export class QuestaoService {
           HttpStatus.CONFLICT,
         );
       }
-      if (
-        await this.provaService.verifyNumber(question.prova, {
-          ...questao.toJSON(),
-          numero: question.numero,
-        })
-      ) {
-        throw new HttpException(
-          `Possível questão já cadastrada com número ${question.numero}.`,
-          HttpStatus.CONFLICT,
-        );
-      }
-      await this.provaService.addQuestion(question.prova, {
-        ...question,
-      } as unknown as Questao);
+      await this.provaService.addQuestion(question.prova, questao);
     } else if (question.prova !== undefined) {
       // Está alterando a prova da questão?
       if (
-        question.prova !== questao.prova._id ||
+        question.prova !== questao.prova._id.toString() ||
         question.numero !== questao.numero
       ) {
-        if (
-          await this.provaService.verifyNumber(question.prova, {
-            ...questao.toJSON(),
-            numero: question.numero,
-          })
-        ) {
-          throw new HttpException(
-            `Possível questão já cadastrada com número ${question.numero}.`,
-            HttpStatus.CONFLICT,
-          );
-        }
+        await this.provaService.ValidatorProvaWithInfoQuestion(
+          question.prova,
+          question.numero,
+          question._id,
+        );
+      }
+      if (
+        question.prova !== questao.prova._id.toString() ||
+        question.enemArea !== questao.enemArea
+      ) {
         await this.provaService.removeQuestion(questao.prova._id, questao);
         await this.provaService.addQuestion(question.prova, {
           ...question,
+          enemArea: question.enemArea,
           status: questao.status,
         } as unknown as Questao);
       }
