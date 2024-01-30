@@ -63,7 +63,7 @@ export class ProvaService {
     prova.questoes.push(question);
     prova.totalQuestaoCadastradas += 1;
     if (question.status === Status.Approved) {
-      prova.totalQuestaoValidadas += 1;
+      await this.approvedQuestion(id, question);
     }
     this.repository.update(prova);
   }
@@ -77,7 +77,7 @@ export class ProvaService {
       prova.questoes.splice(index, 1);
       prova.totalQuestaoCadastradas -= 1;
       if (oldQuestao.status === Status.Approved) {
-        prova.totalQuestaoValidadas -= 1;
+        await this.refuseQuestion(id, oldQuestao);
       }
       await this.repository.update(prova);
     }

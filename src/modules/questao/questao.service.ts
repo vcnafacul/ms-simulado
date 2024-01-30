@@ -128,15 +128,17 @@ export class QuestaoService {
 
   public async updateQuestion(question: UpdateDTOInput) {
     const questao = await this.repository.getById(question._id);
-    if (question.prova) {
+   if (question.prova) {
       const prova = await this.provaService.getById(question.prova);
       if (
         (prova.nome.includes('Dia 1') &&
           ![EnemArea.CienciasHumanas, EnemArea.Linguagens].includes(
-            questao.enemArea,
+            question.enemArea,
           )) ||
         (prova.nome.includes('Dia 2') &&
-          ![EnemArea.BioExatas, EnemArea.Matematica].includes(questao.enemArea))
+          ![EnemArea.BioExatas, EnemArea.Matematica].includes(
+            question.enemArea,
+          ))
       ) {
         throw new HttpException(
           'Area do conhecimento não coincide com a prova',
@@ -163,7 +165,9 @@ export class QuestaoService {
           HttpStatus.CONFLICT,
         );
       }
-      await this.provaService.addQuestion(question.prova, questao);
+      await this.provaService.addQuestion(question.prova, {
+        ...question,
+      } as unknown as Questao);
     } else if (question.prova !== undefined) {
       // Está alterando a prova da questão?
       if (
@@ -182,9 +186,11 @@ export class QuestaoService {
           );
         }
         await this.provaService.removeQuestion(questao.prova._id, questao);
-        await this.provaService.addQuestion(question.prova, questao);
+        await this.provaService.addQuestion(question.prova, {
+          ...question,
+          status: questao.status,
+        } as unknown as Questao);
       }
-      await this.repository.updateQuestion(question);
     }
     await this.repository.updateQuestion(question);
   }
