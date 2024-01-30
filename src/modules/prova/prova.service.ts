@@ -7,6 +7,7 @@ import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repositor
 import { SimuladoService } from '../simulado/simulado.service';
 import { Questao } from '../questao/questao.schema';
 import { Status } from '../questao/enums/status.enum';
+import { EnemArea } from '../questao/enums/enem-area.enum';
 
 @Injectable()
 export class ProvaService {
@@ -45,17 +46,19 @@ export class ProvaService {
     return await this.repository.getByFilter({ nome });
   }
 
-  public async verifyNumber(id: string, questao: Questao): Promise<boolean> {
+  public async verifyNumber(
+    id: string,
+    numberQuestion: number,
+    idQuestion?: string,
+  ): Promise<boolean> {
     const prova = await this.repository.getProvaWithQuestion(id);
     if (
-      questao._id &&
-      prova.questoes.some(
-        (quest) => quest._id.toString() === questao._id.toString(),
-      )
+      idQuestion &&
+      prova.questoes.some((quest) => quest._id.toString() === idQuestion)
     ) {
       return false;
     }
-    return prova.questoes.some((quest) => quest.numero === questao.numero);
+    return prova.questoes.some((quest) => quest.numero === numberQuestion);
   }
 
   public async addQuestion(id: string, question: Questao) {
@@ -63,7 +66,7 @@ export class ProvaService {
     prova.questoes.push(question);
     prova.totalQuestaoCadastradas += 1;
     if (question.status === Status.Approved) {
-      await this.approvedQuestion(id, question);
+      await this.approvedQuestion(id, question, prova);
     }
     this.repository.update(prova);
   }
@@ -77,14 +80,21 @@ export class ProvaService {
       prova.questoes.splice(index, 1);
       prova.totalQuestaoCadastradas -= 1;
       if (oldQuestao.status === Status.Approved) {
-        await this.refuseQuestion(id, oldQuestao);
+        await this.refuseQuestion(id, oldQuestao, prova);
       }
       await this.repository.update(prova);
     }
   }
 
-  public async approvedQuestion(id: string, question: Questao) {
-    const prova = await this.repository.getById(id);
+  public async approvedQuestion(
+    id: string,
+    question: Questao,
+    provaRef?: Prova,
+  ) {
+    let prova;
+    if (provaRef) prova = provaRef;
+    else prova = await this.repository.getById(id);
+
     if (
       this.simuladoService.confirmAddQuestionSimulados(
         prova.simulado,
@@ -98,7 +108,7 @@ export class ProvaService {
       );
     }
     prova.totalQuestaoValidadas++;
-    await this.repository.update(prova);
+    if (!provaRef) await this.repository.update(prova);
     await this.simuladoService.addQuestionSimulados(
       prova.simulado,
       question,
@@ -106,10 +116,12 @@ export class ProvaService {
     );
   }
 
-  public async refuseQuestion(id: string, question: Questao) {
-    const prova = await this.repository.getById(id);
+  public async refuseQuestion(id: string, question: Questao, provaRef?: Prova) {
+    let prova;
+    if (provaRef) prova = provaRef;
+    else prova = await this.repository.getById(id);
     prova.totalQuestaoValidadas--;
-    await this.repository.update(prova);
+    if (!provaRef) await this.repository.update(prova);
     await this.simuladoService.removeQuestionSimulados(
       prova.simulado,
       question,
@@ -131,5 +143,33 @@ export class ProvaService {
       }
     }
     return missingQuestion;
+  }
+
+  public async ValidatorProvaWithEnemArea(id: string, enemArea: EnemArea) {
+    const prova = await this.repository.getById(id);
+    if (
+      (prova.nome.includes('Dia 1') &&
+        ![EnemArea.CienciasHumanas, EnemArea.Linguagens].includes(enemArea)) ||
+      (prova.nome.includes('Dia 2') &&
+        ![EnemArea.BioExatas, EnemArea.Matematica].includes(enemArea))
+    ) {
+      throw new HttpException(
+        'Area do conhecimento não coincide com a prova',
+        HttpStatus.CONFLICT,
+      );
+    }
+  }
+
+  public async ValidatorProvaWithInfoQuestion(
+    id: string,
+    numberQuestion: number,
+    IdQuestion?: string,
+  ) {
+    if (await this.verifyNumber(id, numberQuestion, IdQuestion)) {
+      throw new HttpException(
+        `Possível questão já cadastrada com número ${numberQuestion}.`,
+        HttpStatus.CONFLICT,
+      );
+    }
   }
 }
