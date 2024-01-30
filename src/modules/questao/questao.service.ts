@@ -128,7 +128,7 @@ export class QuestaoService {
 
   public async updateQuestion(question: UpdateDTOInput) {
     const questao = await this.repository.getById(question._id);
-   if (question.prova) {
+    if (question.prova) {
       const prova = await this.provaService.getById(question.prova);
       if (
         (prova.nome.includes('Dia 1') &&
