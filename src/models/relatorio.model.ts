@@ -1,12 +1,12 @@
-import { RespostaRelatorio } from "src/models/resposta-relatorio.model";
-import { ISimulado } from "src/models/simulado.model"
+import { Simulado } from 'src/modules/simulado/schemas/simulado.schema';
+import { RespostaRelatorio } from './resposta-relatorio.model';
 
 export class Relatorio {
-    constructor(
-        public _id: string,
-        public estudante: number,
-        public simulado: ISimulado,
-        public respostas: RespostaRelatorio[],
-        public aproveitamento: number
-    ) { }
+  constructor(
+    public _id: string,
+    public estudante: number,
+    public simulado: Simulado,
+    public respostas: RespostaRelatorio[],
+    public aproveitamento: number,
+  ) {}
 }
