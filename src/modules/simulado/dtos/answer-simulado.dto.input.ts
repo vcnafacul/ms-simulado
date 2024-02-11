@@ -3,7 +3,7 @@ import { AnswerDTO } from './answer.dto.input';
 import { IsArray, IsNumber, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class AnswerSimulado {
+export class AnswerSimuladoDto {
   @ApiProperty()
   @IsNumber()
   idEstudante: number;
@@ -17,4 +17,8 @@ export class AnswerSimulado {
   @ValidateNested({ each: true })
   @Type(() => AnswerDTO)
   respostas: AnswerDTO[];
+
+  @ApiProperty()
+  @IsNumber()
+  tempoRealizado: number;
 }

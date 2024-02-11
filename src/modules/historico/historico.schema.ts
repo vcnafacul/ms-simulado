@@ -3,7 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { BaseSchema } from 'src/shared/base/base.schema';
 import { Simulado } from '../simulado/schemas/simulado.schema';
 import { Types } from 'mongoose';
-import { Resposta } from '../simulado/schemas/resposta.schema';
+import { Resposta } from './types/resposta';
 import { Aproveitamento } from './types/aproveitamento';
 
 @Schema({ timestamps: false, versionKey: false })
