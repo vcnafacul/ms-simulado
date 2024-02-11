@@ -11,6 +11,7 @@ import { TipoSimuladoModule } from '../tipo-simulado/tipo-simulado.module';
 import { ExameModule } from '../exame/exame.module';
 import { FrenteModule } from '../frente/frente.module';
 import { MateriaModule } from '../materia/materia.module';
+import { HistoricoModule } from '../historico/historico.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { MateriaModule } from '../materia/materia.module';
     ExameModule,
     FrenteModule,
     MateriaModule,
+    HistoricoModule,
   ],
   controllers: [SimuladoController],
   providers: [SimuladoService, SimuladoRepository, ProvaRepository],

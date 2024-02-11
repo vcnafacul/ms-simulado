@@ -19,6 +19,7 @@ import {
 import { SimuladoRepository } from '../simulado/repository/simulado.repository';
 import { Simulado, SimuladoSchema } from '../simulado/schemas/simulado.schema';
 import { AuditLogModule } from '../auditLog/auditLog.module';
+import { HistoricoModule } from '../historico/historico.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { AuditLogModule } from '../auditLog/auditLog.module';
     FrenteModule,
     MateriaModule,
     AuditLogModule,
+    HistoricoModule,
   ],
   providers: [
     QuestaoService,
