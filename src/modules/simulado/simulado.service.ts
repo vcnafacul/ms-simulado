@@ -152,11 +152,9 @@ export class SimuladoService {
     const simulado = await this.repository.answer(answer.idSimulado);
 
     const respostas = simulado?.questoes.map((questao) => {
-      const resposta = answer.respostas.find(
-        (r) => r.questao === questao._id.toString(),
-      );
+      const resposta = answer.respostas.find((r) => r.questao === questao);
       return {
-        questao: questao._id.toString(),
+        questao: questao,
         alternativaEstudante: resposta?.alternativaEstudante,
         alternativaCorreta: questao.alternativa,
       };
