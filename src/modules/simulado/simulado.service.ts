@@ -2,12 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { SimuladoRepository } from './repository/simulado.repository';
 import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
 import { Simulado } from './schemas/simulado.schema';
-// import { EnemArea } from '../questao/enums/enem-area.enum';
-// import { toPascalCaseSemAcentos } from 'src/utils/string';
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
 import { AnswerSimulado } from './dtos/answer-simulado.dto.input';
-import { RespostaRepository } from './repository/resposta.repository';
-import { RespostaSimulado } from './schemas/resposta-simulado.schema';
 import { Prova } from '../prova/prova.schema';
 import { Questao } from '../questao/questao.schema';
 import { EnemArea } from '../questao/enums/enem-area.enum';
@@ -18,7 +14,6 @@ export class SimuladoService {
   constructor(
     private readonly repository: SimuladoRepository,
     private readonly tipoSimuladoRepository: TipoSimuladoRepository,
-    private readonly respostaRepository: RespostaRepository, // private readonly questaoService: QuestaoService,
   ) {}
 
   public async createByProva(prova: Prova) {

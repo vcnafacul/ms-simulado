@@ -17,12 +17,7 @@ import {
   TipoSimuladoSchema,
 } from '../tipo-simulado/schemas/tipo-simulado.schema';
 import { SimuladoRepository } from '../simulado/repository/simulado.repository';
-import { RespostaRepository } from '../simulado/repository/resposta.repository';
 import { Simulado, SimuladoSchema } from '../simulado/schemas/simulado.schema';
-import {
-  RespostaSimulado,
-  RespostaSimuladoSchema,
-} from '../simulado/schemas/resposta-simulado.schema';
 import { AuditLogModule } from '../auditLog/auditLog.module';
 
 @Module({
@@ -32,7 +27,6 @@ import { AuditLogModule } from '../auditLog/auditLog.module';
       { name: Prova.name, schema: ProvaSchema },
       { name: TipoSimulado.name, schema: TipoSimuladoSchema },
       { name: Simulado.name, schema: SimuladoSchema },
-      { name: RespostaSimulado.name, schema: RespostaSimuladoSchema },
     ]),
     QuestaoModule,
     ExameModule,
@@ -48,7 +42,6 @@ import { AuditLogModule } from '../auditLog/auditLog.module';
     TipoSimuladoRepository,
     SimuladoService,
     SimuladoRepository,
-    RespostaRepository,
   ],
   controllers: [QuestaoController],
   exports: [QuestaoService, QuestaoRepository],
