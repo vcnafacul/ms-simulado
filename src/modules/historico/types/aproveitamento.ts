@@ -1,17 +1,11 @@
-interface Frente {
-  id: string;
-  nome: string;
-  aprovaitamento: number;
-}
-
-interface Materia {
+export interface SubAproveitamento {
   id: string;
   nome: string;
   aproveitamento: number;
-  frentes: Frente[];
 }
 
 export abstract class Aproveitamento {
   public geral: number;
-  public materias: Materia[];
+  public materias: SubAproveitamento[];
+  public frentes: SubAproveitamento[];
 }

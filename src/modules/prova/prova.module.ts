@@ -5,10 +5,6 @@ import { ProvaController } from './prova.controller';
 import { ProvaService } from './prova.service';
 import { ProvaRepository } from './prova.repository';
 import { ProvaExistValidator } from './validator/prova-exist.validator';
-import {
-  RespostaSimulado,
-  RespostaSimuladoSchema,
-} from '../simulado/schemas/resposta-simulado.schema';
 import { MateriaModule } from '../materia/materia.module';
 import { FrenteModule } from '../frente/frente.module';
 import { QuestaoModule } from '../questao/questao.module';
@@ -24,7 +20,6 @@ import {
   imports: [
     MongooseModule.forFeature([
       { name: Prova.name, schema: ProvaSchema },
-      { name: RespostaSimulado.name, schema: RespostaSimuladoSchema },
       { name: TipoSimulado.name, schema: TipoSimuladoSchema },
     ]),
     ExameModule,

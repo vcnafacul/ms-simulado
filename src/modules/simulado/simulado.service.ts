@@ -1,24 +1,27 @@
 import { Injectable } from '@nestjs/common';
-import { SimuladoRepository } from './repository/simulado.repository';
-import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
-import { Simulado } from './schemas/simulado.schema';
-// import { EnemArea } from '../questao/enums/enem-area.enum';
-// import { toPascalCaseSemAcentos } from 'src/utils/string';
-import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
-import { AnswerSimulado } from './dtos/answer-simulado.dto.input';
-import { RespostaRepository } from './repository/resposta.repository';
-import { RespostaSimulado } from './schemas/resposta-simulado.schema';
+import { HistoricoRepository } from '../historico/historico.repository';
+import { Historico } from '../historico/historico.schema';
+import {
+  Aproveitamento,
+  SubAproveitamento,
+} from '../historico/types/aproveitamento';
+import { Resposta } from '../historico/types/resposta';
 import { Prova } from '../prova/prova.schema';
-import { Questao } from '../questao/questao.schema';
 import { EnemArea } from '../questao/enums/enem-area.enum';
+import { Questao } from '../questao/questao.schema';
+import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
+import { AnswerSimuladoDto } from './dtos/answer-simulado.dto.input';
 import { AvailableSimuladoDTOoutput } from './dtos/available-simulado.dto.output';
+import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
+import { SimuladoRepository } from './repository/simulado.repository';
+import { Simulado } from './schemas/simulado.schema';
 
 @Injectable()
 export class SimuladoService {
   constructor(
     private readonly repository: SimuladoRepository,
     private readonly tipoSimuladoRepository: TipoSimuladoRepository,
-    private readonly respostaRepository: RespostaRepository, // private readonly questaoService: QuestaoService,
+    private readonly historicoRepository: HistoricoRepository,
   ) {}
 
   public async createByProva(prova: Prova) {
@@ -148,23 +151,31 @@ export class SimuladoService {
     return await this.repository.create(simuladoArea);
   }
 
-  public async answer(answer: AnswerSimulado) {
+  public async answer(answer: AnswerSimuladoDto) {
     const simulado = await this.repository.answer(answer.idSimulado);
 
-    const respostas = simulado?.questoes.map((questao) => {
-      const resposta = answer.respostas.find((r) => r.questao === questao);
+    const respostas: Resposta[] = simulado?.questoes.map((questao) => {
+      const resposta = answer.respostas.find(
+        (r) => r.questao === questao._id.toString(),
+      );
       return {
         questao: questao,
         alternativaEstudante: resposta?.alternativaEstudante,
         alternativaCorreta: questao.alternativa,
       };
     });
-    const respostaSimulado: RespostaSimulado = {
-      idEstudante: answer.idEstudante,
-      idSimulado: answer.idSimulado,
+
+    const aproveitamento = this.criaAproveitamento(respostas);
+    const historico: Historico = {
+      usuario: answer.idEstudante,
+      simulado: simulado,
+      aproveitamento: aproveitamento,
+      questoesRespondidas: answer.respostas.length,
       respostas: respostas,
+      tempoRealizado: answer.tempoRealizado,
     };
-    await this.respostaRepository.create(respostaSimulado);
+
+    await this.historicoRepository.create(historico);
   }
 
   private async GetSimulado(id: string) {
@@ -208,5 +219,131 @@ export class SimuladoService {
       nome: nomeTipo,
     });
     return await this.repository.getAvailable(tipo._id);
+  }
+
+  private criaAproveitamento(respostas: Resposta[]): Aproveitamento {
+    let aproveitamentoGeral = 0;
+
+    const materias: SubAproveitamento[] = [];
+    respostas.forEach((r) => {
+      const exist = materias.find(
+        (m) => m?.id?.toString() === r.questao.materia._id.toString(),
+      );
+      if (!exist) {
+        materias.push({
+          id: r.questao.materia._id,
+          nome: r.questao.materia.nome,
+          aproveitamento: 0,
+        } satisfies SubAproveitamento);
+      }
+    });
+
+    const frentes: SubAproveitamento[] = [];
+
+    respostas.forEach((r) => {
+      const existFrente1 = frentes.find(
+        (f) => f?.id?.toString() === r.questao.frente1._id.toString(),
+      );
+      if (!existFrente1) {
+        frentes.push({
+          id: r.questao.frente1._id,
+          nome: r.questao.frente1.nome,
+          aproveitamento: 0,
+        } satisfies SubAproveitamento);
+      }
+      if (
+        r.questao.frente2 &&
+        !frentes.find(
+          (f) => f?.id?.toString() === r.questao.frente2?._id.toString(),
+        )
+      ) {
+        frentes.push({
+          id: r.questao.frente2._id,
+          nome: r.questao.frente2.nome,
+          aproveitamento: 0,
+        } satisfies SubAproveitamento);
+      }
+      if (
+        r.questao.frente3 &&
+        !frentes.find(
+          (f) => f?.id?.toString() === r.questao.frente3?._id.toString(),
+        )
+      ) {
+        frentes.push({
+          id: r.questao.frente3._id,
+          nome: r.questao.frente3.nome,
+          aproveitamento: 0,
+        } satisfies SubAproveitamento);
+      }
+    });
+
+    respostas.forEach((res) => {
+      if (res.alternativaCorreta === res.alternativaEstudante) {
+        aproveitamentoGeral++;
+        this.calculaAproveitamento(
+          res.questao.materia._id,
+          res.questao.materia.nome,
+          materias,
+        );
+        this.calculaAproveitamento(
+          res.questao.frente1._id,
+          res.questao.frente1.nome,
+          frentes,
+        );
+        this.calculaAproveitamento(
+          res.questao.frente2?._id,
+          res.questao.frente2?.nome,
+          frentes,
+        );
+        this.calculaAproveitamento(
+          res.questao.frente3?._id,
+          res.questao.frente3?.nome,
+          frentes,
+        );
+      }
+    });
+
+    materias.forEach((m) => {
+      const quantidade = respostas.reduce(
+        (total, elem) =>
+          elem.questao.materia._id === m.id ? total + 1 : total,
+        0,
+      );
+      m.aproveitamento = m.aproveitamento / quantidade;
+    });
+
+    frentes.forEach((f) => {
+      const quantidade = respostas.reduce(
+        (total, elem) =>
+          [
+            elem.questao.frente1._id,
+            elem.questao.frente2?._id,
+            elem.questao.frente3?._id,
+          ].includes(f.id)
+            ? total + 1
+            : total,
+        0,
+      );
+      f.aproveitamento = f.aproveitamento / quantidade;
+    });
+
+    return {
+      geral: aproveitamentoGeral / respostas.length,
+      materias: materias,
+      frentes: frentes,
+    };
+  }
+
+  private calculaAproveitamento(
+    id: string,
+    nome: string,
+    array: Array<SubAproveitamento>,
+  ) {
+    if (id) {
+      const index: number = array.findIndex((a) => a.id == id);
+      if (index > -1) {
+        array[index].aproveitamento++;
+      }
+    }
   }
 }

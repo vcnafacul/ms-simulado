@@ -34,7 +34,11 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
   async answer(id: string): Promise<Simulado> {
     return await this.model
       .findById(id)
-      .populate({ path: 'questoes', select: 'alternativa' })
+      .populate({
+        path: 'questoes',
+        populate: ['frente1', 'frente2', 'frente3', 'materia'],
+        select: 'alternativa',
+      })
       .exec();
   }
 
