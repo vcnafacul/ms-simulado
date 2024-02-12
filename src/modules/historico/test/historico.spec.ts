@@ -179,7 +179,7 @@ describe('AppController (e2e)', () => {
 
   const getHistoricos = async () => await historicoRepository.getAll();
 
-  it('/ (GET)', async () => {
+  it('Cria Historico de Simulado', async () => {
     const resposta: AnswerDTO[] = [
       {
         questao: dataMemory.questoes[0]._id,
