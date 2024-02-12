@@ -1,20 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import { SimuladoRepository } from './repository/simulado.repository';
-import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
-import { Simulado } from './schemas/simulado.schema';
-import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
-import { AnswerSimuladoDto } from './dtos/answer-simulado.dto.input';
-import { Prova } from '../prova/prova.schema';
-import { Questao } from '../questao/questao.schema';
-import { EnemArea } from '../questao/enums/enem-area.enum';
-import { AvailableSimuladoDTOoutput } from './dtos/available-simulado.dto.output';
-import { Resposta } from '../historico/types/resposta';
+import { HistoricoRepository } from '../historico/historico.repository';
 import { Historico } from '../historico/historico.schema';
 import {
   Aproveitamento,
   SubAproveitamento,
 } from '../historico/types/aproveitamento';
-import { HistoricoRepository } from '../historico/historico.repository';
+import { Resposta } from '../historico/types/resposta';
+import { Prova } from '../prova/prova.schema';
+import { EnemArea } from '../questao/enums/enem-area.enum';
+import { Questao } from '../questao/questao.schema';
+import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
+import { AnswerSimuladoDto } from './dtos/answer-simulado.dto.input';
+import { AvailableSimuladoDTOoutput } from './dtos/available-simulado.dto.output';
+import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
+import { SimuladoRepository } from './repository/simulado.repository';
+import { Simulado } from './schemas/simulado.schema';
 
 @Injectable()
 export class SimuladoService {
@@ -262,8 +262,8 @@ export class SimuladoService {
         (total, elem) =>
           [
             elem.questao.frente1._id,
-            elem.questao.frente2._id,
-            elem.questao.frente3._id,
+            elem.questao.frente2?._id,
+            elem.questao.frente3?._id,
           ].includes(f.id)
             ? total + 1
             : total,
