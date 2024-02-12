@@ -155,20 +155,23 @@ export class SimuladoService {
     const simulado = await this.repository.answer(answer.idSimulado);
 
     const respostas: Resposta[] = simulado?.questoes.map((questao) => {
-      const resposta = answer.respostas.find((r) => r.questao === questao._id);
+      const resposta = answer.respostas.find(
+        (r) => r.questao === questao._id.toString(),
+      );
       return {
         questao: questao,
         alternativaEstudante: resposta?.alternativaEstudante,
         alternativaCorreta: questao.alternativa,
       };
     });
+
     const aproveitamento = this.criaAproveitamento(respostas);
     const historico: Historico = {
       usuario: answer.idEstudante,
       simulado: simulado,
       aproveitamento: aproveitamento,
       questoesRespondidas: answer.respostas.length,
-      resposta: respostas,
+      respostas: respostas,
       tempoRealizado: answer.tempoRealizado,
     };
 
@@ -220,8 +223,62 @@ export class SimuladoService {
 
   private criaAproveitamento(respostas: Resposta[]): Aproveitamento {
     let aproveitamentoGeral = 0;
+
     const materias: SubAproveitamento[] = [];
+    respostas.forEach((r) => {
+      if (
+        !materias.find(
+          (m) => m?.id?.toString() === r.questao.materia._id.toString(),
+        )
+      ) {
+        materias.push({
+          id: r.questao.materia._id,
+          nome: r.questao.materia.nome,
+          aproveitamento: 0,
+        } satisfies SubAproveitamento);
+      }
+    });
+
     const frentes: SubAproveitamento[] = [];
+
+    respostas.forEach((r) => {
+      if (
+        !frentes.find(
+          (f) => f?.id?.toString() === r.questao.frente1._id.toString(),
+        )
+      ) {
+        frentes.push({
+          id: r.questao.frente1._id,
+          nome: r.questao.frente1.nome,
+          aproveitamento: 0,
+        } satisfies SubAproveitamento);
+      }
+      if (
+        r.questao.frente2 &&
+        !frentes.find(
+          (f) => f?.id?.toString() === r.questao.frente2?._id.toString(),
+        )
+      ) {
+        frentes.push({
+          id: r.questao.frente2._id,
+          nome: r.questao.frente2.nome,
+          aproveitamento: 0,
+        } satisfies SubAproveitamento);
+      }
+      if (
+        r.questao.frente3 &&
+        !frentes.find(
+          (f) => f?.id?.toString() === r.questao.frente3?._id.toString(),
+        )
+      ) {
+        frentes.push({
+          id: r.questao.frente3._id,
+          nome: r.questao.frente3.nome,
+          aproveitamento: 0,
+        } satisfies SubAproveitamento);
+      }
+    });
+
     respostas.forEach((res) => {
       if (res.alternativaCorreta === res.alternativaEstudante) {
         aproveitamentoGeral++;
@@ -288,12 +345,6 @@ export class SimuladoService {
       const index: number = array.findIndex((a) => a.id == id);
       if (index > -1) {
         array[index].aproveitamento++;
-      } else {
-        array.push({
-          id: id,
-          nome: nome,
-          aproveitamento: 1,
-        });
       }
     }
   }
