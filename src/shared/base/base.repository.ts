@@ -10,7 +10,7 @@ export class BaseRepository<T> {
     return domain.toObject() as T;
   }
 
-  async getAll() {
+  async getAll(): Promise<T[]> {
     return await this.model.find();
   }
 
