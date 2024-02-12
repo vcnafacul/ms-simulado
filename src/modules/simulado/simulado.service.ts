@@ -251,24 +251,24 @@ export class SimuladoService {
           aproveitamento: 0,
         } satisfies SubAproveitamento);
       }
-      const existFrente2 =
+      if (
         r.questao.frente2 &&
-        frentes.find(
+        !frentes.find(
           (f) => f?.id?.toString() === r.questao.frente2?._id.toString(),
-        );
-      if (!existFrente2) {
+        )
+      ) {
         frentes.push({
           id: r.questao.frente2._id,
           nome: r.questao.frente2.nome,
           aproveitamento: 0,
         } satisfies SubAproveitamento);
       }
-      const existFrente3 =
+      if (
         r.questao.frente3 &&
-        frentes.find(
+        !frentes.find(
           (f) => f?.id?.toString() === r.questao.frente3?._id.toString(),
-        );
-      if (!existFrente3) {
+        )
+      ) {
         frentes.push({
           id: r.questao.frente3._id,
           nome: r.questao.frente3.nome,
