@@ -226,11 +226,10 @@ export class SimuladoService {
 
     const materias: SubAproveitamento[] = [];
     respostas.forEach((r) => {
-      if (
-        !materias.find(
-          (m) => m?.id?.toString() === r.questao.materia._id.toString(),
-        )
-      ) {
+      const exist = materias.find(
+        (m) => m?.id?.toString() === r.questao.materia._id.toString(),
+      );
+      if (!exist) {
         materias.push({
           id: r.questao.materia._id,
           nome: r.questao.materia.nome,
@@ -242,35 +241,34 @@ export class SimuladoService {
     const frentes: SubAproveitamento[] = [];
 
     respostas.forEach((r) => {
-      if (
-        !frentes.find(
-          (f) => f?.id?.toString() === r.questao.frente1._id.toString(),
-        )
-      ) {
+      const existFrente1 = frentes.find(
+        (f) => f?.id?.toString() === r.questao.frente1._id.toString(),
+      );
+      if (!existFrente1) {
         frentes.push({
           id: r.questao.frente1._id,
           nome: r.questao.frente1.nome,
           aproveitamento: 0,
         } satisfies SubAproveitamento);
       }
-      if (
+      const existFrente2 =
         r.questao.frente2 &&
-        !frentes.find(
+        frentes.find(
           (f) => f?.id?.toString() === r.questao.frente2?._id.toString(),
-        )
-      ) {
+        );
+      if (!existFrente2) {
         frentes.push({
           id: r.questao.frente2._id,
           nome: r.questao.frente2.nome,
           aproveitamento: 0,
         } satisfies SubAproveitamento);
       }
-      if (
+      const existFrente3 =
         r.questao.frente3 &&
-        !frentes.find(
+        frentes.find(
           (f) => f?.id?.toString() === r.questao.frente3?._id.toString(),
-        )
-      ) {
+        );
+      if (!existFrente3) {
         frentes.push({
           id: r.questao.frente3._id,
           nome: r.questao.frente3.nome,
