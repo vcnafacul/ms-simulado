@@ -78,7 +78,7 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     await app.close(); // Garante que o aplicativo seja fechado após cada teste
   });
 
