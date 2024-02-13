@@ -33,4 +33,14 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       )
       .exec();
   }
+
+  override async getById(id: string): Promise<Historico> {
+    return this.model
+      .findById(id)
+      .populate({
+        path: 'simulado',
+        populate: ['tipo', 'questoes'],
+      })
+      .exec();
+  }
 }
