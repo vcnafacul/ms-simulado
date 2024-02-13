@@ -24,7 +24,7 @@ export class HistoricoController {
     status: 200,
     description: 'obtém histórico detalhado por ID',
     type: Historico,
-    isArray: true,
+    isArray: false,
   })
   async getById(@Param('id') id: string) {
     return await this.service.getById(id);
