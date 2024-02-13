@@ -13,18 +13,23 @@ export class Historico extends BaseSchema {
   public usuario: number;
 
   @Prop({ ref: Simulado.name, type: Types.ObjectId })
+  @ApiProperty()
   public simulado: Simulado;
 
   @Prop({ type: [Object] })
+  @ApiProperty()
   public respostas: Resposta[];
 
   @Prop({ type: Aproveitamento })
+  @ApiProperty()
   public aproveitamento: Aproveitamento;
 
   @Prop()
+  @ApiProperty()
   public tempoRealizado: number;
 
   @Prop()
+  @ApiProperty()
   public questoesRespondidas: number;
 }
 
