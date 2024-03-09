@@ -37,7 +37,7 @@ export class Prova extends BaseSchema {
   public tipo: TipoSimulado;
 
   @Prop({
-    type: [{ ref: Simulado.name, type: mongoose.Schema.Types.ObjectId }],
+    type: [{ ref: 'Simulado', type: mongoose.Schema.Types.ObjectId }],
   })
   public simulado: Simulado[];
 

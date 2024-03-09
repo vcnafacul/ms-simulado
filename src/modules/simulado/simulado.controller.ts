@@ -11,7 +11,7 @@ import { SimuladoService } from './simulado.service';
 import { Simulado } from './schemas/simulado.schema';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
-import { AnswerSimulado } from './dtos/answer-simulado.dto.input';
+import { AnswerSimuladoDto } from './dtos/answer-simulado.dto.input';
 import { AvailableSimuladoDTOoutput } from './dtos/available-simulado.dto.output';
 
 @ApiTags('Simulado')
@@ -42,7 +42,7 @@ export class SimuladoController {
   }
 
   @Post('answer')
-  public async answer(@Body() answer: AnswerSimulado) {
+  public async answer(@Body() answer: AnswerSimuladoDto) {
     await this.service.answer(answer);
   }
 
