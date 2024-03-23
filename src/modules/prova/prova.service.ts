@@ -8,6 +8,10 @@ import { SimuladoService } from '../simulado/simulado.service';
 import { Questao } from '../questao/questao.schema';
 import { Status } from '../questao/enums/status.enum';
 import { EnemArea } from '../questao/enums/enem-area.enum';
+import {
+  GetAllInput,
+  GetAllOutput,
+} from 'src/shared/base/interfaces/IBaseRepository';
 
 @Injectable()
 export class ProvaService {
@@ -37,8 +41,8 @@ export class ProvaService {
     return prova;
   }
 
-  public async getAll(): Promise<Prova[]> {
-    const provas = await this.repository.getAll();
+  public async getAll(param: GetAllInput): Promise<GetAllOutput<Prova>> {
+    const provas = await this.repository.getAll(param);
     return provas;
   }
 

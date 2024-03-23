@@ -3,6 +3,10 @@ import { FrenteService } from './frente.service';
 import { CreateFrenteDTOInput } from './dtos/create.dto.input';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Frente } from './frente.schema';
+import {
+  GetAllInput,
+  GetAllOutput,
+} from 'src/shared/base/interfaces/IBaseRepository';
 
 @ApiTags('Frente')
 @Controller('v1/frente')
@@ -16,8 +20,11 @@ export class FrenteController {
     type: Frente,
     isArray: true,
   })
-  public async getAll(): Promise<Frente[]> {
-    return await this.service.getAll();
+  public async getAll({
+    page = 0,
+    limit = 10,
+  }: GetAllInput): Promise<GetAllOutput<Frente>> {
+    return await this.service.getAll({ page, limit });
   }
 
   @Post()

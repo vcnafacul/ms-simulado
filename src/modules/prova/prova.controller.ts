@@ -3,6 +3,10 @@ import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ProvaService } from './prova.service';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
 import { Prova } from './prova.schema';
+import {
+  GetAllInput,
+  GetAllOutput,
+} from 'src/shared/base/interfaces/IBaseRepository';
 
 @ApiTags('Prova')
 @Controller('v1/prova')
@@ -27,8 +31,11 @@ export class ProvaController {
     type: Prova,
     isArray: true,
   })
-  public async getAll(): Promise<Prova[]> {
-    return await this.service.getAll();
+  public async getAll({
+    page = 0,
+    limit = 10,
+  }: GetAllInput): Promise<GetAllOutput<Prova>> {
+    return await this.service.getAll({ page, limit });
   }
 
   @Get(':id')

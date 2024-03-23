@@ -12,6 +12,10 @@ import { ProvaRepository } from '../prova/prova.repository';
 import { ExameRepository } from '../exame/exame.repository';
 import { ProvaService } from '../prova/prova.service';
 import { AuditLogService } from '../auditLog/auditLog.service';
+import {
+  GetAllInput,
+  GetAllOutput,
+} from 'src/shared/base/interfaces/IBaseRepository';
 
 @Injectable()
 export class QuestaoService {
@@ -47,8 +51,11 @@ export class QuestaoService {
     return questao;
   }
 
-  public async getAll(status?: Status): Promise<Questao[]> {
-    const questoes = await this.repository.getAll(status);
+  public async getAll(
+    param: GetAllInput,
+    status?: Status,
+  ): Promise<GetAllOutput<Questao>> {
+    const questoes = await this.repository.getAll(param, status);
     return questoes;
   }
 
@@ -74,10 +81,14 @@ export class QuestaoService {
   }
 
   public async getInfos() {
-    const provas = await this.provaRepository.getAll();
-    const exames = await this.exameRepository.getAll();
-    const materias = await this.materiaRepository.getAll();
-    const frentes = await this.frenteRepository.getAll();
+    const param: GetAllInput = {
+      page: 1,
+      limit: 0,
+    };
+    const provas = await this.provaRepository.getAll(param);
+    const exames = await this.exameRepository.getAll(param);
+    const materias = await this.materiaRepository.getAll(param);
+    const frentes = await this.frenteRepository.getAll(param);
     return { provas, exames, materias, frentes };
   }
 

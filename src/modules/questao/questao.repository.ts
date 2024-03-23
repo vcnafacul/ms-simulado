@@ -5,6 +5,10 @@ import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { Status } from './enums/status.enum';
 import { UpdateDTOInput } from './dtos/update.dto.input';
+import {
+  GetAllInput,
+  GetAllOutput,
+} from 'src/shared/base/interfaces/IBaseRepository';
 
 @Injectable()
 export class QuestaoRepository extends BaseRepository<Questao> {
@@ -12,12 +16,20 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     super(model);
   }
 
-  override async getAll(status: Status = Status.Pending) {
+  override async getAll(
+    param: GetAllInput,
+    status: Status = Status.Pending,
+  ): Promise<GetAllOutput<Questao>> {
     const query = this.model.find().select('+alternativa');
-
+    const totalItems = await this.model.countDocuments();
     query.where({ status: status });
-
-    return await query;
+    const data = await query;
+    return {
+      data,
+      page: param.page,
+      limit: param.limit,
+      totalItems,
+    };
   }
 
   override async getById(id: string) {

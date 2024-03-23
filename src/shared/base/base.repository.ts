@@ -1,5 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { Model } from 'mongoose';
+import { GetAllInput, GetAllOutput } from './interfaces/IBaseRepository';
 
 export class BaseRepository<T> {
   constructor(protected model: Model<T>) {}
@@ -10,8 +11,17 @@ export class BaseRepository<T> {
     return domain.toObject() as T;
   }
 
-  async getAll(): Promise<T[]> {
-    return await this.model.find();
+  async getAll({ page, limit }: GetAllInput): Promise<GetAllOutput<T>> {
+    const query = this.model.find();
+    if (limit) query.skip((page - 1) * limit).limit(limit);
+    const data = await query;
+    const totalItems = await this.model.countDocuments();
+    return {
+      data,
+      page,
+      limit,
+      totalItems,
+    };
   }
 
   async getById(id: string): Promise<T> {

@@ -3,6 +3,10 @@ import { ExameService } from './exame.service';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Exame } from './exame.schema';
 import { CreateExameDtoInput } from './dtos/create.dto.input';
+import {
+  GetAllInput,
+  GetAllOutput,
+} from 'src/shared/base/interfaces/IBaseRepository';
 
 @ApiTags('Exame')
 @Controller('v1/exame')
@@ -16,8 +20,8 @@ export class ExameController {
     type: Exame,
     isArray: true,
   })
-  public async getAll(): Promise<Exame[]> {
-    return await this.service.getAll();
+  public async getAll(param: GetAllInput): Promise<GetAllOutput<Exame>> {
+    return await this.service.getAll(param);
   }
 
   @Post()

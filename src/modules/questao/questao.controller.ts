@@ -6,6 +6,7 @@ import {
   Post,
   Delete,
   Patch,
+  Query,
 } from '@nestjs/common';
 import { QuestaoService } from './questao.service';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
@@ -13,6 +14,10 @@ import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Questao } from './questao.schema';
 import { Status } from './enums/status.enum';
 import { UpdateDTOInput } from './dtos/update.dto.input';
+import {
+  GetAllInput,
+  GetAllOutput,
+} from 'src/shared/base/interfaces/IBaseRepository';
 
 @ApiTags('Questao')
 @Controller('v1/questao')
@@ -26,7 +31,8 @@ export class QuestaoController {
     type: Questao,
     isArray: true,
   })
-  public async getInfos() {
+  //precisamos criar dto pra isso
+  public async getInfos(): Promise<any> {
     return await this.service.getInfos();
   }
 
@@ -37,8 +43,11 @@ export class QuestaoController {
     type: Questao,
     isArray: true,
   })
-  public async getAll(@Param('status') status: Status): Promise<Questao[]> {
-    return await this.service.getAll(status);
+  public async getAll(
+    @Param('status') status: Status,
+    @Query() query: GetAllInput,
+  ): Promise<GetAllOutput<Questao>> {
+    return await this.service.getAll(query, status);
   }
 
   @Post()

@@ -3,6 +3,10 @@ import { MateriaService } from './materia.service';
 import { CreateMateriaDTOInput } from './dtos/create.dto.input';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Materia } from './materia.schema';
+import {
+  GetAllInput,
+  GetAllOutput,
+} from 'src/shared/base/interfaces/IBaseRepository';
 
 @ApiTags('Materia')
 @Controller('v1/materia')
@@ -16,8 +20,11 @@ export class MateriaController {
     type: Materia,
     isArray: true,
   })
-  public async getAll(): Promise<Materia[]> {
-    return await this.service.getAll();
+  public async getAll({
+    page = 0,
+    limit = 5,
+  }: GetAllInput): Promise<GetAllOutput<Materia>> {
+    return await this.service.getAll({ page, limit });
   }
 
   @Post()
