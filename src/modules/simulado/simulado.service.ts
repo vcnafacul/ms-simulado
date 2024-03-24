@@ -15,6 +15,10 @@ import { AvailableSimuladoDTOoutput } from './dtos/available-simulado.dto.output
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
 import { SimuladoRepository } from './repository/simulado.repository';
 import { Simulado } from './schemas/simulado.schema';
+import {
+  GetAllInput,
+  GetAllOutput,
+} from 'src/shared/base/interfaces/IBaseRepository';
 
 @Injectable()
 export class SimuladoService {
@@ -50,8 +54,8 @@ export class SimuladoService {
     return await this.repository.getById(id);
   }
 
-  public async getAll(): Promise<Simulado[]> {
-    return await this.repository.getAll();
+  public async getAll(param: GetAllInput): Promise<GetAllOutput<Simulado>> {
+    return await this.repository.getAll(param);
   }
 
   public async delete(id: string) {

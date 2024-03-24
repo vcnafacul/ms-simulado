@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Delete } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Delete,
+  Query,
+} from '@nestjs/common';
 import { FrenteService } from './frente.service';
 import { CreateFrenteDTOInput } from './dtos/create.dto.input';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -20,11 +28,10 @@ export class FrenteController {
     type: Frente,
     isArray: true,
   })
-  public async getAll({
-    page = 0,
-    limit = 10,
-  }: GetAllInput): Promise<GetAllOutput<Frente>> {
-    return await this.service.getAll({ page, limit });
+  public async getAll(
+    @Query() query: GetAllInput,
+  ): Promise<GetAllOutput<Frente>> {
+    return await this.service.getAll(query);
   }
 
   @Post()

@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Delete } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Delete,
+  Query,
+} from '@nestjs/common';
 import { MateriaService } from './materia.service';
 import { CreateMateriaDTOInput } from './dtos/create.dto.input';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -20,11 +28,10 @@ export class MateriaController {
     type: Materia,
     isArray: true,
   })
-  public async getAll({
-    page = 0,
-    limit = 5,
-  }: GetAllInput): Promise<GetAllOutput<Materia>> {
-    return await this.service.getAll({ page, limit });
+  public async getAll(
+    @Query() query: GetAllInput,
+  ): Promise<GetAllOutput<Materia>> {
+    return await this.service.getAll(query);
   }
 
   @Post()

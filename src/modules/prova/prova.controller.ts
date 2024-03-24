@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ProvaService } from './prova.service';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
@@ -31,11 +31,10 @@ export class ProvaController {
     type: Prova,
     isArray: true,
   })
-  public async getAll({
-    page = 0,
-    limit = 10,
-  }: GetAllInput): Promise<GetAllOutput<Prova>> {
-    return await this.service.getAll({ page, limit });
+  public async getAll(
+    @Query() query: GetAllInput,
+  ): Promise<GetAllOutput<Prova>> {
+    return await this.service.getAll(query);
   }
 
   @Get(':id')

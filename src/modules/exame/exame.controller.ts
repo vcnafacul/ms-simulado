@@ -1,4 +1,12 @@
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ExameService } from './exame.service';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Exame } from './exame.schema';
@@ -20,8 +28,10 @@ export class ExameController {
     type: Exame,
     isArray: true,
   })
-  public async getAll(param: GetAllInput): Promise<GetAllOutput<Exame>> {
-    return await this.service.getAll(param);
+  public async getAll(
+    @Query() query: GetAllInput,
+  ): Promise<GetAllOutput<Exame>> {
+    return await this.service.getAll(query);
   }
 
   @Post()

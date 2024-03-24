@@ -13,6 +13,10 @@ import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
 import { AnswerSimuladoDto } from './dtos/answer-simulado.dto.input';
 import { AvailableSimuladoDTOoutput } from './dtos/available-simulado.dto.output';
+import {
+  GetAllInput,
+  GetAllOutput,
+} from 'src/shared/base/interfaces/IBaseRepository';
 
 @ApiTags('Simulado')
 @Controller('v1/simulado')
@@ -26,8 +30,10 @@ export class SimuladoController {
     type: Simulado,
     isArray: true,
   })
-  public async getAll(): Promise<Simulado[]> {
-    return await this.service.getAll();
+  public async getAll(
+    @Query() query: GetAllInput,
+  ): Promise<GetAllOutput<Simulado>> {
+    return await this.service.getAll(query);
   }
 
   @Get('toanswer/:id')
