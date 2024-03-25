@@ -1,23 +1,21 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
-  Post,
-  Delete,
   Patch,
+  Post,
   Query,
 } from '@nestjs/common';
-import { QuestaoService } from './questao.service';
-import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Questao } from './questao.schema';
-import { Status } from './enums/status.enum';
+import { GetAllOutput } from 'src/shared/base/interfaces/IBaseRepository';
+import { GetAllDtoInput } from 'src/shared/dtos/getall.dto.input';
+import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
-import {
-  GetAllInput,
-  GetAllOutput,
-} from 'src/shared/base/interfaces/IBaseRepository';
+import { Status } from './enums/status.enum';
+import { Questao } from './questao.schema';
+import { QuestaoService } from './questao.service';
 
 @ApiTags('Questao')
 @Controller('v1/questao')
@@ -45,7 +43,7 @@ export class QuestaoController {
   })
   public async getAll(
     @Param('status') status: Status,
-    @Query() query: GetAllInput,
+    @Query() query: GetAllDtoInput,
   ): Promise<GetAllOutput<Questao>> {
     return await this.service.getAll(query, status);
   }

@@ -7,14 +7,12 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ExameService } from './exame.service';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Exame } from './exame.schema';
+import { GetAllOutput } from 'src/shared/base/interfaces/IBaseRepository';
+import { GetAllDtoInput } from 'src/shared/dtos/getall.dto.input';
 import { CreateExameDtoInput } from './dtos/create.dto.input';
-import {
-  GetAllInput,
-  GetAllOutput,
-} from 'src/shared/base/interfaces/IBaseRepository';
+import { Exame } from './exame.schema';
+import { ExameService } from './exame.service';
 
 @ApiTags('Exame')
 @Controller('v1/exame')
@@ -29,7 +27,7 @@ export class ExameController {
     isArray: true,
   })
   public async getAll(
-    @Query() query: GetAllInput,
+    @Query() query: GetAllDtoInput,
   ): Promise<GetAllOutput<Exame>> {
     return await this.service.getAll(query);
   }

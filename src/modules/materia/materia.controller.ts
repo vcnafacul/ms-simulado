@@ -1,20 +1,18 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
-  Delete,
   Query,
 } from '@nestjs/common';
-import { MateriaService } from './materia.service';
-import { CreateMateriaDTOInput } from './dtos/create.dto.input';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
+import { GetAllOutput } from 'src/shared/base/interfaces/IBaseRepository';
+import { GetAllDtoInput } from 'src/shared/dtos/getall.dto.input';
+import { CreateMateriaDTOInput } from './dtos/create.dto.input';
 import { Materia } from './materia.schema';
-import {
-  GetAllInput,
-  GetAllOutput,
-} from 'src/shared/base/interfaces/IBaseRepository';
+import { MateriaService } from './materia.service';
 
 @ApiTags('Materia')
 @Controller('v1/materia')
@@ -29,7 +27,7 @@ export class MateriaController {
     isArray: true,
   })
   public async getAll(
-    @Query() query: GetAllInput,
+    @Query() query: GetAllDtoInput,
   ): Promise<GetAllOutput<Materia>> {
     return await this.service.getAll(query);
   }
