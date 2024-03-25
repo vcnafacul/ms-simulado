@@ -1,11 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { FrenteRepository } from './frente.repository';
+import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
+import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
 import { CreateFrenteDTOInput } from './dtos/create.dto.input';
+import { FrenteRepository } from './frente.repository';
 import { Frente } from './frente.schema';
-import {
-  GetAllInput,
-  GetAllOutput,
-} from 'src/shared/base/interfaces/IBaseRepository';
 
 @Injectable()
 export class FrenteService {
@@ -20,7 +18,7 @@ export class FrenteService {
     return await this.repository.getById(id);
   }
 
-  public async getAll(param: GetAllInput): Promise<GetAllOutput<Frente>> {
+  public async getAll(param: GetAllDtoInput): Promise<GetAllDtoOutput<Frente>> {
     return await this.repository.getAll(param);
   }
 

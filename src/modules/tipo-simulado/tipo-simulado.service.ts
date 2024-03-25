@@ -1,11 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { TipoSimuladoRepository } from './tipo-simulado.repository';
+import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
+import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { CreateTipoSimuladoDTOInput } from './dtos/create.dto.input';
 import { TipoSimulado } from './schemas/tipo-simulado.schema';
-import {
-  GetAllInput,
-  GetAllOutput,
-} from 'src/shared/base/interfaces/IBaseRepository';
+import { TipoSimuladoRepository } from './tipo-simulado.repository';
 
 @Injectable()
 export class TipoSimuladoService {

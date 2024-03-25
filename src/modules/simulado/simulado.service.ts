@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
+import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { HistoricoRepository } from '../historico/historico.repository';
 import { Historico } from '../historico/historico.schema';
 import {
@@ -15,10 +17,6 @@ import { AvailableSimuladoDTOoutput } from './dtos/available-simulado.dto.output
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
 import { SimuladoRepository } from './repository/simulado.repository';
 import { Simulado } from './schemas/simulado.schema';
-import {
-  GetAllInput,
-  GetAllOutput,
-} from 'src/shared/base/interfaces/IBaseRepository';
 
 @Injectable()
 export class SimuladoService {

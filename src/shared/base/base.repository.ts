@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { Model } from 'mongoose';
-import { GetAllInput, GetAllOutput } from './interfaces/IBaseRepository';
+import { GetAllOutput } from './interfaces/get-all.output';
+import { GetAllInput } from './interfaces/get-all.input';
 
 export class BaseRepository<T> {
   constructor(protected model: Model<T>) {}

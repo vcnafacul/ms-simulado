@@ -1,17 +1,15 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
+import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
+import { ExameRepository } from '../exame/exame.repository';
+import { EnemArea } from '../questao/enums/enem-area.enum';
+import { Status } from '../questao/enums/status.enum';
+import { Questao } from '../questao/questao.schema';
+import { SimuladoService } from '../simulado/simulado.service';
+import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
+import { CreateProvaDTOInput } from './dtos/create.dto.input';
 import { ProvaRepository } from './prova.repository';
 import { Prova } from './prova.schema';
-import { CreateProvaDTOInput } from './dtos/create.dto.input';
-import { ExameRepository } from '../exame/exame.repository';
-import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
-import { SimuladoService } from '../simulado/simulado.service';
-import { Questao } from '../questao/questao.schema';
-import { Status } from '../questao/enums/status.enum';
-import { EnemArea } from '../questao/enums/enem-area.enum';
-import {
-  GetAllInput,
-  GetAllOutput,
-} from 'src/shared/base/interfaces/IBaseRepository';
 
 @Injectable()
 export class ProvaService {

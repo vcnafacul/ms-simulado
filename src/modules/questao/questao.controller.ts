@@ -9,8 +9,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
-import { GetAllOutput } from 'src/shared/base/interfaces/IBaseRepository';
-import { GetAllDtoInput } from 'src/shared/dtos/getall.dto.input';
+import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
+import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
@@ -44,7 +44,7 @@ export class QuestaoController {
   public async getAll(
     @Param('status') status: Status,
     @Query() query: GetAllDtoInput,
-  ): Promise<GetAllOutput<Questao>> {
+  ): Promise<GetAllDtoOutput<Questao>> {
     return await this.service.getAll(query, status);
   }
 

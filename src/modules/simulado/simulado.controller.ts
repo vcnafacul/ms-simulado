@@ -8,8 +8,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
-import { GetAllOutput } from 'src/shared/base/interfaces/IBaseRepository';
-import { GetAllDtoInput } from 'src/shared/dtos/getall.dto.input';
+import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
+import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
 import { AnswerSimuladoDto } from './dtos/answer-simulado.dto.input';
 import { AvailableSimuladoDTOoutput } from './dtos/available-simulado.dto.output';
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
@@ -30,7 +30,7 @@ export class SimuladoController {
   })
   public async getAll(
     @Query() query: GetAllDtoInput,
-  ): Promise<GetAllOutput<Simulado>> {
+  ): Promise<GetAllDtoOutput<Simulado>> {
     return await this.service.getAll(query);
   }
 

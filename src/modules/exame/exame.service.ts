@@ -1,11 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { Exame } from './exame.schema';
-import { ExameRepository } from './exame.repository';
+import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { CreateExameDtoInput } from './dtos/create.dto.input';
-import {
-  GetAllInput,
-  GetAllOutput,
-} from 'src/shared/base/interfaces/IBaseRepository';
+import { ExameRepository } from './exame.repository';
+import { Exame } from './exame.schema';
+import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 
 @Injectable()
 export class ExameService {

@@ -1,14 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { BaseRepository } from 'src/shared/base/base.repository';
-import { Questao } from './questao.schema';
-import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
-import { Status } from './enums/status.enum';
+import { Model } from 'mongoose';
+import { BaseRepository } from 'src/shared/base/base.repository';
+import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
+import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { UpdateDTOInput } from './dtos/update.dto.input';
-import {
-  GetAllInput,
-  GetAllOutput,
-} from 'src/shared/base/interfaces/IBaseRepository';
+import { Status } from './enums/status.enum';
+import { Questao } from './questao.schema';
 
 @Injectable()
 export class QuestaoRepository extends BaseRepository<Questao> {

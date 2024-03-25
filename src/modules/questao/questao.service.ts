@@ -1,21 +1,19 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { QuestaoRepository } from './questao.repository';
-import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
-import { Questao } from './questao.schema';
-import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
-import { Regra } from '../tipo-simulado/schemas/regra.schemas';
-import { Status } from './enums/status.enum';
-import { MateriaRepository } from '../materia/materia.repository';
-import { FrenteRepository } from '../frente/frente.repository';
-import { UpdateDTOInput } from './dtos/update.dto.input';
-import { ProvaRepository } from '../prova/prova.repository';
-import { ExameRepository } from '../exame/exame.repository';
-import { ProvaService } from '../prova/prova.service';
+import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
+import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { AuditLogService } from '../auditLog/auditLog.service';
-import {
-  GetAllInput,
-  GetAllOutput,
-} from 'src/shared/base/interfaces/IBaseRepository';
+import { ExameRepository } from '../exame/exame.repository';
+import { FrenteRepository } from '../frente/frente.repository';
+import { MateriaRepository } from '../materia/materia.repository';
+import { ProvaRepository } from '../prova/prova.repository';
+import { ProvaService } from '../prova/prova.service';
+import { Regra } from '../tipo-simulado/schemas/regra.schemas';
+import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
+import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
+import { UpdateDTOInput } from './dtos/update.dto.input';
+import { Status } from './enums/status.enum';
+import { QuestaoRepository } from './questao.repository';
+import { Questao } from './questao.schema';
 
 @Injectable()
 export class QuestaoService {

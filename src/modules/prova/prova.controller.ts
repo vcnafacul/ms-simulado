@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
-import { GetAllOutput } from 'src/shared/base/interfaces/IBaseRepository';
-import { GetAllDtoInput } from 'src/shared/dtos/getall.dto.input';
+import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
+import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
 import { Prova } from './prova.schema';
 import { ProvaService } from './prova.service';
@@ -31,7 +31,7 @@ export class ProvaController {
   })
   public async getAll(
     @Query() query: GetAllDtoInput,
-  ): Promise<GetAllOutput<Prova>> {
+  ): Promise<GetAllDtoOutput<Prova>> {
     return await this.service.getAll(query);
   }
 

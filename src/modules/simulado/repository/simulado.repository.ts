@@ -1,12 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Simulado } from '../schemas/simulado.schema';
 import { Model } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
-import {
-  GetAllInput,
-  GetAllOutput,
-} from 'src/shared/base/interfaces/IBaseRepository';
+import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
+import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
+import { Simulado } from '../schemas/simulado.schema';
 
 @Injectable()
 export class SimuladoRepository extends BaseRepository<Simulado> {

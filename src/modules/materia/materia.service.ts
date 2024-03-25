@@ -1,11 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { MateriaRepository } from './materia.repository';
+import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
+import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { CreateMateriaDTOInput } from './dtos/create.dto.input';
+import { MateriaRepository } from './materia.repository';
 import { Materia } from './materia.schema';
-import {
-  GetAllInput,
-  GetAllOutput,
-} from 'src/shared/base/interfaces/IBaseRepository';
 
 @Injectable()
 export class MateriaService {
