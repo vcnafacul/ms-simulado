@@ -1,13 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber } from 'class-validator';
+import { IsOptional } from 'class-validator';
 import { GetAllInput } from '../base/interfaces/get-all.input';
 
 export class GetAllDtoInput implements GetAllInput {
   @ApiProperty({ default: 1 })
-  @IsNumber()
+  @IsOptional()
   page: number = 1;
 
   @ApiProperty({ default: 30 })
-  @IsNumber()
+  @IsOptional()
   limit: number = 30;
 }
