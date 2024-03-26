@@ -19,8 +19,8 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     status: Status = Status.Pending,
   ): Promise<GetAllOutput<Questao>> {
     const query = this.model.find().select('+alternativa');
-    const totalItems = await this.model.countDocuments();
-    query.where({ status: status });
+    const totalItems = await this.model.where({ status }).countDocuments();
+    query.where({ status });
     const data = await query;
     return {
       data,

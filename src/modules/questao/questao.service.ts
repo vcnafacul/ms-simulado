@@ -87,7 +87,12 @@ export class QuestaoService {
     const exames = await this.exameRepository.getAll(param);
     const materias = await this.materiaRepository.getAll(param);
     const frentes = await this.frenteRepository.getAll(param);
-    return { provas, exames, materias, frentes };
+    return {
+      provas: provas.data,
+      exames: exames.data,
+      materias: materias.data,
+      frentes: frentes.data,
+    };
   }
 
   public async updateStatus(
