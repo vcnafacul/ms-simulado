@@ -78,26 +78,25 @@ export class Questao extends BaseSchema {
   @ApiProperty()
   public quantidadeResposta: number;
 
-  @Prop({ required: false })
+  @Prop({ required: false, default: false })
   @ApiProperty()
   public classificationExam: boolean;
 
-  @Prop({ required: false })
+  @Prop({ required: false, default: false })
   @ApiProperty()
   public classificationFront: boolean;
 
-  @Prop({ required: false })
+  @Prop({ required: false, default: false })
   @ApiProperty()
   public questionText: boolean;
-  
-  @Prop({ required: false })
+
+  @Prop({ required: false, default: false })
   @ApiProperty()
   public image: boolean;
 
-  @Prop({ required: false })
+  @Prop({ required: false, default: false })
   @ApiProperty()
   public rightAnswer: boolean;
-
 
   @Prop({ required: false, default: Status.Pending, enum: Status })
   @ApiProperty()
