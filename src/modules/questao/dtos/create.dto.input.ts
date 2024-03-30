@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
 import { EnemArea } from '../enums/enem-area.enum';
 import { Alternativa } from '../enums/alternativa.enum';
 import { FrenteExist } from 'src/modules/frente/validator/frente-exist.validator';
@@ -68,6 +68,31 @@ export class CreateQuestaoDTOInput {
   @ApiProperty()
   @IsString()
   public imageId: string;
+
+  @ApiProperty()
+  @IsBoolean()
+  @IsOptional()
+  public classificationExam: boolean;
+  
+  @ApiProperty()
+  @IsBoolean()
+  @IsOptional()
+  public classificationFront: boolean;
+  
+  @ApiProperty()
+  @IsBoolean()
+  @IsOptional()
+  public image: boolean;
+  
+  @ApiProperty()
+  @IsBoolean()
+  @IsOptional()
+  public questionText: boolean;
+  
+  @ApiProperty()
+  @IsBoolean()
+  @IsOptional()
+  public rightAnswer: boolean;
 
   @ApiProperty()
   @IsString()
