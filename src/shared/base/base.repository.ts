@@ -1,7 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { Model } from 'mongoose';
+import { GetAllWhereInput } from './interfaces/get-all.input';
 import { GetAllOutput } from './interfaces/get-all.output';
-import { GetAllInput } from './interfaces/get-all.input';
 
 export class BaseRepository<T> {
   constructor(protected model: Model<T>) {}
@@ -12,11 +12,17 @@ export class BaseRepository<T> {
     return domain.toObject() as T;
   }
 
-  async getAll({ page, limit }: GetAllInput): Promise<GetAllOutput<T>> {
-    const query = this.model.find();
-    if (limit) query.skip((page - 1) * limit).limit(limit);
-    const data = await query;
-    const totalItems = await this.model.countDocuments();
+  async getAll({
+    page,
+    limit,
+    where,
+  }: GetAllWhereInput): Promise<GetAllOutput<T>> {
+    const data = await this.model
+      .find()
+      .skip((page - 1) * limit)
+      .limit(limit ?? Infinity)
+      .where({ ...where });
+    const totalItems = await this.model.where({ ...where }).countDocuments();
     return {
       data,
       page,

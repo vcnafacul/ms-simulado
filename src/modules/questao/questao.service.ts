@@ -50,10 +50,15 @@ export class QuestaoService {
   }
 
   public async getAll(
-    param: GetAllInput,
+    page: number,
+    limit: number,
     status?: Status,
   ): Promise<GetAllOutput<Questao>> {
-    const questoes = await this.repository.getAll(param, status);
+    const questoes = await this.repository.getAll({
+      page,
+      limit,
+      where: { status },
+    });
     return questoes;
   }
 
