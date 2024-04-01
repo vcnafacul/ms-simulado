@@ -13,6 +13,7 @@ export class HistoricoRepository extends BaseRepository<Historico> {
   override async getAll(): Promise<Historico[]> {
     return this.model
       .find()
+      .sort({ _id: -1 })
       .populate({
         path: 'simulado',
         populate: 'tipo',
@@ -23,6 +24,7 @@ export class HistoricoRepository extends BaseRepository<Historico> {
   async getAllByUser(userId: number): Promise<Historico[]> {
     return this.model
       .find({ usuario: userId })
+      .sort({ _id: -1 })
       .populate({
         path: 'simulado',
         populate: 'tipo',
