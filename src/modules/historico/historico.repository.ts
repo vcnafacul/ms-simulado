@@ -18,8 +18,8 @@ export class HistoricoRepository extends BaseRepository<Historico> {
   }: GetAllInput): Promise<GetAllOutput<Historico>> {
     const data = await this.model
       .find()
-      .skip(page)
-      .limit(limit)
+      .skip((page - 1) * limit)
+      .limit(limit ?? Infinity)
       .sort({ _id: -1 })
       .populate({
         path: 'simulado',
