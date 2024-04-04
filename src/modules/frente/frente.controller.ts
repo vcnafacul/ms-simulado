@@ -1,8 +1,18 @@
-import { Body, Controller, Get, Param, Post, Delete } from '@nestjs/common';
-import { FrenteService } from './frente.service';
-import { CreateFrenteDTOInput } from './dtos/create.dto.input';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
+import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
+import { CreateFrenteDTOInput } from './dtos/create.dto.input';
 import { Frente } from './frente.schema';
+import { FrenteService } from './frente.service';
+import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
 
 @ApiTags('Frente')
 @Controller('v1/frente')
@@ -16,8 +26,10 @@ export class FrenteController {
     type: Frente,
     isArray: true,
   })
-  public async getAll(): Promise<Frente[]> {
-    return await this.service.getAll();
+  public async getAll(
+    @Query() query: GetAllDtoInput,
+  ): Promise<GetAllDtoOutput<Frente>> {
+    return await this.service.getAll(query);
   }
 
   @Post()

@@ -177,7 +177,8 @@ describe('AppController (e2e)', () => {
     });
   };
 
-  const getHistoricos = async () => await historicoRepository.getAll();
+  const getHistoricos = async (page: number, limit: number) =>
+    await historicoRepository.getAll({ page, limit });
 
   it('Cria Historico de Simulado', async () => {
     const resposta: AnswerDTO[] = [
@@ -197,16 +198,16 @@ describe('AppController (e2e)', () => {
       } satisfies AnswerSimuladoDto)
       .expect(201);
 
-    const historicos = await getHistoricos();
+    const historicos = await getHistoricos(1, 40);
 
-    assert.equal(historicos.length, 1);
-    assert.equal(historicos[0].usuario, 1);
+    assert.equal(historicos.data.length, 1);
+    assert.equal(historicos.data[0].usuario, 1);
     assert.equal(
-      historicos[0].simulado._id.toString(),
+      historicos.data[0].simulado._id.toString(),
       dataMemory.simulado._id.toString(),
     );
-    assert.equal(historicos[0].respostas.length, 4);
-    historicos[0].respostas.forEach((r) => {
+    assert.equal(historicos.data[0].respostas.length, 4);
+    historicos.data[0].respostas.forEach((r) => {
       if (r.questao._id.toString() === resposta[0].questao.toString()) {
         assert.equal(r.alternativaEstudante, resposta[0].alternativaEstudante);
       } else {
@@ -220,45 +221,57 @@ describe('AppController (e2e)', () => {
     // 4 Frentes - Frente Teste1: 25% -- Frente Teste2: 50% -- Frente Teste3: 100% -- Frente Teste4: 0%
     // Aproveitamento Geral: 25%
 
-    assert.equal(historicos[0].aproveitamento.geral, 0.25);
-    assert.equal(historicos[0].aproveitamento.materias.length, 2);
+    assert.equal(historicos.data[0].aproveitamento.geral, 0.25);
+    assert.equal(historicos.data[0].aproveitamento.materias.length, 2);
 
     assert.equal(
-      historicos[0].aproveitamento.materias.find(
+      historicos.data[0].aproveitamento.materias.find(
         (m) => m.id.toString() === dataMemory.materias[0]._id.toString(),
       ).aproveitamento,
       0,
     );
     assert.equal(
-      historicos[0].aproveitamento.materias.find(
+      historicos.data[0].aproveitamento.materias.find(
         (m) => m.id.toString() === dataMemory.materias[1]._id.toString(),
       ).aproveitamento,
       0.5,
     );
 
     assert.equal(
-      historicos[0].aproveitamento.frentes[0].nome,
+      historicos.data[0].aproveitamento.frentes[0].nome,
       dataMemory.frentes[0].nome,
     );
-    assert.equal(historicos[0].aproveitamento.frentes[0].aproveitamento, 0.25);
+    assert.equal(
+      historicos.data[0].aproveitamento.frentes[0].aproveitamento,
+      0.25,
+    );
 
     assert.equal(
-      historicos[0].aproveitamento.frentes[1].nome,
+      historicos.data[0].aproveitamento.frentes[1].nome,
       dataMemory.frentes[1].nome,
     );
-    assert.equal(historicos[0].aproveitamento.frentes[1].aproveitamento, 0.5);
+    assert.equal(
+      historicos.data[0].aproveitamento.frentes[1].aproveitamento,
+      0.5,
+    );
 
     assert.equal(
-      historicos[0].aproveitamento.frentes[2].nome,
+      historicos.data[0].aproveitamento.frentes[2].nome,
       dataMemory.frentes[2].nome,
     );
-    assert.equal(historicos[0].aproveitamento.frentes[2].aproveitamento, 1);
+    assert.equal(
+      historicos.data[0].aproveitamento.frentes[2].aproveitamento,
+      1,
+    );
 
     assert.equal(
-      historicos[0].aproveitamento.frentes[3].nome,
+      historicos.data[0].aproveitamento.frentes[3].nome,
       dataMemory.frentes[3].nome,
     );
-    assert.equal(historicos[0].aproveitamento.frentes[3].aproveitamento, 0);
+    assert.equal(
+      historicos.data[0].aproveitamento.frentes[3].aproveitamento,
+      0,
+    );
   });
 });
 

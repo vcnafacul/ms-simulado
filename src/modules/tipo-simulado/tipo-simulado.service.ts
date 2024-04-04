@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { TipoSimuladoRepository } from './tipo-simulado.repository';
+import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
+import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { CreateTipoSimuladoDTOInput } from './dtos/create.dto.input';
 import { TipoSimulado } from './schemas/tipo-simulado.schema';
+import { TipoSimuladoRepository } from './tipo-simulado.repository';
 
 @Injectable()
 export class TipoSimuladoService {
@@ -17,8 +19,8 @@ export class TipoSimuladoService {
     return await this.repository.getById(id);
   }
 
-  public async getAll(): Promise<TipoSimulado[]> {
-    return await this.repository.getAll();
+  public async getAll(param: GetAllInput): Promise<GetAllOutput<TipoSimulado>> {
+    return await this.repository.getAll(param);
   }
 
   public async delete(id: string): Promise<void> {

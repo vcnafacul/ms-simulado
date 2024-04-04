@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { Exame } from './exame.schema';
-import { ExameRepository } from './exame.repository';
+import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { CreateExameDtoInput } from './dtos/create.dto.input';
+import { ExameRepository } from './exame.repository';
+import { Exame } from './exame.schema';
+import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 
 @Injectable()
 export class ExameService {
@@ -17,8 +19,8 @@ export class ExameService {
     return await this.repository.getById(id);
   }
 
-  public async getAll(): Promise<Exame[]> {
-    return await this.repository.getAll();
+  public async getAll(param: GetAllInput): Promise<GetAllOutput<Exame>> {
+    return await this.repository.getAll(param);
   }
 
   public async delete(id: string): Promise<void> {

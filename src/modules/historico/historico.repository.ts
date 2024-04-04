@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
+import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
+import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { Historico } from './historico.schema';
 
 @Injectable()
@@ -10,15 +12,27 @@ export class HistoricoRepository extends BaseRepository<Historico> {
     super(model);
   }
 
-  override async getAll(): Promise<Historico[]> {
-    return this.model
+  override async getAll({
+    page,
+    limit,
+  }: GetAllInput): Promise<GetAllOutput<Historico>> {
+    const data = await this.model
       .find()
+      .skip((page - 1) * limit)
+      .limit(limit ?? Infinity)
       .sort({ _id: -1 })
       .populate({
         path: 'simulado',
         populate: 'tipo',
       })
       .exec();
+    const totalItems = await this.model.countDocuments();
+    return {
+      data,
+      page,
+      limit,
+      totalItems,
+    };
   }
 
   async getAllByUser(userId: number): Promise<Historico[]> {

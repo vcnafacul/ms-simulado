@@ -1,23 +1,39 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
-  Post,
-  Delete,
   Patch,
+  Post,
+  Query,
 } from '@nestjs/common';
-import { QuestaoService } from './questao.service';
-import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Questao } from './questao.schema';
-import { Status } from './enums/status.enum';
+import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
+import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
+import { QuestaoDTOInput } from './dtos/questao.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
+import { Status } from './enums/status.enum';
+import { Questao } from './questao.schema';
+import { QuestaoService } from './questao.service';
 
 @ApiTags('Questao')
 @Controller('v1/questao')
 export class QuestaoController {
   constructor(private readonly service: QuestaoService) {}
+
+  @Get()
+  @ApiResponse({
+    status: 200,
+    description: 'get gestões por status',
+    type: Questao,
+    isArray: true,
+  })
+  public async getAll(
+    @Query() query: QuestaoDTOInput,
+  ): Promise<GetAllDtoOutput<Questao>> {
+    return await this.service.getAll(query.page, query.limit, query.status);
+  }
 
   @Get('infos')
   @ApiResponse({
@@ -26,19 +42,9 @@ export class QuestaoController {
     type: Questao,
     isArray: true,
   })
-  public async getInfos() {
+  //precisamos criar dto pra isso
+  public async getInfos(): Promise<any> {
     return await this.service.getInfos();
-  }
-
-  @Get(':status')
-  @ApiResponse({
-    status: 200,
-    description: 'get gestões por status',
-    type: Questao,
-    isArray: true,
-  })
-  public async getAll(@Param('status') status: Status): Promise<Questao[]> {
-    return await this.service.getAll(status);
   }
 
   @Post()

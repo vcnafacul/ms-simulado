@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { BaseRepository } from 'src/shared/base/base.repository';
-import { Questao } from './questao.schema';
-import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
-import { Status } from './enums/status.enum';
+import { Model } from 'mongoose';
+import { BaseRepository } from 'src/shared/base/base.repository';
 import { UpdateDTOInput } from './dtos/update.dto.input';
+import { Status } from './enums/status.enum';
+import { Questao } from './questao.schema';
 
 @Injectable()
 export class QuestaoRepository extends BaseRepository<Questao> {
@@ -12,13 +12,21 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     super(model);
   }
 
-  override async getAll(status: Status = Status.Pending) {
-    const query = this.model.find().select('+alternativa');
-
-    query.where({ status: status });
-
-    return await query;
-  }
+  // override async getAll(
+  //   param: GetAllInput,
+  //   status: Status = Status.Pending,
+  // ): Promise<GetAllOutput<Questao>> {
+  //   const query = this.model.find().select('+alternativa');
+  //   const totalItems = await this.model.where({ status }).countDocuments();
+  //   query.where({ status });
+  //   const data = await query;
+  //   return {
+  //     data,
+  //     page: param.page,
+  //     limit: param.limit,
+  //     totalItems,
+  //   };
+  // }
 
   override async getById(id: string) {
     return await this.model

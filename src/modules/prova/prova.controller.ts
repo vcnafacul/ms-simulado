@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ProvaService } from './prova.service';
+import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
+import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
 import { Prova } from './prova.schema';
+import { ProvaService } from './prova.service';
 
 @ApiTags('Prova')
 @Controller('v1/prova')
@@ -27,8 +29,10 @@ export class ProvaController {
     type: Prova,
     isArray: true,
   })
-  public async getAll(): Promise<Prova[]> {
-    return await this.service.getAll();
+  public async getAll(
+    @Query() query: GetAllDtoInput,
+  ): Promise<GetAllDtoOutput<Prova>> {
+    return await this.service.getAll(query);
   }
 
   @Get(':id')
