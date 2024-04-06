@@ -52,7 +52,7 @@ export class QuestaoService {
   public async getAll(
     page: number,
     limit: number,
-    status?: Status,
+    status: Status = Status.Pending,
   ): Promise<GetAllOutput<Questao>> {
     const questoes = await this.repository.getAll({
       page,
