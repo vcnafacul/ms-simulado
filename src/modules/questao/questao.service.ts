@@ -58,37 +58,8 @@ export class QuestaoService {
     materia,
     frente,
   }: QuestaoDTOInput): Promise<GetAllOutput<Questao>> {
-    const textConditions: any[] = [];
-    if (text) {
-      textConditions.push({ textoQuestao: { $regex: text, $options: 'i' } });
-      textConditions.push({
-        textoAlternativaA: { $regex: text, $options: 'i' },
-      });
-      textConditions.push({
-        textoAlternativaB: { $regex: text, $options: 'i' },
-      });
-      textConditions.push({
-        textoAlternativaC: { $regex: text, $options: 'i' },
-      });
-      textConditions.push({
-        textoAlternativaD: { $regex: text, $options: 'i' },
-      });
-      textConditions.push({
-        textoAlternativaE: { $regex: text, $options: 'i' },
-      });
-    }
-
-    const num = Number.parseInt(text);
-    if (!isNaN(num)) {
-      textConditions.push({ numero: num });
-    }
-
-    const frenteorConditions: any[] = [];
-    if (frente) {
-      frenteorConditions.push({ frente1: frente });
-      frenteorConditions.push({ frente2: frente });
-      frenteorConditions.push({ frente3: frente });
-    }
+    const textConditions: any[] = this.generateTextCombinations(text);
+    const frenteorConditions: any[] = this.generateFrentesCombinations(frente);
 
     const combineConditions: any[] = [];
     if (frenteorConditions.length > 0)
@@ -277,5 +248,46 @@ export class QuestaoService {
     if (regra.frente) regras['frente1'] = regra.frente._id;
     if (regra.ano) regras['ano'] = regra.ano;
     return regras;
+  }
+
+  private generateFrentesCombinations(text: string) {
+    const combinations = [];
+    if (text) {
+      combinations.push({ frente1: text });
+      combinations.push({ frente2: text });
+      combinations.push({ frente3: text });
+    }
+
+    return combinations;
+  }
+
+  private generateTextCombinations(text: string) {
+    const combinations = [];
+
+    if (text) {
+      combinations.push({ textoQuestao: { $regex: text, $options: 'i' } });
+      combinations.push({
+        textoAlternativaA: { $regex: text, $options: 'i' },
+      });
+      combinations.push({
+        textoAlternativaB: { $regex: text, $options: 'i' },
+      });
+      combinations.push({
+        textoAlternativaC: { $regex: text, $options: 'i' },
+      });
+      combinations.push({
+        textoAlternativaD: { $regex: text, $options: 'i' },
+      });
+      combinations.push({
+        textoAlternativaE: { $regex: text, $options: 'i' },
+      });
+    }
+
+    const num = Number.parseInt(text);
+    if (!isNaN(num)) {
+      combinations.push({ numero: num });
+    }
+
+    return combinations;
   }
 }
