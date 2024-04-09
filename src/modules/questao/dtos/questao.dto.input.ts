@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { IsNumberString, IsOptional, IsString } from 'class-validator';
 import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
 import { Status } from '../enums/status.enum';
-import { IsNumberString, IsOptional, IsString } from 'class-validator';
 
 export class QuestaoDTOInput extends GetAllDtoInput {
   @ApiProperty({ default: Status.Pending })
@@ -15,6 +15,14 @@ export class QuestaoDTOInput extends GetAllDtoInput {
   @ApiProperty({ default: '' })
   @IsString()
   frente: string = '';
+
+  @ApiProperty({ default: '' })
+  @IsString()
+  prova: string = '';
+
+  @ApiProperty({ default: '' })
+  @IsString()
+  enemArea: string = '';
 
   @ApiProperty()
   @IsString()

@@ -57,6 +57,8 @@ export class QuestaoService {
     status,
     materia,
     frente,
+    prova,
+    enemArea,
   }: QuestaoDTOInput): Promise<GetAllOutput<Questao>> {
     const textConditions: any[] = this.generateTextCombinations(text);
     const frenteorConditions: any[] = this.generateFrentesCombinations(frente);
@@ -70,6 +72,9 @@ export class QuestaoService {
       status,
     };
     if (materia) where['materia'] = materia;
+    if (prova) where['prova'] = prova;
+    if (enemArea) where['enemArea'] = enemArea;
+
     const questoes = await this.repository.getAll({
       page,
       limit,
@@ -264,24 +269,22 @@ export class QuestaoService {
   private generateTextCombinations(text: string) {
     const combinations = [];
 
-    if (text) {
-      combinations.push({ textoQuestao: { $regex: text, $options: 'i' } });
-      combinations.push({
-        textoAlternativaA: { $regex: text, $options: 'i' },
-      });
-      combinations.push({
-        textoAlternativaB: { $regex: text, $options: 'i' },
-      });
-      combinations.push({
-        textoAlternativaC: { $regex: text, $options: 'i' },
-      });
-      combinations.push({
-        textoAlternativaD: { $regex: text, $options: 'i' },
-      });
-      combinations.push({
-        textoAlternativaE: { $regex: text, $options: 'i' },
-      });
-    }
+    combinations.push({ textoQuestao: { $regex: text, $options: 'i' } });
+    combinations.push({
+      textoAlternativaA: { $regex: text, $options: 'i' },
+    });
+    combinations.push({
+      textoAlternativaB: { $regex: text, $options: 'i' },
+    });
+    combinations.push({
+      textoAlternativaC: { $regex: text, $options: 'i' },
+    });
+    combinations.push({
+      textoAlternativaD: { $regex: text, $options: 'i' },
+    });
+    combinations.push({
+      textoAlternativaE: { $regex: text, $options: 'i' },
+    });
 
     const num = Number.parseInt(text);
     if (!isNaN(num)) {
