@@ -5,4 +5,5 @@ export interface GetAllInput {
 
 export interface GetAllWhereInput extends GetAllInput {
   where?: object;
+  or?: object[][];
 }

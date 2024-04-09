@@ -10,6 +10,7 @@ import { ProvaService } from '../prova/prova.service';
 import { Regra } from '../tipo-simulado/schemas/regra.schemas';
 import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
+import { QuestaoDTOInput } from './dtos/questao.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
 import { QuestaoRepository } from './questao.repository';
@@ -49,15 +50,60 @@ export class QuestaoService {
     return questao;
   }
 
-  public async getAll(
-    page: number,
-    limit: number,
-    status: Status = Status.Pending,
-  ): Promise<GetAllOutput<Questao>> {
+  public async getAll({
+    page,
+    limit,
+    text,
+    status,
+    materia,
+    frente,
+  }: QuestaoDTOInput): Promise<GetAllOutput<Questao>> {
+    const textConditions: any[] = [];
+    if (text) {
+      textConditions.push({ textoQuestao: { $regex: text, $options: 'i' } });
+      textConditions.push({
+        textoAlternativaA: { $regex: text, $options: 'i' },
+      });
+      textConditions.push({
+        textoAlternativaB: { $regex: text, $options: 'i' },
+      });
+      textConditions.push({
+        textoAlternativaC: { $regex: text, $options: 'i' },
+      });
+      textConditions.push({
+        textoAlternativaD: { $regex: text, $options: 'i' },
+      });
+      textConditions.push({
+        textoAlternativaE: { $regex: text, $options: 'i' },
+      });
+    }
+
+    const num = Number.parseInt(text);
+    if (!isNaN(num)) {
+      textConditions.push({ numero: num });
+    }
+
+    const frenteorConditions: any[] = [];
+    if (frente) {
+      frenteorConditions.push({ frente1: frente });
+      frenteorConditions.push({ frente2: frente });
+      frenteorConditions.push({ frente3: frente });
+    }
+
+    const combineConditions: any[] = [];
+    if (frenteorConditions.length > 0)
+      combineConditions.push(frenteorConditions);
+    if (textConditions.length > 0) combineConditions.push(textConditions);
+
+    const where: { [key: string]: any } = {
+      status,
+    };
+    if (materia) where['materia'] = materia;
     const questoes = await this.repository.getAll({
       page,
       limit,
-      where: { status },
+      where,
+      or: combineConditions,
     });
     return questoes;
   }

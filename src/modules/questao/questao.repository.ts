@@ -18,13 +18,29 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     page,
     limit,
     where,
+    or,
   }: GetAllWhereInput): Promise<GetAllOutput<Questao>> {
     const query = this.model
-      .find()
+      .find(
+        or.length > 0
+          ? {
+              $and: or.map((o) => ({
+                $or: o,
+              })),
+            }
+          : null,
+      )
       .skip((page - 1) * limit)
       .limit(limit ?? Infinity)
       .select('+alternativa');
-    const totalItems = await this.model.where({ ...where }).countDocuments();
+    const totalItems = await this.model
+      .where({ ...where })
+      .or(
+        or.map((o) => ({
+          $or: o,
+        })),
+      )
+      .countDocuments();
     query.where({ ...where });
     const data = await query;
     return {
