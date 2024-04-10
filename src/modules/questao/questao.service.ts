@@ -68,7 +68,7 @@ export class QuestaoService {
       combineConditions.push(frenteorConditions);
     if (textConditions.length > 0) combineConditions.push(textConditions);
 
-    const where: { [key: string]: any } = {
+    const where: Record<string, string | number> = {
       status,
     };
     if (materia) where['materia'] = materia;
