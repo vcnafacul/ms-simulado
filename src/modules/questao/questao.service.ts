@@ -10,6 +10,7 @@ import { ProvaService } from '../prova/prova.service';
 import { Regra } from '../tipo-simulado/schemas/regra.schemas';
 import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
+import { QuestaoDTOInput } from './dtos/questao.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
 import { QuestaoRepository } from './questao.repository';
@@ -49,15 +50,36 @@ export class QuestaoService {
     return questao;
   }
 
-  public async getAll(
-    page: number,
-    limit: number,
-    status: Status = Status.Pending,
-  ): Promise<GetAllOutput<Questao>> {
+  public async getAll({
+    page,
+    limit,
+    text,
+    status,
+    materia,
+    frente,
+    prova,
+    enemArea,
+  }: QuestaoDTOInput): Promise<GetAllOutput<Questao>> {
+    const textConditions: any[] = this.generateTextCombinations(text);
+    const frenteorConditions: any[] = this.generateFrentesCombinations(frente);
+
+    const combineConditions: any[] = [];
+    if (frenteorConditions.length > 0)
+      combineConditions.push(frenteorConditions);
+    if (textConditions.length > 0) combineConditions.push(textConditions);
+
+    const where: Record<string, string | number> = {
+      status,
+    };
+    if (materia) where['materia'] = materia;
+    if (prova) where['prova'] = prova;
+    if (enemArea) where['enemArea'] = enemArea;
+
     const questoes = await this.repository.getAll({
       page,
       limit,
-      where: { status },
+      where,
+      or: combineConditions,
     });
     return questoes;
   }
@@ -231,5 +253,44 @@ export class QuestaoService {
     if (regra.frente) regras['frente1'] = regra.frente._id;
     if (regra.ano) regras['ano'] = regra.ano;
     return regras;
+  }
+
+  private generateFrentesCombinations(text: string) {
+    const combinations = [];
+    if (text) {
+      combinations.push({ frente1: text });
+      combinations.push({ frente2: text });
+      combinations.push({ frente3: text });
+    }
+
+    return combinations;
+  }
+
+  private generateTextCombinations(text: string) {
+    const combinations = [];
+
+    combinations.push({ textoQuestao: { $regex: text, $options: 'i' } });
+    combinations.push({
+      textoAlternativaA: { $regex: text, $options: 'i' },
+    });
+    combinations.push({
+      textoAlternativaB: { $regex: text, $options: 'i' },
+    });
+    combinations.push({
+      textoAlternativaC: { $regex: text, $options: 'i' },
+    });
+    combinations.push({
+      textoAlternativaD: { $regex: text, $options: 'i' },
+    });
+    combinations.push({
+      textoAlternativaE: { $regex: text, $options: 'i' },
+    });
+
+    const num = Number.parseInt(text);
+    if (!isNaN(num)) {
+      combinations.push({ numero: num });
+    }
+
+    return combinations;
   }
 }

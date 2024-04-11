@@ -32,7 +32,7 @@ export class QuestaoController {
   public async getAll(
     @Query() query: QuestaoDTOInput,
   ): Promise<GetAllDtoOutput<Questao>> {
-    return await this.service.getAll(query.page, query.limit, query.status);
+    return await this.service.getAll(query);
   }
 
   @Get('infos')
