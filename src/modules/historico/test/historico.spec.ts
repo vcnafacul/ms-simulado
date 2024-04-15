@@ -90,30 +90,6 @@ describe('AppController (e2e)', () => {
       }),
     );
 
-    dataMemory.frentes.push(
-      await frenteRepository.create({
-        nome: 'Frente Teste 1',
-      }),
-    );
-
-    dataMemory.frentes.push(
-      await frenteRepository.create({
-        nome: 'Frente Teste 2',
-      }),
-    );
-
-    dataMemory.frentes.push(
-      await frenteRepository.create({
-        nome: 'Frente Teste 3',
-      }),
-    );
-
-    dataMemory.frentes.push(
-      await frenteRepository.create({
-        nome: 'Frente Teste 4',
-      }),
-    );
-
     dataMemory.materias.push(
       await materiaRepository.create({
         nome: 'Materia Teste 1',
@@ -123,6 +99,34 @@ describe('AppController (e2e)', () => {
     dataMemory.materias.push(
       await materiaRepository.create({
         nome: 'Materia Teste 2',
+      }),
+    );
+
+    dataMemory.frentes.push(
+      await frenteRepository.create({
+        nome: 'Frente Teste 1',
+        materia: dataMemory.materias[0],
+      }),
+    );
+
+    dataMemory.frentes.push(
+      await frenteRepository.create({
+        nome: 'Frente Teste 2',
+        materia: dataMemory.materias[0],
+      }),
+    );
+
+    dataMemory.frentes.push(
+      await frenteRepository.create({
+        nome: 'Frente Teste 3',
+        materia: dataMemory.materias[0],
+      }),
+    );
+
+    dataMemory.frentes.push(
+      await frenteRepository.create({
+        nome: 'Frente Teste 4',
+        materia: dataMemory.materias[0],
       }),
     );
 
