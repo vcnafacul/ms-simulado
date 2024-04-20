@@ -1,8 +1,18 @@
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
-import { ExameService } from './exame.service';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Exame } from './exame.schema';
+import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
+import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
 import { CreateExameDtoInput } from './dtos/create.dto.input';
+import { Exame } from './exame.schema';
+import { ExameService } from './exame.service';
 
 @ApiTags('Exame')
 @Controller('v1/exame')
@@ -16,8 +26,10 @@ export class ExameController {
     type: Exame,
     isArray: true,
   })
-  public async getAll(): Promise<Exame[]> {
-    return await this.service.getAll();
+  public async getAll(
+    @Query() query: GetAllDtoInput,
+  ): Promise<GetAllDtoOutput<Exame>> {
+    return await this.service.getAll(query);
   }
 
   @Post()

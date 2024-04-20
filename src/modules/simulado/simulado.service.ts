@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
+import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { HistoricoRepository } from '../historico/historico.repository';
 import { Historico } from '../historico/historico.schema';
 import {
@@ -50,8 +52,8 @@ export class SimuladoService {
     return await this.repository.getById(id);
   }
 
-  public async getAll(): Promise<Simulado[]> {
-    return await this.repository.getAll();
+  public async getAll(param: GetAllInput): Promise<GetAllOutput<Simulado>> {
+    return await this.repository.getAll(param);
   }
 
   public async delete(id: string) {

@@ -1,8 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Simulado } from '../schemas/simulado.schema';
 import { Model } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
+import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
+import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
+import { Simulado } from '../schemas/simulado.schema';
 
 @Injectable()
 export class SimuladoRepository extends BaseRepository<Simulado> {
@@ -42,8 +44,22 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
       .exec();
   }
 
-  override async getAll() {
-    return await this.model.find().populate(['tipo']);
+  override async getAll({
+    page,
+    limit,
+  }: GetAllInput): Promise<GetAllOutput<Simulado>> {
+    const data = await this.model
+      .find()
+      .populate(['tipo'])
+      .skip((page - 1) * limit)
+      .limit(limit);
+    const totalItems = await this.model.countDocuments();
+    return {
+      data,
+      page,
+      limit,
+      totalItems,
+    };
   }
 
   async update(simulado: Simulado) {

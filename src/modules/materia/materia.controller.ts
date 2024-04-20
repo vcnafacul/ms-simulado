@@ -1,8 +1,18 @@
-import { Body, Controller, Get, Param, Post, Delete } from '@nestjs/common';
-import { MateriaService } from './materia.service';
-import { CreateMateriaDTOInput } from './dtos/create.dto.input';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
+import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
+import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
+import { CreateMateriaDTOInput } from './dtos/create.dto.input';
 import { Materia } from './materia.schema';
+import { MateriaService } from './materia.service';
 
 @ApiTags('Materia')
 @Controller('v1/materia')
@@ -16,8 +26,10 @@ export class MateriaController {
     type: Materia,
     isArray: true,
   })
-  public async getAll(): Promise<Materia[]> {
-    return await this.service.getAll();
+  public async getAll(
+    @Query() query: GetAllDtoInput,
+  ): Promise<GetAllDtoOutput<Materia>> {
+    return await this.service.getAll(query);
   }
 
   @Post()

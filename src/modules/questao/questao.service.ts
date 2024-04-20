@@ -1,17 +1,20 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { QuestaoRepository } from './questao.repository';
-import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
-import { Questao } from './questao.schema';
-import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
-import { Regra } from '../tipo-simulado/schemas/regra.schemas';
-import { Status } from './enums/status.enum';
-import { MateriaRepository } from '../materia/materia.repository';
-import { FrenteRepository } from '../frente/frente.repository';
-import { UpdateDTOInput } from './dtos/update.dto.input';
-import { ProvaRepository } from '../prova/prova.repository';
-import { ExameRepository } from '../exame/exame.repository';
-import { ProvaService } from '../prova/prova.service';
+import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
+import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { AuditLogService } from '../auditLog/auditLog.service';
+import { ExameRepository } from '../exame/exame.repository';
+import { FrenteRepository } from '../frente/frente.repository';
+import { MateriaRepository } from '../materia/materia.repository';
+import { ProvaRepository } from '../prova/prova.repository';
+import { ProvaService } from '../prova/prova.service';
+import { Regra } from '../tipo-simulado/schemas/regra.schemas';
+import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
+import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
+import { QuestaoDTOInput } from './dtos/questao.dto.input';
+import { UpdateDTOInput } from './dtos/update.dto.input';
+import { Status } from './enums/status.enum';
+import { QuestaoRepository } from './questao.repository';
+import { Questao } from './questao.schema';
 
 @Injectable()
 export class QuestaoService {
@@ -47,8 +50,37 @@ export class QuestaoService {
     return questao;
   }
 
-  public async getAll(status?: Status): Promise<Questao[]> {
-    const questoes = await this.repository.getAll(status);
+  public async getAll({
+    page,
+    limit,
+    text,
+    status,
+    materia,
+    frente,
+    prova,
+    enemArea,
+  }: QuestaoDTOInput): Promise<GetAllOutput<Questao>> {
+    const textConditions: any[] = this.generateTextCombinations(text);
+    const frenteorConditions: any[] = this.generateFrentesCombinations(frente);
+
+    const combineConditions: any[] = [];
+    if (frenteorConditions.length > 0)
+      combineConditions.push(frenteorConditions);
+    if (textConditions.length > 0) combineConditions.push(textConditions);
+
+    const where: Record<string, string | number> = {
+      status,
+    };
+    if (materia) where['materia'] = materia;
+    if (prova) where['prova'] = prova;
+    if (enemArea) where['enemArea'] = enemArea;
+
+    const questoes = await this.repository.getAll({
+      page,
+      limit,
+      where,
+      or: combineConditions,
+    });
     return questoes;
   }
 
@@ -74,11 +106,20 @@ export class QuestaoService {
   }
 
   public async getInfos() {
-    const provas = await this.provaRepository.getAll();
-    const exames = await this.exameRepository.getAll();
-    const materias = await this.materiaRepository.getAll();
-    const frentes = await this.frenteRepository.getAll();
-    return { provas, exames, materias, frentes };
+    const param: GetAllInput = {
+      page: 1,
+      limit: 0,
+    };
+    const provas = await this.provaRepository.getAll(param);
+    const exames = await this.exameRepository.getAll(param);
+    const materias = await this.materiaRepository.getAll(param);
+    const frentes = await this.frenteRepository.getAll(param);
+    return {
+      provas: provas.data,
+      exames: exames.data,
+      materias: materias.data,
+      frentes: frentes.data,
+    };
   }
 
   public async updateStatus(
@@ -212,5 +253,44 @@ export class QuestaoService {
     if (regra.frente) regras['frente1'] = regra.frente._id;
     if (regra.ano) regras['ano'] = regra.ano;
     return regras;
+  }
+
+  private generateFrentesCombinations(text: string) {
+    const combinations = [];
+    if (text) {
+      combinations.push({ frente1: text });
+      combinations.push({ frente2: text });
+      combinations.push({ frente3: text });
+    }
+
+    return combinations;
+  }
+
+  private generateTextCombinations(text: string) {
+    const combinations = [];
+
+    combinations.push({ textoQuestao: { $regex: text, $options: 'i' } });
+    combinations.push({
+      textoAlternativaA: { $regex: text, $options: 'i' },
+    });
+    combinations.push({
+      textoAlternativaB: { $regex: text, $options: 'i' },
+    });
+    combinations.push({
+      textoAlternativaC: { $regex: text, $options: 'i' },
+    });
+    combinations.push({
+      textoAlternativaD: { $regex: text, $options: 'i' },
+    });
+    combinations.push({
+      textoAlternativaE: { $regex: text, $options: 'i' },
+    });
+
+    const num = Number.parseInt(text);
+    if (!isNaN(num)) {
+      combinations.push({ numero: num });
+    }
+
+    return combinations;
   }
 }

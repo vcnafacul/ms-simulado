@@ -1,8 +1,18 @@
-import { Body, Controller, Get, Post, Delete, Param } from '@nestjs/common';
-import { TipoSimuladoService } from './tipo-simulado.service';
-import { CreateTipoSimuladoDTOInput } from './dtos/create.dto.input';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
+import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
+import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
+import { CreateTipoSimuladoDTOInput } from './dtos/create.dto.input';
 import { TipoSimulado } from './schemas/tipo-simulado.schema';
+import { TipoSimuladoService } from './tipo-simulado.service';
 
 @ApiTags('Tipo Simulado')
 @Controller('v1/tipo-simulado')
@@ -16,8 +26,10 @@ export class TipoSimuladoController {
     type: TipoSimulado,
     isArray: true,
   })
-  public async getAll(): Promise<TipoSimulado[]> {
-    return await this.service.getAll();
+  public async getAll(
+    @Query() query: GetAllDtoInput,
+  ): Promise<GetAllDtoOutput<TipoSimulado>> {
+    return await this.service.getAll(query);
   }
 
   @Post()
