@@ -1,9 +1,17 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { IsBoolean, IsString } from 'class-validator';
 import { CreateQuestaoDTOInput } from './create.dto.input';
-import { IsString } from 'class-validator';
 
 export class UpdateDTOInput extends PartialType(CreateQuestaoDTOInput) {
   @IsString()
   @ApiProperty()
-  _id: string;
+  public _id: string;
+
+  @IsBoolean()
+  @ApiProperty()
+  public provaClassification: boolean;
+
+  @IsBoolean()
+  @ApiProperty()
+  public reported: boolean;
 }
