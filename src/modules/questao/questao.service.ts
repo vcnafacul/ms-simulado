@@ -1,4 +1,10 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { AuditLogService } from '../auditLog/auditLog.service';
@@ -85,6 +91,15 @@ export class QuestaoService {
   }
 
   public async delete(id: string): Promise<void> {
+    const question = await this.repository.getById(id);
+    if (!question) {
+      throw new NotFoundException(`Registro com ID ${id} não encontrado.`);
+    }
+    if (question.status === Status.Approved) {
+      throw new BadRequestException(
+        'Não é permitido excluir questões já aprovadas',
+      );
+    }
     await this.repository.delete(id);
   }
 
