@@ -83,4 +83,8 @@ export class QuestaoRepository extends BaseRepository<Questao> {
   async updateQuestion(question: UpdateDTOInput) {
     await this.model.updateOne({ _id: question._id }, { ...question });
   }
+
+  async delete(_id: string) {
+    await this.model.deleteOne({ _id });
+  }
 }
