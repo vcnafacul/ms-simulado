@@ -1,16 +1,16 @@
-import { BaseSchema } from 'src/shared/base/base.schema';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { ApiProperty } from '@nestjs/swagger';
+import { Types } from 'mongoose';
 import { Frente } from '../frente/frente.schema';
 import { Materia } from '../materia/materia.schema';
-import { EnemArea } from './enums/enem-area.enum';
-import { Types } from 'mongoose';
-import { Status } from './enums/status.enum';
-import { ApiProperty } from '@nestjs/swagger';
-import { Alternativa } from './enums/alternativa.enum';
 import { Prova } from '../prova/prova.schema';
+import { Alternativa } from './enums/alternativa.enum';
+import { EnemArea } from './enums/enem-area.enum';
+import { Status } from './enums/status.enum';
+import { QuestaoReview } from './questao.review.schema';
 
 @Schema({ timestamps: true, versionKey: false })
-export class Questao extends BaseSchema {
+export class Questao extends QuestaoReview {
   @Prop()
   @ApiProperty({ enum: EnemArea })
   public enemArea: EnemArea;
