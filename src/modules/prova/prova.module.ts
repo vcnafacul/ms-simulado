@@ -10,7 +10,7 @@ import {
   TipoSimuladoSchema,
 } from '../tipo-simulado/schemas/tipo-simulado.schema';
 import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
-import { ProvaFactoryImp } from './factory/get_factory';
+import { ProvaFactory } from './factory/prova_factory';
 import { ProvaController } from './prova.controller';
 import { ProvaRepository } from './prova.repository';
 import { Prova, ProvaSchema } from './prova.schema';
@@ -35,7 +35,7 @@ import { ProvaExistValidator } from './validator/prova-exist.validator';
     ProvaRepository,
     ProvaExistValidator,
     TipoSimuladoRepository,
-    ProvaFactoryImp,
+    ProvaFactory,
   ],
   exports: [ProvaService, ProvaRepository],
 })

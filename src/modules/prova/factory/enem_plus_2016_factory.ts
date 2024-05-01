@@ -7,9 +7,9 @@ import { TipoSimuladoRepository } from 'src/modules/tipo-simulado/tipo-simulado.
 import { CreateProvaDTOInput } from '../dtos/create.dto.input';
 import { ProvaRepository } from '../prova.repository';
 import { Prova } from '../prova.schema';
-import { ProvaFactory } from './prova_factory';
+import { IProvaFactory } from './types';
 
-export class EnemPlus2016Factory implements ProvaFactory {
+export class EnemPlus2016Factory implements IProvaFactory {
   constructor(
     private readonly provarepository: ProvaRepository,
     private readonly tipoSimuladoRepository: TipoSimuladoRepository,

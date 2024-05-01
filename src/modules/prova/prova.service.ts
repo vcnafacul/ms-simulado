@@ -7,14 +7,14 @@ import { Status } from '../questao/enums/status.enum';
 import { Questao } from '../questao/questao.schema';
 import { SimuladoService } from '../simulado/simulado.service';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
-import { ProvaFactoryImp } from './factory/get_factory';
+import { ProvaFactory } from './factory/prova_factory';
 import { ProvaRepository } from './prova.repository';
 import { Prova } from './prova.schema';
 
 @Injectable()
 export class ProvaService {
   constructor(
-    private readonly provaFactory: ProvaFactoryImp,
+    private readonly provaFactory: ProvaFactory,
     private readonly repository: ProvaRepository,
     private readonly exameRepository: ExameRepository,
     private readonly simuladoService: SimuladoService,

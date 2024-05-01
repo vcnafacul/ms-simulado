@@ -5,7 +5,7 @@ import { ExameModule } from '../exame/exame.module';
 import { FrenteModule } from '../frente/frente.module';
 import { HistoricoModule } from '../historico/historico.module';
 import { MateriaModule } from '../materia/materia.module';
-import { ProvaFactoryImp } from '../prova/factory/get_factory';
+import { ProvaFactory } from '../prova/factory/prova_factory';
 import { ProvaRepository } from '../prova/prova.repository';
 import { Prova, ProvaSchema } from '../prova/prova.schema';
 import { ProvaService } from '../prova/prova.service';
@@ -45,7 +45,7 @@ import { QuestaoService } from './questao.service';
     TipoSimuladoRepository,
     SimuladoService,
     SimuladoRepository,
-    ProvaFactoryImp,
+    ProvaFactory,
   ],
   controllers: [QuestaoController],
   exports: [QuestaoService, QuestaoRepository],
