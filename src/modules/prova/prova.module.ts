@@ -1,20 +1,21 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { Prova, ProvaSchema } from './prova.schema';
-import { ProvaController } from './prova.controller';
-import { ProvaService } from './prova.service';
-import { ProvaRepository } from './prova.repository';
-import { ProvaExistValidator } from './validator/prova-exist.validator';
-import { MateriaModule } from '../materia/materia.module';
+import { ExameModule } from '../exame/exame.module';
 import { FrenteModule } from '../frente/frente.module';
+import { MateriaModule } from '../materia/materia.module';
 import { QuestaoModule } from '../questao/questao.module';
 import { SimuladoModule } from '../simulado/simulado.module';
-import { ExameModule } from '../exame/exame.module';
-import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
 import {
   TipoSimulado,
   TipoSimuladoSchema,
 } from '../tipo-simulado/schemas/tipo-simulado.schema';
+import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
+import { ProvaFactoryImp } from './factory/get_factory';
+import { ProvaController } from './prova.controller';
+import { ProvaRepository } from './prova.repository';
+import { Prova, ProvaSchema } from './prova.schema';
+import { ProvaService } from './prova.service';
+import { ProvaExistValidator } from './validator/prova-exist.validator';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import {
     ProvaRepository,
     ProvaExistValidator,
     TipoSimuladoRepository,
+    ProvaFactoryImp,
   ],
   exports: [ProvaService, ProvaRepository],
 })

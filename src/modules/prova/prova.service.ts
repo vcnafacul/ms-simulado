@@ -6,32 +6,31 @@ import { EnemArea } from '../questao/enums/enem-area.enum';
 import { Status } from '../questao/enums/status.enum';
 import { Questao } from '../questao/questao.schema';
 import { SimuladoService } from '../simulado/simulado.service';
-import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
+import { ProvaFactoryImp } from './factory/get_factory';
 import { ProvaRepository } from './prova.repository';
 import { Prova } from './prova.schema';
 
 @Injectable()
 export class ProvaService {
   constructor(
+    private readonly provaFactory: ProvaFactoryImp,
     private readonly repository: ProvaRepository,
     private readonly exameRepository: ExameRepository,
-    private readonly tipoSimuladoRepository: TipoSimuladoRepository,
     private readonly simuladoService: SimuladoService,
   ) {}
 
   public async create(item: CreateProvaDTOInput): Promise<Prova> {
     const exame = await this.exameRepository.getById(item.exame);
-    const tipo = await this.tipoSimuladoRepository.getById(item.tipo);
-    const prova = new Prova(item, exame, tipo);
-    prova.nome = `${tipo.nome} ${prova.ano} ${prova.edicao} ${prova.aplicacao}`;
-    const hasProva = await this.getByName(prova.nome);
-    if (!!hasProva) {
-      throw new HttpException('Prova já esta cadastrada', HttpStatus.CONFLICT);
+    const factory = this.provaFactory.getFactory(exame, item.ano);
+    try {
+      const prova = await factory.createProva(item);
+      await factory.createSimulados(prova);
+
+      return this.repository.create(prova);
+    } catch (error: any) {
+      throw new HttpException(error.message, HttpStatus.CONFLICT);
     }
-    await this.simuladoService.createByProva(prova);
-    const newProva = await this.repository.create(prova);
-    return newProva;
   }
 
   public async getById(id: string): Promise<Prova> {
@@ -42,10 +41,6 @@ export class ProvaService {
   public async getAll(param: GetAllInput): Promise<GetAllOutput<Prova>> {
     const provas = await this.repository.getAll(param);
     return provas;
-  }
-
-  public async getByName(nome: string): Promise<Prova> {
-    return await this.repository.getByFilter({ nome });
   }
 
   public async verifyNumber(
