@@ -1,12 +1,12 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { BaseSchema } from 'src/shared/base/base.schema';
-import { Edicao } from './enums/edicao.enum';
-import { Exame } from '../exame/exame.schema';
 import mongoose, { Types } from 'mongoose';
-import { CreateProvaDTOInput } from './dtos/create.dto.input';
-import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
+import { BaseSchema } from 'src/shared/base/base.schema';
+import { Exame } from '../exame/exame.schema';
 import { Questao } from '../questao/questao.schema';
 import { Simulado } from '../simulado/schemas/simulado.schema';
+import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
+import { CreateProvaDTOInput } from './dtos/create.dto.input';
+import { Edicao } from './enums/edicao.enum';
 
 @Schema({ timestamps: true, versionKey: false })
 export class Prova extends BaseSchema {
@@ -19,6 +19,7 @@ export class Prova extends BaseSchema {
     this.filename = item.filename;
     this.aplicacao = item.aplicacao;
     this.totalQuestao = tipo.quantidadeTotalQuestao;
+    this.simulado = [];
     this.questoes = [];
   }
   @Prop({ enum: Edicao })
@@ -38,10 +39,14 @@ export class Prova extends BaseSchema {
 
   @Prop({
     type: [{ ref: 'Simulado', type: mongoose.Schema.Types.ObjectId }],
+    default: [],
   })
   public simulado: Simulado[];
 
-  @Prop({ type: [{ ref: 'Questao', type: mongoose.Schema.Types.ObjectId }] })
+  @Prop({
+    type: [{ ref: 'Questao', type: mongoose.Schema.Types.ObjectId }],
+    default: [],
+  })
   questoes: Questao[];
 
   @Prop()
