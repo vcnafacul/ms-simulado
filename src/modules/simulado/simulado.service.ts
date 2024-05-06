@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ClientSession } from 'mongoose';
 import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { HistoricoRepository } from '../historico/historico.repository';
@@ -8,8 +9,6 @@ import {
   SubAproveitamento,
 } from '../historico/types/aproveitamento';
 import { Resposta } from '../historico/types/resposta';
-import { Prova } from '../prova/prova.schema';
-import { EnemArea } from '../questao/enums/enem-area.enum';
 import { Questao } from '../questao/questao.schema';
 import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
 import { AnswerSimuladoDto } from './dtos/answer-simulado.dto.input';
@@ -25,28 +24,6 @@ export class SimuladoService {
     private readonly tipoSimuladoRepository: TipoSimuladoRepository,
     private readonly historicoRepository: HistoricoRepository,
   ) {}
-
-  public async createByProva(prova: Prova) {
-    prova.simulado = [];
-    const mainName = `${prova.tipo.nome} ${prova.ano}`;
-    if (prova.tipo.nome === EnemArea.Enem1) {
-      prova.simulado.push(await this.createArea(mainName, EnemArea.Linguagens));
-      prova.simulado.push(
-        await this.createArea(mainName, EnemArea.CienciasHumanas),
-      );
-    } else if (prova.tipo.nome === EnemArea.Enem2) {
-      prova.simulado.push(await this.createArea(mainName, EnemArea.BioExatas));
-      prova.simulado.push(await this.createArea(mainName, EnemArea.Matematica));
-    }
-    prova.simulado.push(
-      await this.repository.create({
-        nome: mainName,
-        tipo: prova.tipo,
-        questoes: [],
-        descricao: prova.exame.nome,
-      }),
-    );
-  }
 
   public async getById(id: string): Promise<Simulado | null> {
     return await this.repository.getById(id);
@@ -70,34 +47,18 @@ export class SimuladoService {
     }
   }
 
-  public confirmAddQuestionSimulados(
-    simulados: Simulado[],
-    question: Questao,
-    nomeProva: string,
-  ): boolean {
-    return simulados.some((sml) => {
-      if (
-        sml.nome.includes(question.enemArea) ||
-        sml.nome === nomeProva.substring(0, 15)
-      ) {
-        return sml.tipo.quantidadeTotalQuestao === sml.questoes.length;
-      }
-    });
-  }
-
   public async addQuestionSimulados(
     simulados: Simulado[],
     question: Questao,
-    nomeProva: string,
+    session: ClientSession = undefined,
   ) {
     const promise = Promise.all(
       simulados.map((sml) => {
-        if (
-          sml.nome.includes(question.enemArea) ||
-          sml.nome === nomeProva.substring(0, 15)
-        ) {
-          this.addQuestion(sml._id, question);
+        sml.questoes.push(question);
+        if (sml.tipo.quantidadeTotalQuestao === sml.questoes.length) {
+          sml.bloqueado = false;
         }
+        this.repository.updateSession(sml, session);
       }),
     );
     await promise;
@@ -106,51 +67,20 @@ export class SimuladoService {
   public async removeQuestionSimulados(
     simulados: Simulado[],
     question: Questao,
-    nomeProva: string,
+    session: ClientSession = undefined,
   ) {
-    const promise = Promise.all(
-      simulados.map((sml) => {
-        if (
-          sml.nome.includes(question.enemArea) ||
-          sml.nome === nomeProva.substring(0, 15)
-        ) {
-          this.removeQuestion(sml._id, question);
+    await Promise.all(
+      simulados.map(async (sml) => {
+        const index = sml.questoes.findIndex(
+          (questao) => questao._id.toString() === question._id.toString(),
+        );
+        if (index !== -1) {
+          sml.questoes.splice(index, 1);
+          sml.bloqueado = true;
+          await this.repository.updateSession(sml, session);
         }
       }),
     );
-    await promise;
-  }
-
-  public async addQuestion(id: string, question: Questao) {
-    const simulado = await this.repository.getById(id);
-    simulado.questoes.push(question);
-    if (simulado.tipo.quantidadeTotalQuestao === simulado.questoes.length) {
-      simulado.bloqueado = false;
-    }
-    this.repository.update(simulado);
-  }
-
-  public async removeQuestion(id: string, oldQuestao: Questao) {
-    const simulado = await this.repository.getById(id);
-    const index = simulado.questoes.findIndex(
-      (questao) => questao._id.toString() === oldQuestao._id.toString(),
-    );
-    if (index !== -1) {
-      simulado.questoes.splice(index, 1);
-      simulado.bloqueado = true;
-      await this.repository.update(simulado);
-    }
-  }
-
-  private async createArea(defaultName: string, nomeTipo: string) {
-    const simuladoArea = new Simulado();
-    const tipo = await this.tipoSimuladoRepository.getByFilter({
-      nome: nomeTipo,
-    });
-    simuladoArea.tipo = tipo;
-    simuladoArea.nome = `${defaultName} ${nomeTipo}`;
-    simuladoArea.questoes = [];
-    return await this.repository.create(simuladoArea);
   }
 
   public async answer(answer: AnswerSimuladoDto) {
