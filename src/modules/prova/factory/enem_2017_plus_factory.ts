@@ -244,7 +244,7 @@ export class Enem2017PlusFactory implements IProvaFactory {
       changeProva ||
       question.enemArea !== questao.enemArea ||
       (question.enemArea === EnemArea.Linguagens &&
-        question.frente1 !== questao.frente1._id &&
+        question.frente1 !== questao.frente1._id.toString() &&
         (question.frente1 === frenteIngles.id ||
           question.frente1 === frenteEspanhol.id ||
           questao.frente1 === frenteIngles.id ||
