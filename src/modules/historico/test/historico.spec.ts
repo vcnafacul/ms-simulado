@@ -93,12 +93,14 @@ describe('AppController (e2e)', () => {
     dataMemory.materias.push(
       await materiaRepository.create({
         nome: 'Materia Teste 1',
+        enemArea: 'ENEM Area Teste 1',
       }),
     );
 
     dataMemory.materias.push(
       await materiaRepository.create({
         nome: 'Materia Teste 2',
+        enemArea: 'ENEM Area Teste 2',
       }),
     );
 
