@@ -3,6 +3,7 @@ import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
 import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
+import { GetAllDTOOutput } from './dtos/get-all.dto.output';
 import { Prova } from './prova.schema';
 import { ProvaService } from './prova.service';
 
@@ -31,7 +32,7 @@ export class ProvaController {
   })
   public async getAll(
     @Query() query: GetAllDtoInput,
-  ): Promise<GetAllDtoOutput<Prova>> {
+  ): Promise<GetAllDtoOutput<GetAllDTOOutput>> {
     return await this.service.getAll(query);
   }
 
@@ -54,6 +55,6 @@ export class ProvaController {
     isArray: false,
   })
   public async getMissing(@Param('id') id: string): Promise<number[]> {
-    return await this.service.getMissingNumber(id);
+    return await this.service.getMissingNumbers(id);
   }
 }

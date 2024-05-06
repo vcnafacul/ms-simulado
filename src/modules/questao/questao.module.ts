@@ -3,12 +3,14 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuditLogModule } from '../auditLog/auditLog.module';
 import { ExameModule } from '../exame/exame.module';
 import { FrenteModule } from '../frente/frente.module';
+import { FrenteRepository } from '../frente/frente.repository';
 import { HistoricoModule } from '../historico/historico.module';
 import { MateriaModule } from '../materia/materia.module';
 import { ProvaFactory } from '../prova/factory/prova_factory';
 import { ProvaRepository } from '../prova/prova.repository';
 import { Prova, ProvaSchema } from '../prova/prova.schema';
 import { ProvaService } from '../prova/prova.service';
+import { EnemService } from '../prova/services/enem_service';
 import { SimuladoRepository } from '../simulado/repository/simulado.repository';
 import { Simulado, SimuladoSchema } from '../simulado/schemas/simulado.schema';
 import { SimuladoService } from '../simulado/simulado.service';
@@ -21,6 +23,7 @@ import { QuestaoController } from './questao.controller';
 import { QuestaoRepository } from './questao.repository';
 import { Questao, QuestaoSchema } from './questao.schema';
 import { QuestaoService } from './questao.service';
+import { Frente, FrenteSchema } from '../frente/frente.schema';
 
 @Module({
   imports: [
@@ -29,6 +32,7 @@ import { QuestaoService } from './questao.service';
       { name: Prova.name, schema: ProvaSchema },
       { name: TipoSimulado.name, schema: TipoSimuladoSchema },
       { name: Simulado.name, schema: SimuladoSchema },
+      { name: Frente.name, schema: FrenteSchema },
     ]),
     QuestaoModule,
     ExameModule,
@@ -46,6 +50,9 @@ import { QuestaoService } from './questao.service';
     SimuladoService,
     SimuladoRepository,
     ProvaFactory,
+    EnemService,
+    FrenteRepository,
+    SimuladoService,
   ],
   controllers: [QuestaoController],
   exports: [QuestaoService, QuestaoRepository],

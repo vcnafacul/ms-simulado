@@ -16,6 +16,7 @@ import { ProvaRepository } from './prova.repository';
 import { Prova, ProvaSchema } from './prova.schema';
 import { ProvaService } from './prova.service';
 import { ProvaExistValidator } from './validator/prova-exist.validator';
+import { EnemService } from './services/enem_service';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { ProvaExistValidator } from './validator/prova-exist.validator';
     ProvaExistValidator,
     TipoSimuladoRepository,
     ProvaFactory,
+    EnemService,
   ],
   exports: [ProvaService, ProvaRepository],
 })

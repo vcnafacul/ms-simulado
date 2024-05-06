@@ -7,6 +7,10 @@ export class Materia extends BaseSchema {
   @Prop()
   @ApiProperty()
   public nome: string;
+
+  @Prop()
+  @ApiProperty()
+  public enemArea: string;
 }
 
 export const MateriaSchema = SchemaFactory.createForClass(Materia);

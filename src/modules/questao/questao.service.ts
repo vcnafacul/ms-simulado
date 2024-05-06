@@ -11,8 +11,10 @@ import { AuditLogService } from '../auditLog/auditLog.service';
 import { ExameRepository } from '../exame/exame.repository';
 import { FrenteRepository } from '../frente/frente.repository';
 import { MateriaRepository } from '../materia/materia.repository';
+import { ProvaFactory } from '../prova/factory/prova_factory';
 import { ProvaRepository } from '../prova/prova.repository';
 import { ProvaService } from '../prova/prova.service';
+import { SimuladoService } from '../simulado/simulado.service';
 import { Regra } from '../tipo-simulado/schemas/regra.schemas';
 import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
@@ -32,18 +34,16 @@ export class QuestaoService {
     private readonly materiaRepository: MateriaRepository,
     private readonly frenteRepository: FrenteRepository,
     private readonly auditLogService: AuditLogService,
+    private readonly simuladoService: SimuladoService,
+    private readonly provaFactory: ProvaFactory,
   ) {}
 
   public async create(item: CreateQuestaoDTOInput): Promise<Questao> {
-    const newQuestion = Object.assign(new Questao(), item);
-    if (
-      !(await this.provaService.verifyNumber(item.prova, newQuestion.numero))
-    ) {
-      const questao = await this.repository.create(
-        Object.assign(new Questao(), item),
-      );
-      await this.provaService.addQuestion(item.prova, questao);
-      return questao;
+    if (await this.provaService.verifyNumber(item.prova, item.numero)) {
+      const prova = await this.provaRepository.getById(item.prova);
+      const factory = this.provaFactory.getFactory(prova.exame, prova.ano);
+
+      return await factory.createQuestion(item);
     }
     throw new HttpException(
       `Possível questão já cadastrada com número ${item.numero}.`,
@@ -91,7 +91,7 @@ export class QuestaoService {
   }
 
   public async delete(id: string): Promise<void> {
-    const question = await this.repository.getById(id);
+    const question = await this.repository.getByIdToDelete(id);
     if (!question) {
       throw new NotFoundException(`Registro com ID ${id} não encontrado.`);
     }
@@ -100,7 +100,23 @@ export class QuestaoService {
         'Não é permitido excluir questões já aprovadas',
       );
     }
-    await this.repository.delete(id);
+    const session = await this.repository.startSession();
+    session.startTransaction();
+    try {
+      await this.simuladoService.removeQuestionSimulados(
+        question.prova.simulados,
+        question,
+        session,
+      );
+      await this.provaRepository.removeQuestion(question.prova._id, question);
+      await this.repository.delete(id);
+      await session.commitTransaction();
+      session.endSession();
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      throw error;
+    }
   }
 
   public async GeyManyQuestao(tipo: TipoSimulado): Promise<Questao[]> {
@@ -157,13 +173,11 @@ export class QuestaoService {
           HttpStatus.BAD_REQUEST,
         );
       }
-      const prova = await this.provaRepository.getById(question.prova._id);
       if (status === Status.Approved) {
-        await this.provaService.approvedQuestion(prova._id, question, prova);
+        await this.provaService.approvedQuestion(question.prova._id);
       } else {
-        await this.provaService.refuseQuestion(prova._id, question, prova);
+        await this.provaService.refuseQuestion(question.prova._id);
       }
-      await this.provaRepository.update(prova);
       await this.repository.UpdateStatus(id, status);
       await this.auditLogService.create({
         user: userId,
@@ -183,58 +197,16 @@ export class QuestaoService {
   }
 
   public async updateQuestion(question: UpdateDTOInput) {
-    const questao = await this.repository.getById(question._id);
-    if (question.prova)
-      this.provaService.ValidatorProvaWithEnemArea(
-        question.prova,
-        question.enemArea,
-      );
-    if (
-      (question.prova && !questao.prova) ||
-      (question.prova &&
-        (question.prova !== questao.prova._id.toString() ||
-          question.numero !== questao.numero))
-    ) {
-      await this.provaService.ValidatorProvaWithInfoQuestion(
-        question.prova,
-        question.numero,
-        question._id,
-      );
+    if (!question.prova) {
+      throw new HttpException('Prova não informada', HttpStatus.BAD_REQUEST);
     }
-    // Não existia prova antes
-    if (!questao.prova) {
-      if (!question.prova) {
-        throw new HttpException(
-          'Para  editar uma questão, uma prova deve ser definida',
-          HttpStatus.CONFLICT,
-        );
-      }
-      await this.provaService.addQuestion(question.prova, questao);
-    } else if (question.prova !== undefined) {
-      // Está alterando a prova da questão?
-      if (
-        question.prova !== questao.prova._id.toString() ||
-        question.numero !== questao.numero
-      ) {
-        await this.provaService.ValidatorProvaWithInfoQuestion(
-          question.prova,
-          question.numero,
-          question._id,
-        );
-      }
-      if (
-        question.prova !== questao.prova._id.toString() ||
-        question.enemArea !== questao.enemArea
-      ) {
-        await this.provaService.removeQuestion(questao.prova._id, questao);
-        await this.provaService.addQuestion(question.prova, {
-          ...question,
-          enemArea: question.enemArea,
-          status: questao.status,
-        } as unknown as Questao);
-      }
+    const prova = await this.provaRepository.getById(question.prova);
+    const factory = this.provaFactory.getFactory(prova.exame, prova.ano);
+    try {
+      await factory.updateQuestion(question);
+    } catch (error: any) {
+      throw new HttpException(error.message, HttpStatus.CONFLICT);
     }
-    await this.repository.updateQuestion(question);
   }
 
   private async getQuestaoByRegras(regra: Regra) {

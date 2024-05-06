@@ -18,8 +18,7 @@ export class Prova extends BaseSchema {
     this.ano = item.ano;
     this.filename = item.filename;
     this.aplicacao = item.aplicacao;
-    this.totalQuestao = tipo.quantidadeTotalQuestao;
-    this.simulado = [];
+    this.simulados = [];
     this.questoes = [];
   }
   @Prop({ enum: Edicao })
@@ -41,7 +40,7 @@ export class Prova extends BaseSchema {
     type: [{ ref: 'Simulado', type: mongoose.Schema.Types.ObjectId }],
     default: [],
   })
-  public simulado: Simulado[];
+  public simulados: Simulado[];
 
   @Prop({
     type: [{ ref: 'Questao', type: mongoose.Schema.Types.ObjectId }],
@@ -56,13 +55,16 @@ export class Prova extends BaseSchema {
   public totalQuestao: number;
 
   @Prop()
-  public totalQuestaoCadastradas: number = 0;
-
-  @Prop()
   public totalQuestaoValidadas: number = 0;
 
   @Prop()
   public filename: string;
+
+  @Prop()
+  public enemAreas: string[];
+
+  @Prop({ default: 1 })
+  public inicialNumero: number = 1;
 }
 
 export const ProvaSchema = SchemaFactory.createForClass(Prova);

@@ -55,6 +55,24 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       .populate(['frente1', 'frente2', 'frente3', 'materia', 'prova']);
   }
 
+  async getByIdToUpdate(id: string) {
+    return await this.model
+      .findById(id)
+      .select('+alternativa')
+      .populate(['frente1', 'frente2', 'frente3', 'materia', 'prova']);
+  }
+
+  async getByIdToDelete(id: string) {
+    return await this.model
+      .findById(id)
+      .select('+alternativa')
+      .populate(['frente1', 'frente2', 'frente3', 'materia', 'prova'])
+      .populate({
+        path: 'prova',
+        populate: 'simulados',
+      });
+  }
+
   async getQuestaoByFiltro(filtro: object, quant: number): Promise<Questao[]> {
     const questoes = await this.model
       .find(filtro)
