@@ -26,7 +26,7 @@ export class ProvaRepository extends BaseRepository<Prova> {
       .populate(['exame', 'simulados', 'tipo'])
       .populate({
         path: 'simulados',
-        populate: ['tipo'],
+        populate: ['tipo', 'questoes'],
       });
   }
 
