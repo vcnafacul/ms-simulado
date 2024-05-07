@@ -174,9 +174,9 @@ export class QuestaoService {
         );
       }
       if (status === Status.Approved) {
-        await this.provaService.approvedQuestion(question.prova._id);
+        await this.provaService.approvedQuestion(question.prova._id, id);
       } else {
-        await this.provaService.refuseQuestion(question.prova._id);
+        await this.provaService.refuseQuestion(question.prova._id, id);
       }
       await this.repository.UpdateStatus(id, status);
       await this.auditLogService.create({

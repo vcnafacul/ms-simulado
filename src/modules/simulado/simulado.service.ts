@@ -9,6 +9,7 @@ import {
   SubAproveitamento,
 } from '../historico/types/aproveitamento';
 import { Resposta } from '../historico/types/resposta';
+import { Status } from '../questao/enums/status.enum';
 import { Questao } from '../questao/questao.schema';
 import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
 import { AnswerSimuladoDto } from './dtos/answer-simulado.dto.input';
@@ -55,8 +56,12 @@ export class SimuladoService {
     const promise = Promise.all(
       simulados.map((sml) => {
         sml.questoes.push(question);
+        sml.bloqueado = true;
         if (sml.tipo.quantidadeTotalQuestao === sml.questoes.length) {
           sml.bloqueado = false;
+          if (sml.questoes.some((q) => q.status !== Status.Approved)) {
+            sml.bloqueado = true;
+          }
         }
         this.repository.updateSession(sml, session);
       }),

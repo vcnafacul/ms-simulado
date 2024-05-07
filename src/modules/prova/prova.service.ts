@@ -3,6 +3,8 @@ import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { ExameRepository } from '../exame/exame.repository';
 import { EnemArea } from '../questao/enums/enem-area.enum';
+import { Status } from '../questao/enums/status.enum';
+import { SimuladoRepository } from '../simulado/repository/simulado.repository';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
 import { GetAllDTOOutput } from './dtos/get-all.dto.output';
 import { ProvaFactory } from './factory/prova_factory';
@@ -15,6 +17,7 @@ export class ProvaService {
     private readonly provaFactory: ProvaFactory,
     private readonly repository: ProvaRepository,
     private readonly exameRepository: ExameRepository,
+    private readonly simuladoRepository: SimuladoRepository,
   ) {}
 
   public async create(item: CreateProvaDTOInput): Promise<Prova> {
@@ -72,15 +75,39 @@ export class ProvaService {
     }
   }
 
-  public async approvedQuestion(id: string) {
+  public async approvedQuestion(id: string, questionId: string) {
     const prova = await this.repository.getById(id);
     prova.totalQuestaoValidadas += 1;
+    await Promise.all(
+      prova.simulados.map(async (simulado) => {
+        if (
+          simulado.questoes.length === simulado.tipo.quantidadeTotalQuestao &&
+          simulado.questoes.some(
+            (q) =>
+              q.status !== Status.Approved && q._id.toString() !== questionId,
+          )
+        ) {
+          simulado.bloqueado = true;
+        } else {
+          simulado.bloqueado = false;
+        }
+        await this.simuladoRepository.update(simulado);
+      }),
+    );
     await this.repository.update(prova);
   }
 
-  public async refuseQuestion(id: string) {
+  public async refuseQuestion(id: string, questionId: string) {
     const prova = await this.repository.getById(id);
     prova.totalQuestaoValidadas -= 1;
+    await Promise.all(
+      prova.simulados.map(async (simulado) => {
+        if (simulado.questoes.some((q) => q._id.toString() === questionId)) {
+          simulado.bloqueado = true;
+        }
+        await this.simuladoRepository.update(simulado);
+      }),
+    );
     await this.repository.update(prova);
   }
 
