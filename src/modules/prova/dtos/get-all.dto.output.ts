@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Edicao } from '../enums/edicao.enum';
 
-export class GetAllDTOOutput {
+export class GetProvaDTOOutout {
   @ApiProperty()
   _id: string;
 
