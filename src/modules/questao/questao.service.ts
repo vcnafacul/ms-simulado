@@ -103,12 +103,14 @@ export class QuestaoService {
     const session = await this.repository.startSession();
     session.startTransaction();
     try {
-      await this.simuladoService.removeQuestionSimulados(
-        question.prova.simulados,
-        question,
-        session,
-      );
-      await this.provaRepository.removeQuestion(question.prova._id, question);
+      if (question.prova) {
+        await this.simuladoService.removeQuestionSimulados(
+          question.prova.simulados,
+          question,
+          session,
+        );
+        await this.provaRepository.removeQuestion(question.prova._id, question);
+      }
       await this.repository.delete(id);
       await session.commitTransaction();
       session.endSession();

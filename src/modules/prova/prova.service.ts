@@ -6,7 +6,7 @@ import { EnemArea } from '../questao/enums/enem-area.enum';
 import { Status } from '../questao/enums/status.enum';
 import { SimuladoRepository } from '../simulado/repository/simulado.repository';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
-import { GetAllDTOOutput } from './dtos/get-all.dto.output';
+import { GetProvaDTOOutout } from './dtos/get-all.dto.output';
 import { ProvaFactory } from './factory/prova_factory';
 import { ProvaRepository } from './prova.repository';
 import { Prova } from './prova.schema';
@@ -20,14 +20,27 @@ export class ProvaService {
     private readonly simuladoRepository: SimuladoRepository,
   ) {}
 
-  public async create(item: CreateProvaDTOInput): Promise<Prova> {
+  public async create(item: CreateProvaDTOInput): Promise<GetProvaDTOOutout> {
     const exame = await this.exameRepository.getById(item.exame);
     const factory = this.provaFactory.getFactory(exame, item.ano);
     try {
       const prova = await factory.createProva(item);
       await factory.createSimulados(prova);
 
-      return this.repository.create(prova);
+      const result = await this.repository.create(prova);
+      return {
+        _id: result._id,
+        edicao: result.edicao,
+        aplicacao: result.aplicacao,
+        ano: result.ano,
+        exame: result.exame.nome,
+        nome: result.nome,
+        totalQuestao: result.totalQuestao,
+        totalQuestaoCadastradas: result.questoes.length,
+        totalQuestaoValidadas: result.totalQuestaoValidadas,
+        filename: result.filename,
+        enemAreas: result.enemAreas,
+      } as GetProvaDTOOutout;
     } catch (error: any) {
       throw new HttpException(error.message, HttpStatus.CONFLICT);
     }
@@ -40,7 +53,7 @@ export class ProvaService {
 
   public async getAll(
     param: GetAllInput,
-  ): Promise<GetAllOutput<GetAllDTOOutput>> {
+  ): Promise<GetAllOutput<GetProvaDTOOutout>> {
     const provas = await this.repository.getAll(param);
     return {
       ...provas,
