@@ -81,14 +81,13 @@ export class ProvaService {
     await Promise.all(
       prova.simulados.map(async (simulado) => {
         if (
+          simulado.questoes.find((q) => q._id.toString() === questionId) &&
           simulado.questoes.length === simulado.tipo.quantidadeTotalQuestao &&
-          simulado.questoes.some(
+          !simulado.questoes.some(
             (q) =>
               q.status !== Status.Approved && q._id.toString() !== questionId,
           )
         ) {
-          simulado.bloqueado = true;
-        } else {
           simulado.bloqueado = false;
         }
         await this.simuladoRepository.update(simulado);
