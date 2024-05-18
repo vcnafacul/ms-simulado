@@ -10,6 +10,7 @@ import {
 } from '../historico/types/aproveitamento';
 import { Resposta } from '../historico/types/resposta';
 import { Status } from '../questao/enums/status.enum';
+import { QuestaoRepository } from '../questao/questao.repository';
 import { Questao } from '../questao/questao.schema';
 import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
 import { AnswerSimuladoDto } from './dtos/answer-simulado.dto.input';
@@ -21,21 +22,22 @@ import { Simulado } from './schemas/simulado.schema';
 @Injectable()
 export class SimuladoService {
   constructor(
-    private readonly repository: SimuladoRepository,
+    private readonly simuladoRepository: SimuladoRepository,
+    private readonly questoesRepository: QuestaoRepository,
     private readonly tipoSimuladoRepository: TipoSimuladoRepository,
     private readonly historicoRepository: HistoricoRepository,
   ) {}
 
   public async getById(id: string): Promise<Simulado | null> {
-    return await this.repository.getById(id);
+    return await this.simuladoRepository.getById(id);
   }
 
   public async getAll(param: GetAllInput): Promise<GetAllOutput<Simulado>> {
-    return await this.repository.getAll(param);
+    return await this.simuladoRepository.getAll(param);
   }
 
   public async delete(id: string) {
-    await this.repository.delete(id);
+    await this.simuladoRepository.delete(id);
   }
 
   public async getToAnswer(
@@ -63,7 +65,7 @@ export class SimuladoService {
             sml.bloqueado = true;
           }
         }
-        this.repository.updateSession(sml, session);
+        this.simuladoRepository.updateSession(sml, session);
       }),
     );
     await promise;
@@ -82,14 +84,18 @@ export class SimuladoService {
         if (index !== -1) {
           sml.questoes.splice(index, 1);
           sml.bloqueado = true;
-          await this.repository.updateSession(sml, session);
+          await this.simuladoRepository.updateSession(sml, session);
         }
       }),
     );
   }
 
   public async answer(answer: AnswerSimuladoDto) {
-    const simulado = await this.repository.answer(answer.idSimulado);
+    const simulado = await this.simuladoRepository.answer(answer.idSimulado);
+
+    const questao = await this.questoesRepository.getById(
+      simulado.questoes[0]._id,
+    );
 
     const respostas: Resposta[] = simulado?.questoes.map((questao) => {
       const resposta = answer.respostas.find(
@@ -105,6 +111,7 @@ export class SimuladoService {
     const aproveitamento = this.criaAproveitamento(respostas);
     const historico: Historico = {
       usuario: answer.idEstudante,
+      ano: questao.prova.ano,
       simulado: simulado,
       aproveitamento: aproveitamento,
       questoesRespondidas: answer.respostas.length,
@@ -125,7 +132,7 @@ export class SimuladoService {
     id: string,
     inicio: Date,
   ): Promise<SimuladoAnswerDTOOutput> {
-    const simulado = await this.repository.getById(id);
+    const simulado = await this.simuladoRepository.getById(id);
     return !simulado
       ? null
       : {
@@ -155,7 +162,7 @@ export class SimuladoService {
     const tipo = await this.tipoSimuladoRepository.getByFilter({
       nome: nomeTipo,
     });
-    return await this.repository.getAvailable(tipo._id);
+    return await this.simuladoRepository.getAvailable(tipo._id);
   }
 
   private criaAproveitamento(respostas: Resposta[]): Aproveitamento {

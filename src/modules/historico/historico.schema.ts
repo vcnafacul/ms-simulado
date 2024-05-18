@@ -12,6 +12,10 @@ export class Historico extends BaseSchema {
   @ApiProperty()
   public usuario: number;
 
+  @Prop()
+  @ApiProperty()
+  public ano: number;
+
   @Prop({ ref: Simulado.name, type: Types.ObjectId })
   @ApiProperty()
   public simulado: Simulado;
