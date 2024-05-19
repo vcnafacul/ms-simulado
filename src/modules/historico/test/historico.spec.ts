@@ -275,38 +275,38 @@ describe('AppController (e2e)', () => {
     );
 
     assert.equal(
-      historicos.data[0].aproveitamento.frentes[0].nome,
+      historicos.data[0].aproveitamento.materias[1].frentes[0].nome,
       dataMemory.frentes[0].nome,
     );
     assert.equal(
-      historicos.data[0].aproveitamento.frentes[0].aproveitamento,
+      historicos.data[0].aproveitamento.materias[1].frentes[0].aproveitamento,
       0.25,
     );
 
     assert.equal(
-      historicos.data[0].aproveitamento.frentes[1].nome,
+      historicos.data[0].aproveitamento.materias[1].frentes[1].nome,
       dataMemory.frentes[1].nome,
     );
     assert.equal(
-      historicos.data[0].aproveitamento.frentes[1].aproveitamento,
+      historicos.data[0].aproveitamento.materias[1].frentes[1].aproveitamento,
       0.5,
     );
 
     assert.equal(
-      historicos.data[0].aproveitamento.frentes[2].nome,
+      historicos.data[0].aproveitamento.materias[1].frentes[2].nome,
       dataMemory.frentes[2].nome,
     );
     assert.equal(
-      historicos.data[0].aproveitamento.frentes[2].aproveitamento,
+      historicos.data[0].aproveitamento.materias[1].frentes[2].aproveitamento,
       1,
     );
 
     assert.equal(
-      historicos.data[0].aproveitamento.frentes[3].nome,
+      historicos.data[0].aproveitamento.materias[1].frentes[3].nome,
       dataMemory.frentes[3].nome,
     );
     assert.equal(
-      historicos.data[0].aproveitamento.frentes[3].aproveitamento,
+      historicos.data[0].aproveitamento.materias[1].frentes[3].aproveitamento,
       0,
     );
   });
