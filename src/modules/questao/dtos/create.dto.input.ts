@@ -1,17 +1,24 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
-import { EnemArea } from '../enums/enem-area.enum';
-import { Alternativa } from '../enums/alternativa.enum';
+import {
+  IsBoolean,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import { FrenteExist } from 'src/modules/frente/validator/frente-exist.validator';
 import { MateriaExist } from 'src/modules/materia/validator/materia-exist.validator';
 import { ProvaExist } from 'src/modules/prova/validator/prova-exist.validator';
+import { Alternativa } from '../enums/alternativa.enum';
+import { EnemArea } from '../enums/enem-area.enum';
 
 export class CreateQuestaoDTOInput {
   @ApiProperty({ enum: EnemArea })
   @IsEnum(EnemArea)
   public enemArea: EnemArea;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
   @FrenteExist({ message: 'frente não existe' })
   public frente1: string;
@@ -28,7 +35,8 @@ export class CreateQuestaoDTOInput {
   @FrenteExist({ message: 'frente não existe' })
   public frente3: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
   @MateriaExist({ message: 'materia não existe' })
   public materia: string;
@@ -73,4 +81,24 @@ export class CreateQuestaoDTOInput {
   @IsString()
   @ProvaExist({ message: 'prova não existe' })
   public prova: string;
+
+  @IsBoolean()
+  @ApiProperty({ required: false })
+  @IsOptional()
+  public subjectClassification: boolean = false;
+
+  @IsBoolean()
+  @ApiProperty({ required: false })
+  @IsOptional()
+  public textClassification: boolean = false;
+
+  @IsBoolean()
+  @ApiProperty({ required: false })
+  @IsOptional()
+  public imageClassfication: boolean = false;
+
+  @IsBoolean()
+  @ApiProperty({ required: false })
+  @IsOptional()
+  public alternativeClassfication: boolean = false;
 }

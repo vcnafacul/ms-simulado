@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { ClientSession, Model } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
@@ -66,10 +66,33 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
     await this.model.updateOne({ _id: simulado._id }, simulado);
   }
 
+  async updateSession(simulado: Simulado, session?: ClientSession) {
+    await this.model.updateOne({ _id: simulado._id }, simulado, {
+      session: session,
+    });
+  }
+
   async getAvailable(tipo: string) {
     return await this.model
       .find()
       .where({ tipo, bloqueado: false })
       .select(['nome', '_id']);
+  }
+
+  public removeDuplicatedSimulados(
+    simuladosToCheck: Simulado[],
+    simuladosToCompare: Simulado[],
+  ): Simulado[] {
+    const simulados = simuladosToCheck.filter((simulado) => {
+      if (
+        simuladosToCompare.find((simuladoToCompare) => {
+          return simulado._id.toString() === simuladoToCompare._id.toString();
+        })
+      ) {
+        return false;
+      }
+      return true;
+    });
+    return simulados;
   }
 }

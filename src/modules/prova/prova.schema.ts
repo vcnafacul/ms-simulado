@@ -1,12 +1,12 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { BaseSchema } from 'src/shared/base/base.schema';
-import { Edicao } from './enums/edicao.enum';
-import { Exame } from '../exame/exame.schema';
 import mongoose, { Types } from 'mongoose';
-import { CreateProvaDTOInput } from './dtos/create.dto.input';
-import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
+import { BaseSchema } from 'src/shared/base/base.schema';
+import { Exame } from '../exame/exame.schema';
 import { Questao } from '../questao/questao.schema';
 import { Simulado } from '../simulado/schemas/simulado.schema';
+import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
+import { CreateProvaDTOInput } from './dtos/create.dto.input';
+import { Edicao } from './enums/edicao.enum';
 
 @Schema({ timestamps: true, versionKey: false })
 export class Prova extends BaseSchema {
@@ -18,7 +18,7 @@ export class Prova extends BaseSchema {
     this.ano = item.ano;
     this.filename = item.filename;
     this.aplicacao = item.aplicacao;
-    this.totalQuestao = tipo.quantidadeTotalQuestao;
+    this.simulados = [];
     this.questoes = [];
   }
   @Prop({ enum: Edicao })
@@ -38,10 +38,14 @@ export class Prova extends BaseSchema {
 
   @Prop({
     type: [{ ref: 'Simulado', type: mongoose.Schema.Types.ObjectId }],
+    default: [],
   })
-  public simulado: Simulado[];
+  public simulados: Simulado[];
 
-  @Prop({ type: [{ ref: 'Questao', type: mongoose.Schema.Types.ObjectId }] })
+  @Prop({
+    type: [{ ref: 'Questao', type: mongoose.Schema.Types.ObjectId }],
+    default: [],
+  })
   questoes: Questao[];
 
   @Prop()
@@ -51,13 +55,16 @@ export class Prova extends BaseSchema {
   public totalQuestao: number;
 
   @Prop()
-  public totalQuestaoCadastradas: number = 0;
-
-  @Prop()
   public totalQuestaoValidadas: number = 0;
 
   @Prop()
   public filename: string;
+
+  @Prop()
+  public enemAreas: string[];
+
+  @Prop({ default: 1 })
+  public inicialNumero: number = 1;
 }
 
 export const ProvaSchema = SchemaFactory.createForClass(Prova);

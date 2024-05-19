@@ -6,6 +6,10 @@ import { GetAllOutput } from './interfaces/get-all.output';
 export class BaseRepository<T> {
   constructor(protected model: Model<T>) {}
 
+  async startSession() {
+    return await this.model.startSession();
+  }
+
   async create(item: T): Promise<T> {
     const domain = await this.model.create(item);
     await domain.save();

@@ -4,34 +4,46 @@ import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { ExameRepository } from '../exame/exame.repository';
 import { EnemArea } from '../questao/enums/enem-area.enum';
 import { Status } from '../questao/enums/status.enum';
-import { Questao } from '../questao/questao.schema';
-import { SimuladoService } from '../simulado/simulado.service';
-import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
+import { SimuladoRepository } from '../simulado/repository/simulado.repository';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
+import { GetProvaDTOOutout } from './dtos/get-all.dto.output';
+import { ProvaFactory } from './factory/prova_factory';
 import { ProvaRepository } from './prova.repository';
 import { Prova } from './prova.schema';
 
 @Injectable()
 export class ProvaService {
   constructor(
+    private readonly provaFactory: ProvaFactory,
     private readonly repository: ProvaRepository,
     private readonly exameRepository: ExameRepository,
-    private readonly tipoSimuladoRepository: TipoSimuladoRepository,
-    private readonly simuladoService: SimuladoService,
+    private readonly simuladoRepository: SimuladoRepository,
   ) {}
 
-  public async create(item: CreateProvaDTOInput): Promise<Prova> {
+  public async create(item: CreateProvaDTOInput): Promise<GetProvaDTOOutout> {
     const exame = await this.exameRepository.getById(item.exame);
-    const tipo = await this.tipoSimuladoRepository.getById(item.tipo);
-    const prova = new Prova(item, exame, tipo);
-    prova.nome = `${tipo.nome} ${prova.ano} ${prova.edicao} ${prova.aplicacao}`;
-    const hasProva = await this.getByName(prova.nome);
-    if (!!hasProva) {
-      throw new HttpException('Prova já esta cadastrada', HttpStatus.CONFLICT);
+    const factory = this.provaFactory.getFactory(exame, item.ano);
+    try {
+      const prova = await factory.createProva(item);
+      await factory.createSimulados(prova);
+
+      const result = await this.repository.create(prova);
+      return {
+        _id: result._id,
+        edicao: result.edicao,
+        aplicacao: result.aplicacao,
+        ano: result.ano,
+        exame: result.exame.nome,
+        nome: result.nome,
+        totalQuestao: result.totalQuestao,
+        totalQuestaoCadastradas: result.questoes.length,
+        totalQuestaoValidadas: result.totalQuestaoValidadas,
+        filename: result.filename,
+        enemAreas: result.enemAreas,
+      } as GetProvaDTOOutout;
+    } catch (error: any) {
+      throw new HttpException(error.message, HttpStatus.CONFLICT);
     }
-    await this.simuladoService.createByProva(prova);
-    const newProva = await this.repository.create(prova);
-    return newProva;
   }
 
   public async getById(id: string): Promise<Prova> {
@@ -39,112 +51,82 @@ export class ProvaService {
     return prova;
   }
 
-  public async getAll(param: GetAllInput): Promise<GetAllOutput<Prova>> {
+  public async getAll(
+    param: GetAllInput,
+  ): Promise<GetAllOutput<GetProvaDTOOutout>> {
     const provas = await this.repository.getAll(param);
-    return provas;
-  }
-
-  public async getByName(nome: string): Promise<Prova> {
-    return await this.repository.getByFilter({ nome });
+    return {
+      ...provas,
+      data: provas.data.map((prova) => {
+        return {
+          _id: prova._id,
+          edicao: prova.edicao,
+          aplicacao: prova.aplicacao,
+          ano: prova.ano,
+          exame: prova.exame.nome,
+          nome: prova.nome,
+          totalQuestao: prova.totalQuestao,
+          totalQuestaoValidadas: prova.totalQuestaoValidadas,
+          filename: prova.filename,
+          enemAreas: prova.enemAreas,
+          totalQuestaoCadastradas: prova.questoes.length,
+        };
+      }),
+    };
   }
 
   public async verifyNumber(
     id: string,
     numberQuestion: number,
-    idQuestion?: string,
   ): Promise<boolean> {
-    const prova = await this.repository.getProvaWithQuestion(id);
-    if (
-      idQuestion &&
-      prova.questoes.some((quest) => quest._id.toString() === idQuestion)
-    ) {
-      return false;
-    }
-    return prova.questoes.some((quest) => quest.numero === numberQuestion);
-  }
-
-  public async addQuestion(id: string, question: Questao) {
     const prova = await this.repository.getById(id);
-    prova.questoes.push(question);
-    prova.totalQuestaoCadastradas += 1;
-    if (question.status === Status.Approved) {
-      await this.approvedQuestion(id, question, prova);
+    const factory = this.provaFactory.getFactory(prova.exame, prova.ano);
+    try {
+      return await factory.verifyNumberProva(prova._id, numberQuestion);
+    } catch (error: any) {
+      throw new HttpException(error.message, HttpStatus.CONFLICT);
     }
-    this.repository.update(prova);
   }
 
-  public async removeQuestion(id: string, oldQuestao: Questao) {
+  public async approvedQuestion(id: string, questionId: string) {
     const prova = await this.repository.getById(id);
-    const index = prova.questoes.findIndex(
-      (questao) => questao._id.toString() === oldQuestao._id.toString(),
+    prova.totalQuestaoValidadas += 1;
+    await Promise.all(
+      prova.simulados.map(async (simulado) => {
+        if (
+          simulado.questoes.find((q) => q._id.toString() === questionId) &&
+          simulado.questoes.length === simulado.tipo.quantidadeTotalQuestao &&
+          !simulado.questoes.some(
+            (q) =>
+              q.status !== Status.Approved && q._id.toString() !== questionId,
+          )
+        ) {
+          simulado.bloqueado = false;
+        }
+        await this.simuladoRepository.update(simulado);
+      }),
     );
-    if (index !== -1) {
-      prova.questoes.splice(index, 1);
-      prova.totalQuestaoCadastradas -= 1;
-      if (oldQuestao.status === Status.Approved) {
-        await this.refuseQuestion(id, oldQuestao, prova);
-      }
-      await this.repository.update(prova);
-    }
+    await this.repository.update(prova);
   }
 
-  public async approvedQuestion(
-    id: string,
-    question: Questao,
-    provaRef?: Prova,
-  ) {
-    let prova;
-    if (provaRef) prova = provaRef;
-    else prova = await this.repository.getById(id);
-
-    if (
-      this.simuladoService.confirmAddQuestionSimulados(
-        prova.simulado,
-        question,
-        prova.nome,
-      )
-    ) {
-      throw new HttpException(
-        'Não é possível inserir questões no simulado. Verifique se os simulados já estão completos',
-        HttpStatus.CONFLICT,
-      );
-    }
-    prova.totalQuestaoValidadas++;
-    if (!provaRef) await this.repository.update(prova);
-    await this.simuladoService.addQuestionSimulados(
-      prova.simulado,
-      question,
-      prova.nome,
+  public async refuseQuestion(id: string, questionId: string) {
+    const prova = await this.repository.getById(id);
+    prova.totalQuestaoValidadas -= 1;
+    await Promise.all(
+      prova.simulados.map(async (simulado) => {
+        if (simulado.questoes.some((q) => q._id.toString() === questionId)) {
+          simulado.bloqueado = true;
+        }
+        await this.simuladoRepository.update(simulado);
+      }),
     );
+    await this.repository.update(prova);
   }
 
-  public async refuseQuestion(id: string, question: Questao, provaRef?: Prova) {
-    let prova;
-    if (provaRef) prova = provaRef;
-    else prova = await this.repository.getById(id);
-    prova.totalQuestaoValidadas--;
-    if (!provaRef) await this.repository.update(prova);
-    await this.simuladoService.removeQuestionSimulados(
-      prova.simulado,
-      question,
-      prova.nome,
-    );
-  }
-
-  public async getMissingNumber(id: string) {
+  public async getMissingNumbers(id: string) {
     const prova = await this.repository.getProvaWithQuestion(id);
-    const day1 = prova.nome.includes('Dia 1');
-    const missingQuestion = [];
-    for (
-      let index = day1 ? 1 : 91;
-      index <= (day1 ? prova.totalQuestao : prova.totalQuestao + 90);
-      index++
-    ) {
-      if (!prova.questoes.find((quest) => quest.numero === index)) {
-        missingQuestion.push(index);
-      }
-    }
-    return missingQuestion;
+    const factory = this.provaFactory.getFactory(prova.exame, prova.ano);
+    return factory.getMissingNumbers(prova);
   }
 
   public async ValidatorProvaWithEnemArea(id: string, enemArea: EnemArea) {
@@ -157,19 +139,6 @@ export class ProvaService {
     ) {
       throw new HttpException(
         'Area do conhecimento não coincide com a prova',
-        HttpStatus.CONFLICT,
-      );
-    }
-  }
-
-  public async ValidatorProvaWithInfoQuestion(
-    id: string,
-    numberQuestion: number,
-    IdQuestion?: string,
-  ) {
-    if (await this.verifyNumber(id, numberQuestion, IdQuestion)) {
-      throw new HttpException(
-        `Possível questão já cadastrada com número ${numberQuestion}.`,
         HttpStatus.CONFLICT,
       );
     }

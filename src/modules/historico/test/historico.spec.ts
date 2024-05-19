@@ -9,7 +9,11 @@ import { FrenteRepository } from 'src/modules/frente/frente.repository';
 import { Frente } from 'src/modules/frente/frente.schema';
 import { MateriaRepository } from 'src/modules/materia/materia.repository';
 import { Materia } from 'src/modules/materia/materia.schema';
+import { Edicao } from 'src/modules/prova/enums/edicao.enum';
+import { ProvaRepository } from 'src/modules/prova/prova.repository';
+import { Prova } from 'src/modules/prova/prova.schema';
 import { Alternativa } from 'src/modules/questao/enums/alternativa.enum';
+import { EnemArea } from 'src/modules/questao/enums/enem-area.enum';
 import { QuestaoRepository } from 'src/modules/questao/questao.repository';
 import { Questao } from 'src/modules/questao/questao.schema';
 import { AnswerSimuladoDto } from 'src/modules/simulado/dtos/answer-simulado.dto.input';
@@ -41,6 +45,7 @@ describe('AppController (e2e)', () => {
   let tipoSimuladoRepository: BaseRepository<TipoSimulado>;
   let simuladoRepository: BaseRepository<Simulado>;
   let historicoRepository: BaseRepository<Historico>;
+  let provaRepository: BaseRepository<Prova>;
 
   const dataMemory = {
     exames: [] as Exame[],
@@ -74,6 +79,8 @@ describe('AppController (e2e)', () => {
     historicoRepository =
       moduleFixture.get<BaseRepository<Historico>>(HistoricoRepository);
 
+    provaRepository = moduleFixture.get<BaseRepository<Prova>>(ProvaRepository);
+
     await setUp(dataMemory);
     await app.init();
   });
@@ -93,12 +100,14 @@ describe('AppController (e2e)', () => {
     dataMemory.materias.push(
       await materiaRepository.create({
         nome: 'Materia Teste 1',
+        enemArea: 'ENEM Area Teste 1',
       }),
     );
 
     dataMemory.materias.push(
       await materiaRepository.create({
         nome: 'Materia Teste 2',
+        enemArea: 'ENEM Area Teste 2',
       }),
     );
 
@@ -130,9 +139,33 @@ describe('AppController (e2e)', () => {
       }),
     );
 
+    dataMemory.tipoSimulado = await tipoSimuladoRepository.create({
+      nome: 'Tipo Simulado Teste',
+      quantidadeTotalQuestao: 4,
+      duracao: 10,
+      regras: [],
+    });
+
+    const prova = await provaRepository.create({
+      edicao: Edicao.Regular,
+      tipo: dataMemory.tipoSimulado,
+      simulados: [],
+      questoes: [],
+      inicialNumero: 1,
+      aplicacao: 1,
+      ano: 2020,
+      exame: dataMemory.exames[0],
+      nome: 'Prova Teste',
+      totalQuestao: 95,
+      totalQuestaoValidadas: 4,
+      filename: 'filename',
+      enemAreas: [EnemArea.Linguagens, EnemArea.CienciasHumanas],
+    });
+
     dataMemory.questoes.push(
       await questaoRepository.create(
         _createQuestionMock(
+          prova,
           dataMemory.materias[1],
           dataMemory.frentes[0],
           dataMemory.frentes[1],
@@ -143,13 +176,18 @@ describe('AppController (e2e)', () => {
 
     dataMemory.questoes.push(
       await questaoRepository.create(
-        _createQuestionMock(dataMemory.materias[0], dataMemory.frentes[0]),
+        _createQuestionMock(
+          prova,
+          dataMemory.materias[0],
+          dataMemory.frentes[0],
+        ),
       ),
     );
 
     dataMemory.questoes.push(
       await questaoRepository.create(
         _createQuestionMock(
+          prova,
           dataMemory.materias[0],
           dataMemory.frentes[0],
           dataMemory.frentes[1],
@@ -160,6 +198,7 @@ describe('AppController (e2e)', () => {
     dataMemory.questoes.push(
       await questaoRepository.create(
         _createQuestionMock(
+          prova,
           dataMemory.materias[1],
           dataMemory.frentes[0],
           dataMemory.frentes[3],
@@ -167,12 +206,6 @@ describe('AppController (e2e)', () => {
       ),
     );
 
-    dataMemory.tipoSimulado = await tipoSimuladoRepository.create({
-      nome: 'Tipo Simulado Teste',
-      quantidadeTotalQuestao: 4,
-      duracao: 10,
-      regras: [],
-    });
     dataMemory.simulado = await simuladoRepository.create({
       nome: 'Simulado Teste',
       descricao: 'Descricao Simulado Teste',
@@ -242,44 +275,45 @@ describe('AppController (e2e)', () => {
     );
 
     assert.equal(
-      historicos.data[0].aproveitamento.frentes[0].nome,
+      historicos.data[0].aproveitamento.materias[1].frentes[0].nome,
       dataMemory.frentes[0].nome,
     );
     assert.equal(
-      historicos.data[0].aproveitamento.frentes[0].aproveitamento,
+      historicos.data[0].aproveitamento.materias[1].frentes[0].aproveitamento,
       0.25,
     );
 
     assert.equal(
-      historicos.data[0].aproveitamento.frentes[1].nome,
+      historicos.data[0].aproveitamento.materias[1].frentes[1].nome,
       dataMemory.frentes[1].nome,
     );
     assert.equal(
-      historicos.data[0].aproveitamento.frentes[1].aproveitamento,
+      historicos.data[0].aproveitamento.materias[1].frentes[1].aproveitamento,
       0.5,
     );
 
     assert.equal(
-      historicos.data[0].aproveitamento.frentes[2].nome,
+      historicos.data[0].aproveitamento.materias[1].frentes[2].nome,
       dataMemory.frentes[2].nome,
     );
     assert.equal(
-      historicos.data[0].aproveitamento.frentes[2].aproveitamento,
+      historicos.data[0].aproveitamento.materias[1].frentes[2].aproveitamento,
       1,
     );
 
     assert.equal(
-      historicos.data[0].aproveitamento.frentes[3].nome,
+      historicos.data[0].aproveitamento.materias[1].frentes[3].nome,
       dataMemory.frentes[3].nome,
     );
     assert.equal(
-      historicos.data[0].aproveitamento.frentes[3].aproveitamento,
+      historicos.data[0].aproveitamento.materias[1].frentes[3].aproveitamento,
       0,
     );
   });
 });
 
 const _createQuestionMock = (
+  prova: Prova,
   materia: Materia,
   frente: Frente,
   frente2?: Frente,
@@ -291,5 +325,6 @@ const _createQuestionMock = (
   questao.frente2 = frente2;
   questao.frente3 = frente3;
   questao.alternativa = Alternativa.A;
+  questao.prova = prova;
   return questao;
 };
