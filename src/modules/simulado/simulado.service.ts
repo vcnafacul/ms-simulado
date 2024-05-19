@@ -2,10 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { ClientSession } from 'mongoose';
 import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
+import { FrenteRepository } from '../frente/frente.repository';
 import { HistoricoRepository } from '../historico/historico.repository';
 import { Historico } from '../historico/historico.schema';
 import {
   Aproveitamento,
+  FrenteAproveitamento,
+  MateriaAproveitamento,
   SubAproveitamento,
 } from '../historico/types/aproveitamento';
 import { Resposta } from '../historico/types/resposta';
@@ -26,6 +29,7 @@ export class SimuladoService {
     private readonly questoesRepository: QuestaoRepository,
     private readonly tipoSimuladoRepository: TipoSimuladoRepository,
     private readonly historicoRepository: HistoricoRepository,
+    private readonly frenteRepository: FrenteRepository,
   ) {}
 
   public async getById(id: string): Promise<Simulado | null> {
@@ -108,7 +112,7 @@ export class SimuladoService {
       };
     });
 
-    const aproveitamento = this.criaAproveitamento(respostas);
+    const aproveitamento = await this.criaAproveitamento(respostas);
     const historico: Historico = {
       usuario: answer.idEstudante,
       ano: questao.prova.ano,
@@ -165,10 +169,17 @@ export class SimuladoService {
     return await this.simuladoRepository.getAvailable(tipo._id);
   }
 
-  private criaAproveitamento(respostas: Resposta[]): Aproveitamento {
+  private async criaAproveitamento(
+    respostas: Resposta[],
+  ): Promise<Aproveitamento> {
     let aproveitamentoGeral = 0;
+    const frentesBD = await this.frenteRepository.getAll({
+      page: 1,
+      limit: 1000,
+      where: null,
+    });
 
-    const materias: SubAproveitamento[] = [];
+    const materias: MateriaAproveitamento[] = [];
     respostas.forEach((r) => {
       const exist = materias.find(
         (m) => m?.id?.toString() === r.questao.materia._id.toString(),
@@ -178,11 +189,12 @@ export class SimuladoService {
           id: r.questao.materia._id,
           nome: r.questao.materia.nome,
           aproveitamento: 0,
-        } satisfies SubAproveitamento);
+          frentes: [],
+        } satisfies MateriaAproveitamento);
       }
     });
 
-    const frentes: SubAproveitamento[] = [];
+    const frentes: FrenteAproveitamento[] = [];
 
     respostas.forEach((r) => {
       const existFrente1 = frentes.find(
@@ -193,7 +205,10 @@ export class SimuladoService {
           id: r.questao.frente1._id,
           nome: r.questao.frente1.nome,
           aproveitamento: 0,
-        } satisfies SubAproveitamento);
+          materia: frentesBD.data.find(
+            (f) => f._id.toString() === r.questao.frente1._id.toString(),
+          ).materia._id,
+        } satisfies FrenteAproveitamento);
       }
       if (
         r.questao.frente2 &&
@@ -205,7 +220,10 @@ export class SimuladoService {
           id: r.questao.frente2._id,
           nome: r.questao.frente2.nome,
           aproveitamento: 0,
-        } satisfies SubAproveitamento);
+          materia: frentesBD.data.find(
+            (f) => f._id.toString() === r.questao.frente2._id.toString(),
+          ).materia._id,
+        } satisfies FrenteAproveitamento);
       }
       if (
         r.questao.frente3 &&
@@ -217,33 +235,20 @@ export class SimuladoService {
           id: r.questao.frente3._id,
           nome: r.questao.frente3.nome,
           aproveitamento: 0,
-        } satisfies SubAproveitamento);
+          materia: frentesBD.data.find(
+            (f) => f._id.toString() === r.questao.frente3._id.toString(),
+          ).materia._id,
+        } satisfies FrenteAproveitamento);
       }
     });
 
     respostas.forEach((res) => {
       if (res.alternativaCorreta === res.alternativaEstudante) {
         aproveitamentoGeral++;
-        this.calculaAproveitamento(
-          res.questao.materia._id,
-          res.questao.materia.nome,
-          materias,
-        );
-        this.calculaAproveitamento(
-          res.questao.frente1._id,
-          res.questao.frente1.nome,
-          frentes,
-        );
-        this.calculaAproveitamento(
-          res.questao.frente2?._id,
-          res.questao.frente2?.nome,
-          frentes,
-        );
-        this.calculaAproveitamento(
-          res.questao.frente3?._id,
-          res.questao.frente3?.nome,
-          frentes,
-        );
+        this.calculaAproveitamento(res.questao.materia._id, materias);
+        this.calculaAproveitamento(res.questao.frente1._id, frentes);
+        this.calculaAproveitamento(res.questao.frente2?._id, frentes);
+        this.calculaAproveitamento(res.questao.frente3?._id, frentes);
       }
     });
 
@@ -257,32 +262,31 @@ export class SimuladoService {
     });
 
     frentes.forEach((f) => {
-      const quantidade = respostas.reduce(
-        (total, elem) =>
-          [
-            elem.questao.frente1._id,
-            elem.questao.frente2?._id,
-            elem.questao.frente3?._id,
-          ].includes(f.id)
-            ? total + 1
-            : total,
-        0,
+      const qtF1 = respostas.filter(
+        (r) => r.questao.frente1._id.toString() === f.id.toString(),
+      ).length;
+      const qtF2 = respostas.filter(
+        (r) => r.questao.frente2?._id.toString() === f.id.toString(),
+      ).length;
+      const qtF3 = respostas.filter(
+        (r) => r.questao.frente3?._id.toString() === f.id.toString(),
+      ).length;
+      f.aproveitamento = f.aproveitamento / (qtF1 + qtF2 + qtF3);
+    });
+
+    materias.forEach((m) => {
+      m.frentes = frentes.filter(
+        (f) => f.materia.toString() === m.id.toString(),
       );
-      f.aproveitamento = f.aproveitamento / quantidade;
     });
 
     return {
       geral: aproveitamentoGeral / respostas.length,
       materias: materias,
-      frentes: frentes,
     };
   }
 
-  private calculaAproveitamento(
-    id: string,
-    nome: string,
-    array: Array<SubAproveitamento>,
-  ) {
+  private calculaAproveitamento(id: string, array: Array<SubAproveitamento>) {
     if (id) {
       const index: number = array.findIndex((a) => a.id == id);
       if (index > -1) {

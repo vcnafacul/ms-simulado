@@ -4,8 +4,14 @@ export interface SubAproveitamento {
   aproveitamento: number;
 }
 
+export interface FrenteAproveitamento extends SubAproveitamento {
+  materia: string;
+}
+
+export interface MateriaAproveitamento extends SubAproveitamento {
+  frentes: FrenteAproveitamento[];
+}
 export abstract class Aproveitamento {
   public geral: number;
-  public materias: SubAproveitamento[];
-  public frentes: SubAproveitamento[];
+  public materias: MateriaAproveitamento[];
 }
