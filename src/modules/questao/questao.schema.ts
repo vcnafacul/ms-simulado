@@ -25,11 +25,11 @@ export class Questao extends QuestaoReview {
 
   @Prop({ ref: Frente.name, type: Types.ObjectId, required: false })
   @ApiProperty()
-  public frente3: Frente;
+  public frente3: Frente = null;
 
   @Prop({ ref: Materia.name, type: Types.ObjectId })
   @ApiProperty()
-  public materia: Materia;
+  public materia: Materia = null;
 
   @Prop()
   @ApiProperty()
