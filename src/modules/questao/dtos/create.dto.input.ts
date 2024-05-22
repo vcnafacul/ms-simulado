@@ -11,6 +11,7 @@ import { MateriaExist } from 'src/modules/materia/validator/materia-exist.valida
 import { ProvaExist } from 'src/modules/prova/validator/prova-exist.validator';
 import { Alternativa } from '../enums/alternativa.enum';
 import { EnemArea } from '../enums/enem-area.enum';
+import { Frente2And3Exist } from 'src/modules/frente/validator/frente-2-and-3-exist.validator';
 
 export class CreateQuestaoDTOInput {
   @ApiProperty({ enum: EnemArea })
@@ -26,13 +27,13 @@ export class CreateQuestaoDTOInput {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
-  @FrenteExist({ message: 'frente não existe' })
+  @Frente2And3Exist({ message: 'frente não existe' })
   public frente2: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
-  @FrenteExist({ message: 'frente não existe' })
+  @Frente2And3Exist({ message: 'frente não existe' })
   public frente3: string;
 
   @ApiProperty({ required: false })
