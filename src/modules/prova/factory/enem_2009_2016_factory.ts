@@ -221,7 +221,7 @@ export class Enem2009_2017Factory implements IProvaFactory {
   }
 
   public async updateQuestion(question: UpdateDTOInput) {
-    const questao = await this.questaoRepository.getById(question._id);
+    const questao = await this.questaoRepository.getByIdToUpdate(question._id);
 
     const frenteIngles = await this.frenteRepository.getByFilter({
       nome: 'Inglês',
