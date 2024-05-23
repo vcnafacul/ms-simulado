@@ -39,10 +39,9 @@ export class QuestaoService {
   ) {}
 
   public async create(item: CreateQuestaoDTOInput): Promise<Questao> {
-    if (await this.provaService.verifyNumber(item.prova, item.numero)) {
-      const prova = await this.provaRepository.getById(item.prova);
-      const factory = this.provaFactory.getFactory(prova.exame, prova.ano);
-
+    const prova = await this.provaRepository.getById(item.prova);
+    const factory = this.provaFactory.getFactory(prova.exame, prova.ano);
+    if (await factory.verifyNumberProva(prova._id, item.numero)) {
       return await factory.createQuestion(item);
     }
     throw new HttpException(
