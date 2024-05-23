@@ -9,7 +9,7 @@ import { FrenteRepository } from '../frente.repository';
 
 @Injectable()
 @ValidatorConstraint({ async: true })
-export class FrenteExistValidator implements ValidatorConstraintInterface {
+export class Frente2And3ExistValidator implements ValidatorConstraintInterface {
   constructor(private readonly frenteRepository: FrenteRepository) {}
 
   async validate(value: any): Promise<boolean> {
@@ -19,7 +19,7 @@ export class FrenteExistValidator implements ValidatorConstraintInterface {
         return !!frente;
       }
       return true;
-    } catch {
+    } catch (error) {
       return false;
     }
   }
@@ -32,7 +32,7 @@ export const Frente2And3Exist = (validationOptions: ValidationOptions) => {
       propertyName: props,
       options: validationOptions,
       constraints: [],
-      validator: FrenteExistValidator,
+      validator: Frente2And3ExistValidator,
     });
   };
 };
