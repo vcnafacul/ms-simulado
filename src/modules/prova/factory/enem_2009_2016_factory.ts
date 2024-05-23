@@ -127,6 +127,7 @@ export class Enem2009_2017Factory implements IProvaFactory {
       }
       return false;
     }
+    return true;
   }
 
   public async createQuestion(question: CreateQuestaoDTOInput) {

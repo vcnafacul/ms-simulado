@@ -75,19 +75,6 @@ export class ProvaService {
     };
   }
 
-  public async verifyNumber(
-    id: string,
-    numberQuestion: number,
-  ): Promise<boolean> {
-    const prova = await this.repository.getById(id);
-    const factory = this.provaFactory.getFactory(prova.exame, prova.ano);
-    try {
-      return await factory.verifyNumberProva(prova._id, numberQuestion);
-    } catch (error: any) {
-      throw new HttpException(error.message, HttpStatus.CONFLICT);
-    }
-  }
-
   public async approvedQuestion(id: string, questionId: string) {
     const prova = await this.repository.getById(id);
     prova.totalQuestaoValidadas += 1;
