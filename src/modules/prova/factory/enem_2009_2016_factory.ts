@@ -204,13 +204,13 @@ export class Enem2009_2017Factory implements IProvaFactory {
     const session = await this.questaoRepository.startSession();
     session.startTransaction();
     try {
+      const result = await this.questaoRepository.create(questao);
       await this.simuladoService.addQuestionSimulados(
         simuladosToEnter,
-        questao,
+        result,
         session,
       );
-      await this.provaRepository.addQuestion(question.prova, questao);
-      const result = await this.questaoRepository.create(questao);
+      await this.provaRepository.addQuestion(question.prova, result);
       await session.commitTransaction();
       session.endSession();
       return result;
