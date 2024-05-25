@@ -52,7 +52,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     return await this.model
       .findById(id)
       .select('+alternativa')
-      .populate(['frente1', 'frente2', 'frente3', 'materia', 'prova']);
+      .populate(['frente1', 'materia', 'prova']);
   }
 
   async getByIdToUpdate(id: string) {

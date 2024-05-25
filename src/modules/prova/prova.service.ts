@@ -89,6 +89,10 @@ export class ProvaService {
           )
         ) {
           simulado.bloqueado = false;
+          const organizationQuestions = simulado.questoes.sort(
+            (a, b) => a.numero - b.numero,
+          );
+          simulado.questoes = organizationQuestions;
         }
         await this.simuladoRepository.update(simulado);
       }),
