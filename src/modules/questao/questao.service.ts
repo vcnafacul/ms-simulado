@@ -73,9 +73,8 @@ export class QuestaoService {
       combineConditions.push(frenteorConditions);
     if (textConditions.length > 0) combineConditions.push(textConditions);
 
-    const where: Record<string, string | number> = {
-      status,
-    };
+    const where: Record<string, string | number> = {};
+    if (status !== undefined) where['status'] = status;
     if (materia) where['materia'] = materia;
     if (prova) where['prova'] = prova;
     if (enemArea) where['enemArea'] = enemArea;
