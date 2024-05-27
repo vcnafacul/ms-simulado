@@ -99,6 +99,8 @@ export class QuestaoRepository extends BaseRepository<Questao> {
   }
 
   async updateQuestion(question: UpdateDTOInput) {
+    if (question.frente2 === '') question.frente2 = null;
+    if (question.frente3 === '') question.frente3 = null;
     await this.model.updateOne({ _id: question._id }, { ...question });
   }
 
