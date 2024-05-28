@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
-import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
+import { GetHistoricoDTOInput } from './dtos/get-historico.dto';
 import { Historico } from './historico.schema';
 
 @Injectable()
@@ -12,42 +12,32 @@ export class HistoricoRepository extends BaseRepository<Historico> {
     super(model);
   }
 
-  override async getAll({
+  async getAllByUser({
     page,
     limit,
-  }: GetAllInput): Promise<GetAllOutput<Historico>> {
+    userId,
+  }: GetHistoricoDTOInput): Promise<GetAllOutput<Historico>> {
     const data = await this.model
-      .find()
+      .find({ usuario: userId })
       .skip((page - 1) * limit)
       .limit(limit ?? Infinity)
       .sort({ _id: -1 })
       .populate({
         path: 'simulado',
         populate: 'tipo',
+        select: '_id nome tipo',
       })
       .exec();
-    const totalItems = await this.model.countDocuments();
+
+    const totalItems = await this.model
+      .find({ usuario: userId })
+      .countDocuments();
     return {
       data,
       page,
       limit,
       totalItems,
     };
-  }
-
-  async getAllByUser(userId: number): Promise<Historico[]> {
-    return this.model
-      .find({ usuario: userId })
-      .sort({ _id: -1 })
-      .populate({
-        path: 'simulado',
-        populate: 'tipo',
-        select: '_id nome tipo',
-      })
-      .select(
-        '_id usuario simulado aproveitamento tempoRealizado questoesRespondidas',
-      )
-      .exec();
   }
 
   override async getById(id: string): Promise<Historico> {
