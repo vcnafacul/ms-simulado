@@ -1,8 +1,8 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
+import { GetHistoricoDTOInput } from './dtos/get-historico.dto';
 import { Historico } from './historico.schema';
 import { HistoricoService } from './historico.service';
-import { GetHistoricoDTOInput } from './dtos/get-historico.dto';
 
 @ApiTags('Historico')
 @Controller('v1/historico')
@@ -18,6 +18,16 @@ export class HistoricoController {
   })
   async getAll(@Query() dto: GetHistoricoDTOInput) {
     return await this.service.getAllbyUser(dto);
+  }
+
+  @Get('performance/:userId')
+  @ApiResponse({
+    status: 200,
+    description: 'obtém histórico de performance por usuário',
+    isArray: true,
+  })
+  async getPerformance(@Param('userId') userId: number) {
+    return await this.service.getPerformance(userId);
   }
 
   @Get(':id')

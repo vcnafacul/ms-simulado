@@ -3,7 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { BaseSchema } from 'src/shared/base/base.schema';
 import { Simulado } from '../simulado/schemas/simulado.schema';
-import { Aproveitamento } from './types/aproveitamento';
+import { AproveitamentoHistorico } from './types/aproveitamento';
 import { Resposta } from './types/resposta';
 
 @Schema({ timestamps: false, versionKey: false })
@@ -24,9 +24,9 @@ export class Historico extends BaseSchema {
   @ApiProperty()
   public respostas: Resposta[];
 
-  @Prop({ type: Aproveitamento })
+  @Prop({ type: AproveitamentoHistorico })
   @ApiProperty()
-  public aproveitamento: Aproveitamento;
+  public aproveitamento: AproveitamentoHistorico;
 
   @Prop()
   @ApiProperty()

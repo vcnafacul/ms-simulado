@@ -49,4 +49,15 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       })
       .exec();
   }
+
+  async getToPerformance(userId: number): Promise<Historico[]> {
+    return this.model
+      .find({ usuario: userId })
+      .sort({ _id: -1 })
+      .populate({
+        path: 'simulado',
+        populate: ['tipo'],
+      })
+      .exec();
+  }
 }

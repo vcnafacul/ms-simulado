@@ -6,7 +6,7 @@ import { FrenteRepository } from '../frente/frente.repository';
 import { HistoricoRepository } from '../historico/historico.repository';
 import { Historico } from '../historico/historico.schema';
 import {
-  Aproveitamento,
+  AproveitamentoHistorico,
   FrenteAproveitamento,
   MateriaAproveitamento,
   SubAproveitamento,
@@ -171,7 +171,7 @@ export class SimuladoService {
 
   private async criaAproveitamento(
     respostas: Resposta[],
-  ): Promise<Aproveitamento> {
+  ): Promise<AproveitamentoHistorico> {
     let aproveitamentoGeral = 0;
     const frentesBD = await this.frenteRepository.getAll({
       page: 1,
