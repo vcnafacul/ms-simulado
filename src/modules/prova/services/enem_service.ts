@@ -3,7 +3,7 @@ import { Frente } from 'src/modules/frente/frente.schema';
 import { CreateQuestaoDTOInput } from 'src/modules/questao/dtos/create.dto.input';
 import { UpdateDTOInput } from 'src/modules/questao/dtos/update.dto.input';
 import { EnemArea } from 'src/modules/questao/enums/enem-area.enum';
-import { SimuladoRepository } from 'src/modules/simulado/repository/simulado.repository';
+import { SimuladoRepository } from 'src/modules/simulado/simulado.repository';
 import { Simulado } from 'src/modules/simulado/schemas/simulado.schema';
 import { TipoSimuladoRepository } from 'src/modules/tipo-simulado/tipo-simulado.repository';
 import { ProvaRepository } from '../prova.repository';

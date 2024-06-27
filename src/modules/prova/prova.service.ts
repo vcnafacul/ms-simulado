@@ -4,7 +4,7 @@ import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { ExameRepository } from '../exame/exame.repository';
 import { EnemArea } from '../questao/enums/enem-area.enum';
 import { Status } from '../questao/enums/status.enum';
-import { SimuladoRepository } from '../simulado/repository/simulado.repository';
+import { SimuladoRepository } from '../simulado/simulado.repository';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
 import { GetProvaDTOOutout } from './dtos/get-all.dto.output';
 import { ProvaFactory } from './factory/prova_factory';
