@@ -18,7 +18,7 @@ import { QuestaoRepository } from 'src/modules/questao/questao.repository';
 import { Questao } from 'src/modules/questao/questao.schema';
 import { AnswerSimuladoDto } from 'src/modules/simulado/dtos/answer-simulado.dto.input';
 import { AnswerDTO } from 'src/modules/simulado/dtos/answer.dto.input';
-import { SimuladoRepository } from 'src/modules/simulado/repository/simulado.repository';
+import { SimuladoRepository } from 'src/modules/simulado/simulado.repository';
 import { Simulado } from 'src/modules/simulado/schemas/simulado.schema';
 import { TipoSimulado } from 'src/modules/tipo-simulado/schemas/tipo-simulado.schema';
 import { TipoSimuladoRepository } from 'src/modules/tipo-simulado/tipo-simulado.repository';
@@ -101,6 +101,7 @@ describe('AppController (e2e)', () => {
       await materiaRepository.create({
         nome: 'Materia Teste 1',
         enemArea: 'ENEM Area Teste 1',
+        frentes: [],
       }),
     );
 
@@ -108,6 +109,7 @@ describe('AppController (e2e)', () => {
       await materiaRepository.create({
         nome: 'Materia Teste 2',
         enemArea: 'ENEM Area Teste 2',
+        frentes: [],
       }),
     );
 
