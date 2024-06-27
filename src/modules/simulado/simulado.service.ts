@@ -215,7 +215,9 @@ export class SimuladoService {
       m.frentes.forEach((f) => {
         const quantidade = respostas.reduce(
           (total, elem) =>
-            elem.questao.frente1._id === f.id ? total + 1 : total,
+            elem.questao.frente1._id.toString() === f.id.toString()
+              ? total + 1
+              : total,
           0,
         );
         f.aproveitamento = quantidade > 0 ? f.aproveitamento / quantidade : 0;
