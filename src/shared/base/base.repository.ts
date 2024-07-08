@@ -2,8 +2,9 @@ import { NotFoundException } from '@nestjs/common';
 import { Model } from 'mongoose';
 import { GetAllWhereInput } from './interfaces/get-all.input';
 import { GetAllOutput } from './interfaces/get-all.output';
+import { BaseSchema } from './base.schema';
 
-export class BaseRepository<T> {
+export class BaseRepository<T extends BaseSchema> {
   constructor(protected model: Model<T>) {}
 
   async startSession() {
@@ -52,5 +53,9 @@ export class BaseRepository<T> {
     if (!existingRecord) {
       throw new NotFoundException(`Registro com ID ${id} não encontrado.`);
     }
+  }
+
+  async update(entity: T) {
+    await this.model.updateOne({ _id: entity._id }, entity);
   }
 }

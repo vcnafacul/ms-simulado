@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Exame } from 'src/modules/exame/exame.schema';
 import { FrenteRepository } from 'src/modules/frente/frente.repository';
 import { QuestaoRepository } from 'src/modules/questao/questao.repository';
-import { SimuladoRepository } from 'src/modules/simulado/repository/simulado.repository';
+import { SimuladoRepository } from 'src/modules/simulado/simulado.repository';
 import { SimuladoService } from 'src/modules/simulado/simulado.service';
 import { TipoSimuladoRepository } from 'src/modules/tipo-simulado/tipo-simulado.repository';
 import { ProvaRepository } from '../prova.repository';
