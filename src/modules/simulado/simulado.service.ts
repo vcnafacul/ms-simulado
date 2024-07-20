@@ -206,10 +206,10 @@ export class SimuladoService {
     });
 
     const materiasBD = [
+      ...materiaLinguagens.data,
       ...materiaCienciasHumanas.data,
       ...materiasCienciasDaNatureza.data,
       ...materiasMatematica.data,
-      ...materiaLinguagens.data,
     ];
 
     const materias: MateriaAproveitamento[] = materiasBD.map((m) => ({
