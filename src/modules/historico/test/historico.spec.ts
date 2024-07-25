@@ -100,7 +100,7 @@ describe('AppController (e2e)', () => {
     dataMemory.materias.push(
       await materiaRepository.create({
         nome: 'Materia Teste 1',
-        enemArea: 'ENEM Area Teste 1',
+        enemArea: 'Ciências da Natureza',
         frentes: [],
       }),
     );
@@ -108,7 +108,7 @@ describe('AppController (e2e)', () => {
     dataMemory.materias.push(
       await materiaRepository.create({
         nome: 'Materia Teste 2',
-        enemArea: 'ENEM Area Teste 2',
+        enemArea: 'Matemática',
         frentes: [],
       }),
     );

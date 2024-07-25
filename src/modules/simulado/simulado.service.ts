@@ -173,13 +173,46 @@ export class SimuladoService {
   ): Promise<AproveitamentoHistorico> {
     let aproveitamentoGeral = 0;
 
-    const materiasBD = await this.materiaRepository.getAll({
+    const materiaCienciasHumanas = await this.materiaRepository.getAll({
       page: 1,
       limit: 1000,
-      where: null,
+      where: {
+        enemArea: 'Ciências Humanas',
+      },
     });
 
-    const materias: MateriaAproveitamento[] = materiasBD.data.map((m) => ({
+    const materiaLinguagens = await this.materiaRepository.getAll({
+      page: 1,
+      limit: 1000,
+      where: {
+        enemArea: 'Linguagens',
+      },
+    });
+
+    const materiasCienciasDaNatureza = await this.materiaRepository.getAll({
+      page: 1,
+      limit: 1000,
+      where: {
+        enemArea: 'Ciências da Natureza',
+      },
+    });
+
+    const materiasMatematica = await this.materiaRepository.getAll({
+      page: 1,
+      limit: 1000,
+      where: {
+        enemArea: 'Matemática',
+      },
+    });
+
+    const materiasBD = [
+      ...materiaLinguagens.data,
+      ...materiaCienciasHumanas.data,
+      ...materiasCienciasDaNatureza.data,
+      ...materiasMatematica.data,
+    ];
+
+    const materias: MateriaAproveitamento[] = materiasBD.map((m) => ({
       id: m._id,
       nome: m.nome,
       aproveitamento: 0,
