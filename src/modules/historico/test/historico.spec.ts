@@ -18,7 +18,7 @@ import { QuestaoRepository } from 'src/modules/questao/questao.repository';
 import { Questao } from 'src/modules/questao/questao.schema';
 import { AnswerSimuladoDto } from 'src/modules/simulado/dtos/answer-simulado.dto.input';
 import { AnswerDTO } from 'src/modules/simulado/dtos/answer.dto.input';
-import { SimuladoRepository } from 'src/modules/simulado/repository/simulado.repository';
+import { SimuladoRepository } from 'src/modules/simulado/simulado.repository';
 import { Simulado } from 'src/modules/simulado/schemas/simulado.schema';
 import { TipoSimulado } from 'src/modules/tipo-simulado/schemas/tipo-simulado.schema';
 import { TipoSimuladoRepository } from 'src/modules/tipo-simulado/tipo-simulado.repository';
@@ -100,21 +100,23 @@ describe('AppController (e2e)', () => {
     dataMemory.materias.push(
       await materiaRepository.create({
         nome: 'Materia Teste 1',
-        enemArea: 'ENEM Area Teste 1',
+        enemArea: 'Ciências da Natureza',
+        frentes: [],
       }),
     );
 
     dataMemory.materias.push(
       await materiaRepository.create({
         nome: 'Materia Teste 2',
-        enemArea: 'ENEM Area Teste 2',
+        enemArea: 'Matemática',
+        frentes: [],
       }),
     );
 
     dataMemory.frentes.push(
       await frenteRepository.create({
         nome: 'Frente Teste 1',
-        materia: dataMemory.materias[0],
+        materia: dataMemory.materias[1],
       }),
     );
 
@@ -138,6 +140,14 @@ describe('AppController (e2e)', () => {
         materia: dataMemory.materias[0],
       }),
     );
+
+    dataMemory.materias[1].frentes.push(dataMemory.frentes[0]);
+    dataMemory.materias[0].frentes.push(dataMemory.frentes[1]);
+    dataMemory.materias[0].frentes.push(dataMemory.frentes[2]);
+    dataMemory.materias[0].frentes.push(dataMemory.frentes[3]);
+
+    await materiaRepository.update(dataMemory.materias[0]);
+    await materiaRepository.update(dataMemory.materias[1]);
 
     dataMemory.tipoSimulado = await tipoSimuladoRepository.create({
       nome: 'Tipo Simulado Teste',
@@ -179,7 +189,7 @@ describe('AppController (e2e)', () => {
         _createQuestionMock(
           prova,
           dataMemory.materias[0],
-          dataMemory.frentes[0],
+          dataMemory.frentes[1],
         ),
       ),
     );
@@ -189,8 +199,8 @@ describe('AppController (e2e)', () => {
         _createQuestionMock(
           prova,
           dataMemory.materias[0],
-          dataMemory.frentes[0],
           dataMemory.frentes[1],
+          dataMemory.frentes[2],
         ),
       ),
     );
@@ -252,10 +262,13 @@ describe('AppController (e2e)', () => {
       }
     });
     // Assert Aproveitamento
-    // Simulado tem 4 questões
+    // Simulado tem 4 questões e 2 materias.
+    // Cada Materia tem 2 questões
     // Resposta estudando só tem 1 questão e 1 acerto
-    // 2 Materias - Materia Teste 1: 50% -- Materia Teste 2: 0%
-    // 4 Frentes - Frente Teste1: 25% -- Frente Teste2: 50% -- Frente Teste3: 100% -- Frente Teste4: 0%
+    // A questão correta é a questão 0 da Materia Teste 2
+    // 2 Materias - Materia Teste 1: 0% -- Materia Teste 2: 50%
+    // 4 Frentes - Frente Teste1: 50% -- Frente Teste2: 0% -- Frente Teste3: 0% -- Frente Teste4: 0%
+    // A mudança de aproveitamento de Frentes é porque estamos no momento considerando só a frente1.
     // Aproveitamento Geral: 25%
 
     assert.equal(historicos.data[0].aproveitamento.geral, 0.25);
@@ -274,41 +287,25 @@ describe('AppController (e2e)', () => {
       0.5,
     );
 
-    assert.equal(
-      historicos.data[0].aproveitamento.materias[1].frentes[0].nome,
-      dataMemory.frentes[0].nome,
-    );
-    assert.equal(
-      historicos.data[0].aproveitamento.materias[1].frentes[0].aproveitamento,
-      0.25,
+    const materiaData1 = historicos.data[0].aproveitamento.materias.find(
+      (m) => m.nome === 'Materia Teste 1',
     );
 
-    assert.equal(
-      historicos.data[0].aproveitamento.materias[1].frentes[1].nome,
-      dataMemory.frentes[1].nome,
-    );
-    assert.equal(
-      historicos.data[0].aproveitamento.materias[1].frentes[1].aproveitamento,
-      0.5,
+    const materiaData2 = historicos.data[0].aproveitamento.materias.find(
+      (m) => m.nome === 'Materia Teste 2',
     );
 
-    assert.equal(
-      historicos.data[0].aproveitamento.materias[1].frentes[2].nome,
-      dataMemory.frentes[2].nome,
-    );
-    assert.equal(
-      historicos.data[0].aproveitamento.materias[1].frentes[2].aproveitamento,
-      1,
-    );
+    assert.equal(materiaData2.frentes[0].nome, dataMemory.frentes[0].nome);
+    assert.equal(materiaData2.frentes[0].aproveitamento, 0.5);
 
-    assert.equal(
-      historicos.data[0].aproveitamento.materias[1].frentes[3].nome,
-      dataMemory.frentes[3].nome,
-    );
-    assert.equal(
-      historicos.data[0].aproveitamento.materias[1].frentes[3].aproveitamento,
-      0,
-    );
+    assert.equal(materiaData1.frentes[0].nome, dataMemory.frentes[1].nome);
+    assert.equal(materiaData1.frentes[0].aproveitamento, 0);
+
+    assert.equal(materiaData1.frentes[1].nome, dataMemory.frentes[2].nome);
+    assert.equal(materiaData1.frentes[1].aproveitamento, 0);
+
+    assert.equal(materiaData1.frentes[2].nome, dataMemory.frentes[3].nome);
+    assert.equal(materiaData1.frentes[2].aproveitamento, 0);
   });
 });
 

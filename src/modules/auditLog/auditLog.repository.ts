@@ -9,4 +9,8 @@ export class AuditLogRepository extends BaseRepository<AuditLog> {
   constructor(@InjectModel('AuditLog') model: Model<AuditLog>) {
     super(model);
   }
+
+  async getByEntityId(id: string): Promise<AuditLog[]> {
+    return await this.model.find({ entityId: id });
+  }
 }

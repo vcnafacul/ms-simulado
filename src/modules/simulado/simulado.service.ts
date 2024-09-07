@@ -2,16 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { ClientSession } from 'mongoose';
 import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
-import { FrenteRepository } from '../frente/frente.repository';
 import { HistoricoRepository } from '../historico/historico.repository';
 import { Historico } from '../historico/historico.schema';
 import {
-  Aproveitamento,
-  FrenteAproveitamento,
+  AproveitamentoHistorico,
   MateriaAproveitamento,
   SubAproveitamento,
 } from '../historico/types/aproveitamento';
 import { Resposta } from '../historico/types/resposta';
+import { MateriaRepository } from '../materia/materia.repository';
 import { Status } from '../questao/enums/status.enum';
 import { QuestaoRepository } from '../questao/questao.repository';
 import { Questao } from '../questao/questao.schema';
@@ -19,8 +18,8 @@ import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repositor
 import { AnswerSimuladoDto } from './dtos/answer-simulado.dto.input';
 import { AvailableSimuladoDTOoutput } from './dtos/available-simulado.dto.output';
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
-import { SimuladoRepository } from './repository/simulado.repository';
 import { Simulado } from './schemas/simulado.schema';
+import { SimuladoRepository } from './simulado.repository';
 
 @Injectable()
 export class SimuladoService {
@@ -29,7 +28,7 @@ export class SimuladoService {
     private readonly questoesRepository: QuestaoRepository,
     private readonly tipoSimuladoRepository: TipoSimuladoRepository,
     private readonly historicoRepository: HistoricoRepository,
-    private readonly frenteRepository: FrenteRepository,
+    private readonly materiaRepository: MateriaRepository,
   ) {}
 
   public async getById(id: string): Promise<Simulado | null> {
@@ -171,119 +170,105 @@ export class SimuladoService {
 
   private async criaAproveitamento(
     respostas: Resposta[],
-  ): Promise<Aproveitamento> {
+  ): Promise<AproveitamentoHistorico> {
     let aproveitamentoGeral = 0;
-    const frentesBD = await this.frenteRepository.getAll({
+
+    const materiaCienciasHumanas = await this.materiaRepository.getAll({
       page: 1,
       limit: 1000,
-      where: null,
+      where: {
+        enemArea: 'Ciências Humanas',
+      },
     });
 
-    const materias: MateriaAproveitamento[] = [];
-    respostas.forEach((r) => {
-      const exist = materias.find(
-        (m) => m?.id?.toString() === r.questao.materia._id.toString(),
-      );
-      if (!exist) {
-        materias.push({
-          id: r.questao.materia._id,
-          nome: r.questao.materia.nome,
-          aproveitamento: 0,
-          frentes: [],
-        } satisfies MateriaAproveitamento);
-      }
+    const materiaLinguagens = await this.materiaRepository.getAll({
+      page: 1,
+      limit: 1000,
+      where: {
+        enemArea: 'Linguagens',
+      },
     });
 
-    const frentes: FrenteAproveitamento[] = [];
-
-    respostas.forEach((r) => {
-      const existFrente1 = frentes.find(
-        (f) => f?.id?.toString() === r.questao.frente1._id.toString(),
-      );
-      if (!existFrente1) {
-        frentes.push({
-          id: r.questao.frente1._id,
-          nome: r.questao.frente1.nome,
-          aproveitamento: 0,
-          materia: frentesBD.data.find(
-            (f) => f._id.toString() === r.questao.frente1._id.toString(),
-          ).materia._id,
-        } satisfies FrenteAproveitamento);
-      }
-      if (
-        r.questao.frente2 &&
-        !frentes.find(
-          (f) => f?.id?.toString() === r.questao.frente2?._id.toString(),
-        )
-      ) {
-        frentes.push({
-          id: r.questao.frente2._id,
-          nome: r.questao.frente2.nome,
-          aproveitamento: 0,
-          materia: frentesBD.data.find(
-            (f) => f._id.toString() === r.questao.frente2._id.toString(),
-          ).materia._id,
-        } satisfies FrenteAproveitamento);
-      }
-      if (
-        r.questao.frente3 &&
-        !frentes.find(
-          (f) => f?.id?.toString() === r.questao.frente3?._id.toString(),
-        )
-      ) {
-        frentes.push({
-          id: r.questao.frente3._id,
-          nome: r.questao.frente3.nome,
-          aproveitamento: 0,
-          materia: frentesBD.data.find(
-            (f) => f._id.toString() === r.questao.frente3._id.toString(),
-          ).materia._id,
-        } satisfies FrenteAproveitamento);
-      }
+    const materiasCienciasDaNatureza = await this.materiaRepository.getAll({
+      page: 1,
+      limit: 1000,
+      where: {
+        enemArea: 'Ciências da Natureza',
+      },
     });
+
+    const materiasMatematica = await this.materiaRepository.getAll({
+      page: 1,
+      limit: 1000,
+      where: {
+        enemArea: 'Matemática',
+      },
+    });
+
+    const materiasBD = [
+      ...materiaLinguagens.data,
+      ...materiaCienciasHumanas.data,
+      ...materiasCienciasDaNatureza.data,
+      ...materiasMatematica.data,
+    ];
+
+    const materias: MateriaAproveitamento[] = materiasBD.map((m) => ({
+      id: m._id,
+      nome: m.nome,
+      aproveitamento: 0,
+      frentes: m.frentes.map((f) => ({
+        id: f._id,
+        nome: f.nome,
+        aproveitamento: 0,
+        materia: m.nome,
+      })),
+    }));
 
     respostas.forEach((res) => {
       if (res.alternativaCorreta === res.alternativaEstudante) {
         aproveitamentoGeral++;
-        this.calculaAproveitamento(res.questao.materia._id, materias);
-        this.calculaAproveitamento(res.questao.frente1._id, frentes);
-        this.calculaAproveitamento(res.questao.frente2?._id, frentes);
-        this.calculaAproveitamento(res.questao.frente3?._id, frentes);
+        this.increasePerformance(
+          res,
+          materias.find(
+            (m) => m.id.toString() === res.questao.materia._id.toString(),
+          ),
+        );
       }
     });
 
     materias.forEach((m) => {
       const quantidade = respostas.reduce(
         (total, elem) =>
-          elem.questao.materia._id === m.id ? total + 1 : total,
+          elem.questao.materia._id.toString() === m.id.toString()
+            ? total + 1
+            : total,
         0,
       );
-      m.aproveitamento = m.aproveitamento / quantidade;
-    });
-
-    frentes.forEach((f) => {
-      const qtF1 = respostas.filter(
-        (r) => r.questao.frente1._id.toString() === f.id.toString(),
-      ).length;
-      const qtF2 = respostas.filter(
-        (r) => r.questao.frente2?._id.toString() === f.id.toString(),
-      ).length;
-      const qtF3 = respostas.filter(
-        (r) => r.questao.frente3?._id.toString() === f.id.toString(),
-      ).length;
-      f.aproveitamento = f.aproveitamento / (qtF1 + qtF2 + qtF3);
-    });
-
-    materias.forEach((m) => {
-      m.frentes = frentes.filter(
-        (f) => f.materia.toString() === m.id.toString(),
-      );
+      m.aproveitamento = quantidade > 0 ? m.aproveitamento / quantidade : 0;
+      m.frentes.forEach((f) => {
+        const quantidade = respostas.reduce(
+          (total, elem) =>
+            elem.questao.frente1._id.toString() === f.id.toString()
+              ? total + 1
+              : total,
+          0,
+        );
+        f.aproveitamento = quantidade > 0 ? f.aproveitamento / quantidade : 0;
+      });
     });
 
     return {
       geral: aproveitamentoGeral / respostas.length,
       materias: materias,
     };
+  }
+
+  private increasePerformance(res: Resposta, materia: MateriaAproveitamento) {
+    materia.aproveitamento++;
+    this.calculaAproveitamento(
+      res.questao.frente1._id.toString(),
+      materia.frentes,
+    );
   }
 
   private calculaAproveitamento(id: string, array: Array<SubAproveitamento>) {

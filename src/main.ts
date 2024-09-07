@@ -17,6 +17,6 @@ async function bootstrap() {
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
   app.useGlobalPipes(new ValidationPipe());
   SwaggerModule.setup('api', app, document(app));
-  await app.listen(process.env.PORT);
+  await app.listen(process.env.MS_PORT);
 }
 bootstrap();

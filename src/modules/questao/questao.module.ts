@@ -4,6 +4,7 @@ import { AuditLogModule } from '../auditLog/auditLog.module';
 import { ExameModule } from '../exame/exame.module';
 import { FrenteModule } from '../frente/frente.module';
 import { FrenteRepository } from '../frente/frente.repository';
+import { Frente, FrenteSchema } from '../frente/frente.schema';
 import { HistoricoModule } from '../historico/historico.module';
 import { MateriaModule } from '../materia/materia.module';
 import { ProvaFactory } from '../prova/factory/prova_factory';
@@ -11,8 +12,8 @@ import { ProvaRepository } from '../prova/prova.repository';
 import { Prova, ProvaSchema } from '../prova/prova.schema';
 import { ProvaService } from '../prova/prova.service';
 import { EnemService } from '../prova/services/enem_service';
-import { SimuladoRepository } from '../simulado/repository/simulado.repository';
 import { Simulado, SimuladoSchema } from '../simulado/schemas/simulado.schema';
+import { SimuladoRepository } from '../simulado/simulado.repository';
 import { SimuladoService } from '../simulado/simulado.service';
 import {
   TipoSimulado,
@@ -23,7 +24,6 @@ import { QuestaoController } from './questao.controller';
 import { QuestaoRepository } from './questao.repository';
 import { Questao, QuestaoSchema } from './questao.schema';
 import { QuestaoService } from './questao.service';
-import { Frente, FrenteSchema } from '../frente/frente.schema';
 
 @Module({
   imports: [

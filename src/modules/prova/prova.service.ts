@@ -4,7 +4,7 @@ import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { ExameRepository } from '../exame/exame.repository';
 import { EnemArea } from '../questao/enums/enem-area.enum';
 import { Status } from '../questao/enums/status.enum';
-import { SimuladoRepository } from '../simulado/repository/simulado.repository';
+import { SimuladoRepository } from '../simulado/simulado.repository';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
 import { GetProvaDTOOutout } from './dtos/get-all.dto.output';
 import { ProvaFactory } from './factory/prova_factory';
@@ -75,19 +75,6 @@ export class ProvaService {
     };
   }
 
-  public async verifyNumber(
-    id: string,
-    numberQuestion: number,
-  ): Promise<boolean> {
-    const prova = await this.repository.getById(id);
-    const factory = this.provaFactory.getFactory(prova.exame, prova.ano);
-    try {
-      return await factory.verifyNumberProva(prova._id, numberQuestion);
-    } catch (error: any) {
-      throw new HttpException(error.message, HttpStatus.CONFLICT);
-    }
-  }
-
   public async approvedQuestion(id: string, questionId: string) {
     const prova = await this.repository.getById(id);
     prova.totalQuestaoValidadas += 1;
@@ -102,6 +89,10 @@ export class ProvaService {
           )
         ) {
           simulado.bloqueado = false;
+          const organizationQuestions = simulado.questoes.sort(
+            (a, b) => a.numero - b.numero,
+          );
+          simulado.questoes = organizationQuestions;
         }
         await this.simuladoRepository.update(simulado);
       }),

@@ -6,7 +6,7 @@ import { UpdateDTOInput } from 'src/modules/questao/dtos/update.dto.input';
 import { EnemArea } from 'src/modules/questao/enums/enem-area.enum';
 import { QuestaoRepository } from 'src/modules/questao/questao.repository';
 import { Questao } from 'src/modules/questao/questao.schema';
-import { SimuladoRepository } from 'src/modules/simulado/repository/simulado.repository';
+import { SimuladoRepository } from 'src/modules/simulado/simulado.repository';
 import { Simulado } from 'src/modules/simulado/schemas/simulado.schema';
 import { SimuladoService } from 'src/modules/simulado/simulado.service';
 import { TipoSimuladoRepository } from 'src/modules/tipo-simulado/tipo-simulado.repository';
@@ -127,6 +127,7 @@ export class Enem2009_2017Factory implements IProvaFactory {
       }
       return false;
     }
+    return true;
   }
 
   public async createQuestion(question: CreateQuestaoDTOInput) {
@@ -203,13 +204,13 @@ export class Enem2009_2017Factory implements IProvaFactory {
     const session = await this.questaoRepository.startSession();
     session.startTransaction();
     try {
+      const result = await this.questaoRepository.create(questao);
       await this.simuladoService.addQuestionSimulados(
         simuladosToEnter,
-        questao,
+        result,
         session,
       );
-      await this.provaRepository.addQuestion(question.prova, questao);
-      const result = await this.questaoRepository.create(questao);
+      await this.provaRepository.addQuestion(question.prova, result);
       await session.commitTransaction();
       session.endSession();
       return result;
@@ -221,7 +222,7 @@ export class Enem2009_2017Factory implements IProvaFactory {
   }
 
   public async updateQuestion(question: UpdateDTOInput) {
-    const questao = await this.questaoRepository.getById(question._id);
+    const questao = await this.questaoRepository.getByIdToUpdate(question._id);
 
     const frenteIngles = await this.frenteRepository.getByFilter({
       nome: 'Inglês',
