@@ -18,12 +18,13 @@ import { QuestaoRepository } from 'src/modules/questao/questao.repository';
 import { Questao } from 'src/modules/questao/questao.schema';
 import { AnswerSimuladoDto } from 'src/modules/simulado/dtos/answer-simulado.dto.input';
 import { AnswerDTO } from 'src/modules/simulado/dtos/answer.dto.input';
-import { SimuladoRepository } from 'src/modules/simulado/simulado.repository';
 import { Simulado } from 'src/modules/simulado/schemas/simulado.schema';
+import { SimuladoRepository } from 'src/modules/simulado/simulado.repository';
 import { TipoSimulado } from 'src/modules/tipo-simulado/schemas/tipo-simulado.schema';
 import { TipoSimuladoRepository } from 'src/modules/tipo-simulado/tipo-simulado.repository';
 import { BaseRepository } from 'src/shared/base/base.repository';
 import request from 'supertest';
+import { v4 as uuidv4 } from 'uuid';
 import { HistoricoRepository } from '../historico.repository';
 import { Historico } from '../historico.schema';
 
@@ -235,10 +236,11 @@ describe('AppController (e2e)', () => {
       },
     ];
 
+    const userId = uuidv4();
     await request(app.getHttpServer())
       .post('/v1/simulado/answer')
       .send({
-        idEstudante: 1,
+        idEstudante: userId,
         idSimulado: dataMemory.simulado._id,
         respostas: resposta,
         tempoRealizado: 1,
@@ -248,7 +250,7 @@ describe('AppController (e2e)', () => {
     const historicos = await getHistoricos(1, 40);
 
     assert.equal(historicos.data.length, 1);
-    assert.equal(historicos.data[0].usuario, 1);
+    assert.equal(historicos.data[0].usuario, userId);
     assert.equal(
       historicos.data[0].simulado._id.toString(),
       dataMemory.simulado._id.toString(),

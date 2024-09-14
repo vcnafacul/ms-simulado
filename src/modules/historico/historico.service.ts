@@ -20,7 +20,7 @@ export class HistoricoService {
     return await this.repository.getById(id);
   }
 
-  async getPerformance(userId: number): Promise<GetPerformanceHistories> {
+  async getPerformance(userId: string): Promise<GetPerformanceHistories> {
     const getHistoricos = await this.repository.getToPerformance(userId);
     const aproveitamentoGeralMateriaFrente = this.calcularMediaAproveitamento(
       getHistoricos.map((historico) => historico.aproveitamento),

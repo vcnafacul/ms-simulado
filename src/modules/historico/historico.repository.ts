@@ -50,7 +50,7 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       .exec();
   }
 
-  async getToPerformance(userId: number): Promise<Historico[]> {
+  async getToPerformance(userId: string): Promise<Historico[]> {
     return this.model
       .find({ usuario: userId })
       .sort({ _id: -1 })
