@@ -26,7 +26,7 @@ export class HistoricoController {
     description: 'obtém histórico de performance por usuário',
     isArray: true,
   })
-  async getPerformance(@Param('userId') userId: number) {
+  async getPerformance(@Param('userId') userId: string) {
     return await this.service.getPerformance(userId);
   }
 

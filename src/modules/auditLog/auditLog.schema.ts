@@ -4,7 +4,7 @@ import { BaseSchema } from 'src/shared/base/base.schema';
 @Schema({ timestamps: false, versionKey: false })
 export class AuditLog extends BaseSchema {
   @Prop()
-  public user: number;
+  public user: string;
 
   @Prop()
   public entityId: string;

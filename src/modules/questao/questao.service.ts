@@ -156,7 +156,7 @@ export class QuestaoService {
   public async updateStatus(
     id: string,
     status: Status,
-    userId: number,
+    userId: string,
     message?: string,
   ) {
     try {
