@@ -10,7 +10,7 @@ import { Resposta } from './types/resposta';
 export class Historico extends BaseSchema {
   @Prop()
   @ApiProperty()
-  public usuario: number;
+  public usuario: string;
 
   @Prop()
   @ApiProperty()

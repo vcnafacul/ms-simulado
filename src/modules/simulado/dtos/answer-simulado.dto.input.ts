@@ -5,8 +5,8 @@ import { Type } from 'class-transformer';
 
 export class AnswerSimuladoDto {
   @ApiProperty()
-  @IsNumber()
-  idEstudante: number;
+  @IsString()
+  idEstudante: string;
 
   @ApiProperty()
   @IsString()

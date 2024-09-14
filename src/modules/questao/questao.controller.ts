@@ -78,7 +78,7 @@ export class QuestaoController {
   public async updateStatus(
     @Param('id') id: string,
     @Param('status') status: Status,
-    @Body() body: { message: string; userId: number },
+    @Body() body: { message: string; userId: string },
   ) {
     await this.service.updateStatus(id, status, body.userId, body.message);
   }
