@@ -10,9 +10,9 @@ export class BaseSchema {
   @Prop({ required: false, default: false, select: false })
   public deleted?: boolean;
 
-  @Prop({ default: now(), required: false })
+  @Prop({ default: () => now(), required: false })
   createdAt?: Date = now();
 
-  @Prop({ default: now(), required: false })
+  @Prop({ default: () => now(), required: false })
   updatedAt?: Date;
 }
