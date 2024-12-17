@@ -38,7 +38,7 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
       .findById(id)
       .populate({
         path: 'questoes',
-        populate: ['frente1', , 'frente2', 'frente3', 'materia'],
+        populate: ['frente1', 'materia'],
         select: 'alternativa',
       })
       .exec();
