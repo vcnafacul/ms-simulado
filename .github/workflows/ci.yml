@@ -1,0 +1,47 @@
+name: CI
+
+on: [push]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.title }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+      - run: npm install
+      - run: npm run build
+      - run: npm run test
+
+  lint-styles:
+    name: Lint Styles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+      - run: npm install
+      - run: npm run lint
+  open-pr-to-main:
+    name: Open PR to main
+    runs-on: ubuntu-latest
+    needs: [tests, lint-styles]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create PR
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: main
+          branch: ${{ github.ref_name }}
+          title: 'Automatic PR from ${{ github.ref_name }} to main'
+          body: 'This PR was automatically created from the branch ${{ github.ref_name }} to main.'
