@@ -12,8 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Cache Node Modules
         uses: actions/cache@v3
@@ -36,8 +34,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Cache Node Modules
         uses: actions/cache@v3
@@ -61,18 +57,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Debug branch
-        run: |
-          echo "Branch: ${{ github.ref_name }}"
-
-      - name: Update branch
-        run: |
-          git fetch origin
-          git checkout ${{ github.ref_name }}
-          git pull origin ${{ github.ref_name }}
 
       - name: Create PR
         uses: peter-evans/create-pull-request@v4
@@ -82,14 +66,13 @@ jobs:
           branch: ${{ github.ref_name }}
           title: 'Automatic PR from ${{ github.ref_name }} to develop'
           body: 'This PR was automatically created from the branch ${{ github.ref_name }} to develop.'
-          always-create: true
-
       - name: Check outputs
         if: ${{ steps.cpr.outputs.pull-request-number }}
         run: |
-          echo "Pull Request Number - ${{ steps.cpr.outputs.pull-request-number }}"
-          echo "Pull Request URL - ${{ steps.cpr.outputs.pull-request-url }}"
-
+            echo "Pull Request Number - ${{ steps.cpr.outputs.pull-request-number }}"
+            echo "Pull Request URL - ${{ steps.cpr.outputs.pull-request-url }}"
+  
+          
   push-image-dockerhub:
     name: Push Image DockerHub
     runs-on: ubuntu-latest
@@ -97,8 +80,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Cache Docker layers
         uses: actions/cache@v3
