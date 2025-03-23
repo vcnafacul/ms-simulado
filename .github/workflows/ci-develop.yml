@@ -78,8 +78,8 @@ jobs:
         uses: peter-evans/create-pull-request@v4
         with:
           token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-          base: ${{ github.ref_name }}
-          branch: develop
+          base: develop
+          branch: ${{ github.ref_name }}
           title: 'Automatic PR from ${{ github.ref_name }} to develop'
           body: 'This PR was automatically created from the branch ${{ github.ref_name }} to develop.'
           always-create: true
