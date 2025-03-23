@@ -1,0 +1,64 @@
+name: Create Release Branch and PR from Develop
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  create-release-branch:
+    name: Create Release Branch
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fetch all tags and branches
+        run: git fetch --all --tags
+
+      - name: Determine next release number
+        id: release_number
+        run: |
+          # Get the latest release branch
+          latest_release=$(git branch -r | grep 'origin/release-' | sed 's/.*release-//' | sort -V | tail -n 1)
+          echo "Latest release: $latest_release"
+
+          # Calculate the next release number
+          if [ -z "$latest_release" ]; then
+            next_release=1
+          else
+            next_release=$((latest_release + 1))
+          fi
+          echo "Next release: $next_release"
+
+          # Set the next release number as an output
+          echo "release_number=$next_release" >> $GITHUB_OUTPUT
+
+      - name: Create and push release branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create the new release branch
+          git checkout -b release-${{ steps.release_number.outputs.release_number }}
+
+          # Push the new release branch to the remote repository
+          git push origin release-${{ steps.release_number.outputs.release_number }}
+
+  create-pr-to-release-branch-from-develop:
+    name: Create PR from Develop to Release
+    runs-on: ubuntu-latest
+    needs: create-release-branch
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: release-${{ needs.create-release-branch.outputs.release_number }}
+          branch: develop
+          title: 'Merge Develop into Release: release-${{ needs.create-release-branch.outputs.release_number }}'
+          body: 'This PR merges the latest changes from `develop` into the new release branch `release-${{ needs.create-release-branch.outputs.release_number }}`.'     
