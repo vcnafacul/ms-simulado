@@ -66,6 +66,12 @@ jobs:
           branch: ${{ github.ref_name }}
           title: 'Automatic PR from ${{ github.ref_name }} to develop'
           body: 'This PR was automatically created from the branch ${{ github.ref_name }} to develop.'
+      - name: Check outputs
+        if: ${{ steps.cpr.outputs.pull-request-number }}
+        run: |
+            echo "Pull Request Number - ${{ steps.cpr.outputs.pull-request-number }}"
+            echo "Pull Request URL - ${{ steps.cpr.outputs.pull-request-url }}"
+  
           
   push-image-dockerhub:
     name: Push Image DockerHub
