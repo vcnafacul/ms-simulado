@@ -62,31 +62,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Cache Node Modules
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20.x
-
-      - name: Install dependencies and build
-        run: |
-          npm ci
-          npm run build
-
-      - name: Cache Docker layers
-        uses: actions/cache@v3
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-docker-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-docker-
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -103,5 +78,3 @@ jobs:
           file: ms.dockerfile
           push: true
           tags: vcnafacul/simulado:latest
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
