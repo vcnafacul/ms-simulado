@@ -61,7 +61,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
+      - name: Install dependencies
+        run: npm install
+      - name: Build app vCnafacul
+        run: npm run build
       - name: Log in to DockerHub
         uses: docker/login-action@v2
         with:
