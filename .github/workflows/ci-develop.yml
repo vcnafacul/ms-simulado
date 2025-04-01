@@ -11,8 +11,6 @@ concurrency:
   group: ci-${{ github.event.pull_request.title }}
   cancel-in-progress: true
 
-run-name: ${{ github.event.head_commit.message }}
-
 jobs:
   tests:
     name: Tests
