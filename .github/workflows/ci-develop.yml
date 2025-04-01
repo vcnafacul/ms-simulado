@@ -1,11 +1,12 @@
 name: CI
 
 on:
+  
   pull_request:
     types: [opened, reopened, synchronize]
     branches:
       - develop
-
+  workflow_dispatch:
 concurrency:
   group: ci-${{ github.event.pull_request.title }}
   cancel-in-progress: true
@@ -92,4 +93,6 @@ jobs:
           context: .
           file: ms.dockerfile
           push: true
-          tags: vcnafacul/simulado:latest
+          tags: | 
+            vcnafacul/simulado:v${{ github.run_number }}
+            vcnafacul/simulado:latest
