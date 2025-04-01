@@ -13,64 +13,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  tests:
-    name: Tests
+  setup:
+    name: Setup and Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Cache Yarn Modules
-        uses: actions/cache@v3
-        with:
-          path: ~/.yarn
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20.x
-
-      - run: yarn
-      - run: yarn build
-      - run: yarn test
-
-  lint-styles:
-    name: Lint Styles
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Cache Yarn Modules
-        uses: actions/cache@v3
-        with:
-          path: ~/.yarn
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20.x
-
-      - run: yarn
-      - run: yarn lint
-
-  push-image-dockerhub:
-    name: Push Image DockerHub
-    runs-on: ubuntu-latest
-    needs: [lint-styles]
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Cache Yarn Modules
-        uses: actions/cache@v3
-        with:
-          path: ~/.yarn
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
 
       - uses: actions/setup-node@v4
         with:
@@ -79,9 +26,69 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Build app vCnafacul
+      - name: Build application
         run: yarn build
-      
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: .
+
+  tests:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: [setup]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-artifacts
+
+      - name: Run tests
+        run: yarn test
+
+  lint-styles:
+    name: Lint Styles
+    runs-on: ubuntu-latest
+    needs: [setup]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-artifacts
+
+      - name: Run lint
+        run: yarn lint
+
+  push-image-dockerhub:
+    name: Push Image to DockerHub
+    runs-on: ubuntu-latest
+    needs: [lint-styles]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-artifacts
+
       - name: Dockerfile analysis
         uses: hadolint/hadolint-action@v3.1.0
         with:
