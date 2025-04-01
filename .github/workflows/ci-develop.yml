@@ -102,7 +102,7 @@ jobs:
             vcnafacul/simulado:v${{ github.run_number }}
             vcnafacul/simulado:latest
 
-      - name: Execute Trivy
+      - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@v0.23.0
         with:
           scan-type: 'image'
@@ -111,7 +111,7 @@ jobs:
           output: 'trivy-docker-result.sarif'
           severity: 'CRITICAL, HIGH'
 
-      - name: Upload Trivy file to Github
+      - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         with:
           category: docker-result
