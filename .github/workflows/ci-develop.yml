@@ -1,4 +1,5 @@
 name: CI
+run-name: Pipeline CI executed by {{ github.actor }} in {{ github.run_number }}
 
 on:
   pull_request:
