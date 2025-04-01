@@ -1,12 +1,12 @@
 name: CI
 
 on:
-  
   pull_request:
     types: [opened, reopened, synchronize]
     branches:
       - develop
   workflow_dispatch:
+
 concurrency:
   group: ci-${{ github.event.pull_request.title }}
   cancel-in-progress: true
@@ -80,6 +80,11 @@ jobs:
 
       - name: Build app vCnafacul
         run: yarn build
+      
+      - name: Dockerfile analysis
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: ms.dockerfile
 
       - name: Log in to DockerHub
         uses: docker/login-action@v2
