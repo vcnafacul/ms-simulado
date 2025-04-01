@@ -101,3 +101,19 @@ jobs:
           tags: | 
             vcnafacul/simulado:v${{ github.run_number }}
             vcnafacul/simulado:latest
+
+      - name: Execute Trivy
+        uses: aquasecurity/trivy-action@v0.23.0
+        with:
+          scan-type: 'image'
+          image-ref: vcnafacul/simulado:v${{ github.run_number }}
+          format: 'sarif'
+          output: 'trivy-docker-result.sarif'
+          severity: 'CRITICAL, HIGH'
+
+      - name: Upload Trivy file to Github
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          category: docker-result
+          sarif_file: trivy-docker-result.sarif
+          fail_on_error: true
