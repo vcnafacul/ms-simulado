@@ -58,7 +58,7 @@ jobs:
   push-image-dockerhub:
     name: Push Image DockerHub
     runs-on: ubuntu-latest
-    needs: [lint-styles]
+    needs: [lint-styles, tests]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
