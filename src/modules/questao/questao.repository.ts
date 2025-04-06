@@ -24,22 +24,25 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       .find()
       .skip((page - 1) * limit)
       .limit(limit ?? Infinity)
-      .and(
+      .select('+alternativa');
+
+    const queryCount = this.model.where({ ...where });
+
+    if (or.length > 0) {
+      query.and(
         or.map((o) => ({
           $or: o,
         })),
-      )
-      .select('+alternativa');
+      );
+      queryCount.and(
+        or.map((o) => ({
+          $or: o,
+        })),
+      );
+    }
     query.where({ ...where });
     const data = await query;
-    const totalItems = await this.model
-      .where({ ...where })
-      .and(
-        or.map((o) => ({
-          $or: o,
-        })),
-      )
-      .countDocuments();
+    const totalItems = await queryCount.countDocuments();
     return {
       data,
       page: page,
@@ -106,5 +109,19 @@ export class QuestaoRepository extends BaseRepository<Questao> {
 
   async delete(_id: string) {
     await this.model.deleteOne({ _id });
+  }
+
+  async canInsertQuestion(
+    provaId: string,
+    numero: number,
+    frente1: string,
+  ): Promise<boolean> {
+    const questaoExistente = await this.model.findOne({
+      prova: provaId,
+      numero,
+      frente1,
+    });
+
+    return !questaoExistente; // se já existe, não pode cadastrar → false
   }
 }
