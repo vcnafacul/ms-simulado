@@ -56,22 +56,28 @@ export class SimuladoService {
   public async addQuestionSimulados(
     simulados: Simulado[],
     question: Questao,
-    session: ClientSession = undefined,
+    session?: ClientSession,
   ) {
-    const promise = Promise.all(
-      simulados.map((sml) => {
+    await Promise.all(
+      simulados.map(async (sml) => {
+        // Adiciona a nova questão
         sml.questoes.push(question);
-        sml.bloqueado = true;
-        if (sml.tipo.quantidadeTotalQuestao === sml.questoes.length) {
-          sml.bloqueado = false;
-          if (sml.questoes.some((q) => q.status !== Status.Approved)) {
-            sml.bloqueado = true;
-          }
-        }
-        this.simuladoRepository.updateSession(sml, session);
+
+        // Verifica se o simulador atingiu a quantidade total de questões
+        const atingiuQuantidadeTotal =
+          sml.questoes.length === sml.tipo.quantidadeTotalQuestao;
+        // Verifica se todas as questões estão aprovadas
+        const todasAprovadas = sml.questoes.every(
+          (q) => q.status === Status.Approved,
+        );
+
+        // Define bloqueado como false somente se todas as questões foram adicionadas e estão aprovadas
+        sml.bloqueado = !(atingiuQuantidadeTotal && todasAprovadas);
+
+        // Retorna a promessa para o update
+        return await this.simuladoRepository.updateSession(sml, session);
       }),
     );
-    await promise;
   }
 
   public async removeQuestionSimulados(

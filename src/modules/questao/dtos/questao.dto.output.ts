@@ -31,6 +31,9 @@ export class QuestaoDTO {
   public textoQuestao?: string;
 
   @ApiProperty()
+  public pergunta?: string;
+
+  @ApiProperty()
   public textoAlternativaA?: string;
 
   @ApiProperty()

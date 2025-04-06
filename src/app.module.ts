@@ -28,6 +28,9 @@ import { TipoSimuladoModule } from './modules/tipo-simulado/tipo-simulado.module
         }
         return {
           uri: process.env.MONGODB,
+          useNewUrlParser: true,
+          useUnifiedTopology: true,
+          serverSelectionTimeoutMS: 5000,
         };
       },
     }),

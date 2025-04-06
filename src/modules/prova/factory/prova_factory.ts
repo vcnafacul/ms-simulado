@@ -7,7 +7,7 @@ import { SimuladoService } from 'src/modules/simulado/simulado.service';
 import { TipoSimuladoRepository } from 'src/modules/tipo-simulado/tipo-simulado.repository';
 import { ProvaRepository } from '../prova.repository';
 import { EnemService } from '../services/enem_service';
-import { Enem2009_2017Factory } from './enem_2009_2016_factory';
+import { Enem2010_2017Factory } from './enem_2010_2016_factory';
 import { Enem2017PlusFactory } from './enem_2017_plus_factory';
 import { ExameName, IProvaFactory } from './types';
 
@@ -35,8 +35,8 @@ export class ProvaFactory {
         this.enemService,
         exame,
       );
-    } else if (exame.nome === ExameName.ENEM && ano >= 2009 && ano <= 2016) {
-      return new Enem2009_2017Factory(
+    } else if (exame.nome === ExameName.ENEM && ano > 2009 && ano <= 2016) {
+      return new Enem2010_2017Factory(
         this.tipoSimuladoRepository,
         this.questaoRepository,
         this.provaRepository,
