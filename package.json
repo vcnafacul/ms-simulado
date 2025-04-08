@@ -12,12 +12,17 @@
     "dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "lint:eslint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "lint:prettier": "prettier --check \"src/**/*.ts\"",
+    "lint": "npm run lint:eslint && npm run lint:prettier",
     "test": "jest --detectOpenHandles --forceExit",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "services:up": "npm run docker:compose -- up -d",
+    "services:stop": "npm run docker:compose -- stop",
+    "services:down": "npm run docker:compose -- down"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -28,13 +33,15 @@
     "@nestjs/swagger": "^7.1.10",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
+    "mongodb-memory-server": "^9.1.6",
     "mongoose": "^7.4.5",
     "pm2": "^5.3.0",
     "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.8.1",
-    "mongodb-memory-server": "^9.1.6"
+    "rxjs": "^7.8.1"
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.8.0",
+    "@commitlint/config-conventional": "^19.8.0",
     "@nestjs/cli": "^10.0.0",
     "@nestjs/schematics": "^10.0.0",
     "@nestjs/testing": "^10.0.0",
