@@ -1,13 +1,14 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { Exame } from 'src/modules/exame/exame.schema';
 import { FrenteRepository } from 'src/modules/frente/frente.repository';
+import { Frente } from 'src/modules/frente/frente.schema';
 import { CreateQuestaoDTOInput } from 'src/modules/questao/dtos/create.dto.input';
 import { UpdateDTOInput } from 'src/modules/questao/dtos/update.dto.input';
 import { EnemArea } from 'src/modules/questao/enums/enem-area.enum';
 import { QuestaoRepository } from 'src/modules/questao/questao.repository';
 import { Questao } from 'src/modules/questao/questao.schema';
-import { SimuladoRepository } from 'src/modules/simulado/simulado.repository';
 import { Simulado } from 'src/modules/simulado/schemas/simulado.schema';
+import { SimuladoRepository } from 'src/modules/simulado/simulado.repository';
 import { SimuladoService } from 'src/modules/simulado/simulado.service';
 import { TipoSimuladoRepository } from 'src/modules/tipo-simulado/tipo-simulado.repository';
 import { CreateProvaDTOInput } from '../dtos/create.dto.input';
@@ -132,12 +133,14 @@ export class Enem2017PlusFactory implements IProvaFactory {
 
   public async createQuestion(question: CreateQuestaoDTOInput) {
     const questao = Object.assign(new Questao(), question);
-    const frenteIngles = await this.frenteRepository.getByFilter({
-      nome: 'Inglês',
-    });
-    const frenteEspanhol = await this.frenteRepository.getByFilter({
-      nome: 'Espanhol',
-    });
+
+    // Busca as frentes em paralelo
+    const [frenteIngles, frenteEspanhol] = await Promise.all([
+      this.getFrenteByNome('Inglês'),
+      this.getFrenteByNome('Espanhol'),
+    ]);
+
+    // Validação conforme regras do ENEM (parâmetros 1 e 5 para provas de 2017+)
     await this.enemService.validate(
       question,
       frenteIngles,
@@ -147,58 +150,24 @@ export class Enem2017PlusFactory implements IProvaFactory {
     );
 
     const provaToEnter = await this.provaRepository.getById(question.prova);
-    let simuladosToEnter: Simulado[] = [];
-
+    // Define o "dia1" para Ciências Humanas e Linguagens
     const dia1 = [EnemArea.CienciasHumanas, EnemArea.Linguagens].includes(
       question.enemArea,
     );
-
     const isIngles = question.frente1 === frenteIngles._id.toString();
-    const isEspanhol = isIngles
-      ? false
-      : question.frente1 === frenteEspanhol._id.toString();
-    if (dia1) {
-      if (isIngles) {
-        simuladosToEnter = simuladosToEnter.concat(
-          provaToEnter.simulados.filter((simulado) =>
-            simulado.nome.includes(`Inglês`),
-          ),
-        );
-      } else if (isEspanhol) {
-        simuladosToEnter = simuladosToEnter.concat(
-          provaToEnter.simulados.filter((simulado) =>
-            simulado.nome.includes(`Espanhol`),
-          ),
-        );
-      } else {
-        simuladosToEnter = simuladosToEnter.concat(
-          provaToEnter.simulados.filter((simulado) =>
-            simulado.nome.includes(question.enemArea),
-          ),
-        );
-        simuladosToEnter = simuladosToEnter.concat(
-          provaToEnter.simulados.filter(
-            (simulado) =>
-              simulado.nome ===
-                `${provaToEnter.tipo.nome} ${provaToEnter.ano} Inglês` ||
-              simulado.nome ===
-                `${provaToEnter.tipo.nome} ${provaToEnter.ano} Espanhol`,
-          ),
-        );
-      }
-    } else {
-      simuladosToEnter = simuladosToEnter.concat(
-        provaToEnter.simulados.filter((simulado) =>
-          simulado.nome.includes(question.enemArea),
-        ),
-      );
-      simuladosToEnter.push(
-        provaToEnter.simulados.find(
-          (simulado) =>
-            simulado.nome === `${provaToEnter.tipo.nome} ${provaToEnter.ano}`,
-        ),
-      );
-    }
+    const isEspanhol =
+      !isIngles && question.frente1 === frenteEspanhol._id.toString();
+
+    // Seleciona os simulados para entrada
+    const simuladosToEnter = this.selectSimuladosToEnter(
+      provaToEnter,
+      question,
+      isIngles,
+      isEspanhol,
+      dia1,
+    );
+
+    // Inicia a transação
     const session = await this.questaoRepository.startSession();
     session.startTransaction();
     try {
@@ -210,24 +179,23 @@ export class Enem2017PlusFactory implements IProvaFactory {
       );
       await this.provaRepository.addQuestion(question.prova, result);
       await session.commitTransaction();
-      session.endSession();
       return result;
     } catch (error) {
       await session.abortTransaction();
-      session.endSession();
       throw error;
+    } finally {
+      session.endSession();
     }
   }
 
   public async updateQuestion(question: UpdateDTOInput) {
     const questao = await this.questaoRepository.getByIdToUpdate(question._id);
 
-    const frenteIngles = await this.frenteRepository.getByFilter({
-      nome: 'Inglês',
-    });
-    const frenteEspanhol = await this.frenteRepository.getByFilter({
-      nome: 'Espanhol',
-    });
+    // Busca as frentes em paralelo
+    const [frenteIngles, frenteEspanhol] = await Promise.all([
+      this.getFrenteByNome('Inglês'),
+      this.getFrenteByNome('Espanhol'),
+    ]);
 
     await this.enemService.validate(
       question,
@@ -237,128 +205,49 @@ export class Enem2017PlusFactory implements IProvaFactory {
       5,
     );
 
-    const provaToLeave = questao.prova?._id.toString();
+    const provaToLeaveId = questao.prova?._id.toString();
     const provaToEnter = await this.provaRepository.getById(question.prova);
-    const changeProva = provaToLeave !== provaToEnter._id.toString();
+    const changeProva = provaToLeaveId !== provaToEnter._id.toString();
     const changeSimulados =
       changeProva ||
       question.enemArea !== questao.enemArea ||
       (question.enemArea === EnemArea.Linguagens &&
         question.frente1 !== questao.frente1._id.toString() &&
-        (question.frente1 === frenteIngles.id ||
-          question.frente1 === frenteEspanhol.id ||
-          questao.frente1 === frenteIngles.id ||
-          questao.frente1 === frenteEspanhol.id));
+        (question.frente1 === frenteIngles._id.toString() ||
+          question.frente1 === frenteEspanhol._id.toString() ||
+          questao.frente1._id.toString() === frenteIngles._id.toString() ||
+          questao.frente1._id.toString() === frenteEspanhol._id.toString()));
 
     const dia1 = [EnemArea.CienciasHumanas, EnemArea.Linguagens].includes(
       question.enemArea,
     );
+
     let simuladosToLeave: Simulado[] = [];
-    if (changeSimulados && provaToLeave) {
-      const prova = await this.provaRepository.getById(provaToLeave);
-
-      if (prova.ano < 2017 || prova.exame.nome !== ExameName.ENEM) {
-        simuladosToLeave.push(...prova.simulados);
-      } else {
-        const wasIngles =
-          questao.frente1._id.toString() === frenteIngles._id.toString();
-        const wasEspanhol = wasIngles
-          ? false
-          : questao.frente1._id.toString() === frenteEspanhol._id.toString();
-
-        if (dia1) {
-          if (wasIngles) {
-            simuladosToLeave = simuladosToLeave.concat(
-              prova.simulados.filter((simulado) =>
-                simulado.nome.includes(`Inglês`),
-              ),
-            );
-          } else if (wasEspanhol) {
-            simuladosToLeave = simuladosToLeave.concat(
-              prova.simulados.filter((simulado) =>
-                simulado.nome.includes(`Espanhol`),
-              ),
-            );
-          } else {
-            simuladosToLeave = simuladosToLeave.concat(
-              prova.simulados.filter((simulado) =>
-                simulado.nome.includes(questao.enemArea),
-              ),
-            );
-            simuladosToLeave = simuladosToLeave.concat(
-              prova.simulados.filter(
-                (simulado) =>
-                  simulado.nome === `${prova.tipo.nome} ${prova.ano} Inglês` ||
-                  simulado.nome === `${prova.tipo.nome} ${prova.ano} Espanhol`,
-              ),
-            );
-          }
-        } else {
-          simuladosToLeave = simuladosToLeave.concat(
-            provaToEnter.simulados.filter((simulado) =>
-              simulado.nome.includes(question.enemArea),
-            ),
-          );
-          simuladosToLeave.push(
-            provaToEnter.simulados.find(
-              (simulado) =>
-                simulado.nome ===
-                `${provaToEnter.tipo.nome} ${provaToEnter.ano}`,
-            ),
-          );
-        }
-      }
+    if (changeSimulados && provaToLeaveId) {
+      const oldProva = await this.provaRepository.getById(provaToLeaveId);
+      simuladosToLeave = this.selectSimuladosToLeave(
+        oldProva,
+        questao,
+        frenteIngles,
+        frenteEspanhol,
+        dia1,
+      );
     }
 
     let simuladosToEnter: Simulado[] = [];
     if (changeSimulados) {
       const isIngles = question.frente1 === frenteIngles._id.toString();
-      const isEspanhol = isIngles
-        ? false
-        : question.frente1.toString() === frenteEspanhol._id.toString();
-      if (dia1) {
-        if (isIngles) {
-          simuladosToEnter = simuladosToEnter.concat(
-            provaToEnter.simulados.filter((simulado) =>
-              simulado.nome.includes(`Inglês`),
-            ),
-          );
-        } else if (isEspanhol) {
-          simuladosToEnter = simuladosToEnter.concat(
-            provaToEnter.simulados.filter((simulado) =>
-              simulado.nome.includes(`Espanhol`),
-            ),
-          );
-        } else {
-          simuladosToEnter = simuladosToEnter.concat(
-            provaToEnter.simulados.filter((simulado) =>
-              simulado.nome.includes(question.enemArea),
-            ),
-          );
-          simuladosToEnter = simuladosToEnter.concat(
-            provaToEnter.simulados.filter(
-              (simulado) =>
-                simulado.nome ===
-                  `${provaToEnter.tipo.nome} ${provaToEnter.ano} Inglês` ||
-                simulado.nome ===
-                  `${provaToEnter.tipo.nome} ${provaToEnter.ano} Espanhol`,
-            ),
-          );
-        }
-      } else {
-        simuladosToEnter = simuladosToEnter.concat(
-          provaToEnter.simulados.filter((simulado) =>
-            simulado.nome.includes(question.enemArea),
-          ),
-        );
-        simuladosToEnter.push(
-          provaToEnter.simulados.find(
-            (simulado) =>
-              simulado.nome === `${provaToEnter.tipo.nome} ${provaToEnter.ano}`,
-          ),
-        );
-      }
+      const isEspanhol =
+        !isIngles && question.frente1 === frenteEspanhol._id.toString();
+      simuladosToEnter = this.selectSimuladosToEnter(
+        provaToEnter,
+        question,
+        isIngles,
+        isEspanhol,
+        dia1,
+      );
     }
+
     const session = await this.questaoRepository.startSession();
     session.startTransaction();
     try {
@@ -373,7 +262,7 @@ export class Enem2017PlusFactory implements IProvaFactory {
           questao,
           session,
         );
-        await this.provaRepository.removeQuestion(provaToLeave, questao);
+        await this.provaRepository.removeQuestion(provaToLeaveId, questao);
       }
       const simuladosActuallyEnter =
         this.simuladoRepository.removeDuplicatedSimulados(
@@ -390,11 +279,119 @@ export class Enem2017PlusFactory implements IProvaFactory {
       }
       await this.questaoRepository.updateQuestion(question);
       await session.commitTransaction();
-      session.endSession();
     } catch (error) {
       await session.abortTransaction();
-      session.endSession();
       throw error;
+    } finally {
+      session.endSession();
     }
+  }
+
+  // --- Funções auxiliares ---
+
+  private async getFrenteByNome(nome: string): Promise<Frente> {
+    return this.frenteRepository.getByFilter({ nome });
+  }
+
+  /**
+   * Seleciona os simulados para entrada com base no tipo de prova, área e se a questão é de Inglês ou Espanhol.
+   */
+  private selectSimuladosToEnter(
+    prova: Prova,
+    question: CreateQuestaoDTOInput | UpdateDTOInput,
+    isIngles: boolean,
+    isEspanhol: boolean,
+    diaMode: boolean, // dia1: Ciências Humanas e Linguagens
+  ): Simulado[] {
+    let simulados: Simulado[] = [];
+    if (diaMode) {
+      if (isIngles) {
+        simulados = prova.simulados.filter((simulado) =>
+          simulado.nome.includes('Inglês'),
+        );
+      } else if (isEspanhol) {
+        simulados = prova.simulados.filter((simulado) =>
+          simulado.nome.includes('Espanhol'),
+        );
+      } else {
+        simulados = prova.simulados.filter((simulado) =>
+          simulado.nome.includes(question.enemArea),
+        );
+        simulados = simulados.concat(
+          prova.simulados.filter(
+            (simulado) =>
+              simulado.nome === `${prova.tipo.nome} ${prova.ano} Inglês` ||
+              simulado.nome === `${prova.tipo.nome} ${prova.ano} Espanhol`,
+          ),
+        );
+      }
+    } else {
+      simulados = prova.simulados.filter((simulado) =>
+        simulado.nome.includes(question.enemArea),
+      );
+      const simuladoPadrao = prova.simulados.find(
+        (simulado) => simulado.nome === `${prova.tipo.nome} ${prova.ano}`,
+      );
+      if (simuladoPadrao) {
+        simulados.push(simuladoPadrao);
+      }
+    }
+    return simulados;
+  }
+
+  /**
+   * Seleciona os simulados para remoção com base na prova e no estado atual da questão.
+   * Se a prova for anterior a 2017 ou não for do ENEM, retorna todos os simulados.
+   */
+  private selectSimuladosToLeave(
+    prova: Prova,
+    questao: Questao,
+    frenteIngles: Frente,
+    frenteEspanhol: Frente,
+    diaMode: boolean, // dia1: Ciências Humanas e Linguagens
+  ): Simulado[] {
+    let simulados: Simulado[] = [];
+    if (prova.ano < 2017 || prova.exame.nome !== ExameName.ENEM) {
+      simulados = [...prova.simulados];
+    } else {
+      const wasIngles =
+        questao.frente1._id.toString() === frenteIngles._id.toString();
+      const wasEspanhol =
+        !wasIngles &&
+        questao.frente1._id.toString() === frenteEspanhol._id.toString();
+      if (diaMode) {
+        if (wasIngles) {
+          simulados = prova.simulados.filter((simulado) =>
+            simulado.nome.includes('Inglês'),
+          );
+        } else if (wasEspanhol) {
+          simulados = prova.simulados.filter((simulado) =>
+            simulado.nome.includes('Espanhol'),
+          );
+        } else {
+          simulados = prova.simulados.filter((simulado) =>
+            simulado.nome.includes(questao.enemArea),
+          );
+          simulados = simulados.concat(
+            prova.simulados.filter(
+              (simulado) =>
+                simulado.nome === `${prova.tipo.nome} ${prova.ano} Inglês` ||
+                simulado.nome === `${prova.tipo.nome} ${prova.ano} Espanhol`,
+            ),
+          );
+        }
+      } else {
+        simulados = prova.simulados.filter((simulado) =>
+          simulado.nome.includes(questao.enemArea),
+        );
+        const simuladoPadrao = prova.simulados.find(
+          (simulado) => simulado.nome === `${prova.tipo.nome} ${prova.ano}`,
+        );
+        if (simuladoPadrao) {
+          simulados.push(simuladoPadrao);
+        }
+      }
+    }
+    return simulados;
   }
 }

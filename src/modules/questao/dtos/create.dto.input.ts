@@ -6,12 +6,12 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
+import { Frente2And3Exist } from 'src/modules/frente/validator/frente-2-and-3-exist.validator';
 import { FrenteExist } from 'src/modules/frente/validator/frente-exist.validator';
 import { MateriaExist } from 'src/modules/materia/validator/materia-exist.validator';
 import { ProvaExist } from 'src/modules/prova/validator/prova-exist.validator';
 import { Alternativa } from '../enums/alternativa.enum';
 import { EnemArea } from '../enums/enem-area.enum';
-import { Frente2And3Exist } from 'src/modules/frente/validator/frente-2-and-3-exist.validator';
 
 export class CreateQuestaoDTOInput {
   @ApiProperty({ enum: EnemArea })
@@ -52,6 +52,10 @@ export class CreateQuestaoDTOInput {
 
   @ApiProperty({ required: false })
   @IsOptional()
+  public pergunta?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
   public textoAlternativaA?: string;
 
   @ApiProperty({ required: false })
@@ -76,7 +80,8 @@ export class CreateQuestaoDTOInput {
 
   @ApiProperty()
   @IsString()
-  public imageId: string;
+  @IsOptional()
+  public imageId?: string | null;
 
   @ApiProperty()
   @IsString()

@@ -35,6 +35,15 @@ export class QuestaoController {
     return await this.service.getAll(query);
   }
 
+  @Get('canInsert')
+  public async canInsertQuestion(
+    @Query('provaId') provaId: string,
+    @Query('numero') numero: number,
+    @Query('frente1') frente1: string,
+  ): Promise<boolean> {
+    return await this.service.canInsertQuestion(provaId, numero, frente1);
+  }
+
   @Get('infos')
   @ApiResponse({
     status: 200,

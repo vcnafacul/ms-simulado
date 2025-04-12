@@ -55,6 +55,14 @@ export class QuestaoService {
     return questao;
   }
 
+  public async canInsertQuestion(
+    provaId: string,
+    numero: number,
+    frente1: string,
+  ): Promise<boolean> {
+    return this.repository.canInsertQuestion(provaId, numero, frente1);
+  }
+
   public async getAll({
     page,
     limit,
@@ -65,8 +73,12 @@ export class QuestaoService {
     prova,
     enemArea,
   }: QuestaoDTOInput): Promise<GetAllOutput<Questao>> {
-    const textConditions: any[] = this.generateTextCombinations(text);
-    const frenteorConditions: any[] = this.generateFrentesCombinations(frente);
+    const textConditions: any[] = text
+      ? this.generateTextCombinations(text)
+      : [];
+    const frenteorConditions: any[] = frente
+      ? this.generateFrentesCombinations(frente)
+      : [];
 
     const combineConditions: any[] = [];
     if (frenteorConditions.length > 0)

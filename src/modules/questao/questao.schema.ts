@@ -41,7 +41,15 @@ export class Questao extends QuestaoReview {
 
   @Prop({ required: false, default: '' })
   @ApiProperty()
+  public pergunta: string;
+
+  @Prop({ required: false, default: '' })
+  @ApiProperty()
   public textoAlternativaA: string;
+
+  @Prop({ required: false, default: '' })
+  @ApiProperty()
+  public imageAlternativaA: string;
 
   @Prop({ required: false, default: '' })
   @ApiProperty()
@@ -49,7 +57,15 @@ export class Questao extends QuestaoReview {
 
   @Prop({ required: false, default: '' })
   @ApiProperty()
+  public imageAlternativaB: string;
+
+  @Prop({ required: false, default: '' })
+  @ApiProperty()
   public textoAlternativaC: string;
+
+  @Prop({ required: false, default: '' })
+  @ApiProperty()
+  public imageAlternativaC: string;
 
   @Prop({ required: false, default: '' })
   @ApiProperty()
@@ -57,7 +73,15 @@ export class Questao extends QuestaoReview {
 
   @Prop({ required: false, default: '' })
   @ApiProperty()
+  public imageAlternativaD: string;
+
+  @Prop({ required: false, default: '' })
+  @ApiProperty()
   public textoAlternativaE: string;
+
+  @Prop({ required: false, default: '' })
+  @ApiProperty()
+  public imageAlternativaE: string;
 
   @Prop({ select: false })
   public alternativa: Alternativa;
@@ -85,6 +109,10 @@ export class Questao extends QuestaoReview {
   @Prop({ ref: Prova.name, type: Types.ObjectId })
   @ApiProperty()
   public prova: Prova;
+
+  @Prop({ required: false, default: [], type: [String] })
+  @ApiProperty()
+  public files: string[];
 }
 
 export const QuestaoSchema = SchemaFactory.createForClass(Questao);
