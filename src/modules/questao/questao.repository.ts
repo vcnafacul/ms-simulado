@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllWhereInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
+import { Resposta } from '../historico/types/resposta';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
 import { Questao } from './questao.schema';
@@ -43,6 +44,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     query.where({ ...where });
     const data = await query;
     const totalItems = await queryCount.countDocuments();
+
     return {
       data,
       page: page,
@@ -105,6 +107,28 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     if (question.frente2 === '') question.frente2 = null;
     if (question.frente3 === '') question.frente3 = null;
     await this.model.updateOne({ _id: question._id }, { ...question });
+  }
+
+  public async updateQuestionAnswered(respostas: Resposta[]) {
+    const bulkOperations = respostas.map((resposta) => {
+      const update: any = {
+        $inc: {
+          quantidadeResposta: 1,
+        },
+      };
+
+      if (resposta.alternativaCorreta === resposta.alternativaEstudante) {
+        update.$inc.acertos = 1;
+      }
+
+      return {
+        updateOne: {
+          filter: { _id: resposta.questao._id },
+          update,
+        },
+      };
+    });
+    await this.model.bulkWrite(bulkOperations);
   }
 
   async delete(_id: string) {
