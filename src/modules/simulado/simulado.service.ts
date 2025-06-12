@@ -128,6 +128,7 @@ export class SimuladoService {
       tempoRealizado: answer.tempoRealizado,
     };
 
+    await this.questoesRepository.updateQuestionAnswered(respostas);
     await this.historicoRepository.create(historico);
   }
 
