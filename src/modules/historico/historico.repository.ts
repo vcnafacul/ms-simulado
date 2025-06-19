@@ -60,4 +60,25 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       })
       .exec();
   }
+
+  async getTotalEntity() {
+    return this.model.find({ deletedAt: null }).count();
+  }
+
+  async entityCompleted() {
+    const result: { total: number }[] = await this.model.aggregate([
+      {
+        $match: {
+          deletedAt: null,
+          $expr: {
+            $eq: [{ $size: '$respostas' }, '$questoesRespondidas'],
+          },
+        },
+      },
+      {
+        $count: 'total',
+      },
+    ]);
+    return result[0].total;
+  }
 }

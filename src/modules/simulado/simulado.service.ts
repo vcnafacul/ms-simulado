@@ -286,4 +286,14 @@ export class SimuladoService {
       }
     }
   }
+
+  async getSummary() {
+    const simuladosTotais = await this.simuladoRepository.getTotalEntity();
+    const simuladosActived = await this.simuladoRepository.entityActived();
+
+    return {
+      simuladosTotais,
+      simuladosActived,
+    };
+  }
 }

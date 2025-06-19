@@ -52,4 +52,8 @@ export class ProvaRepository extends BaseRepository<Prova> {
       await this.model.updateOne({ _id: prova._id }, prova);
     }
   }
+
+  async getTotalEntity() {
+    return this.model.find({ deletedAt: null }).count();
+  }
 }

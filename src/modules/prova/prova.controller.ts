@@ -38,6 +38,11 @@ export class ProvaController {
     return await this.service.getAll(query);
   }
 
+  @Get('summary')
+  async getSummary() {
+    return await this.service.getSummary();
+  }
+
   @Get(':id')
   @ApiResponse({
     status: 200,
