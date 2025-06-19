@@ -67,6 +67,11 @@ export class QuestaoController {
     return await this.service.create(model);
   }
 
+  @Get('summary')
+  async getSummary() {
+    return await this.service.getSummary();
+  }
+
   @Get(':id')
   @ApiResponse({
     status: 200,

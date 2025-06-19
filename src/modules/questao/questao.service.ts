@@ -292,4 +292,24 @@ export class QuestaoService {
 
     return combinations;
   }
+
+  async getSummary() {
+    const questionTotal = await this.repository.getTotalEntity();
+    const questionPending = await this.repository.entityByStatus(
+      Status.Pending,
+    );
+    const questionApproved = await this.repository.entityByStatus(
+      Status.Approved,
+    );
+    const questionRejected = await this.repository.entityByStatus(
+      Status.Rejected,
+    );
+
+    return {
+      questionTotal,
+      questionPending,
+      questionApproved,
+      questionRejected,
+    };
+  }
 }

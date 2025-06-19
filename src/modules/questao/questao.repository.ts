@@ -148,4 +148,12 @@ export class QuestaoRepository extends BaseRepository<Questao> {
 
     return !questaoExistente; // se já existe, não pode cadastrar → false
   }
+
+  async getTotalEntity() {
+    return this.model.find({ deletedAt: null }).count();
+  }
+
+  async entityByStatus(status: Status) {
+    return this.model.find({ deletedAt: null, status }).countDocuments();
+  }
 }
