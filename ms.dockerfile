@@ -13,4 +13,4 @@ ENV NODE_ENV=$NODE_ENV
 
 RUN yarn install --production && yarn cache clean
 
-CMD ./node_modules/pm2/bin/pm2-runtime main.js --name msSimulado
+CMD ["./node_modules/pm2/bin/pm2-runtime", "main.js", "--name", "msSimulado"]
