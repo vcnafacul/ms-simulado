@@ -95,4 +95,14 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
     });
     return simulados;
   }
+
+  async getTotalEntity() {
+    return this.model.find({ deletedAt: null }).count();
+  }
+
+  async entityActived() {
+    return this.model
+      .find({ deletedAt: null, bloqueado: true })
+      .countDocuments();
+  }
 }

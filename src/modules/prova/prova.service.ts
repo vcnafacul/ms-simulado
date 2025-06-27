@@ -134,4 +134,11 @@ export class ProvaService {
       );
     }
   }
+
+  async getSummary() {
+    const provaTotal = await this.repository.getTotalEntity();
+    return {
+      provaTotal,
+    };
+  }
 }

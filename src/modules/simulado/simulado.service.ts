@@ -128,6 +128,7 @@ export class SimuladoService {
       tempoRealizado: answer.tempoRealizado,
     };
 
+    await this.questoesRepository.updateQuestionAnswered(respostas);
     await this.historicoRepository.create(historico);
   }
 
@@ -284,5 +285,15 @@ export class SimuladoService {
         array[index].aproveitamento++;
       }
     }
+  }
+
+  async getSummary() {
+    const simuladosTotais = await this.simuladoRepository.getTotalEntity();
+    const simuladosActived = await this.simuladoRepository.entityActived();
+
+    return {
+      simuladosTotais,
+      simuladosActived,
+    };
   }
 }

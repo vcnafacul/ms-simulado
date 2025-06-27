@@ -107,4 +107,14 @@ export class HistoricoService {
 
     return aproveitamentoUnico;
   }
+
+  async getSummary() {
+    const historicTotal = await this.repository.getTotalEntity();
+    const historicCompleted = await this.repository.entityCompleted();
+
+    return {
+      historicTotal,
+      historicCompleted,
+    };
+  }
 }

@@ -30,6 +30,11 @@ export class HistoricoController {
     return await this.service.getPerformance(userId);
   }
 
+  @Get('summary')
+  async getSummary() {
+    return await this.service.getSummary();
+  }
+
   @Get(':id')
   @ApiResponse({
     status: 200,
