@@ -305,11 +305,14 @@ export class QuestaoService {
       Status.Rejected,
     );
 
+    const questionReported = await this.repository.getTotalEntityReported();
+
     return {
       questionTotal,
       questionPending,
       questionApproved,
       questionRejected,
+      questionReported,
     };
   }
 }
