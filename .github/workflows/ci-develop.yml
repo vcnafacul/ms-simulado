@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches:
+      - develop
+
+concurrency:
+  group: ci-${{ github.event.pull_request.title || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Yarn Modules
+        uses: actions/cache@v3
+        with:
+          path: ~/.yarn
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - run: yarn
+      - run: yarn build
+      - run: yarn test
+
+  lint-styles:
+    name: Lint Styles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Yarn Modules
+        uses: actions/cache@v3
+        with:
+          path: ~/.yarn
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - run: yarn
+      - run: yarn lint
+
+  push-image-dockerhub:
+    name: Push Image DockerHub
+    runs-on: ubuntu-latest
+    needs: [lint-styles, tests]
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'develop'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Yarn Modules
+        uses: actions/cache@v3
+        with:
+          path: ~/.yarn
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build app vCnafacul
+        run: yarn build
+      
+      - name: Dockerfile analysis
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: ms.dockerfile
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ms.dockerfile
+          push: true
+          tags: | 
+            vcnafacul/simulado:v${{ github.run_number }}
+            vcnafacul/simulado:latest
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: 'image'
+          image-ref: vcnafacul/simulado:v${{ github.run_number }}
+          format: 'sarif'
+          output: 'trivy-docker-result.sarif'
+          severity: 'CRITICAL, HIGH'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          category: docker-result
+          sarif_file: trivy-docker-result.sarif
+          fail_on_error: true
