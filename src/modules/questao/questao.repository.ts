@@ -156,4 +156,10 @@ export class QuestaoRepository extends BaseRepository<Questao> {
   async entityByStatus(status: Status) {
     return this.model.find({ deletedAt: null, status }).countDocuments();
   }
+
+  async getTotalEntityReported() {
+    return this.model
+      .find({ deletedAt: null, reported: true })
+      .countDocuments();
+  }
 }
