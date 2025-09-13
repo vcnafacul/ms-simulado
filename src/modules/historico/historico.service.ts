@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { AggregatePeriodDtoInput } from 'src/shared/dtos/aggregate-period.dto.input';
 import { GetHistoricoDTOInput } from './dtos/get-historico.dto';
 import { GetPerformanceHistories } from './dtos/get-perfomance-histories.dto';
 import { HistoricoRepository } from './historico.repository';
@@ -116,5 +117,9 @@ export class HistoricoService {
       historicTotal,
       historicCompleted,
     };
+  }
+
+  async aggregateByPeriod({ groupBy }: AggregatePeriodDtoInput) {
+    return await this.repository.aggregateByPeriod({ groupBy });
   }
 }
