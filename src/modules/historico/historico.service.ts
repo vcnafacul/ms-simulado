@@ -122,4 +122,8 @@ export class HistoricoService {
   async aggregateByPeriod({ groupBy }: AggregatePeriodDtoInput) {
     return await this.repository.aggregateByPeriod({ groupBy });
   }
+
+  async aggregateByPeriodAndTipo({ groupBy }: AggregatePeriodDtoInput) {
+    return await this.repository.aggregateByPeriodAndTipo({ groupBy });
+  }
 }

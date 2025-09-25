@@ -41,6 +41,11 @@ export class HistoricoController {
     return await this.service.aggregateByPeriod(dto);
   }
 
+  @Get('aggregate-by-Period-and-Type')
+  async aggregateByPeriodAndTipo(@Query() dto: AggregatePeriodDtoInput) {
+    return await this.service.aggregateByPeriodAndTipo(dto);
+  }
+
   @Get(':id')
   @ApiResponse({
     status: 200,
