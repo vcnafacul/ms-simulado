@@ -307,12 +307,15 @@ export class QuestaoService {
 
     const questionReported = await this.repository.getTotalEntityReported();
 
+    const questionClassified = await this.repository.getTotalEntityClassified();
+
     return {
       questionTotal,
       questionPending,
       questionApproved,
       questionRejected,
       questionReported,
+      questionClassified,
     };
   }
 }
