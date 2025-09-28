@@ -162,4 +162,20 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       .find({ deletedAt: null, reported: true })
       .countDocuments();
   }
+
+  async getTotalEntityClassified() {
+    const query = this.model.find({ deletedAt: null });
+
+    query.where({
+      $or: [
+        { provaClassification: true },
+        { subjectClassification: true },
+        { textClassification: true },
+        { imageClassfication: true },
+        { alternativeClassfication: true },
+      ],
+    });
+
+    return query.countDocuments();
+  }
 }
