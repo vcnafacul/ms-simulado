@@ -39,6 +39,7 @@ export class ProvaService {
         totalQuestaoCadastradas: result.questoes.length,
         totalQuestaoValidadas: result.totalQuestaoValidadas,
         filename: result.filename,
+        gabartio: result.gabarito,
         enemAreas: result.enemAreas,
       } as GetProvaDTOOutout;
     } catch (error: any) {

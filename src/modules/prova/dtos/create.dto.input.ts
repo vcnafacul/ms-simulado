@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Edicao } from '../enums/edicao.enum';
-import { IsEnum, IsNumber, IsString } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
 import { ExameExist } from 'src/modules/exame/validator/exame-exist.validator';
 
 export class CreateProvaDTOInput {
@@ -28,4 +28,8 @@ export class CreateProvaDTOInput {
   @ApiProperty()
   @IsString()
   filename: string;
+
+  @ApiProperty()
+  @IsOptional()
+  gabarito?: string;
 }
