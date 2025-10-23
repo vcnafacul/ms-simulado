@@ -67,6 +67,7 @@ export class ProvaService {
           exame: prova.exame.nome,
           nome: prova.nome,
           totalQuestao: prova.totalQuestao,
+          gabartio: prova.gabarito,
           totalQuestaoValidadas: prova.totalQuestaoValidadas,
           filename: prova.filename,
           enemAreas: prova.enemAreas,
