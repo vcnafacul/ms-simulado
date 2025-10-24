@@ -25,6 +25,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       .find()
       .skip((page - 1) * limit)
       .limit(limit ?? Infinity)
+      .populate('prova')
       .select('+alternativa');
 
     const queryCount = this.model.where({ ...where });
