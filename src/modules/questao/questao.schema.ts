@@ -106,9 +106,9 @@ export class Questao extends QuestaoReview {
   @ApiProperty()
   public status: Status;
 
-  @Prop({ ref: Prova.name, type: Types.ObjectId })
+  @Prop({ ref: Prova.name, type: Types.ObjectId, required: false })
   @ApiProperty()
-  public prova: Prova;
+  public prova?: Prova;
 
   @Prop({ required: false, default: [], type: [String] })
   @ApiProperty()
