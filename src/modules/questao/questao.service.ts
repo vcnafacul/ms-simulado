@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
+import { AuditLog } from '../auditLog/auditLog.schema';
 import { AuditLogService } from '../auditLog/auditLog.service';
 import { ExameRepository } from '../exame/exame.repository';
 import { FrenteRepository } from '../frente/frente.repository';
@@ -18,7 +19,12 @@ import { SimuladoService } from '../simulado/simulado.service';
 import { Regra } from '../tipo-simulado/schemas/regra.schemas';
 import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
+import { QuestaoAllDTO } from './dtos/questao.all.dto.output';
 import { QuestaoDTOInput } from './dtos/questao.dto.input';
+import { UpdateClassificacaoDTOInput } from './dtos/update-classificacao.dto.input';
+import { UpdateContentDTOInput } from './dtos/update-content.dto.input';
+import { UpdateImageAlternativaDTOInput } from './dtos/update-image-alternativa.dto.input';
+import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
 import { QuestaoRepository } from './questao.repository';
@@ -72,7 +78,7 @@ export class QuestaoService {
     frente,
     prova,
     enemArea,
-  }: QuestaoDTOInput): Promise<GetAllOutput<Questao>> {
+  }: QuestaoDTOInput): Promise<GetAllOutput<QuestaoAllDTO>> {
     const textConditions: any[] = text
       ? this.generateTextCombinations(text)
       : [];
@@ -97,7 +103,23 @@ export class QuestaoService {
       where,
       or: combineConditions,
     });
-    return questoes;
+
+    const questoesAll: QuestaoAllDTO[] = questoes.data.map((questao) => ({
+      _id: questao._id,
+      prova: questao.prova.nome,
+      enemArea: questao.enemArea,
+      materia: questao.materia?.nome,
+      numero: questao.numero,
+      status: questao.status,
+      updatedAt: questao.updatedAt,
+    }));
+
+    return {
+      data: questoesAll,
+      page: questoes.page,
+      limit: questoes.limit,
+      totalItems: questoes.totalItems,
+    };
   }
 
   public async delete(id: string): Promise<void> {
@@ -172,7 +194,7 @@ export class QuestaoService {
     message?: string,
   ) {
     try {
-      const question = await this.repository.getById(id);
+      const question = await this.repository.getByIdToUpdate(id);
       if (question.status === status) {
         throw new HttpException(
           'Não houve alteração de status',
@@ -203,7 +225,7 @@ export class QuestaoService {
     } catch (error: any) {
       throw new HttpException(
         `Não foi possível atualizar a questão.  ${error.message}`,
-        error.status,
+        HttpStatus.BAD_REQUEST,
       );
     }
   }
@@ -218,6 +240,77 @@ export class QuestaoService {
       await factory.updateQuestion(question);
     } catch (error: any) {
       throw new HttpException(error.message, HttpStatus.CONFLICT);
+    }
+  }
+
+  public async updateClassificacao(
+    id: string,
+    classificacao: UpdateClassificacaoDTOInput,
+  ) {
+    console.log(classificacao);
+    const questao = await this.repository.getById(id);
+    if (!questao) {
+      throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
+    }
+
+    try {
+      await this.repository.updateClassificacao(id, classificacao);
+    } catch (error: any) {
+      throw new HttpException(
+        `Não foi possível atualizar a classificação. ${error.message}`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  public async updateContent(id: string, content: UpdateContentDTOInput) {
+    const questao = await this.repository.getById(id);
+    if (!questao) {
+      throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
+    }
+
+    try {
+      await this.repository.updateContent(id, content);
+    } catch (error: any) {
+      throw new HttpException(
+        `Não foi possível atualizar o conteúdo. ${error.message}`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  public async updateImageId(id: string, imageId: UpdateImageIdDTOInput) {
+    const questao = await this.repository.getById(id);
+    if (!questao) {
+      throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
+    }
+
+    try {
+      await this.repository.updateImageId(id, imageId);
+    } catch (error: any) {
+      throw new HttpException(
+        `Não foi possível atualizar o imageId. ${error.message}`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  public async updateImageAlternativa(
+    id: string,
+    imageAlternativa: UpdateImageAlternativaDTOInput,
+  ) {
+    const questao = await this.repository.getById(id);
+    if (!questao) {
+      throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
+    }
+
+    try {
+      await this.repository.updateImageAlternativa(id, imageAlternativa);
+    } catch (error: any) {
+      throw new HttpException(
+        `Não foi possível atualizar a imagem da alternativa. ${error.message}`,
+        HttpStatus.BAD_REQUEST,
+      );
     }
   }
 
@@ -317,5 +410,14 @@ export class QuestaoService {
       questionReported,
       questionClassified,
     };
+  }
+
+  public async getLogs(id: string): Promise<AuditLog[]> {
+    const questao = await this.repository.getById(id);
+    if (!questao) {
+      throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
+    }
+
+    return await this.auditLogService.getByEntityId(id);
   }
 }

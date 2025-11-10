@@ -5,6 +5,10 @@ import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllWhereInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { Resposta } from '../historico/types/resposta';
+import { UpdateClassificacaoDTOInput } from './dtos/update-classificacao.dto.input';
+import { UpdateContentDTOInput } from './dtos/update-content.dto.input';
+import { UpdateImageAlternativaDTOInput } from './dtos/update-image-alternativa.dto.input';
+import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
 import { Questao } from './questao.schema';
@@ -25,7 +29,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       .find()
       .skip((page - 1) * limit)
       .limit(limit ?? Infinity)
-      .populate('prova')
+      .populate(['materia', 'prova'])
       .select('+alternativa');
 
     const queryCount = this.model.where({ ...where });
@@ -55,10 +59,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
   }
 
   override async getById(id: string) {
-    return await this.model
-      .findById(id)
-      .select('+alternativa')
-      .populate(['frente1', 'materia', 'prova']);
+    return await this.model.findById(id).select('+alternativa');
   }
 
   async getByIdToUpdate(id: string) {
@@ -108,6 +109,70 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     if (question.frente2 === '') question.frente2 = null;
     if (question.frente3 === '') question.frente3 = null;
     await this.model.updateOne({ _id: question._id }, { ...question });
+  }
+
+  async updateClassificacao(
+    id: string,
+    classificacao: UpdateClassificacaoDTOInput,
+  ) {
+    const updateData: any = {
+      prova: classificacao.prova,
+      numero: classificacao.numero,
+      enemArea: classificacao.enemArea,
+      materia: classificacao.materia,
+      frente1: classificacao.frente1,
+      provaClassification: classificacao.provaClassification,
+      subjectClassification: classificacao.subjectClassification,
+      reported: classificacao.reported,
+    };
+
+    if (classificacao.frente2 !== undefined) {
+      updateData.frente2 = classificacao.frente2 || null;
+    }
+    if (classificacao.frente3 !== undefined) {
+      updateData.frente3 = classificacao.frente3 || null;
+    }
+
+    await this.model.updateOne({ _id: id }, updateData);
+  }
+
+  async updateContent(id: string, content: UpdateContentDTOInput) {
+    const updateData: any = {
+      textoQuestao: content.textoQuestao,
+      textoAlternativaA: content.textoAlternativaA,
+      textoAlternativaB: content.textoAlternativaB,
+      textoAlternativaC: content.textoAlternativaC,
+      textoAlternativaD: content.textoAlternativaD,
+      textoAlternativaE: content.textoAlternativaE,
+      alternativa: content.alternativa,
+      textClassification: content.textClassification,
+      alternativeClassfication: content.alternativeClassfication,
+    };
+
+    if (content.pergunta !== undefined) {
+      updateData.pergunta = content.pergunta;
+    }
+
+    await this.model.updateOne({ _id: id }, updateData);
+  }
+
+  async updateImageId(id: string, imageId: UpdateImageIdDTOInput) {
+    await this.model.updateOne(
+      { _id: id },
+      { imageId: imageId.imageId || null },
+    );
+  }
+
+  async updateImageAlternativa(
+    id: string,
+    imageAlternativa: UpdateImageAlternativaDTOInput,
+  ) {
+    const campoImageAlternativa = `imageAlternativa${imageAlternativa.alternativa}`;
+    const updateData: any = {};
+    updateData[campoImageAlternativa] =
+      imageAlternativa.imageAlternativa || null;
+
+    await this.model.updateOne({ _id: id }, updateData);
   }
 
   public async updateQuestionAnswered(respostas: Resposta[]) {
