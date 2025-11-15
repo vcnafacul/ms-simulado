@@ -9,7 +9,6 @@ import {
   MateriaAproveitamento,
   SubAproveitamento,
 } from '../historico/types/aproveitamento';
-import { Resposta } from '../historico/types/resposta';
 import { MateriaRepository } from '../materia/materia.repository';
 import { Status } from '../questao/enums/status.enum';
 import { QuestaoRepository } from '../questao/questao.repository';
@@ -20,6 +19,7 @@ import { AvailableSimuladoDTOoutput } from './dtos/available-simulado.dto.output
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
 import { Simulado } from './schemas/simulado.schema';
 import { SimuladoRepository } from './simulado.repository';
+import { RespostaAproveitamento } from './valueObject/resposta-aproveitamento';
 
 @Injectable()
 export class SimuladoService {
@@ -102,29 +102,37 @@ export class SimuladoService {
   public async answer(answer: AnswerSimuladoDto) {
     const simulado = await this.simuladoRepository.answer(answer.idSimulado);
 
-    const questao = await this.questoesRepository.getById(
-      simulado.questoes[0]._id,
-    );
+    const ano = (
+      await this.questoesRepository.getById(simulado.questoes[0]._id)
+    ).prova.ano;
 
-    const respostas: Resposta[] = simulado?.questoes.map((questao) => {
-      const resposta = answer.respostas.find(
-        (r) => r.questao === questao._id.toString(),
-      );
-      return {
-        questao: questao,
-        alternativaEstudante: resposta?.alternativaEstudante,
-        alternativaCorreta: questao.alternativa,
-      };
-    });
+    const respostas: RespostaAproveitamento[] = simulado?.questoes.map(
+      (questao) => {
+        const resposta = answer.respostas.find(
+          (r) => r.questao === questao._id.toString(),
+        );
+        return {
+          questao: questao,
+          alternativaEstudante: resposta?.alternativaEstudante,
+          alternativaCorreta: questao.alternativa,
+          materia: questao.materia,
+          frente: questao.frente1,
+        };
+      },
+    );
 
     const aproveitamento = await this.criaAproveitamento(respostas);
     const historico: Historico = {
       usuario: answer.idEstudante,
-      ano: questao.prova.ano,
+      ano: ano,
       simulado: simulado,
       aproveitamento: aproveitamento,
       questoesRespondidas: answer.respostas.length,
-      respostas: respostas,
+      respostas: respostas.map((r) => ({
+        questao: r.questao,
+        alternativaEstudante: r.alternativaEstudante,
+        alternativaCorreta: r.alternativaCorreta,
+      })),
       tempoRealizado: answer.tempoRealizado,
     };
 
@@ -176,90 +184,67 @@ export class SimuladoService {
   }
 
   private async criaAproveitamento(
-    respostas: Resposta[],
+    respostas: RespostaAproveitamento[],
   ): Promise<AproveitamentoHistorico> {
     let aproveitamentoGeral = 0;
 
-    const materiaCienciasHumanas = await this.materiaRepository.getAll({
-      page: 1,
-      limit: 1000,
-      where: {
-        enemArea: 'Ciências Humanas',
-      },
+    // Extrai matérias únicas presentes nas respostas
+    const materiasUnicas = new Map<string, MateriaAproveitamento>();
+
+    respostas.forEach((res) => {
+      const materiaId = res.materia._id.toString();
+
+      // Inicializa a matéria se ainda não existir
+      if (!materiasUnicas.has(materiaId)) {
+        materiasUnicas.set(materiaId, {
+          id: res.materia._id,
+          nome: res.materia.nome,
+          aproveitamento: 0,
+          frentes: [],
+        });
+      }
+
+      const materia = materiasUnicas.get(materiaId);
+
+      // Adiciona a frente se ainda não existir nesta matéria
+      const frenteId = res.frente._id.toString();
+      if (!materia.frentes.some((f) => f.id.toString() === frenteId)) {
+        materia.frentes.push({
+          id: res.frente._id,
+          nome: res.frente.nome,
+          aproveitamento: 0,
+          materia: res.materia.nome,
+        });
+      }
     });
 
-    const materiaLinguagens = await this.materiaRepository.getAll({
-      page: 1,
-      limit: 1000,
-      where: {
-        enemArea: 'Linguagens',
-      },
-    });
+    // Converte o Map para array
+    const materias = Array.from(materiasUnicas.values());
 
-    const materiasCienciasDaNatureza = await this.materiaRepository.getAll({
-      page: 1,
-      limit: 1000,
-      where: {
-        enemArea: 'Ciências da Natureza',
-      },
-    });
-
-    const materiasMatematica = await this.materiaRepository.getAll({
-      page: 1,
-      limit: 1000,
-      where: {
-        enemArea: 'Matemática',
-      },
-    });
-
-    const materiasBD = [
-      ...materiaLinguagens.data,
-      ...materiaCienciasHumanas.data,
-      ...materiasCienciasDaNatureza.data,
-      ...materiasMatematica.data,
-    ];
-
-    const materias: MateriaAproveitamento[] = materiasBD.map((m) => ({
-      id: m._id,
-      nome: m.nome,
-      aproveitamento: 0,
-      frentes: m.frentes.map((f) => ({
-        id: f._id,
-        nome: f.nome,
-        aproveitamento: 0,
-        materia: m.nome,
-      })),
-    }));
-
+    // Calcula o aproveitamento
     respostas.forEach((res) => {
       if (res.alternativaCorreta === res.alternativaEstudante) {
         aproveitamentoGeral++;
         this.increasePerformance(
           res,
-          materias.find(
-            (m) => m.id.toString() === res.questao.materia._id.toString(),
-          ),
+          materias.find((m) => m.id.toString() === res.materia._id.toString()),
         );
       }
     });
 
+    // Calcula o aproveitamento de cada matéria e frente
     materias.forEach((m) => {
-      const quantidade = respostas.reduce(
-        (total, elem) =>
-          elem.questao.materia._id.toString() === m.id.toString()
-            ? total + 1
-            : total,
-        0,
-      );
+      const quantidade = respostas.filter(
+        (elem) => elem.materia._id.toString() === m.id.toString(),
+      ).length;
+
       m.aproveitamento = quantidade > 0 ? m.aproveitamento / quantidade : 0;
+
       m.frentes.forEach((f) => {
-        const quantidade = respostas.reduce(
-          (total, elem) =>
-            elem.questao.frente1._id.toString() === f.id.toString()
-              ? total + 1
-              : total,
-          0,
-        );
+        const quantidade = respostas.filter(
+          (elem) => elem.frente._id.toString() === f.id.toString(),
+        ).length;
+
         f.aproveitamento = quantidade > 0 ? f.aproveitamento / quantidade : 0;
       });
     });
@@ -270,12 +255,12 @@ export class SimuladoService {
     };
   }
 
-  private increasePerformance(res: Resposta, materia: MateriaAproveitamento) {
+  private increasePerformance(
+    res: RespostaAproveitamento,
+    materia: MateriaAproveitamento,
+  ) {
     materia.aproveitamento++;
-    this.calculaAproveitamento(
-      res.questao.frente1._id.toString(),
-      materia.frentes,
-    );
+    this.calculaAproveitamento(res.frente._id.toString(), materia.frentes);
   }
 
   private calculaAproveitamento(id: string, array: Array<SubAproveitamento>) {

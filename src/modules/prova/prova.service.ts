@@ -39,6 +39,7 @@ export class ProvaService {
         totalQuestaoCadastradas: result.questoes.length,
         totalQuestaoValidadas: result.totalQuestaoValidadas,
         filename: result.filename,
+        gabartio: result.gabarito,
         enemAreas: result.enemAreas,
       } as GetProvaDTOOutout;
     } catch (error: any) {
@@ -66,6 +67,7 @@ export class ProvaService {
           exame: prova.exame.nome,
           nome: prova.nome,
           totalQuestao: prova.totalQuestao,
+          gabartio: prova.gabarito,
           totalQuestaoValidadas: prova.totalQuestaoValidadas,
           filename: prova.filename,
           enemAreas: prova.enemAreas,

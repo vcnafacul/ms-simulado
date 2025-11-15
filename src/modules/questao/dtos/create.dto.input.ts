@@ -1,11 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsBoolean,
-  IsEnum,
-  IsNumber,
-  IsOptional,
-  IsString,
-} from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
 import { Frente2And3Exist } from 'src/modules/frente/validator/frente-2-and-3-exist.validator';
 import { FrenteExist } from 'src/modules/frente/validator/frente-exist.validator';
 import { MateriaExist } from 'src/modules/materia/validator/materia-exist.validator';
@@ -80,31 +74,6 @@ export class CreateQuestaoDTOInput {
 
   @ApiProperty()
   @IsString()
-  @IsOptional()
-  public imageId?: string | null;
-
-  @ApiProperty()
-  @IsString()
   @ProvaExist({ message: 'prova não existe' })
   public prova: string;
-
-  @IsBoolean()
-  @ApiProperty({ required: false })
-  @IsOptional()
-  public subjectClassification: boolean = false;
-
-  @IsBoolean()
-  @ApiProperty({ required: false })
-  @IsOptional()
-  public textClassification: boolean = false;
-
-  @IsBoolean()
-  @ApiProperty({ required: false })
-  @IsOptional()
-  public imageClassfication: boolean = false;
-
-  @IsBoolean()
-  @ApiProperty({ required: false })
-  @IsOptional()
-  public alternativeClassfication: boolean = false;
 }

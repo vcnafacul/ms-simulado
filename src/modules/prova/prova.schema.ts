@@ -17,6 +17,7 @@ export class Prova extends BaseSchema {
     this.tipo = tipo;
     this.ano = item.ano;
     this.filename = item.filename;
+    this.gabarito = item.gabarito;
     this.aplicacao = item.aplicacao;
     this.simulados = [];
     this.questoes = [];
@@ -59,6 +60,9 @@ export class Prova extends BaseSchema {
 
   @Prop()
   public filename: string;
+
+  @Prop()
+  public gabarito?: string;
 
   @Prop()
   public enemAreas: string[];

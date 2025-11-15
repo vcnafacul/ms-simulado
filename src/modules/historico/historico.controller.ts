@@ -1,5 +1,6 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AggregatePeriodDtoInput } from 'src/shared/dtos/aggregate-period.dto.input';
 import { GetHistoricoDTOInput } from './dtos/get-historico.dto';
 import { Historico } from './historico.schema';
 import { HistoricoService } from './historico.service';
@@ -33,6 +34,16 @@ export class HistoricoController {
   @Get('summary')
   async getSummary() {
     return await this.service.getSummary();
+  }
+
+  @Get('aggregate-by-Period')
+  async aggregateByPeriod(@Query() dto: AggregatePeriodDtoInput) {
+    return await this.service.aggregateByPeriod(dto);
+  }
+
+  @Get('aggregate-by-Period-and-Type')
+  async aggregateByPeriodAndTipo(@Query() dto: AggregatePeriodDtoInput) {
+    return await this.service.aggregateByPeriodAndTipo(dto);
   }
 
   @Get(':id')
