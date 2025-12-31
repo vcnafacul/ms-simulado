@@ -11,49 +11,49 @@ import {
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
 import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
-import { CreateFrenteDTOInput } from './dtos/create.dto.input';
+import { CreateSubjectDTOInput } from './dtos/create.dto.input';
 import { MovePositionDTOInput } from './dtos/move-position.dto.input';
 import { SwapOrderDTOInput } from './dtos/swap-order.dto.input';
-import { Frente } from './frente.schema';
-import { FrenteService } from './frente.service';
+import { Subject } from './subject.schema';
+import { SubjectService } from './subject.service';
 
-@ApiTags('Frente')
-@Controller('v1/frente')
-export class FrenteController {
-  constructor(private readonly service: FrenteService) {}
+@ApiTags('Temas')
+@Controller('v1/subject')
+export class SubjectController {
+  constructor(private readonly service: SubjectService) {}
 
   @Get()
   @ApiResponse({
     status: 200,
-    description: 'lista de exames cadastrados e validos',
-    type: Frente,
+    description: 'subjects cadastrados e válidos',
+    type: Subject,
     isArray: true,
   })
   public async getAll(
     @Query() query: GetAllDtoInput,
-  ): Promise<GetAllDtoOutput<Frente>> {
+  ): Promise<GetAllDtoOutput<Subject>> {
     return await this.service.getAll(query);
   }
 
   @Post()
   @ApiResponse({
     status: 200,
-    description: 'lista de exames cadastrados e validos',
-    type: Frente,
+    description: 'cadastrado com sucesso',
+    type: Subject,
     isArray: false,
   })
-  public async post(@Body() model: CreateFrenteDTOInput): Promise<Frente> {
+  public async post(@Body() model: CreateSubjectDTOInput): Promise<Subject> {
     return await this.service.add(model);
   }
 
   @Get(':id')
   @ApiResponse({
     status: 200,
-    description: 'lista de exames cadastrados e validos',
-    type: Frente,
+    description: 'subject cadastrado e válido',
+    type: Subject,
     isArray: false,
   })
-  public async getById(@Param('id') id: string): Promise<Frente> {
+  public async getById(@Param('id') id: string): Promise<Subject> {
     return await this.service.getById(id);
   }
 
@@ -74,7 +74,7 @@ export class FrenteController {
   @Patch(':id/move-to-position')
   @ApiResponse({
     status: 200,
-    description: 'Frente movida para nova posição',
+    description: 'Subject movido para nova posição',
   })
   public async moveToPosition(
     @Param('id') id: string,
@@ -83,55 +83,55 @@ export class FrenteController {
     return await this.service.moveToPosition(
       id,
       model.position,
-      model.materiaId,
+      model.frenteId,
     );
   }
 
   @Patch(':id/move-up')
   @ApiResponse({
     status: 200,
-    description: 'Frente movida uma posição acima',
+    description: 'Subject movido uma posição acima',
   })
   public async moveUp(
     @Param('id') id: string,
-    @Query('materiaId') materiaId: string,
+    @Query('frenteId') frenteId: string,
   ): Promise<void> {
-    return await this.service.moveUp(id, materiaId);
+    return await this.service.moveUp(id, frenteId);
   }
 
   @Patch(':id/move-down')
   @ApiResponse({
     status: 200,
-    description: 'Frente movida uma posição abaixo',
+    description: 'Subject movido uma posição abaixo',
   })
   public async moveDown(
     @Param('id') id: string,
-    @Query('materiaId') materiaId: string,
+    @Query('frenteId') frenteId: string,
   ): Promise<void> {
-    return await this.service.moveDown(id, materiaId);
+    return await this.service.moveDown(id, frenteId);
   }
 
   @Patch(':id/move-to-top')
   @ApiResponse({
     status: 200,
-    description: 'Frente movida para o topo',
+    description: 'Subject movido para o topo',
   })
   public async moveToTop(
     @Param('id') id: string,
-    @Query('materiaId') materiaId: string,
+    @Query('frenteId') frenteId: string,
   ): Promise<void> {
-    return await this.service.moveToTop(id, materiaId);
+    return await this.service.moveToTop(id, frenteId);
   }
 
   @Patch(':id/move-to-bottom')
   @ApiResponse({
     status: 200,
-    description: 'Frente movida para o fim',
+    description: 'Subject movido para o fim',
   })
   public async moveToBottom(
     @Param('id') id: string,
-    @Query('materiaId') materiaId: string,
+    @Query('frenteId') frenteId: string,
   ): Promise<void> {
-    return await this.service.moveToBottom(id, materiaId);
+    return await this.service.moveToBottom(id, frenteId);
   }
 }
