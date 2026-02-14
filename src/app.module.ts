@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import { ExameModule } from './modules/exame/exame.module';
 import { FrenteModule } from './modules/frente/frente.module';
 import { HistoricoModule } from './modules/historico/historico.module';
@@ -17,22 +16,8 @@ import { TipoSimuladoModule } from './modules/tipo-simulado/tipo-simulado.module
       isGlobal: true,
       envFilePath: process.env.NODE_ENV !== 'test' ? '.env' : undefined,
     }),
-    MongooseModule.forRootAsync({
-      useFactory: async () => {
-        if (process.env.NODE_ENV === 'test') {
-          const mongod = await MongoMemoryServer.create();
-          const uri = mongod.getUri();
-          return {
-            uri,
-          };
-        }
-        return {
-          uri: process.env.MONGODB,
-          useNewUrlParser: true,
-          useUnifiedTopology: true,
-          serverSelectionTimeoutMS: 5000,
-        };
-      },
+    MongooseModule.forRoot(process.env.MONGODB, {
+      serverSelectionTimeoutMS: 5000,
     }),
     ExameModule,
     FrenteModule,

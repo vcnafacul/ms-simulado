@@ -223,6 +223,13 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     return !questaoExistente; // se já existe, não pode cadastrar → false
   }
 
+  async getAllByProvaIds(provaIds: string[]): Promise<Questao[]> {
+    return await this.model
+      .find({ prova: { $in: provaIds }, deletedAt: null })
+      .populate(['frente1'])
+      .exec();
+  }
+
   async getTotalEntity() {
     return this.model.find({ deletedAt: null }).count();
   }
