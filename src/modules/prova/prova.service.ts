@@ -11,6 +11,7 @@ import {
   ProvaFixEntry,
   SimuladoFixEntry,
   SyncReport,
+  SyncStatus,
 } from './dtos/sync-report.dto';
 import { ProvaFactory } from './factory/prova_factory';
 import { ProvaRepository } from './prova.repository';
@@ -18,6 +19,9 @@ import { Prova } from './prova.schema';
 
 @Injectable()
 export class ProvaService {
+  private syncReport: SyncReport | null = null;
+  private isSyncing = false;
+
   constructor(
     private readonly provaFactory: ProvaFactory,
     private readonly repository: ProvaRepository,
@@ -145,133 +149,173 @@ export class ProvaService {
     }
   }
 
-  public async sync(): Promise<SyncReport> {
+  public startSync(): { status: SyncStatus; message: string } {
+    if (this.isSyncing) {
+      throw new HttpException(
+        'Sincronizacao ja em andamento',
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    this.isSyncing = true;
+    this.executeSync();
+
+    return { status: 'processing', message: 'Sincronizacao iniciada' };
+  }
+
+  public getSyncReport(): SyncReport | { status: SyncStatus } {
+    if (this.isSyncing) {
+      return { status: 'processing' };
+    }
+    if (!this.syncReport) {
+      return { status: 'idle' };
+    }
+    return this.syncReport;
+  }
+
+  private async executeSync(): Promise<void> {
     const report: SyncReport = {
+      status: 'processing',
+      processedAt: null,
       totalProvas: 0,
       provasFixed: [],
       simuladosFixed: [],
       errors: [],
     };
 
-    const provas = await this.repository.getAllPopulated();
-    report.totalProvas = provas.length;
+    try {
+      const provas = await this.repository.getAllPopulated();
+      report.totalProvas = provas.length;
 
-    for (const prova of provas) {
-      try {
-        const provaFixes: ProvaFixEntry = {
-          provaId: prova._id,
-          provaNome: prova.nome,
-          fixes: [],
-        };
-
-        // Passo A: Remover referencias orfas de questoes na prova
-        const originalQuestaoCount = prova.questoes.length;
-        const validQuestoes = prova.questoes.filter(
-          (q) => q !== null && q._id !== undefined,
-        );
-        const orphanCount = originalQuestaoCount - validQuestoes.length;
-        if (orphanCount > 0) {
-          prova.questoes = validQuestoes;
-          provaFixes.fixes.push({
-            field: 'questoes',
-            issue: 'orphan_references',
-            oldValue: originalQuestaoCount,
-            newValue: validQuestoes.length,
-            detail: `Removidas ${orphanCount} referencias orfas de questoes`,
-          });
-        }
-
-        // Passo B: Recalcular totalQuestaoValidadas
-        const actualApproved = validQuestoes.filter(
-          (q) => q.status === Status.Approved,
-        ).length;
-        if (prova.totalQuestaoValidadas !== actualApproved) {
-          provaFixes.fixes.push({
-            field: 'totalQuestaoValidadas',
-            issue: 'incorrect_count',
-            oldValue: prova.totalQuestaoValidadas,
-            newValue: actualApproved,
-          });
-          prova.totalQuestaoValidadas = actualApproved;
-        }
-
-        // Passo C: Processar cada simulado
-        const validSimulados = (prova.simulados || []).filter(
-          (s) => s !== null && s._id !== undefined,
-        );
-        for (const simulado of validSimulados) {
-          const simuladoFixes: SimuladoFixEntry = {
-            simuladoId: simulado._id,
-            simuladoNome: simulado.nome,
+      for (const prova of provas) {
+        try {
+          const provaFixes: ProvaFixEntry = {
+            provaId: prova._id,
+            provaNome: prova.nome,
             fixes: [],
           };
 
-          // C1: Remover referencias orfas de questoes no simulado
-          const origSimQuestaoCount = simulado.questoes.length;
-          const validSimQuestoes = simulado.questoes.filter(
+          // Passo A: Remover referencias orfas de questoes na prova
+          const originalQuestaoCount = prova.questoes.length;
+          const validQuestoes = prova.questoes.filter(
             (q) => q !== null && q._id !== undefined,
           );
-          const simOrphanCount = origSimQuestaoCount - validSimQuestoes.length;
-          if (simOrphanCount > 0) {
-            simulado.questoes = validSimQuestoes;
-            simuladoFixes.fixes.push({
+          const orphanCount = originalQuestaoCount - validQuestoes.length;
+          if (orphanCount > 0) {
+            prova.questoes = validQuestoes;
+            provaFixes.fixes.push({
               field: 'questoes',
               issue: 'orphan_references',
-              oldValue: origSimQuestaoCount,
-              newValue: validSimQuestoes.length,
-              detail: `Removidas ${simOrphanCount} referencias orfas de questoes`,
+              oldValue: originalQuestaoCount,
+              newValue: validQuestoes.length,
+              detail: `Removidas ${orphanCount} referencias orfas de questoes`,
             });
           }
 
-          // C2: Recalcular bloqueado
-          const hasRequiredCount = simulado.tipo
-            ? validSimQuestoes.length === simulado.tipo.quantidadeTotalQuestao
-            : false;
-          const allApproved =
-            validSimQuestoes.length > 0 &&
-            validSimQuestoes.every((q) => q.status === Status.Approved);
-          const shouldBeBlocked = !(hasRequiredCount && allApproved);
-
-          if (simulado.bloqueado !== shouldBeBlocked) {
-            simuladoFixes.fixes.push({
-              field: 'bloqueado',
-              issue: 'incorrect_value',
-              oldValue: simulado.bloqueado,
-              newValue: shouldBeBlocked,
-              detail: !simulado.tipo
-                ? 'tipo e nulo, definido bloqueado=true'
-                : `questoes: ${validSimQuestoes.length}/${simulado.tipo.quantidadeTotalQuestao}, todasAprovadas: ${allApproved}`,
+          // Passo B: Recalcular totalQuestaoValidadas
+          const actualApproved = validQuestoes.filter(
+            (q) => q.status === Status.Approved,
+          ).length;
+          if (prova.totalQuestaoValidadas !== actualApproved) {
+            provaFixes.fixes.push({
+              field: 'totalQuestaoValidadas',
+              issue: 'incorrect_count',
+              oldValue: prova.totalQuestaoValidadas,
+              newValue: actualApproved,
             });
-            simulado.bloqueado = shouldBeBlocked;
+            prova.totalQuestaoValidadas = actualApproved;
           }
 
-          // C3: Ordenar questoes por numero
-          simulado.questoes = validSimQuestoes.sort(
-            (a, b) => a.numero - b.numero,
+          // Passo C: Processar cada simulado
+          const validSimulados = (prova.simulados || []).filter(
+            (s) => s !== null && s._id !== undefined,
           );
+          for (const simulado of validSimulados) {
+            const simuladoFixes: SimuladoFixEntry = {
+              simuladoId: simulado._id,
+              simuladoNome: simulado.nome,
+              fixes: [],
+            };
 
-          // C4: Persistir simulado se houve mudanca
-          if (simuladoFixes.fixes.length > 0) {
-            await this.simuladoRepository.update(simulado);
-            report.simuladosFixed.push(simuladoFixes);
+            // C1: Remover referencias orfas de questoes no simulado
+            const origSimQuestaoCount = simulado.questoes.length;
+            const validSimQuestoes = simulado.questoes.filter(
+              (q) => q !== null && q._id !== undefined,
+            );
+            const simOrphanCount =
+              origSimQuestaoCount - validSimQuestoes.length;
+            if (simOrphanCount > 0) {
+              simulado.questoes = validSimQuestoes;
+              simuladoFixes.fixes.push({
+                field: 'questoes',
+                issue: 'orphan_references',
+                oldValue: origSimQuestaoCount,
+                newValue: validSimQuestoes.length,
+                detail: `Removidas ${simOrphanCount} referencias orfas de questoes`,
+              });
+            }
+
+            // C2: Recalcular bloqueado
+            const hasRequiredCount = simulado.tipo
+              ? validSimQuestoes.length === simulado.tipo.quantidadeTotalQuestao
+              : false;
+            const allApproved =
+              validSimQuestoes.length > 0 &&
+              validSimQuestoes.every((q) => q.status === Status.Approved);
+            const shouldBeBlocked = !(hasRequiredCount && allApproved);
+
+            if (simulado.bloqueado !== shouldBeBlocked) {
+              simuladoFixes.fixes.push({
+                field: 'bloqueado',
+                issue: 'incorrect_value',
+                oldValue: simulado.bloqueado,
+                newValue: shouldBeBlocked,
+                detail: !simulado.tipo
+                  ? 'tipo e nulo, definido bloqueado=true'
+                  : `questoes: ${validSimQuestoes.length}/${simulado.tipo.quantidadeTotalQuestao}, todasAprovadas: ${allApproved}`,
+              });
+              simulado.bloqueado = shouldBeBlocked;
+            }
+
+            // C3: Ordenar questoes por numero
+            simulado.questoes = validSimQuestoes.sort(
+              (a, b) => a.numero - b.numero,
+            );
+
+            // C4: Persistir simulado se houve mudanca
+            if (simuladoFixes.fixes.length > 0) {
+              await this.simuladoRepository.update(simulado);
+              report.simuladosFixed.push(simuladoFixes);
+            }
           }
-        }
 
-        // Passo D: Persistir prova se houve mudanca
-        if (provaFixes.fixes.length > 0) {
-          await this.repository.update(prova);
-          report.provasFixed.push(provaFixes);
+          // Passo D: Persistir prova se houve mudanca
+          if (provaFixes.fixes.length > 0) {
+            await this.repository.update(prova);
+            report.provasFixed.push(provaFixes);
+          }
+        } catch (error: any) {
+          report.errors.push({
+            provaId: prova._id,
+            provaNome: prova.nome,
+            error: error.message,
+          });
         }
-      } catch (error: any) {
-        report.errors.push({
-          provaId: prova._id,
-          provaNome: prova.nome,
-          error: error.message,
-        });
       }
-    }
 
-    return report;
+      report.status = 'completed';
+    } catch (error: any) {
+      report.status = 'error';
+      report.errors.push({
+        provaId: '',
+        provaNome: '',
+        error: `Erro geral: ${error.message}`,
+      });
+    } finally {
+      report.processedAt = new Date().toISOString();
+      this.syncReport = report;
+      this.isSyncing = false;
+    }
   }
 
   async getSummary() {

@@ -1,10 +1,18 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
 import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
 import { GetProvaDTOOutout } from './dtos/get-all.dto.output';
-import { SyncReport } from './dtos/sync-report.dto';
 import { Prova } from './prova.schema';
 import { ProvaService } from './prova.service';
 
@@ -44,14 +52,27 @@ export class ProvaController {
     return await this.service.getSummary();
   }
 
-  @Get('sync')
+  @Post('sync')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiResponse({
+    status: 202,
+    description: 'Inicia sincronizacao em background',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Sincronizacao ja em andamento',
+  })
+  public startSync() {
+    return this.service.startSync();
+  }
+
+  @Get('sync/report')
   @ApiResponse({
     status: 200,
-    description:
-      'Sincroniza e corrige inconsistencias em provas e simulados',
+    description: 'Retorna o relatorio da ultima sincronizacao',
   })
-  public async sync(): Promise<SyncReport> {
-    return await this.service.sync();
+  public getSyncReport() {
+    return this.service.getSyncReport();
   }
 
   @Get(':id')

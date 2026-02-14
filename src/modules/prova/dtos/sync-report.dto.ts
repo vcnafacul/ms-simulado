@@ -24,7 +24,11 @@ export interface SyncError {
   error: string;
 }
 
+export type SyncStatus = 'idle' | 'processing' | 'completed' | 'error';
+
 export interface SyncReport {
+  status: SyncStatus;
+  processedAt: string | null;
   totalProvas: number;
   provasFixed: ProvaFixEntry[];
   simuladosFixed: SimuladoFixEntry[];
