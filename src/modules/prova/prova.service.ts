@@ -87,8 +87,12 @@ export class ProvaService {
     prova.totalQuestaoValidadas += 1;
     await Promise.all(
       prova.simulados.map(async (simulado) => {
+        const containsQuestion = simulado.questoes.find(
+          (q) => q._id.toString() === questionId,
+        );
+        if (!containsQuestion) return;
+
         if (
-          simulado.questoes.find((q) => q._id.toString() === questionId) &&
           simulado.questoes.length === simulado.tipo.quantidadeTotalQuestao &&
           !simulado.questoes.some(
             (q) =>
@@ -96,10 +100,9 @@ export class ProvaService {
           )
         ) {
           simulado.bloqueado = false;
-          const organizationQuestions = simulado.questoes.sort(
+          simulado.questoes = simulado.questoes.sort(
             (a, b) => a.numero - b.numero,
           );
-          simulado.questoes = organizationQuestions;
         }
         await this.simuladoRepository.update(simulado);
       }),
@@ -114,8 +117,8 @@ export class ProvaService {
       prova.simulados.map(async (simulado) => {
         if (simulado.questoes.some((q) => q._id.toString() === questionId)) {
           simulado.bloqueado = true;
+          await this.simuladoRepository.update(simulado);
         }
-        await this.simuladoRepository.update(simulado);
       }),
     );
     await this.repository.update(prova);
@@ -222,8 +225,7 @@ export class ProvaService {
 
           // C2: Recalcular bloqueado
           const hasRequiredCount = simulado.tipo
-            ? validSimQuestoes.length ===
-              simulado.tipo.quantidadeTotalQuestao
+            ? validSimQuestoes.length === simulado.tipo.quantidadeTotalQuestao
             : false;
           const allApproved =
             validSimQuestoes.length > 0 &&

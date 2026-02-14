@@ -213,7 +213,7 @@ export class QuestaoService {
       }
       if (status === Status.Approved) {
         await this.provaService.approvedQuestion(question.prova._id, id);
-      } else if (question.status !== Status.Pending) {
+      } else if (question.status === Status.Approved) {
         await this.provaService.refuseQuestion(question.prova._id, id);
       }
       await this.repository.UpdateStatus(id, status);
