@@ -24,9 +24,17 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     limit,
     where,
     or,
+    sortColumn = 'numero',
+    sortOrder = 'asc',
   }: GetAllWhereInput): Promise<GetAllOutput<Questao>> {
+    const sortDirection: 1 | -1 = sortOrder === 'desc' ? -1 : 1;
+    const sort: Record<string, 1 | -1> = {
+      [sortColumn ?? 'numero']: sortDirection,
+    };
+
     const query = this.model
       .find()
+      .sort(sort)
       .skip((page - 1) * limit)
       .limit(limit ?? Infinity)
       .populate(['materia', 'prova'])

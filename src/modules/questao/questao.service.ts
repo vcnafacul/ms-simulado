@@ -78,6 +78,8 @@ export class QuestaoService {
     frente,
     prova,
     enemArea,
+    sortColumn = 'numero',
+    sortOrder = 'asc',
   }: QuestaoDTOInput): Promise<GetAllOutput<QuestaoAllDTO>> {
     const textConditions: any[] = text
       ? this.generateTextCombinations(text)
@@ -102,6 +104,8 @@ export class QuestaoService {
       limit,
       where,
       or: combineConditions,
+      sortColumn,
+      sortOrder,
     });
 
     const questoesAll: QuestaoAllDTO[] = questoes.data.map((questao) => ({

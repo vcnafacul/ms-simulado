@@ -1,7 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumberString, IsOptional, IsString } from 'class-validator';
+import {
+  IsIn,
+  IsNumberString,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
 import { Status } from '../enums/status.enum';
+
+export const QUESTAO_SORT_COLUMNS = ['numero'] as const;
+export type QuestaoSortColumn = (typeof QUESTAO_SORT_COLUMNS)[number];
+
+export const SORT_ORDER = ['asc', 'desc'] as const;
+export type SortOrder = (typeof SORT_ORDER)[number];
 
 export class QuestaoDTOInput extends GetAllDtoInput {
   @ApiProperty()
@@ -29,4 +40,16 @@ export class QuestaoDTOInput extends GetAllDtoInput {
   @IsString()
   @IsOptional()
   text: string = '';
+
+  /** Coluna para ordenação. Atualmente apenas "numero" é permitido. */
+  @ApiProperty({ enum: QUESTAO_SORT_COLUMNS, default: 'numero' })
+  @IsOptional()
+  @IsIn(QUESTAO_SORT_COLUMNS)
+  sortColumn?: QuestaoSortColumn = 'numero';
+
+  /** Direção da ordenação: "asc" (menor para maior) ou "desc" (maior para menor). */
+  @ApiProperty({ enum: SORT_ORDER, default: 'asc' })
+  @IsOptional()
+  @IsIn(SORT_ORDER)
+  sortOrder?: SortOrder = 'asc';
 }
