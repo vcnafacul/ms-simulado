@@ -271,7 +271,9 @@ export class ProvaService {
               detail: `Reconstruido array de questoes da prova`,
             });
           }
-          prova.questoes = questoesDaProva as any;
+          prova.questoes = questoesDaProva.sort(
+            (a, b) => a.numero - b.numero,
+          ) as any;
 
           // Passo B: Recalcular totalQuestaoValidadas
           const actualApproved = questoesDaProva.filter(
