@@ -53,6 +53,18 @@ export class ProvaRepository extends BaseRepository<Prova> {
     }
   }
 
+  async getAllPopulated(): Promise<Prova[]> {
+    return await this.model
+      .find()
+      .populate(['exame', 'tipo'])
+      .populate({
+        path: 'simulados',
+        populate: ['tipo', 'questoes'],
+      })
+      .populate('questoes')
+      .exec();
+  }
+
   async getTotalEntity() {
     return this.model.find({ deletedAt: null }).count();
   }

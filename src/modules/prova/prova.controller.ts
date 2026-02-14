@@ -4,6 +4,7 @@ import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
 import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
 import { GetProvaDTOOutout } from './dtos/get-all.dto.output';
+import { SyncReport } from './dtos/sync-report.dto';
 import { Prova } from './prova.schema';
 import { ProvaService } from './prova.service';
 
@@ -41,6 +42,16 @@ export class ProvaController {
   @Get('summary')
   async getSummary() {
     return await this.service.getSummary();
+  }
+
+  @Get('sync')
+  @ApiResponse({
+    status: 200,
+    description:
+      'Sincroniza e corrige inconsistencias em provas e simulados',
+  })
+  public async sync(): Promise<SyncReport> {
+    return await this.service.sync();
   }
 
   @Get(':id')
