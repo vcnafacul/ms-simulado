@@ -121,6 +121,17 @@ export class ContentController {
     return await this.service.getById(id);
   }
 
+  @Patch('swap-order')
+  @ApiResponse({
+    status: 200,
+    description: 'ordem de dois conteúdos trocada',
+  })
+  async swapOrder(
+    @Body() body: { id1: string; id2: string },
+  ): Promise<void> {
+    return await this.service.swapOrder(body.id1, body.id2);
+  }
+
   @Patch(':id/status')
   @ApiResponse({
     status: 200,

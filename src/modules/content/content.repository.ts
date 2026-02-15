@@ -12,6 +12,7 @@ interface GetAllContentFilter {
   status?: StatusContent;
   subject?: string;
   title?: string;
+  materia?: string;
 }
 
 @Injectable()
@@ -28,6 +29,11 @@ export class ContentRepository extends BaseRepository<Content> {
     if (filter.subject) where.subject = filter.subject;
     if (filter.title) where.title = { $regex: filter.title, $options: 'i' };
 
+    if (filter.materia) {
+      const subjectIds = await this.getSubjectIdsByMateria(filter.materia);
+      where.subject = { $in: subjectIds };
+    }
+
     const data = await this.model
       .find(where)
       .skip((filter.page - 1) * filter.limit)
@@ -36,6 +42,24 @@ export class ContentRepository extends BaseRepository<Content> {
     const totalItems = await this.model.where(where).countDocuments();
 
     return { data, page: filter.page, limit: filter.limit, totalItems };
+  }
+
+  private async getSubjectIdsByMateria(materiaId: string): Promise<any[]> {
+    const mongoose = require('mongoose');
+    const Subject = mongoose.connection.model('Subject');
+    const Frente = mongoose.connection.model('Frente');
+
+    const frentes = await Frente.find({
+      materia: materiaId,
+      deleted: { $ne: true },
+    }).select('_id');
+    const frenteIds = frentes.map((f: any) => f._id);
+
+    const subjects = await Subject.find({
+      frente: { $in: frenteIds },
+      deleted: { $ne: true },
+    }).select('_id');
+    return subjects.map((s: any) => s._id);
   }
 
   async getByIdPopulated(id: string): Promise<Content> {

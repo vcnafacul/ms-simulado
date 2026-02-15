@@ -17,4 +17,9 @@ export class GetAllContentDtoInput extends GetAllDtoInput {
   @IsString()
   @IsOptional()
   title?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  materia?: string;
 }

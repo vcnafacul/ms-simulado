@@ -64,6 +64,22 @@ export class SubjectService {
     await this.repository.update(subject);
   }
 
+  async swapOrder(id1: string, id2: string): Promise<void> {
+    const s1 = await this.repository.getById(id1);
+    const s2 = await this.repository.getById(id2);
+    if (!s1 || !s2) {
+      throw new HttpException(
+        'Tema não encontrado',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    const tempOrder = s1.order;
+    s1.order = s2.order;
+    s2.order = tempOrder;
+    await this.repository.update(s1);
+    await this.repository.update(s2);
+  }
+
   async delete(id: string): Promise<void> {
     await this.repository.delete(id);
   }

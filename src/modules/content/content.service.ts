@@ -95,6 +95,22 @@ export class ContentService {
     );
   }
 
+  async swapOrder(id1: string, id2: string): Promise<void> {
+    const content1 = await this.repository.getById(id1);
+    const content2 = await this.repository.getById(id2);
+    if (!content1 || !content2) {
+      throw new HttpException(
+        'Conteúdo não encontrado',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    const tempOrder = content1.order;
+    content1.order = content2.order;
+    content2.order = tempOrder;
+    await this.repository.update(content1);
+    await this.repository.update(content2);
+  }
+
   async delete(id: string): Promise<void> {
     await this.repository.delete(id);
   }

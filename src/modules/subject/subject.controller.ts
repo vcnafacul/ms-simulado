@@ -87,6 +87,17 @@ export class SubjectController {
     return await this.service.changeOrder(model.subjectId, model.newOrder);
   }
 
+  @Patch('swap-order')
+  @ApiResponse({
+    status: 200,
+    description: 'ordem de dois temas trocada',
+  })
+  async swapOrder(
+    @Body() body: { id1: string; id2: string },
+  ): Promise<void> {
+    return await this.service.swapOrder(body.id1, body.id2);
+  }
+
   @Delete(':id')
   async delete(@Param('id') id: string): Promise<void> {
     return await this.service.delete(id);
