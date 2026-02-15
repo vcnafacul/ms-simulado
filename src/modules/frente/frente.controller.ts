@@ -9,11 +9,14 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
+import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
 import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
-import { CreateFrenteDTOInput, UpdateFrenteDTOInput } from './dtos/create.dto.input';
+import {
+  CreateFrenteDTOInput,
+  UpdateFrenteDTOInput,
+} from './dtos/create.dto.input';
 import { Frente } from './frente.schema';
 import { FrenteService } from './frente.service';
-import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
 
 @ApiTags('Frente')
 @Controller('v1/frente')
