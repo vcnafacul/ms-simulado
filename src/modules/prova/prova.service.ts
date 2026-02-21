@@ -21,6 +21,7 @@ import {
 import { ProvaFactory } from './factory/prova_factory';
 import { ProvaRepository } from './prova.repository';
 import { Prova } from './prova.schema';
+import { UpdateProvaFilesDTO } from './dtos/update-files.dto.input';
 
 @Injectable()
 export class ProvaService {
@@ -55,7 +56,7 @@ export class ProvaService {
         totalQuestaoCadastradas: result.questoes.length,
         totalQuestaoValidadas: result.totalQuestaoValidadas,
         filename: result.filename,
-        gabartio: result.gabarito,
+        gabarito: result.gabarito,
         enemAreas: result.enemAreas,
       } as GetProvaDTOOutout;
     } catch (error: any) {
@@ -83,7 +84,7 @@ export class ProvaService {
           exame: prova.exame.nome,
           nome: prova.nome,
           totalQuestao: prova.totalQuestao,
-          gabartio: prova.gabarito,
+          gabarito: prova.gabarito,
           totalQuestaoValidadas: prova.totalQuestaoValidadas,
           filename: prova.filename,
           enemAreas: prova.enemAreas,
@@ -448,5 +449,47 @@ export class ProvaService {
     return {
       provaTotal,
     };
+  }
+
+  public async updateFiles(
+    id: string,
+    dto: UpdateProvaFilesDTO,
+  ): Promise<GetProvaDTOOutout> {
+    const prova = await this.repository.getById(id);
+
+    if (!prova) {
+      throw new HttpException('Prova não encontrada', HttpStatus.NOT_FOUND);
+    }
+    if (!dto.filename && !dto.gabarito) {
+      throw new HttpException(
+        'Nenhum campo para atualizar',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (dto.filename) {
+      prova.filename = dto.filename;
+    }
+
+    if (dto.gabarito) {
+      prova.gabarito = dto.gabarito;
+    }
+
+    await this.repository.update(prova);
+
+    return {
+      _id: prova._id,
+      edicao: prova.edicao,
+      aplicacao: prova.aplicacao,
+      ano: prova.ano,
+      exame: prova.exame.nome,
+      nome: prova.nome,
+      totalQuestao: prova.totalQuestao,
+      totalQuestaoCadastradas: prova.questoes.length,
+      totalQuestaoValidadas: prova.totalQuestaoValidadas,
+      filename: prova.filename,
+      gabarito: prova.gabarito,
+      enemAreas: prova.enemAreas,
+    } as GetProvaDTOOutout;
   }
 }
