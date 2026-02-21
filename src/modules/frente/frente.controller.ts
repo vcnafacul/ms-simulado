@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Param,
   Patch,
@@ -90,10 +89,5 @@ export class FrenteController {
     @Body() model: UpdateFrenteDTOInput,
   ): Promise<void> {
     return await this.service.update(id, model);
-  }
-
-  @Delete(':id')
-  public async delete(@Param('id') id: string): Promise<void> {
-    return await this.service.delete(id);
   }
 }

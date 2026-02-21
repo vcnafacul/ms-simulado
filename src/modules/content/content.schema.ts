@@ -30,6 +30,10 @@ export class Content extends BaseSchema {
   @Prop({ default: 0 })
   @ApiProperty()
   public order: number;
+
+  @Prop({ ref: 'FileContent', type: Types.ObjectId, required: false })
+  @ApiProperty({ required: false })
+  public file: Types.ObjectId;
 }
 
 export const ContentSchema = SchemaFactory.createForClass(Content);

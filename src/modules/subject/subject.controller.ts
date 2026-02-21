@@ -92,9 +92,7 @@ export class SubjectController {
     status: 200,
     description: 'ordem de dois temas trocada',
   })
-  async swapOrder(
-    @Body() body: { id1: string; id2: string },
-  ): Promise<void> {
+  async swapOrder(@Body() body: { id1: string; id2: string }): Promise<void> {
     return await this.service.swapOrder(body.id1, body.id2);
   }
 

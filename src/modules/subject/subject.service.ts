@@ -1,4 +1,7 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Content } from 'src/modules/content/content.schema';
 import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
 import { CreateSubjectDTOInput } from './dtos/create-subject.dto.input';
 import { GetAllSubjectDtoInput } from './dtos/get-all-subject.dto.input';
@@ -8,7 +11,10 @@ import { Subject } from './subject.schema';
 
 @Injectable()
 export class SubjectService {
-  constructor(private readonly repository: SubjectRepository) {}
+  constructor(
+    private readonly repository: SubjectRepository,
+    @InjectModel(Content.name) private readonly contentModel: Model<Content>,
+  ) {}
 
   async add(item: CreateSubjectDTOInput): Promise<Subject> {
     const isUnique = await this.repository.isUnique(item.frente, item.name);
@@ -37,6 +43,7 @@ export class SubjectService {
   }
 
   async getByFrente(frenteId: string): Promise<Subject[]> {
+    console.log('frenteId', frenteId);
     return await this.repository.getByFrente(frenteId);
   }
 
@@ -68,10 +75,7 @@ export class SubjectService {
     const s1 = await this.repository.getById(id1);
     const s2 = await this.repository.getById(id2);
     if (!s1 || !s2) {
-      throw new HttpException(
-        'Tema não encontrado',
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException('Tema não encontrado', HttpStatus.NOT_FOUND);
     }
     const tempOrder = s1.order;
     s1.order = s2.order;
@@ -81,6 +85,16 @@ export class SubjectService {
   }
 
   async delete(id: string): Promise<void> {
+    const demands = await this.contentModel.countDocuments({
+      subject: id,
+      deleted: { $ne: true },
+    });
+    if (demands > 0) {
+      throw new HttpException(
+        'Não é possível deletar este tema pois existem demandas vinculadas.',
+        HttpStatus.CONFLICT,
+      );
+    }
     await this.repository.delete(id);
   }
 }

@@ -36,6 +36,11 @@ export class ContentRepository extends BaseRepository<Content> {
 
     const data = await this.model
       .find(where)
+      .populate({
+        path: 'subject',
+        populate: { path: 'frente' },
+      })
+      .populate('file')
       .skip((filter.page - 1) * filter.limit)
       .limit(filter.limit ?? Infinity)
       .sort({ order: 1 });
@@ -69,12 +74,17 @@ export class ContentRepository extends BaseRepository<Content> {
         path: 'frente',
         populate: { path: 'materia' },
       },
-    });
+    }).populate('file');
   }
 
   async getBySubject(subjectId: string): Promise<Content[]> {
     return this.model
       .find({ subject: subjectId, deleted: { $ne: true } })
+      .populate({
+        path: 'subject',
+        populate: { path: 'frente' },
+      })
+      .populate('file')
       .sort({ order: 1 });
   }
 
