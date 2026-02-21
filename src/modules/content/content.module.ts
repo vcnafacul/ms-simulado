@@ -2,6 +2,10 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AuditLogModule } from '../auditLog/auditLog.module';
+import {
+  FileContent,
+  FileContentSchema,
+} from '../file-content/file-content.schema';
 import { SubjectModule } from '../subject/subject.module';
 import { ContentController } from './content.controller';
 import { ContentRepository } from './content.repository';
@@ -17,6 +21,7 @@ import { SnapshotContentStatusRepository } from './snapshot/snapshot-content-sta
   imports: [
     MongooseModule.forFeature([
       { name: Content.name, schema: ContentSchema },
+      { name: FileContent.name, schema: FileContentSchema },
       {
         name: SnapshotContentStatus.name,
         schema: SnapshotContentStatusSchema,
@@ -32,6 +37,6 @@ import { SnapshotContentStatusRepository } from './snapshot/snapshot-content-sta
     ContentRepository,
     SnapshotContentStatusRepository,
   ],
-  exports: [ContentService, ContentRepository],
+  exports: [ContentService, ContentRepository, MongooseModule],
 })
 export class ContentModule {}

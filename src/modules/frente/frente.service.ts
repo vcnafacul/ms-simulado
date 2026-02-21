@@ -1,7 +1,10 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
 import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
-import { CreateFrenteDTOInput, UpdateFrenteDTOInput } from './dtos/create.dto.input';
+import {
+  CreateFrenteDTOInput,
+  UpdateFrenteDTOInput,
+} from './dtos/create.dto.input';
 import { FrenteRepository } from './frente.repository';
 import { Frente } from './frente.schema';
 
@@ -38,11 +41,9 @@ export class FrenteService {
     return await this.repository.getByMateria(materiaId);
   }
 
-  public async getByMateriaWithApprovedContent(materiaId: string): Promise<any[]> {
-    return await this.repository.getByMateriaWithApprovedContent(materiaId);
-  }
-
-  public async delete(id: string): Promise<void> {
-    await this.repository.delete(id);
+  public async getByMateriaWithApprovedContent(
+    materiaId: string,
+  ): Promise<any[]> {
+    return this.repository.getByMateriaWithApprovedContent(materiaId);
   }
 }

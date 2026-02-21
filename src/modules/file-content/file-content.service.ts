@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { Types } from 'mongoose';
 import { ContentRepository } from '../content/content.repository';
 import { StatusContent } from '../content/enums/status-content.enum';
 import { CreateFileContentDTOInput } from './dtos/create-file-content.dto.input';
@@ -25,6 +26,7 @@ export class FileContentService {
     const result = await this.repository.create(fileContent);
 
     content.status = StatusContent.Pending;
+    content.file = new Types.ObjectId(result._id);
     await this.contentRepository.update(content);
 
     return result;

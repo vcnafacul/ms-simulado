@@ -3,7 +3,6 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuditLogModule } from '../auditLog/auditLog.module';
 import { ExameModule } from '../exame/exame.module';
 import { FrenteModule } from '../frente/frente.module';
-import { FrenteRepository } from '../frente/frente.repository';
 import { Frente, FrenteSchema } from '../frente/frente.schema';
 import { HistoricoModule } from '../historico/historico.module';
 import { MateriaModule } from '../materia/materia.module';
@@ -51,7 +50,6 @@ import { QuestaoService } from './questao.service';
     SimuladoRepository,
     ProvaFactory,
     EnemService,
-    FrenteRepository,
     SimuladoService,
   ],
   controllers: [QuestaoController],

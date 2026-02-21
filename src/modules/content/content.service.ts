@@ -29,7 +29,8 @@ export class ContentService {
 
     const order = await this.repository.getNextOrder(data.subject);
     const content = Object.assign(new Content(), { ...data, order });
-    return await this.repository.create(content);
+    const created = await this.repository.create(content);
+    return await this.repository.getByIdPopulated(created._id);
   }
 
   async getById(id: string): Promise<Content> {
