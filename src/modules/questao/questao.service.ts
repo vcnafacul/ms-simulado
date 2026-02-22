@@ -78,6 +78,8 @@ export class QuestaoService {
     frente,
     prova,
     enemArea,
+    sortColumn = 'numero',
+    sortOrder = 'asc',
   }: QuestaoDTOInput): Promise<GetAllOutput<QuestaoAllDTO>> {
     const textConditions: any[] = text
       ? this.generateTextCombinations(text)
@@ -102,6 +104,8 @@ export class QuestaoService {
       limit,
       where,
       or: combineConditions,
+      sortColumn,
+      sortOrder,
     });
 
     const questoesAll: QuestaoAllDTO[] = questoes.data.map((questao) => ({
@@ -209,7 +213,7 @@ export class QuestaoService {
       }
       if (status === Status.Approved) {
         await this.provaService.approvedQuestion(question.prova._id, id);
-      } else if (question.status !== Status.Pending) {
+      } else if (question.status === Status.Approved) {
         await this.provaService.refuseQuestion(question.prova._id, id);
       }
       await this.repository.UpdateStatus(id, status);
@@ -247,13 +251,31 @@ export class QuestaoService {
     id: string,
     classificacao: UpdateClassificacaoDTOInput,
   ) {
-    console.log(classificacao);
-    const questao = await this.repository.getById(id);
+    const questao = await this.repository.getByIdToUpdate(id);
     if (!questao) {
       throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
     }
 
+    const provaChanged =
+      classificacao.prova !== questao.prova?._id?.toString();
+    const enemAreaChanged = classificacao.enemArea !== questao.enemArea;
+    const frente1Changed =
+      classificacao.frente1 !== questao.frente1?._id?.toString();
+
     try {
+      if (provaChanged || enemAreaChanged || frente1Changed) {
+        const updateDto = new UpdateDTOInput();
+        updateDto._id = id;
+        updateDto.prova = classificacao.prova;
+        updateDto.enemArea = classificacao.enemArea;
+        updateDto.frente1 = classificacao.frente1;
+        updateDto.frente2 = classificacao.frente2;
+        updateDto.frente3 = classificacao.frente3;
+        updateDto.materia = classificacao.materia;
+        updateDto.numero = classificacao.numero;
+        updateDto.alternativa = questao.alternativa;
+        await this.updateQuestion(updateDto);
+      }
       await this.repository.updateClassificacao(id, classificacao);
     } catch (error: any) {
       throw new HttpException(

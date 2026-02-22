@@ -23,7 +23,7 @@ export class ProvaRepository extends BaseRepository<Prova> {
   async getById(id: string): Promise<Prova> {
     return await this.model
       .findById(id)
-      .populate(['exame', 'simulados', 'tipo'])
+      .populate(['exame', 'simulados', 'tipo', 'questoes'])
       .populate({
         path: 'simulados',
         populate: ['tipo', 'questoes'],
@@ -51,6 +51,18 @@ export class ProvaRepository extends BaseRepository<Prova> {
       }
       await this.model.updateOne({ _id: prova._id }, prova);
     }
+  }
+
+  async getAllPopulated(): Promise<Prova[]> {
+    return await this.model
+      .find()
+      .populate(['exame', 'tipo'])
+      .populate({
+        path: 'simulados',
+        populate: ['tipo', 'questoes'],
+      })
+      .populate('questoes')
+      .exec();
   }
 
   async getTotalEntity() {

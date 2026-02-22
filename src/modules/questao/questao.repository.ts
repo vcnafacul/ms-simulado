@@ -24,9 +24,17 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     limit,
     where,
     or,
+    sortColumn = 'numero',
+    sortOrder = 'asc',
   }: GetAllWhereInput): Promise<GetAllOutput<Questao>> {
+    const sortDirection: 1 | -1 = sortOrder === 'desc' ? -1 : 1;
+    const sort: Record<string, 1 | -1> = {
+      [sortColumn ?? 'numero']: sortDirection,
+    };
+
     const query = this.model
       .find()
+      .sort(sort)
       .skip((page - 1) * limit)
       .limit(limit ?? Infinity)
       .populate(['materia', 'prova'])
@@ -213,6 +221,13 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     });
 
     return !questaoExistente; // se já existe, não pode cadastrar → false
+  }
+
+  async getAllByProvaIds(provaIds: string[]): Promise<Questao[]> {
+    return await this.model
+      .find({ prova: { $in: provaIds }, deletedAt: null })
+      .populate(['frente1'])
+      .exec();
   }
 
   async getTotalEntity() {
