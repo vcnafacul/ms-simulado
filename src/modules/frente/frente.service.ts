@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
 import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
+import { Types } from 'mongoose';
 import {
   CreateFrenteDTOInput,
   UpdateFrenteDTOInput,
@@ -14,6 +15,9 @@ export class FrenteService {
 
   public async add(item: CreateFrenteDTOInput): Promise<Frente> {
     const frente = Object.assign(new Frente(), item);
+    if (item.materia) {
+      frente.materia = new Types.ObjectId(item.materia) as any;
+    }
     return await this.repository.create(frente);
   }
 
