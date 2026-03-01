@@ -43,7 +43,6 @@ export class SubjectService {
   }
 
   async getByFrente(frenteId: string): Promise<Subject[]> {
-    console.log('frenteId', frenteId);
     return await this.repository.getByFrente(frenteId);
   }
 

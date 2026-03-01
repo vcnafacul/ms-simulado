@@ -1,7 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { Content, ContentSchema } from '../content/content.schema';
-import { FrenteModule } from '../frente/frente.module';
+import { Content, ContentSchema } from '../../content/content.schema';
+import { FrenteModule } from '../../frente/frente.module';
 import { SubjectController } from './subject.controller';
 import { SubjectRepository } from './subject.repository';
 import { Subject, SubjectSchema } from './subject.schema';
