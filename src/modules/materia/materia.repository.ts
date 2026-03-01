@@ -17,17 +17,26 @@ export class MateriaRepository extends BaseRepository<Materia> {
     limit,
     where,
   }: GetAllWhereInput): Promise<GetAllOutput<Materia>> {
-    const data = await this.model
-      .find()
-      .populate(['frentes'])
-      .limit(limit ?? Infinity)
-      .where({ ...where });
+    const matchStage = where ? { $match: { ...where } } : { $match: {} };
+    const pipeline: any[] = [
+      matchStage,
+      {
+        $lookup: {
+          from: 'frentes',
+          localField: '_id',
+          foreignField: 'materia',
+          pipeline: [
+            { $match: { deleted: { $ne: true } } },
+          ],
+          as: 'frentes',
+        },
+      },
+    ];
+    if (limit) {
+      pipeline.push({ $limit: Number(limit) });
+    }
+    const data = await this.model.aggregate(pipeline);
     const totalItems = await this.model.where({ ...where }).countDocuments();
-    return {
-      data,
-      page,
-      limit,
-      totalItems,
-    };
+    return { data: data as Materia[], page, limit, totalItems };
   }
 }

@@ -1,14 +1,14 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { AuditLogService } from '../auditLog/auditLog.service';
 import { ContentRepository } from './content.repository';
 import { Content } from './content.schema';
 import { CreateContentDTOInput } from './dtos/create-content.dto.input';
 import { GetAllContentDtoInput } from './dtos/get-all-content.dto.input';
 import { StatusContent } from './enums/status-content.enum';
-import { SnapshotContentStatus } from './snapshot/snapshot-content-status.schema';
 import { SnapshotContentStatusRepository } from './snapshot/snapshot-content-status.repository';
-import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
+import { SnapshotContentStatus } from './snapshot/snapshot-content-status.schema';
 
 @Injectable()
 export class ContentService {
@@ -41,9 +41,7 @@ export class ContentService {
     return await this.repository.getByIdPopulated(id);
   }
 
-  async getAll(
-    param: GetAllContentDtoInput,
-  ): Promise<GetAllOutput<Content>> {
+  async getAll(param: GetAllContentDtoInput): Promise<GetAllOutput<Content>> {
     return await this.repository.findAllByFilter(param);
   }
 
@@ -51,7 +49,10 @@ export class ContentService {
     return await this.repository.getBySubject(subjectId);
   }
 
-  async getDemands(page: number, limit: number): Promise<GetAllOutput<Content>> {
+  async getDemands(
+    page: number,
+    limit: number,
+  ): Promise<GetAllOutput<Content>> {
     return await this.repository.findAllByFilter({
       page,
       limit,
@@ -100,10 +101,7 @@ export class ContentService {
     const content1 = await this.repository.getById(id1);
     const content2 = await this.repository.getById(id2);
     if (!content1 || !content2) {
-      throw new HttpException(
-        'Conteúdo não encontrado',
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException('Conteúdo não encontrado', HttpStatus.NOT_FOUND);
     }
     const tempOrder = content1.order;
     content1.order = content2.order;

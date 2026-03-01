@@ -2,7 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { ApiProperty } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { BaseSchema } from 'src/shared/base/base.schema';
-import { Subject } from '../subject/subject.schema';
+import { Subject } from '../questao/subject/subject.schema';
 import { StatusContent } from './enums/status-content.enum';
 
 @Schema({ timestamps: false, versionKey: false })

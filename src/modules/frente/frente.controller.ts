@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -89,5 +90,18 @@ export class FrenteController {
     @Body() model: UpdateFrenteDTOInput,
   ): Promise<void> {
     return await this.service.update(id, model);
+  }
+
+  @Delete(':id')
+  @ApiResponse({
+    status: 200,
+    description: 'frente excluída com sucesso',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'frente possui subjects ou questões vinculados',
+  })
+  public async delete(@Param('id') id: string): Promise<void> {
+    return await this.service.delete(id);
   }
 }

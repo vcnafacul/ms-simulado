@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString } from 'class-validator';
-import { SubjectExist } from 'src/modules/subject/validator/subject-exist.validator';
+import { SubjectExist } from 'src/modules/questao/subject/validator/subject-exist.validator';
 
 export class CreateContentDTOInput {
   @ApiProperty()
