@@ -6,7 +6,7 @@ import {
   FileContent,
   FileContentSchema,
 } from '../file-content/file-content.schema';
-import { SubjectModule } from '../subject/subject.module';
+import { SubjectModule } from '../questao/subject/subject.module';
 import { ContentController } from './content.controller';
 import { ContentRepository } from './content.repository';
 import { Content, ContentSchema } from './content.schema';

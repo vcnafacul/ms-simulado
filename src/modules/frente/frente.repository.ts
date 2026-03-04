@@ -4,7 +4,7 @@ import { Model, Types } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
 import { Content } from '../content/content.schema';
 import { StatusContent } from '../content/enums/status-content.enum';
-import { Subject } from '../subject/subject.schema';
+import { Subject } from '../questao/subject/subject.schema';
 import { Frente } from './frente.schema';
 
 @Injectable()

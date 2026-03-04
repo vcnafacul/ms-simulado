@@ -2,7 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { ApiProperty } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { BaseSchema } from 'src/shared/base/base.schema';
-import { Frente } from '../frente/frente.schema';
+import { Frente } from '../../frente/frente.schema';
 
 @Schema({ timestamps: false, versionKey: false })
 export class Subject extends BaseSchema {
