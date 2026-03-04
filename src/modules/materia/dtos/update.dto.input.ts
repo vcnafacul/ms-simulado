@@ -1,11 +1,11 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
-import { MateriaUnique } from '../validator/materia-unique.validator';
 
-export class CreateMateriaDTOInput {
-  @ApiProperty()
-  @MateriaUnique({ message: 'O nome sugerido já existe' })
-  nome: string;
+export class UpdateMateriaDTOInput {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  nome?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
