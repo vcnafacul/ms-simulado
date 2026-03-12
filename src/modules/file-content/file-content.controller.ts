@@ -19,6 +19,18 @@ export class FileContentController {
     return await this.service.create(model);
   }
 
+  @Post('standalone')
+  @ApiResponse({
+    status: 201,
+    description: 'referência de arquivo criada sem atualizar conteúdo',
+    type: FileContent,
+  })
+  async createStandalone(
+    @Body() model: CreateFileContentDTOInput,
+  ): Promise<FileContent> {
+    return await this.service.createStandalone(model);
+  }
+
   @Get('content/:contentId')
   @ApiResponse({
     status: 200,
