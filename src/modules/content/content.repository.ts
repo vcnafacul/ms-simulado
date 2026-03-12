@@ -104,6 +104,16 @@ export class ContentRepository extends BaseRepository<Content> {
     return !existing;
   }
 
+  async bulkUpdateOrder(items: { id: string; order: number }[]): Promise<void> {
+    const ops = items.map(({ id, order }) => ({
+      updateOne: {
+        filter: { _id: id },
+        update: { $set: { order } },
+      },
+    }));
+    await this.model.bulkWrite(ops);
+  }
+
   async countByStatus(status: StatusContent): Promise<number> {
     return this.model.countDocuments({ status, deleted: { $ne: true } });
   }
