@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { AdjustmentProposalModule } from './modules/adjustment-proposal/adjustment-proposal.module';
 import { ContentModule } from './modules/content/content.module';
+import { ContentFileHistoryModule } from './modules/content-file-history/content-file-history.module';
 import { ExameModule } from './modules/exame/exame.module';
 import { FileContentModule } from './modules/file-content/file-content.module';
 import { FrenteModule } from './modules/frente/frente.module';
@@ -32,7 +34,9 @@ import { TipoSimuladoModule } from './modules/tipo-simulado/tipo-simulado.module
     HistoricoModule,
     SubjectModule,
     ContentModule,
+    ContentFileHistoryModule,
     FileContentModule,
+    AdjustmentProposalModule,
   ],
   providers: [],
 })

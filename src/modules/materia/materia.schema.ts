@@ -11,6 +11,14 @@ export class Materia extends BaseSchema {
   @Prop()
   @ApiProperty()
   public enemArea: string;
+
+  @Prop()
+  @ApiProperty({ required: false })
+  public icon: string;
+
+  @Prop()
+  @ApiProperty({ required: false })
+  public image: string;
 }
 
 export const MateriaSchema = SchemaFactory.createForClass(Materia);
