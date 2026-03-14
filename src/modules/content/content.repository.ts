@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
+import { Frente } from 'src/modules/frente/frente.schema';
+import { Subject } from 'src/modules/questao/subject/subject.schema';
 import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { Content } from './content.schema';
@@ -17,7 +19,11 @@ interface GetAllContentFilter {
 
 @Injectable()
 export class ContentRepository extends BaseRepository<Content> {
-  constructor(@InjectModel(Content.name) model: Model<Content>) {
+  constructor(
+    @InjectModel(Content.name) model: Model<Content>,
+    @InjectModel(Subject.name) private readonly subjectModel: Model<Subject>,
+    @InjectModel(Frente.name) private readonly frenteModel: Model<Frente>,
+  ) {
     super(model);
   }
 
@@ -49,32 +55,31 @@ export class ContentRepository extends BaseRepository<Content> {
     return { data, page: filter.page, limit: filter.limit, totalItems };
   }
 
-  private async getSubjectIdsByMateria(materiaId: string): Promise<any[]> {
-    const mongoose = require('mongoose');
-    const Subject = mongoose.connection.model('Subject');
-    const Frente = mongoose.connection.model('Frente');
-
-    const frentes = await Frente.find({
-      materia: materiaId,
-      deleted: { $ne: true },
-    }).select('_id');
-    const frenteIds = frentes.map((f: any) => f._id);
-
-    const subjects = await Subject.find({
-      frente: { $in: frenteIds },
-      deleted: { $ne: true },
-    }).select('_id');
-    return subjects.map((s: any) => s._id);
+  private async getSubjectIdsByMateria(materiaId: string): Promise<string[]> {
+    const materiaObjectId = new Types.ObjectId(materiaId);
+    const frentes = await this.frenteModel
+      .find({ materia: materiaObjectId, deleted: { $ne: true } })
+      .select('_id')
+      .lean();
+    const frenteIds = frentes.map((f) => f._id.toString());
+    const subjects = await this.subjectModel
+      .find({ frente: { $in: frenteIds }, deleted: { $ne: true } })
+      .select('_id')
+      .lean();
+    return subjects.map((s) => s._id.toString());
   }
 
   async getByIdPopulated(id: string): Promise<Content> {
-    return this.model.findById(id).populate({
-      path: 'subject',
-      populate: {
-        path: 'frente',
-        populate: { path: 'materia' },
-      },
-    }).populate('file');
+    return this.model
+      .findById(id)
+      .populate({
+        path: 'subject',
+        populate: {
+          path: 'frente',
+          populate: { path: 'materia' },
+        },
+      })
+      .populate('file');
   }
 
   async getBySubject(subjectId: string): Promise<Content[]> {
@@ -149,7 +154,9 @@ export class ContentRepository extends BaseRepository<Content> {
           frente: { $first: '$frenteData.nome' },
           materia: { $first: '$frenteData.materia' },
           pendentes: {
-            $sum: { $cond: [{ $eq: ['$status', StatusContent.Pending] }, 1, 0] },
+            $sum: {
+              $cond: [{ $eq: ['$status', StatusContent.Pending] }, 1, 0],
+            },
           },
           aprovados: {
             $sum: {
