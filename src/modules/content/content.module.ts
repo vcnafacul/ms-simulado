@@ -6,6 +6,7 @@ import {
   FileContent,
   FileContentSchema,
 } from '../file-content/file-content.schema';
+import { Frente, FrenteSchema } from '../frente/frente.schema';
 import { SubjectModule } from '../questao/subject/subject.module';
 import { ContentController } from './content.controller';
 import { ContentRepository } from './content.repository';
@@ -22,6 +23,7 @@ import { SnapshotContentStatusRepository } from './snapshot/snapshot-content-sta
     MongooseModule.forFeature([
       { name: Content.name, schema: ContentSchema },
       { name: FileContent.name, schema: FileContentSchema },
+      { name: Frente.name, schema: FrenteSchema },
       {
         name: SnapshotContentStatus.name,
         schema: SnapshotContentStatusSchema,

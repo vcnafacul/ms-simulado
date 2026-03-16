@@ -34,6 +34,14 @@ export class Content extends BaseSchema {
   @Prop({ ref: 'FileContent', type: Types.ObjectId, required: false })
   @ApiProperty({ required: false })
   public file: Types.ObjectId;
+
+  @Prop({ required: false })
+  @ApiProperty({ required: false })
+  public lastEditedBy?: string;
+
+  @Prop({ required: false })
+  @ApiProperty({ required: false })
+  public lastEditedAt?: Date;
 }
 
 export const ContentSchema = SchemaFactory.createForClass(Content);
