@@ -293,6 +293,30 @@ export class QuestaoService {
 
     try {
       await this.repository.updateContent(id, content);
+
+      // Extract asset:// references from all text fields and update assets array
+      if (content.contentFormat === 'markdown') {
+        const allText = [
+          content.textoQuestao,
+          content.pergunta,
+          content.textoAlternativaA,
+          content.textoAlternativaB,
+          content.textoAlternativaC,
+          content.textoAlternativaD,
+          content.textoAlternativaE,
+        ]
+          .filter(Boolean)
+          .join('\n');
+
+        const assetRegex = /asset:\/\/([^\s)]+)/g;
+        const assets: string[] = [];
+        let match: RegExpExecArray | null;
+        while ((match = assetRegex.exec(allText)) !== null) {
+          assets.push(match[1]);
+        }
+
+        await this.repository.updateAssets(id, assets);
+      }
     } catch (error: any) {
       throw new HttpException(
         `Não foi possível atualizar o conteúdo. ${error.message}`,

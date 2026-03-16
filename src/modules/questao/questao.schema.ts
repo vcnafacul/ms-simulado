@@ -113,6 +113,14 @@ export class Questao extends QuestaoReview {
   @Prop({ required: false, default: [], type: [String] })
   @ApiProperty()
   public files: string[];
+
+  @Prop({ required: false, default: 'plain', enum: ['plain', 'markdown'] })
+  @ApiProperty({ enum: ['plain', 'markdown'], default: 'plain' })
+  public contentFormat: string;
+
+  @Prop({ required: false, default: [], type: [String] })
+  @ApiProperty()
+  public assets: string[];
 }
 
 export const QuestaoSchema = SchemaFactory.createForClass(Questao);
