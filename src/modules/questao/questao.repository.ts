@@ -161,6 +161,10 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       updateData.pergunta = content.pergunta;
     }
 
+    if (content.contentFormat !== undefined) {
+      updateData.contentFormat = content.contentFormat;
+    }
+
     await this.model.updateOne({ _id: id }, updateData);
   }
 
@@ -203,6 +207,10 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       };
     });
     await this.model.bulkWrite(bulkOperations);
+  }
+
+  async updateAssets(id: string, assets: string[]) {
+    await this.model.updateOne({ _id: id }, { assets });
   }
 
   async delete(_id: string) {
