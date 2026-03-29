@@ -1,14 +1,17 @@
-name: msSimulado
+# =============================================================================
+# main - CI only (deploy é feito via tag no release.yml)
+# =============================================================================
+
+name: CI Main
+
 on:
   pull_request:
-    branches: ["main"]
-    types: [opened, synchronize, reopened, closed]
+    branches: ['main']
+    types: [opened, synchronize, reopened]
 
 jobs:
   CI:
-    if: github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.action == 'reopened')
     runs-on: ubuntu-latest
-
     services:
       mongodb:
         image: mongo:7
@@ -30,42 +33,3 @@ jobs:
         env:
           NODE_ENV: test
           MONGODB: mongodb://localhost:27017/ms-simulado-test
-  PUSH:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
-    runs-on: ubuntu-latest
-    steps:
-      # Checkout main para a imagem refletir o estado da branch em produção
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20.x
-          cache: yarn
-      - name: Install depends
-        run: yarn
-      - name: Build app MS Simulado
-        run: yarn build
-      - name: Build Image
-        run: docker build -t mssimulado -f ms.dockerfile .
-      - name: docker tags
-        run: docker tag mssimulado vcnafacul/simulado:stable
-      - name: docker login
-        run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USER }} --password-stdin
-      - name: Image Push
-        run: docker push vcnafacul/simulado:stable
-  DEPLOY_PROD:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.base_ref == 'main'
-    needs: PUSH
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy em Produção (Hostinger)
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.DEPLOY_HOST_PROD }}
-          username: ${{ secrets.DEPLOY_USER_PROD }}
-          password: ${{ secrets.DEPLOY_PASS_PROD }}
-          script: |
-            chmod +x ~/subir_ms.sh
-            ~/subir_ms.sh
