@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllWhereInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
@@ -266,5 +266,53 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     });
 
     return query.countDocuments();
+  }
+
+  async pendingByMateria(frenteIds?: string[]): Promise<
+    Array<{ materiaId: string; materiaName: string; count: number }>
+  > {
+    const match: Record<string, any> = {
+      deletedAt: null,
+      status: Status.Pending,
+    };
+
+    if (frenteIds?.length) {
+      const objectIds = frenteIds.map(
+        (id) => new Types.ObjectId(id),
+      );
+      match.$or = [
+        { frente1: { $in: objectIds } },
+        { frente2: { $in: objectIds } },
+        { frente3: { $in: objectIds } },
+      ];
+    }
+
+    return this.model.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: '$materia',
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $lookup: {
+          from: 'materias',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'mat',
+        },
+      },
+      { $unwind: '$mat' },
+      {
+        $project: {
+          _id: 0,
+          materiaId: { $toString: '$_id' },
+          materiaName: '$mat.nome',
+          count: 1,
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
   }
 }

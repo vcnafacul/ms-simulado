@@ -78,6 +78,14 @@ export class QuestaoController {
     return await this.service.getSummary();
   }
 
+  @Get('pending-by-materia')
+  async getPendingByMateria(
+    @Query('frentes') frentes?: string,
+  ) {
+    const frenteIds = frentes ? frentes.split(',').filter(Boolean) : undefined;
+    return await this.service.getPendingByMateria(frenteIds);
+  }
+
   @Get(':id/logs')
   @ApiResponse({
     status: 200,

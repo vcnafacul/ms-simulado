@@ -458,6 +458,12 @@ export class QuestaoService {
     };
   }
 
+  async getPendingByMateria(frenteIds?: string[]) {
+    const byMateria = await this.repository.pendingByMateria(frenteIds);
+    const total = byMateria.reduce((sum, item) => sum + item.count, 0);
+    return { total, byMateria };
+  }
+
   public async getLogs(id: string): Promise<AuditLog[]> {
     const questao = await this.repository.getById(id);
     if (!questao) {
