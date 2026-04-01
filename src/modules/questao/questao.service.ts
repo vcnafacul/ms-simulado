@@ -458,8 +458,8 @@ export class QuestaoService {
     };
   }
 
-  async getPendingByMateria(frenteIds?: string[]) {
-    const byMateria = await this.repository.pendingByMateria(frenteIds);
+  async getPendingByMateria(materiaIds?: string[]) {
+    const byMateria = await this.repository.pendingByMateria(materiaIds);
     const total = byMateria.reduce((sum, item) => sum + item.count, 0);
     return { total, byMateria };
   }

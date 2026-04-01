@@ -268,7 +268,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     return query.countDocuments();
   }
 
-  async pendingByMateria(frenteIds?: string[]): Promise<
+  async pendingByMateria(materiaIds?: string[]): Promise<
     Array<{ materiaId: string; materiaName: string; count: number }>
   > {
     const match: Record<string, any> = {
@@ -276,15 +276,8 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       status: Status.Pending,
     };
 
-    if (frenteIds?.length) {
-      const objectIds = frenteIds.map(
-        (id) => new Types.ObjectId(id),
-      );
-      match.$or = [
-        { frente1: { $in: objectIds } },
-        { frente2: { $in: objectIds } },
-        { frente3: { $in: objectIds } },
-      ];
+    if (materiaIds?.length) {
+      match.materia = { $in: materiaIds };
     }
 
     return this.model.aggregate([
@@ -296,9 +289,14 @@ export class QuestaoRepository extends BaseRepository<Questao> {
         },
       },
       {
+        $addFields: {
+          _materiaOid: { $toObjectId: '$_id' },
+        },
+      },
+      {
         $lookup: {
           from: 'materias',
-          localField: '_id',
+          localField: '_materiaOid',
           foreignField: '_id',
           as: 'mat',
         },
