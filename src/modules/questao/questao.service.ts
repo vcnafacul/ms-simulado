@@ -3,6 +3,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
@@ -32,6 +33,8 @@ import { Questao } from './questao.schema';
 
 @Injectable()
 export class QuestaoService {
+  private readonly logger = new Logger(QuestaoService.name);
+
   constructor(
     private readonly repository: QuestaoRepository,
     private readonly provaService: ProvaService,
