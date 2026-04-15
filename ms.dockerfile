@@ -1,16 +1,22 @@
-FROM node:20.18.2-alpine
+FROM node:20-alpine AS deps
 
-COPY dist /var/www
+WORKDIR /app
+
+COPY package.json yarn.lock ./
+
+RUN yarn install --production --frozen-lockfile && yarn cache clean
+
+FROM node:20-alpine
 
 WORKDIR /var/www
 
+COPY --from=deps /app/node_modules ./node_modules
+COPY dist ./
 COPY package.json .
-COPY yarn.lock .
+
+ARG NODE_ENV=production
+ENV NODE_ENV=$NODE_ENV
 
 EXPOSE 3000
 
-ENV NODE_ENV=$NODE_ENV
-
-RUN yarn install --production && yarn cache clean
-
-CMD ./node_modules/pm2/bin/pm2-runtime main.js --name msSimulado
+CMD ["./node_modules/pm2/bin/pm2-runtime", "main.js", "--name", "msSimulado"]
