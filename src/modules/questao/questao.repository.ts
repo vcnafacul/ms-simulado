@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllWhereInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
@@ -161,6 +161,10 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       updateData.pergunta = content.pergunta;
     }
 
+    if (content.contentFormat !== undefined) {
+      updateData.contentFormat = content.contentFormat;
+    }
+
     await this.model.updateOne({ _id: id }, updateData);
   }
 
@@ -203,6 +207,10 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       };
     });
     await this.model.bulkWrite(bulkOperations);
+  }
+
+  async updateAssets(id: string, assets: string[]) {
+    await this.model.updateOne({ _id: id }, { assets });
   }
 
   async delete(_id: string) {
@@ -258,5 +266,51 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     });
 
     return query.countDocuments();
+  }
+
+  async pendingByMateria(materiaIds?: string[]): Promise<
+    Array<{ materiaId: string; materiaName: string; count: number }>
+  > {
+    const match: Record<string, any> = {
+      deletedAt: null,
+      status: Status.Pending,
+    };
+
+    if (materiaIds?.length) {
+      match.materia = { $in: materiaIds };
+    }
+
+    return this.model.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: '$materia',
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $addFields: {
+          _materiaOid: { $toObjectId: '$_id' },
+        },
+      },
+      {
+        $lookup: {
+          from: 'materias',
+          localField: '_materiaOid',
+          foreignField: '_id',
+          as: 'mat',
+        },
+      },
+      { $unwind: '$mat' },
+      {
+        $project: {
+          _id: 0,
+          materiaId: { $toString: '$_id' },
+          materiaName: '$mat.nome',
+          count: 1,
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
   }
 }

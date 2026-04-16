@@ -3,6 +3,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
@@ -32,6 +33,8 @@ import { Questao } from './questao.schema';
 
 @Injectable()
 export class QuestaoService {
+  private readonly logger = new Logger(QuestaoService.name);
+
   constructor(
     private readonly repository: QuestaoRepository,
     private readonly provaService: ProvaService,
@@ -293,6 +296,30 @@ export class QuestaoService {
 
     try {
       await this.repository.updateContent(id, content);
+
+      // Extract asset:// references from all text fields and update assets array
+      if (content.contentFormat === 'markdown') {
+        const allText = [
+          content.textoQuestao,
+          content.pergunta,
+          content.textoAlternativaA,
+          content.textoAlternativaB,
+          content.textoAlternativaC,
+          content.textoAlternativaD,
+          content.textoAlternativaE,
+        ]
+          .filter(Boolean)
+          .join('\n');
+
+        const assetRegex = /asset:\/\/([^\s)]+)/g;
+        const assets: string[] = [];
+        let match: RegExpExecArray | null;
+        while ((match = assetRegex.exec(allText)) !== null) {
+          assets.push(match[1]);
+        }
+
+        await this.repository.updateAssets(id, assets);
+      }
     } catch (error: any) {
       throw new HttpException(
         `Não foi possível atualizar o conteúdo. ${error.message}`,
@@ -432,6 +459,12 @@ export class QuestaoService {
       questionReported,
       questionClassified,
     };
+  }
+
+  async getPendingByMateria(materiaIds?: string[]) {
+    const byMateria = await this.repository.pendingByMateria(materiaIds);
+    const total = byMateria.reduce((sum, item) => sum + item.count, 0);
+    return { total, byMateria };
   }
 
   public async getLogs(id: string): Promise<AuditLog[]> {
