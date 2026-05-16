@@ -132,9 +132,9 @@ export class SimuladoService {
         return;
       }
 
-      const simulado = await this.simuladoRepository.answer(
-        historico.simulado.toString(),
-      );
+      const simuladoId = (historico.simulado as any)?._id?.toString()
+        ?? historico.simulado.toString();
+      const simulado = await this.simuladoRepository.answer(simuladoId);
 
       const ano = (
         await this.questoesRepository.getById(simulado.questoes[0]._id)
