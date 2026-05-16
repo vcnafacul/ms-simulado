@@ -49,7 +49,7 @@ class MateriaAggregate {
   frentes: FrenteAggregate[];
 }
 
-class AggregatePayload {
+export class AggregatePayload {
   @Prop()
   @ApiProperty()
   geral: number;

@@ -2,28 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Historico } from '../historico/historico.schema';
-import { UserGroupAggregate } from './user-group-aggregate.schema';
+import { AggregatePayload, UserGroupAggregate } from './user-group-aggregate.schema';
 
-export interface AggregatePayload {
-  geral: number;
-  totalAttempts: number;
-  totalAttemptsCompleted: number;
-  studentsWithAtLeastOneCompletedAttempt: number;
-  materias: {
-    id: string;
-    nome: string;
-    aproveitamento: number;
-    studentsContributing: number;
-    attemptsContributing: number;
-    frentes: {
-      id: string;
-      nome: string;
-      aproveitamento: number;
-      studentsContributing: number;
-      attemptsContributing: number;
-    }[];
-  }[];
-}
+export { AggregatePayload };
 
 @Injectable()
 export class UserGroupAggregateRepository {
@@ -90,28 +71,13 @@ export class UserGroupAggregateRepository {
     const [facetResult] = await this.histModel.aggregate([
       { $match: baseMatch },
       {
-        $lookup: {
-          from: 'simulados',
-          localField: 'simulado',
-          foreignField: '_id',
-          as: 'simuladoDoc',
-        },
-      },
-      { $unwind: '$simuladoDoc' },
-      {
-        $addFields: {
-          isCompleted: {
-            $eq: [
-              '$questoesRespondidas',
-              { $size: '$simuladoDoc.questoes' },
-            ],
-          },
+        $match: {
+          $expr: { $eq: [{ $size: '$respostas' }, '$questoesRespondidas'] },
         },
       },
       {
         $facet: {
           completedRows: [
-            { $match: { isCompleted: true } },
             { $unwind: '$aproveitamento.materias' },
             { $unwind: '$aproveitamento.materias.frentes' },
             {
@@ -130,12 +96,8 @@ export class UserGroupAggregateRepository {
               },
             },
           ],
-          completedCount: [
-            { $match: { isCompleted: true } },
-            { $count: 'total' },
-          ],
+          completedCount: [{ $count: 'total' }],
           completedUsers: [
-            { $match: { isCompleted: true } },
             { $group: { _id: '$usuario' } },
             { $count: 'total' },
           ],

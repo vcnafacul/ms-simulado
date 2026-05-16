@@ -1,3 +1,5 @@
+// Requires a real MongoDB instance (process.env.MONGODB or mongodb://localhost:27017/ms-simulado-test).
+// In CI, ensure a MongoDB service is running (e.g., via docker-compose or GitHub Actions service).
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
