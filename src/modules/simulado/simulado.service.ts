@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { ClientSession } from 'mongoose';
 import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
+import { QueueProducer } from 'src/shared/modules/queue/queue.producer';
 import { HistoricoRepository } from '../historico/historico.repository';
+import { HistoricoStatus } from '../historico/enums/historico-status.enum';
 import { Historico } from '../historico/historico.schema';
 import {
   AproveitamentoHistorico,
@@ -29,6 +31,7 @@ export class SimuladoService {
     private readonly tipoSimuladoRepository: TipoSimuladoRepository,
     private readonly historicoRepository: HistoricoRepository,
     private readonly materiaRepository: MateriaRepository,
+    private readonly queueProducer: QueueProducer,
   ) {}
 
   public async getById(id: string): Promise<Simulado | null> {
@@ -99,45 +102,76 @@ export class SimuladoService {
     );
   }
 
-  public async answer(answer: AnswerSimuladoDto) {
-    const simulado = await this.simuladoRepository.answer(answer.idSimulado);
-
-    const ano = (
-      await this.questoesRepository.getById(simulado.questoes[0]._id)
-    ).prova.ano;
-
-    const respostas: RespostaAproveitamento[] = simulado?.questoes.map(
-      (questao) => {
-        const resposta = answer.respostas.find(
-          (r) => r.questao === questao._id.toString(),
-        );
-        return {
-          questao: questao,
-          alternativaEstudante: resposta?.alternativaEstudante,
-          alternativaCorreta: questao.alternativa,
-          materia: questao.materia,
-          frente: questao.frente1,
-        };
-      },
-    );
-
-    const aproveitamento = await this.criaAproveitamento(respostas);
-    const historico: Historico = {
+  public async answer(
+    answer: AnswerSimuladoDto,
+  ): Promise<{ histId: string; status: string }> {
+    const pending = await this.historicoRepository.createPending({
       usuario: answer.idEstudante,
-      ano: ano,
-      simulado: simulado,
-      aproveitamento: aproveitamento,
-      questoesRespondidas: answer.respostas.length,
-      respostas: respostas.map((r) => ({
-        questao: r.questao,
-        alternativaEstudante: r.alternativaEstudante,
-        alternativaCorreta: r.alternativaCorreta,
-      })),
+      simuladoId: answer.idSimulado,
+      rawRespostas: answer.respostas,
       tempoRealizado: answer.tempoRealizado,
-    };
+      questoesRespondidas: answer.respostas.length,
+    });
 
-    await this.questoesRepository.updateQuestionAnswered(respostas);
-    await this.historicoRepository.create(historico);
+    await this.queueProducer.publish('stream:simulado:answers', {
+      histId: pending._id.toString(),
+    });
+
+    return { histId: pending._id.toString(), status: 'pending' };
+  }
+
+  public async processAnswer(histId: string): Promise<void> {
+    const claimed = await this.historicoRepository.claimForProcessing(histId);
+    if (!claimed) return;
+
+    try {
+      const historico = await this.historicoRepository.getById(histId);
+
+      if (!historico?.rawRespostas) {
+        await this.historicoRepository.updateStatus(histId, HistoricoStatus.Failed);
+        return;
+      }
+
+      const simuladoId = (historico.simulado as any)?._id?.toString()
+        ?? historico.simulado.toString();
+      const simulado = await this.simuladoRepository.answer(simuladoId);
+
+      const ano = (
+        await this.questoesRepository.getById(simulado.questoes[0]._id)
+      ).prova.ano;
+
+      const respostasAproveitamento: RespostaAproveitamento[] = simulado.questoes.map(
+        (questao) => {
+          const resposta = historico.rawRespostas!.find(
+            (r: any) => r.questao === questao._id.toString(),
+          );
+          return {
+            questao,
+            alternativaEstudante: resposta?.alternativaEstudante,
+            alternativaCorreta: questao.alternativa,
+            materia: questao.materia,
+            frente: questao.frente1,
+          };
+        },
+      );
+
+      const aproveitamento = await this.criaAproveitamento(respostasAproveitamento);
+      await this.questoesRepository.updateQuestionAnswered(respostasAproveitamento);
+
+      await this.historicoRepository.completeProcessing(histId, {
+        ano,
+        simulado,
+        respostas: respostasAproveitamento.map((r) => ({
+          questao: r.questao,
+          alternativaEstudante: r.alternativaEstudante,
+          alternativaCorreta: r.alternativaCorreta,
+        })),
+        aproveitamento,
+      });
+    } catch (err) {
+      await this.historicoRepository.updateStatus(histId, HistoricoStatus.Failed);
+      throw err;
+    }
   }
 
   private async GetSimulado(id: string) {

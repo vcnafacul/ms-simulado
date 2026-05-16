@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { AggregatePeriodDtoInput } from 'src/shared/dtos/aggregate-period.dto.input';
 import { AggregateHistoricoDtoOutput } from './dtos/aggregate-historico.dto.output';
 import { AggregatePeriodByTypeDtoOutput } from './dtos/aggregate-period-by-type.dto.output';
 import { GetHistoricoDTOInput } from './dtos/get-historico.dto';
+import { HistoricoStatus } from './enums/historico-status.enum';
 import { buildFullSeriesHistorico } from './handle/build-full-series-historico';
 import { buildFullSeriesHistoricoByType } from './handle/build-full-seriesH-historico-by-type';
 import { Historico } from './historico.schema';
@@ -194,5 +195,57 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       groupBy,
       result,
     ) as AggregatePeriodByTypeDtoOutput[];
+  }
+
+  async createPending(data: {
+    usuario: string;
+    simuladoId: string;
+    rawRespostas: any[];
+    tempoRealizado: number;
+    questoesRespondidas: number;
+  }): Promise<Historico> {
+    return this.model.create({
+      usuario: data.usuario,
+      simulado: new Types.ObjectId(data.simuladoId),
+      rawRespostas: data.rawRespostas,
+      tempoRealizado: data.tempoRealizado,
+      questoesRespondidas: data.questoesRespondidas,
+      status: HistoricoStatus.Pending,
+    });
+  }
+
+  async findByStatuses(statuses: HistoricoStatus[]): Promise<Historico[]> {
+    return this.model.find({ status: { $in: statuses } }).exec();
+  }
+
+  async updateStatus(id: string, status: HistoricoStatus): Promise<void> {
+    await this.model.findByIdAndUpdate(id, { status }).exec();
+  }
+
+  async claimForProcessing(id: string): Promise<boolean> {
+    const result = await this.model.findOneAndUpdate(
+      { _id: id, status: { $in: [HistoricoStatus.Pending, HistoricoStatus.Processing] } },
+      { status: HistoricoStatus.Processing },
+    ).exec();
+    return result !== null;
+  }
+
+  async completeProcessing(
+    id: string,
+    data: {
+      ano: number;
+      simulado: any;
+      respostas: any[];
+      aproveitamento: any;
+    },
+  ): Promise<void> {
+    await this.model.findByIdAndUpdate(id, {
+      status: HistoricoStatus.Completed,
+      ano: data.ano,
+      simulado: data.simulado,
+      respostas: data.respostas,
+      aproveitamento: data.aproveitamento,
+      rawRespostas: null,
+    }).exec();
   }
 }

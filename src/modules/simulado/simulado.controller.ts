@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   Post,
   Query,
@@ -46,8 +47,9 @@ export class SimuladoController {
   }
 
   @Post('answer')
+  @HttpCode(202)
   public async answer(@Body() answer: AnswerSimuladoDto) {
-    await this.service.answer(answer);
+    return this.service.answer(answer);
   }
 
   @Get('available')

@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AdjustmentProposalModule } from './modules/adjustment-proposal/adjustment-proposal.module';
 import { ContentModule } from './modules/content/content.module';
@@ -14,16 +14,24 @@ import { QuestaoModule } from './modules/questao/questao.module';
 import { SimuladoModule } from './modules/simulado/simulado.module';
 import { SubjectModule } from './modules/questao/subject/subject.module';
 import { TipoSimuladoModule } from './modules/tipo-simulado/tipo-simulado.module';
+import { EnvModule } from './shared/modules/env/env.module';
+import { Env, envSchema } from './shared/modules/env/env';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: process.env.NODE_ENV !== 'test' ? '.env' : undefined,
+      validate: (env) => envSchema.parse(env),
     }),
-    MongooseModule.forRoot(process.env.MONGODB, {
-      serverSelectionTimeoutMS: 5000,
+    MongooseModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Env, true>) => ({
+        uri: config.get('MONGODB'),
+        serverSelectionTimeoutMS: 5000,
+      }),
     }),
+    EnvModule,
     ExameModule,
     FrenteModule,
     MateriaModule,
