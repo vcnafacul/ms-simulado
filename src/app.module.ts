@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AdjustmentProposalModule } from './modules/adjustment-proposal/adjustment-proposal.module';
+import { UserGroupAggregateModule } from './modules/user-group-aggregates/user-group-aggregate.module';
 import { ContentModule } from './modules/content/content.module';
 import { ContentFileHistoryModule } from './modules/content-file-history/content-file-history.module';
 import { ExameModule } from './modules/exame/exame.module';
@@ -45,6 +46,7 @@ import { Env, envSchema } from './shared/modules/env/env';
     ContentFileHistoryModule,
     FileContentModule,
     AdjustmentProposalModule,
+    UserGroupAggregateModule,
   ],
   providers: [],
 })
