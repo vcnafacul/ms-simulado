@@ -96,6 +96,7 @@ export class ValkeyQueueConsumer
         try {
           await handler(id, fields);
           await this.redis.xack(stream, group, id);
+          await this.redis.xdel(stream, id);
         } catch (err) {
           this.logger.error(`Failed processing ${id} from ${stream}:`, err);
         }
@@ -133,6 +134,7 @@ export class ValkeyQueueConsumer
         try {
           await handler(id, fields);
           await this.redis.xack(stream, group, id);
+          await this.redis.xdel(stream, id);
         } catch (err) {
           this.logger.error(`Failed reclaiming ${id} from ${stream}:`, err);
         }
