@@ -17,6 +17,9 @@ async function bootstrap() {
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
   app.useGlobalPipes(new ValidationPipe());
   SwaggerModule.setup('api', app, document(app));
-  await app.listen(process.env.MS_PORT);
+  const port = process.env.MS_PORT ?? process.env.PORT ?? 3000;
+  await app.listen(port);
+  console.log(`🚀 MS-Simulado rodando em: http://localhost:${port}`);
+  console.log(`📃 Swagger: http://localhost:${port}/api`);
 }
 bootstrap();
