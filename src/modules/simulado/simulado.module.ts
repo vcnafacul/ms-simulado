@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { QueueModule } from 'src/shared/modules/queue/queue.module';
 import { ExameModule } from '../exame/exame.module';
 import { FrenteModule } from '../frente/frente.module';
 import { HistoricoModule } from '../historico/historico.module';
@@ -9,6 +10,7 @@ import { Prova, ProvaSchema } from '../prova/prova.schema';
 import { QuestaoModule } from '../questao/questao.module';
 import { TipoSimuladoModule } from '../tipo-simulado/tipo-simulado.module';
 import { Simulado, SimuladoSchema } from './schemas/simulado.schema';
+import { AnswerProcessorService } from './answer-processor.service';
 import { SimuladoController } from './simulado.controller';
 import { SimuladoRepository } from './simulado.repository';
 import { SimuladoService } from './simulado.service';
@@ -19,6 +21,7 @@ import { SimuladoService } from './simulado.service';
       { name: Simulado.name, schema: SimuladoSchema },
       { name: Prova.name, schema: ProvaSchema },
     ]),
+    QueueModule,
     QuestaoModule,
     TipoSimuladoModule,
     ExameModule,
@@ -27,7 +30,7 @@ import { SimuladoService } from './simulado.service';
     HistoricoModule,
   ],
   controllers: [SimuladoController],
-  providers: [SimuladoService, SimuladoRepository, ProvaRepository],
+  providers: [SimuladoService, SimuladoRepository, ProvaRepository, AnswerProcessorService],
   exports: [SimuladoService, SimuladoRepository],
 })
 export class SimuladoModule {}
