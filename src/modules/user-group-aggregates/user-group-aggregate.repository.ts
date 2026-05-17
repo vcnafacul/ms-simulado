@@ -141,27 +141,31 @@ export class UserGroupAggregateRepository {
 
     for (const row of completedRows) {
       const { materiaId, materiaNome, frenteId, frenteNome, usuario } = row._id;
+      // IDs vêm como ObjectId do Mongo; Map.has compara por referência,
+      // então sem .toString() cada linha vira uma matéria/frente "nova".
+      const materiaKey = String(materiaId);
+      const frenteKey = String(frenteId);
 
-      if (!materiaMap.has(materiaId)) {
-        materiaMap.set(materiaId, {
-          id: materiaId,
+      if (!materiaMap.has(materiaKey)) {
+        materiaMap.set(materiaKey, {
+          id: materiaKey,
           nome: materiaNome,
           frenteMap: new Map(),
           studentIds: new Set(),
         });
       }
-      const mat = materiaMap.get(materiaId)!;
-      mat.studentIds.add(usuario);
+      const mat = materiaMap.get(materiaKey)!;
+      mat.studentIds.add(String(usuario));
 
-      if (!mat.frenteMap.has(frenteId)) {
-        mat.frenteMap.set(frenteId, {
-          id: frenteId,
+      if (!mat.frenteMap.has(frenteKey)) {
+        mat.frenteMap.set(frenteKey, {
+          id: frenteKey,
           nome: frenteNome,
           studentAvgs: [],
           attempts: 0,
         });
       }
-      const fr = mat.frenteMap.get(frenteId)!;
+      const fr = mat.frenteMap.get(frenteKey)!;
       fr.studentAvgs.push(row.avg);
       fr.attempts += row.attempts;
     }
