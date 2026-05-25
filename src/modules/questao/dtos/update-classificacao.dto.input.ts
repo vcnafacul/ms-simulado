@@ -18,9 +18,10 @@ export class UpdateClassificacaoDTOInput {
   @ProvaExist({ message: 'prova não existe' })
   public prova: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
   @IsNumber()
-  public numero: number;
+  public numero?: number | null;
 
   @ApiProperty({ enum: EnemArea })
   @IsEnum(EnemArea)

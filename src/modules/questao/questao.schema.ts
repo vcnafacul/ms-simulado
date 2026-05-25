@@ -31,9 +31,9 @@ export class Questao extends QuestaoReview {
   @ApiProperty()
   public materia: Materia;
 
-  @Prop()
-  @ApiProperty()
-  public numero: number;
+  @Prop({ required: false, default: null })
+  @ApiProperty({ required: false, nullable: true })
+  public numero: number | null;
 
   @Prop({ required: false, default: '' })
   @ApiProperty()
