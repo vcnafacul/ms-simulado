@@ -36,9 +36,10 @@ export class CreateQuestaoDTOInput {
   @MateriaExist({ message: 'materia não existe' })
   public materia: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
   @IsNumber()
-  public numero: number;
+  public numero?: number | null;
 
   @ApiProperty({ required: false })
   @IsOptional()
