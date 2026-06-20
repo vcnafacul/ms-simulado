@@ -13,7 +13,7 @@ import { Type } from 'class-transformer';
 export class CreateCategoriaDTOInput {
   @ApiProperty()
   @IsString()
-  @CategoriaUnique({ message: 'nome tipo simulado já existe' })
+  @CategoriaUnique({ message: 'nome categoria já existe' })
   public nome: string;
 
   @ApiProperty()
