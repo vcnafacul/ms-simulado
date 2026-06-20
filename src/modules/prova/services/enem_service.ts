@@ -5,7 +5,7 @@ import { UpdateDTOInput } from 'src/modules/questao/dtos/update.dto.input';
 import { EnemArea } from 'src/modules/questao/enums/enem-area.enum';
 import { SimuladoRepository } from 'src/modules/simulado/simulado.repository';
 import { Simulado } from 'src/modules/simulado/schemas/simulado.schema';
-import { TipoSimuladoRepository } from 'src/modules/tipo-simulado/tipo-simulado.repository';
+import { CategoriaRepository } from 'src/modules/categoria/categoria.repository';
 import { ProvaRepository } from '../prova.repository';
 import { Prova } from '../prova.schema';
 
@@ -13,7 +13,7 @@ import { Prova } from '../prova.schema';
 export class EnemService {
   constructor(
     private readonly simuladoRepository: SimuladoRepository,
-    private readonly tipoSimuladoRepository: TipoSimuladoRepository,
+    private readonly categoriaRepository: CategoriaRepository,
     private readonly provarepository: ProvaRepository,
   ) {}
 
@@ -54,7 +54,7 @@ export class EnemService {
     complemento?: string,
   ) {
     const simuladoArea = new Simulado();
-    const tipo = await this.tipoSimuladoRepository.getByFilter({
+    const tipo = await this.categoriaRepository.getByFilter({
       nome: nomeTipo,
     });
     simuladoArea.tipo = tipo;

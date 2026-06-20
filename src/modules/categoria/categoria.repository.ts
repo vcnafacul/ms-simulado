@@ -1,14 +1,14 @@
 import { BaseRepository } from 'src/shared/base/base.repository';
-import { TipoSimulado } from './schemas/tipo-simulado.schema';
+import { Categoria } from './schemas/categoria.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 
-export class TipoSimuladoRepository extends BaseRepository<TipoSimulado> {
-  constructor(@InjectModel(TipoSimulado.name) model: Model<TipoSimulado>) {
+export class CategoriaRepository extends BaseRepository<Categoria> {
+  constructor(@InjectModel(Categoria.name) model: Model<Categoria>) {
     super(model);
   }
 
-  override async getById(id: string): Promise<TipoSimulado> {
+  override async getById(id: string): Promise<Categoria> {
     return await this.model
       .findById(id)
       .populate({

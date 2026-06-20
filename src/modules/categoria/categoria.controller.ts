@@ -10,25 +10,25 @@ import {
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
 import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
-import { CreateTipoSimuladoDTOInput } from './dtos/create.dto.input';
-import { TipoSimulado } from './schemas/tipo-simulado.schema';
-import { TipoSimuladoService } from './tipo-simulado.service';
+import { CreateCategoriaDTOInput } from './dtos/create.dto.input';
+import { Categoria } from './schemas/categoria.schema';
+import { CategoriaService } from './categoria.service';
 
-@ApiTags('Tipo Simulado')
-@Controller('v1/tipo-simulado')
-export class TipoSimuladoController {
-  constructor(private readonly service: TipoSimuladoService) {}
+@ApiTags('Categoria')
+@Controller('v1/categoria')
+export class CategoriaController {
+  constructor(private readonly service: CategoriaService) {}
 
   @Get()
   @ApiResponse({
     status: 200,
     description: 'materias cadastradas e validas',
-    type: TipoSimulado,
+    type: Categoria,
     isArray: true,
   })
   public async getAll(
     @Query() query: GetAllDtoInput,
-  ): Promise<GetAllDtoOutput<TipoSimulado>> {
+  ): Promise<GetAllDtoOutput<Categoria>> {
     return await this.service.getAll(query);
   }
 
@@ -36,12 +36,12 @@ export class TipoSimuladoController {
   @ApiResponse({
     status: 200,
     description: 'cadastrado com sucesso',
-    type: TipoSimulado,
+    type: Categoria,
     isArray: false,
   })
   public async post(
-    @Body() model: CreateTipoSimuladoDTOInput,
-  ): Promise<TipoSimulado> {
+    @Body() model: CreateCategoriaDTOInput,
+  ): Promise<Categoria> {
     return await this.service.add(model);
   }
 
@@ -49,10 +49,10 @@ export class TipoSimuladoController {
   @ApiResponse({
     status: 200,
     description: 'materias cadastradas e validas',
-    type: TipoSimulado,
+    type: Categoria,
     isArray: false,
   })
-  public async getById(@Param('id') id: string): Promise<TipoSimulado> {
+  public async getById(@Param('id') id: string): Promise<Categoria> {
     return await this.service.getById(id);
   }
 

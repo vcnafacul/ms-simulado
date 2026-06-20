@@ -7,13 +7,13 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
-import { TipoSimuladoUnique } from '../validator/tipo-simulado-unique.validator';
+import { CategoriaUnique } from '../validator/categoria-unique.validator';
 import { Type } from 'class-transformer';
 
-export class CreateTipoSimuladoDTOInput {
+export class CreateCategoriaDTOInput {
   @ApiProperty()
   @IsString()
-  @TipoSimuladoUnique({ message: 'nome tipo simulado já existe' })
+  @CategoriaUnique({ message: 'nome tipo simulado já existe' })
   public nome: string;
 
   @ApiProperty()

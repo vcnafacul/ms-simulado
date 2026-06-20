@@ -4,13 +4,13 @@ import { BaseSchema } from 'src/shared/base/base.schema';
 import { Exame } from '../exame/exame.schema';
 import { Questao } from '../questao/questao.schema';
 import { Simulado } from '../simulado/schemas/simulado.schema';
-import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
+import { Categoria } from '../categoria/schemas/categoria.schema';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
 import { Edicao } from './enums/edicao.enum';
 
 @Schema({ timestamps: true, versionKey: false })
 export class Prova extends BaseSchema {
-  constructor(item: CreateProvaDTOInput, exame: Exame, tipo: TipoSimulado) {
+  constructor(item: CreateProvaDTOInput, exame: Exame, tipo: Categoria) {
     super();
     this.edicao = item.edicao;
     this.exame = exame;
@@ -34,8 +34,8 @@ export class Prova extends BaseSchema {
   @Prop({ ref: Exame.name, type: Types.ObjectId })
   public exame: Exame;
 
-  @Prop({ ref: TipoSimulado.name, type: Types.ObjectId })
-  public tipo: TipoSimulado;
+  @Prop({ ref: Categoria.name, type: Types.ObjectId })
+  public tipo: Categoria;
 
   @Prop({
     type: [{ ref: 'Simulado', type: mongoose.Schema.Types.ObjectId }],

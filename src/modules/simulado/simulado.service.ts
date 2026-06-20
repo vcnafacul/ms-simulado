@@ -15,7 +15,7 @@ import { MateriaRepository } from '../materia/materia.repository';
 import { Status } from '../questao/enums/status.enum';
 import { QuestaoRepository } from '../questao/questao.repository';
 import { Questao } from '../questao/questao.schema';
-import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
+import { CategoriaRepository } from '../categoria/categoria.repository';
 import { AnswerSimuladoDto } from './dtos/answer-simulado.dto.input';
 import { AvailableSimuladoDTOoutput } from './dtos/available-simulado.dto.output';
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
@@ -28,7 +28,7 @@ export class SimuladoService {
   constructor(
     private readonly simuladoRepository: SimuladoRepository,
     private readonly questoesRepository: QuestaoRepository,
-    private readonly tipoSimuladoRepository: TipoSimuladoRepository,
+    private readonly categoriaRepository: CategoriaRepository,
     private readonly historicoRepository: HistoricoRepository,
     private readonly materiaRepository: MateriaRepository,
     private readonly queueProducer: QueueProducer,
@@ -211,7 +211,7 @@ export class SimuladoService {
   public async getAvailable(
     nomeTipo: string,
   ): Promise<AvailableSimuladoDTOoutput[]> {
-    const tipo = await this.tipoSimuladoRepository.getByFilter({
+    const tipo = await this.categoriaRepository.getByFilter({
       nome: nomeTipo,
     });
     return await this.simuladoRepository.getAvailable(tipo._id);

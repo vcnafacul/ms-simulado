@@ -14,7 +14,7 @@ import { ProvaModule } from './modules/prova/prova.module';
 import { QuestaoModule } from './modules/questao/questao.module';
 import { SimuladoModule } from './modules/simulado/simulado.module';
 import { SubjectModule } from './modules/questao/subject/subject.module';
-import { TipoSimuladoModule } from './modules/tipo-simulado/tipo-simulado.module';
+import { CategoriaModule } from './modules/categoria/categoria.module';
 import { EnvModule } from './shared/modules/env/env.module';
 import { Env, envSchema } from './shared/modules/env/env';
 
@@ -37,7 +37,7 @@ import { Env, envSchema } from './shared/modules/env/env';
     FrenteModule,
     MateriaModule,
     QuestaoModule,
-    TipoSimuladoModule,
+    CategoriaModule,
     SimuladoModule,
     ProvaModule,
     HistoricoModule,

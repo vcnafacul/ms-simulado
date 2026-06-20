@@ -5,35 +5,31 @@ import {
   ValidatorConstraintInterface,
   registerDecorator,
 } from 'class-validator';
-import { TipoSimuladoRepository } from '../tipo-simulado.repository';
+import { CategoriaRepository } from '../categoria.repository';
 
 @Injectable()
 @ValidatorConstraint({ async: true })
-export class TipoSimuladoExistValidator
-  implements ValidatorConstraintInterface
-{
+export class CategoriaUniqueValidator implements ValidatorConstraintInterface {
   constructor(
-    private readonly tipoSimuladoRepository: TipoSimuladoRepository,
+    private readonly categoriaRepository: CategoriaRepository,
   ) {}
 
   async validate(value: any): Promise<boolean> {
-    try {
-      const tipoSimulado = await this.tipoSimuladoRepository.getById(value);
-      return !!tipoSimulado;
-    } catch {
-      return false;
-    }
+    const categoria = await this.categoriaRepository.getByFilter({
+      nome: value,
+    });
+    return !categoria;
   }
 }
 
-export const TipoSimuladoExist = (validationOptions: ValidationOptions) => {
+export const CategoriaUnique = (validationOptions: ValidationOptions) => {
   return (obj: object, props: string) => {
     registerDecorator({
       target: obj.constructor,
       propertyName: props,
       options: validationOptions,
       constraints: [],
-      validator: TipoSimuladoExistValidator,
+      validator: CategoriaUniqueValidator,
     });
   };
 };

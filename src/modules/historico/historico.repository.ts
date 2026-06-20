@@ -157,10 +157,10 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       },
       { $unwind: { path: '$simulado', preserveNullAndEmptyArrays: true } },
 
-      // junta com TipoSimulado
+      // junta com Categoria
       {
         $lookup: {
-          from: 'tiposimulados', // nome real da collection
+          from: 'categorias', // nome real da collection
           localField: 'simulado.tipo',
           foreignField: '_id',
           as: 'tipo',

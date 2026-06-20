@@ -10,7 +10,7 @@ import { Questao } from 'src/modules/questao/questao.schema';
 import { Simulado } from 'src/modules/simulado/schemas/simulado.schema';
 import { SimuladoRepository } from 'src/modules/simulado/simulado.repository';
 import { SimuladoService } from 'src/modules/simulado/simulado.service';
-import { TipoSimuladoRepository } from 'src/modules/tipo-simulado/tipo-simulado.repository';
+import { CategoriaRepository } from 'src/modules/categoria/categoria.repository';
 import { CreateProvaDTOInput } from '../dtos/create.dto.input';
 import { ProvaRepository } from '../prova.repository';
 import { Prova } from '../prova.schema';
@@ -19,7 +19,7 @@ import { ExameName, IProvaFactory } from './types';
 
 export class Enem2017PlusFactory implements IProvaFactory {
   constructor(
-    private readonly tipoSimuladoRepository: TipoSimuladoRepository,
+    private readonly categoriaRepository: CategoriaRepository,
     private readonly questaoRepository: QuestaoRepository,
     private readonly provaRepository: ProvaRepository,
     private readonly frenteRepository: FrenteRepository,
@@ -30,7 +30,7 @@ export class Enem2017PlusFactory implements IProvaFactory {
   ) {}
 
   async createProva(item: CreateProvaDTOInput): Promise<Prova> {
-    const tipo = await this.tipoSimuladoRepository.getById(item.tipo);
+    const tipo = await this.categoriaRepository.getById(item.tipo);
     const prova = new Prova(item, this.exame, tipo);
     prova.nome = `${tipo.nome} ${prova.ano} ${prova.edicao} ${prova.aplicacao}`;
     const hasProva = await this.enemService.getByName(prova.nome);

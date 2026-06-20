@@ -8,7 +8,7 @@ import { MateriaModule } from '../materia/materia.module';
 import { ProvaRepository } from '../prova/prova.repository';
 import { Prova, ProvaSchema } from '../prova/prova.schema';
 import { QuestaoModule } from '../questao/questao.module';
-import { TipoSimuladoModule } from '../tipo-simulado/tipo-simulado.module';
+import { CategoriaModule } from '../categoria/categoria.module';
 import { Simulado, SimuladoSchema } from './schemas/simulado.schema';
 import { AnswerProcessorService } from './answer-processor.service';
 import { SimuladoController } from './simulado.controller';
@@ -23,7 +23,7 @@ import { SimuladoService } from './simulado.service';
     ]),
     QueueModule,
     QuestaoModule,
-    TipoSimuladoModule,
+    CategoriaModule,
     ExameModule,
     FrenteModule,
     MateriaModule,

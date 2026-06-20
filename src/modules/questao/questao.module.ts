@@ -15,10 +15,10 @@ import { Simulado, SimuladoSchema } from '../simulado/schemas/simulado.schema';
 import { SimuladoRepository } from '../simulado/simulado.repository';
 import { SimuladoService } from '../simulado/simulado.service';
 import {
-  TipoSimulado,
-  TipoSimuladoSchema,
-} from '../tipo-simulado/schemas/tipo-simulado.schema';
-import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
+  Categoria,
+  CategoriaSchema,
+} from '../categoria/schemas/categoria.schema';
+import { CategoriaRepository } from '../categoria/categoria.repository';
 import { QuestaoController } from './questao.controller';
 import { QuestaoRepository } from './questao.repository';
 import { Questao, QuestaoSchema } from './questao.schema';
@@ -29,7 +29,7 @@ import { QuestaoService } from './questao.service';
     MongooseModule.forFeature([
       { name: Questao.name, schema: QuestaoSchema },
       { name: Prova.name, schema: ProvaSchema },
-      { name: TipoSimulado.name, schema: TipoSimuladoSchema },
+      { name: Categoria.name, schema: CategoriaSchema },
       { name: Simulado.name, schema: SimuladoSchema },
       { name: Frente.name, schema: FrenteSchema },
     ]),
@@ -45,7 +45,7 @@ import { QuestaoService } from './questao.service';
     QuestaoRepository,
     ProvaRepository,
     ProvaService,
-    TipoSimuladoRepository,
+    CategoriaRepository,
     SimuladoService,
     SimuladoRepository,
     ProvaFactory,

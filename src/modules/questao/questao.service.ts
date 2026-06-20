@@ -17,8 +17,8 @@ import { ProvaFactory } from '../prova/factory/prova_factory';
 import { ProvaRepository } from '../prova/prova.repository';
 import { ProvaService } from '../prova/prova.service';
 import { SimuladoService } from '../simulado/simulado.service';
-import { Regra } from '../tipo-simulado/schemas/regra.schemas';
-import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
+import { Regra } from '../categoria/schemas/regra.schemas';
+import { Categoria } from '../categoria/schemas/categoria.schema';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
 import { QuestaoAllDTO } from './dtos/questao.all.dto.output';
 import { QuestaoDTOInput } from './dtos/questao.dto.input';
@@ -160,7 +160,7 @@ export class QuestaoService {
     }
   }
 
-  public async GeyManyQuestao(tipo: TipoSimulado): Promise<Questao[]> {
+  public async GeyManyQuestao(tipo: Categoria): Promise<Questao[]> {
     let questoes: Questao[] = [];
     await Promise.all(
       tipo.regras.map(async (regra) => {

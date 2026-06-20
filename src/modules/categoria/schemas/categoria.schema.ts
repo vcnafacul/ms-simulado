@@ -4,7 +4,7 @@ import { Regra } from './regra.schemas';
 import { ApiProperty } from '@nestjs/swagger';
 
 @Schema({ timestamps: true, versionKey: false })
-export class TipoSimulado extends BaseSchema {
+export class Categoria extends BaseSchema {
   @Prop({ unique: true })
   @ApiProperty()
   public nome: string;
@@ -22,4 +22,4 @@ export class TipoSimulado extends BaseSchema {
   public regras: Regra[];
 }
 
-export const TipoSimuladoSchema = SchemaFactory.createForClass(TipoSimulado);
+export const CategoriaSchema = SchemaFactory.createForClass(Categoria);
