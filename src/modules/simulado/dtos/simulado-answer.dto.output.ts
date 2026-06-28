@@ -6,7 +6,7 @@ export class SimuladoAnswerDTOOutput {
   _id: string;
 
   @ApiProperty()
-  tipo: string;
+  categoria: string;
 
   @ApiProperty({ type: QuestaoAnswerDTOOutput, isArray: true })
   questoes: QuestaoAnswerDTOOutput[];

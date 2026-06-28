@@ -161,7 +161,7 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       {
         $lookup: {
           from: 'categorias', // nome real da collection
-          localField: 'simulado.tipo',
+          localField: 'simulado.categoria',
           foreignField: '_id',
           as: 'tipo',
         },

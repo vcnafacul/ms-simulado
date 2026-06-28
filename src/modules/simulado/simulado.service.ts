@@ -68,7 +68,7 @@ export class SimuladoService {
 
         // Verifica se o simulador atingiu a quantidade total de questões
         const atingiuQuantidadeTotal =
-          sml.questoes.length === sml.tipo.quantidadeTotalQuestao;
+          sml.questoes.length === sml.categoria.quantidadeTotalQuestao;
         // Verifica se todas as questões estão aprovadas
         const todasAprovadas = sml.questoes.every(
           (q) => q.status === Status.Approved,
@@ -191,7 +191,7 @@ export class SimuladoService {
           _id: simulado._id,
           nome: simulado.nome,
           descricao: simulado.descricao,
-          tipo: simulado.tipo._id,
+          categoria: simulado.categoria._id,
           questoes: simulado.questoes.map((q) => ({
             _id: q._id,
             enemArea: q.enemArea,
@@ -204,17 +204,17 @@ export class SimuladoService {
             prova: q.prova,
           })),
           inicio: inicio,
-          duracao: simulado.tipo.duracao,
+          duracao: simulado.categoria.duracao,
         };
   }
 
   public async getAvailable(
     nomeTipo: string,
   ): Promise<AvailableSimuladoDTOoutput[]> {
-    const tipo = await this.categoriaRepository.getByFilter({
+    const categoria = await this.categoriaRepository.getByFilter({
       nome: nomeTipo,
     });
-    return await this.simuladoRepository.getAvailable(tipo._id);
+    return await this.simuladoRepository.getAvailable(categoria._id);
   }
 
   private async criaAproveitamento(

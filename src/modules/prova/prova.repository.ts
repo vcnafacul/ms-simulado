@@ -17,16 +17,21 @@ export class ProvaRepository extends BaseRepository<Prova> {
   }
 
   async getProvaWithQuestion(id: string): Promise<Prova> {
-    return await this.model.findById(id).populate(['questoes', 'exame']).exec();
+    return await this.model
+      .findById(id)
+      .populate('questoes')
+      .populate({ path: 'categoria', populate: 'exame' })
+      .exec();
   }
 
   async getById(id: string): Promise<Prova> {
     return await this.model
       .findById(id)
-      .populate(['exame', 'simulados', 'tipo', 'questoes'])
+      .populate(['simulados', 'questoes'])
+      .populate({ path: 'categoria', populate: 'exame' })
       .populate({
         path: 'simulados',
-        populate: ['tipo', 'questoes'],
+        populate: ['categoria', 'questoes'],
       });
   }
 
@@ -56,10 +61,10 @@ export class ProvaRepository extends BaseRepository<Prova> {
   async getAllPopulated(): Promise<Prova[]> {
     return await this.model
       .find()
-      .populate(['exame', 'tipo'])
+      .populate({ path: 'categoria', populate: 'exame' })
       .populate({
         path: 'simulados',
-        populate: ['tipo', 'questoes'],
+        populate: ['categoria', 'questoes'],
       })
       .populate('questoes')
       .exec();

@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
-import { ExameRepository } from '../exame/exame.repository';
+import { CategoriaRepository } from '../categoria/categoria.repository';
 import { FrenteRepository } from '../frente/frente.repository';
 import { Frente } from '../frente/frente.schema';
 import { EnemArea } from '../questao/enums/enem-area.enum';
@@ -31,15 +31,15 @@ export class ProvaService {
   constructor(
     private readonly provaFactory: ProvaFactory,
     private readonly repository: ProvaRepository,
-    private readonly exameRepository: ExameRepository,
+    private readonly categoriaRepository: CategoriaRepository,
     private readonly simuladoRepository: SimuladoRepository,
     private readonly questaoRepository: QuestaoRepository,
     private readonly frenteRepository: FrenteRepository,
   ) {}
 
   public async create(item: CreateProvaDTOInput): Promise<GetProvaDTOOutout> {
-    const exame = await this.exameRepository.getById(item.exame);
-    const factory = this.provaFactory.getFactory(exame, item.ano);
+    const categoria = await this.categoriaRepository.getById(item.categoria);
+    const factory = this.provaFactory.getFactory(categoria.exame as any, item.ano);
     try {
       const prova = await factory.createProva(item);
       await factory.createSimulados(prova);
@@ -50,7 +50,7 @@ export class ProvaService {
         edicao: result.edicao,
         aplicacao: result.aplicacao,
         ano: result.ano,
-        exame: result.exame.nome,
+        exame: result.categoria.exame.nome,
         nome: result.nome,
         totalQuestao: result.totalQuestao,
         totalQuestaoCadastradas: result.questoes.length,
@@ -81,7 +81,7 @@ export class ProvaService {
           edicao: prova.edicao,
           aplicacao: prova.aplicacao,
           ano: prova.ano,
-          exame: prova.exame.nome,
+          exame: prova.categoria.exame.nome,
           nome: prova.nome,
           totalQuestao: prova.totalQuestao,
           gabarito: prova.gabarito,
@@ -111,7 +111,7 @@ export class ProvaService {
         if (!containsQuestion) return;
 
         const hasRequiredCount =
-          simulado.questoes.length === simulado.tipo.quantidadeTotalQuestao;
+          simulado.questoes.length === simulado.categoria.quantidadeTotalQuestao;
         const allApproved = simulado.questoes.every(
           (q) =>
             q.status === Status.Approved || q._id.toString() === questionId,
@@ -147,7 +147,7 @@ export class ProvaService {
 
         // Recalcula bloqueado considerando a questão sendo rejeitada
         const hasRequiredCount =
-          simulado.questoes.length === simulado.tipo.quantidadeTotalQuestao;
+          simulado.questoes.length === simulado.categoria.quantidadeTotalQuestao;
         const allApproved =
           hasRequiredCount &&
           simulado.questoes.every((q) => {
@@ -164,7 +164,10 @@ export class ProvaService {
 
   public async getMissingNumbers(id: string) {
     const prova = await this.repository.getProvaWithQuestion(id);
-    const factory = this.provaFactory.getFactory(prova.exame, prova.ano);
+    const factory = this.provaFactory.getFactory(
+      prova.categoria.exame as any,
+      prova.ano,
+    );
     return factory.getMissingNumbers(prova);
   }
 
@@ -331,8 +334,8 @@ export class ProvaService {
             }
 
             // C2: Recalcular bloqueado
-            const hasRequiredCount = simulado.tipo
-              ? newSimQuestoes.length === simulado.tipo.quantidadeTotalQuestao
+            const hasRequiredCount = simulado.categoria
+              ? newSimQuestoes.length === simulado.categoria.quantidadeTotalQuestao
               : false;
             const allApproved =
               newSimQuestoes.length > 0 &&
@@ -345,9 +348,9 @@ export class ProvaService {
                 issue: 'incorrect_value',
                 oldValue: simulado.bloqueado,
                 newValue: shouldBeBlocked,
-                detail: !simulado.tipo
-                  ? 'tipo e nulo, definido bloqueado=true'
-                  : `questoes: ${newSimQuestoes.length}/${simulado.tipo.quantidadeTotalQuestao}, todasAprovadas: ${allApproved}`,
+                detail: !simulado.categoria
+                  ? 'categoria e nula, definido bloqueado=true'
+                  : `questoes: ${newSimQuestoes.length}/${simulado.categoria.quantidadeTotalQuestao}, todasAprovadas: ${allApproved}`,
               });
             }
 
@@ -406,7 +409,7 @@ export class ProvaService {
     frenteEspanhol: Frente,
   ): Questao[] {
     const nome = simulado.nome;
-    const tipoNomeAno = prova.tipo ? `${prova.tipo.nome} ${prova.ano}` : '';
+    const tipoNomeAno = prova.categoria ? `${prova.categoria.nome} ${prova.ano}` : '';
 
     return questoesDaProva.filter((q) => {
       const frente1Id = q.frente1?._id?.toString() || '';
@@ -482,7 +485,7 @@ export class ProvaService {
       edicao: prova.edicao,
       aplicacao: prova.aplicacao,
       ano: prova.ano,
-      exame: prova.exame.nome,
+      exame: prova.categoria.exame.nome,
       nome: prova.nome,
       totalQuestao: prova.totalQuestao,
       totalQuestaoCadastradas: prova.questoes.length,

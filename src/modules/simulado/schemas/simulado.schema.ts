@@ -17,7 +17,7 @@ export class Simulado extends BaseSchema {
 
   @Prop({ ref: Categoria.name, type: Types.ObjectId })
   @ApiProperty()
-  tipo: Categoria;
+  categoria: Categoria;
 
   @Prop({
     type: [{ ref: 'Questao', type: mongoose.Schema.Types.ObjectId }],

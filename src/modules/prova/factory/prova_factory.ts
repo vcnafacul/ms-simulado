@@ -33,7 +33,6 @@ export class ProvaFactory {
         this.simuladoService,
         this.simuladoRepository,
         this.enemService,
-        exame,
       );
     } else if (exame.nome === ExameName.ENEM && ano > 2009 && ano <= 2016) {
       return new Enem2010_2017Factory(
@@ -44,7 +43,6 @@ export class ProvaFactory {
         this.simuladoService,
         this.simuladoRepository,
         this.enemService,
-        exame,
       );
     }
     throw new Error('Factory não encontrada');

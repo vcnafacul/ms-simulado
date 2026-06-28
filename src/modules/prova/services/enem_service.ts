@@ -18,46 +18,50 @@ export class EnemService {
   ) {}
 
   public async createSimuladoIdiomatica(prova: Prova) {
-    const mainName = `${prova.tipo.nome} ${prova.ano}`;
+    const mainName = `${prova.categoria.nome} ${prova.ano}`;
+    const exameId = prova.categoria.exame._id.toString();
     await this.createSimuladoLinguagem(prova);
     prova.simulados.push(
       await this.simuladoRepository.create({
         nome: `${mainName} Inglês`,
-        tipo: prova.tipo,
+        categoria: prova.categoria,
         questoes: [],
-        descricao: `${prova.exame.nome} Inglês`,
+        descricao: `${prova.categoria.exame.nome} Inglês`,
       }),
     );
     prova.simulados.push(
       await this.simuladoRepository.create({
         nome: `${mainName} Espanhol`,
-        tipo: prova.tipo,
+        categoria: prova.categoria,
         questoes: [],
-        descricao: `${prova.exame.nome} Espanhol`,
+        descricao: `${prova.categoria.exame.nome} Espanhol`,
       }),
     );
   }
 
   public async createSimuladoLinguagem(prova: Prova) {
-    const mainName = `${prova.tipo.nome} ${prova.ano}`;
+    const mainName = `${prova.categoria.nome} ${prova.ano}`;
+    const exameId = prova.categoria.exame._id.toString();
     prova.simulados.push(
-      await this.createSimuladoArea(mainName, EnemArea.Linguagens, 'Inglês'),
+      await this.createSimuladoArea(mainName, EnemArea.Linguagens, exameId, 'Inglês'),
     );
     prova.simulados.push(
-      await this.createSimuladoArea(mainName, EnemArea.Linguagens, 'Espanhol'),
+      await this.createSimuladoArea(mainName, EnemArea.Linguagens, exameId, 'Espanhol'),
     );
   }
 
   public async createSimuladoArea(
     defaultName: string,
     nomeTipo: string,
+    exameId: string,
     complemento?: string,
   ) {
     const simuladoArea = new Simulado();
-    const tipo = await this.categoriaRepository.getByFilter({
+    const categoria = await this.categoriaRepository.getByFilter({
       nome: nomeTipo,
+      exame: exameId,
     });
-    simuladoArea.tipo = tipo;
+    simuladoArea.categoria = categoria;
     simuladoArea.nome = `${defaultName} ${nomeTipo}`;
     if (complemento) {
       simuladoArea.nome = `${simuladoArea.nome} ${complemento}`;

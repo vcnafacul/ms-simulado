@@ -1,5 +1,4 @@
 import { BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
-import { Exame } from 'src/modules/exame/exame.schema';
 import { FrenteRepository } from 'src/modules/frente/frente.repository';
 import { Frente } from 'src/modules/frente/frente.schema';
 import { CreateQuestaoDTOInput } from 'src/modules/questao/dtos/create.dto.input';
@@ -26,22 +25,21 @@ export class Enem2010_2017Factory implements IProvaFactory {
     private readonly simuladoService: SimuladoService,
     private readonly simuladoRepository: SimuladoRepository,
     private readonly enemService: EnemService,
-    private exame: Exame,
   ) {}
 
   async createProva(item: CreateProvaDTOInput): Promise<Prova> {
-    const tipo = await this.categoriaRepository.getById(item.tipo);
-    const prova = new Prova(item, this.exame, tipo);
-    prova.nome = `${tipo.nome} ${prova.ano} ${prova.edicao} ${prova.aplicacao}`;
+    const categoria = await this.categoriaRepository.getById(item.categoria);
+    const prova = new Prova(item, categoria);
+    prova.nome = `${categoria.nome} ${prova.ano} ${prova.edicao} ${prova.aplicacao}`;
     const hasProva = await this.enemService.getByName(prova.nome);
     if (!!hasProva) {
       throw new HttpException('Prova já esta cadastrada', HttpStatus.CONFLICT);
     }
 
-    if (prova.tipo.nome === EnemArea.Enem1) {
+    if (prova.categoria.nome === EnemArea.Enem1) {
       prova.enemAreas = [EnemArea.CienciasHumanas, EnemArea.BioExatas];
       prova.totalQuestao = 90;
-    } else if (prova.tipo.nome === EnemArea.Enem2) {
+    } else if (prova.categoria.nome === EnemArea.Enem2) {
       prova.enemAreas = [EnemArea.Linguagens, EnemArea.Matematica];
       prova.inicialNumero = 91;
       prova.totalQuestao = 95;
@@ -50,39 +48,42 @@ export class Enem2010_2017Factory implements IProvaFactory {
   }
 
   public async createSimulados(prova: Prova) {
-    if (prova.tipo.nome === EnemArea.Enem1) {
+    if (prova.categoria.nome === EnemArea.Enem1) {
       await this.createSimuladoDia1(prova);
-    } else if (prova.tipo.nome === EnemArea.Enem2) {
+    } else if (prova.categoria.nome === EnemArea.Enem2) {
       await this.createSimuladoDia2(prova);
     }
   }
 
   public async createSimuladoDia1(prova: Prova) {
-    const mainName = `${prova.tipo.nome} ${prova.ano}`;
+    const mainName = `${prova.categoria.nome} ${prova.ano}`;
+    const exameId = prova.categoria.exame._id.toString();
     prova.simulados.push(
       await this.enemService.createSimuladoArea(
         mainName,
         EnemArea.CienciasHumanas,
+        exameId,
       ),
     );
     prova.simulados.push(
-      await this.enemService.createSimuladoArea(mainName, EnemArea.BioExatas),
+      await this.enemService.createSimuladoArea(mainName, EnemArea.BioExatas, exameId),
     );
     prova.simulados.push(
       await this.simuladoRepository.create({
         nome: `${mainName}`,
-        tipo: prova.tipo,
+        categoria: prova.categoria,
         questoes: [],
-        descricao: `${prova.exame.nome}`,
+        descricao: `${prova.categoria.exame.nome}`,
       }),
     );
   }
 
   public async createSimuladoDia2(prova: Prova) {
-    const mainName = `${prova.tipo.nome} ${prova.ano}`;
+    const mainName = `${prova.categoria.nome} ${prova.ano}`;
+    const exameId = prova.categoria.exame._id.toString();
     await this.enemService.createSimuladoIdiomatica(prova);
     prova.simulados.push(
-      await this.enemService.createSimuladoArea(mainName, EnemArea.Matematica),
+      await this.enemService.createSimuladoArea(mainName, EnemArea.Matematica, exameId),
     );
   }
 
@@ -342,8 +343,8 @@ export class Enem2010_2017Factory implements IProvaFactory {
         simulados = simulados.concat(
           prova.simulados.filter(
             (simulado) =>
-              simulado.nome === `${prova.tipo.nome} ${prova.ano} Inglês` ||
-              simulado.nome === `${prova.tipo.nome} ${prova.ano} Espanhol`,
+              simulado.nome === `${prova.categoria.nome} ${prova.ano} Inglês` ||
+              simulado.nome === `${prova.categoria.nome} ${prova.ano} Espanhol`,
           ),
         );
       }
@@ -352,7 +353,7 @@ export class Enem2010_2017Factory implements IProvaFactory {
         simulado.nome.includes(`${question.enemArea}`),
       );
       const simuladoPadrao = prova.simulados.find(
-        (simulado) => simulado.nome === `${prova.tipo.nome} ${prova.ano}`,
+        (simulado) => simulado.nome === `${prova.categoria.nome} ${prova.ano}`,
       );
       if (simuladoPadrao) {
         simulados.push(simuladoPadrao);
@@ -375,7 +376,7 @@ export class Enem2010_2017Factory implements IProvaFactory {
     if (
       prova.ano < 2010 ||
       prova.ano > 2016 ||
-      prova.exame.nome !== ExameName.ENEM
+      prova.categoria.exame.nome !== ExameName.ENEM
     ) {
       simulados.push(...prova.simulados);
     } else {
@@ -398,8 +399,8 @@ export class Enem2010_2017Factory implements IProvaFactory {
           simulados = simulados.concat(
             prova.simulados.filter(
               (simulado) =>
-                simulado.nome === `${prova.tipo.nome} ${prova.ano} Inglês` ||
-                simulado.nome === `${prova.tipo.nome} ${prova.ano} Espanhol`,
+                simulado.nome === `${prova.categoria.nome} ${prova.ano} Inglês` ||
+                simulado.nome === `${prova.categoria.nome} ${prova.ano} Espanhol`,
             ),
           );
         }
@@ -408,7 +409,7 @@ export class Enem2010_2017Factory implements IProvaFactory {
           simulado.nome.includes(questao.enemArea),
         );
         const simuladoPadrao = prova.simulados.find(
-          (simulado) => simulado.nome === `${prova.tipo.nome} ${prova.ano}`,
+          (simulado) => simulado.nome === `${prova.categoria.nome} ${prova.ano}`,
         );
         if (simuladoPadrao) {
           simulados.push(simuladoPadrao);

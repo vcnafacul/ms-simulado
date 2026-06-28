@@ -14,7 +14,7 @@ const mockProvaFactory = {
 };
 
 const mockProvaRepository = {
-  getById: jest.fn().mockResolvedValue({ _id: 'prova-id', exame: {}, ano: 2023 }),
+  getById: jest.fn().mockResolvedValue({ _id: 'prova-id', categoria: { exame: {} }, ano: 2023 }),
 };
 
 function makeService(): QuestaoService {
@@ -45,7 +45,7 @@ describe('QuestaoService.create', () => {
     jest.clearAllMocks();
     mockProvaRepository.getById.mockResolvedValue({
       _id: 'prova-id',
-      exame: {},
+      categoria: { exame: {} },
       ano: 2023,
     });
     mockProvaFactory.getFactory.mockReturnValue(mockFactory);
