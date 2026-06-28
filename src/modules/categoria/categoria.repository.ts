@@ -13,21 +13,7 @@ export class CategoriaRepository extends BaseRepository<Categoria> {
   override async getById(id: string): Promise<Categoria> {
     return await this.model
       .findById(id)
-      .populate('exame')
-      .populate({
-        path: 'regras',
-        populate: {
-          path: 'materia',
-          model: 'Materia',
-        },
-      })
-      .populate({
-        path: 'regras',
-        populate: {
-          path: 'frente',
-          model: 'Frente',
-        },
-      });
+      .populate('exame');
   }
 
   override async getAll({

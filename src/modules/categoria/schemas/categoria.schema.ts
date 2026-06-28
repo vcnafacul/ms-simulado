@@ -1,6 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { BaseSchema } from 'src/shared/base/base.schema';
-import { Regra } from './regra.schemas';
 import { ApiProperty } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { Exame } from '../../exame/exame.schema';
@@ -18,10 +17,6 @@ export class Categoria extends BaseSchema {
   @Prop({ required: false, default: null })
   @ApiProperty({ required: false, nullable: true })
   public quantidadeTotalQuestao: number | null;
-
-  @Prop([Regra])
-  @ApiProperty({ isArray: true, type: Regra })
-  public regras: Regra[];
 
   @Prop({ ref: Exame.name, type: Types.ObjectId, required: true })
   @ApiProperty()

@@ -17,8 +17,6 @@ import { ProvaFactory } from '../prova/factory/prova_factory';
 import { ProvaRepository } from '../prova/prova.repository';
 import { ProvaService } from '../prova/prova.service';
 import { SimuladoService } from '../simulado/simulado.service';
-import { Regra } from '../categoria/schemas/regra.schemas';
-import { Categoria } from '../categoria/schemas/categoria.schema';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
 import { QuestaoAllDTO } from './dtos/questao.all.dto.output';
 import { QuestaoDTOInput } from './dtos/questao.dto.input';
@@ -158,23 +156,6 @@ export class QuestaoService {
       session.endSession();
       throw error;
     }
-  }
-
-  public async GeyManyQuestao(tipo: Categoria): Promise<Questao[]> {
-    let questoes: Questao[] = [];
-    await Promise.all(
-      tipo.regras.map(async (regra) => {
-        questoes = questoes.concat(await this.getQuestaoByRegras(regra));
-      }),
-    );
-
-    if (tipo.quantidadeTotalQuestao > questoes.length) {
-      questoes = questoes.concat(
-        await this.getQuestoes(tipo.quantidadeTotalQuestao - questoes.length),
-      );
-    }
-    await this.repository.IncrementaSimulado(questoes.map((q) => q._id));
-    return questoes;
   }
 
   public async getInfos() {
@@ -363,11 +344,6 @@ export class QuestaoService {
     }
   }
 
-  private async getQuestaoByRegras(regra: Regra) {
-    const regras = this.MontaFiltro(regra);
-    return await this.getQuestoesByFiltro(regras, regra.quantidade as number);
-  }
-
   private async getQuestoes(amount: number) {
     return await this.getQuestoesByFiltro({}, amount);
   }
@@ -386,14 +362,6 @@ export class QuestaoService {
       );
     }
     return questoes;
-  }
-
-  private MontaFiltro(regra: Regra) {
-    const regras: { [key: string]: any } = {};
-    regras['materia'] = regra.materia._id;
-    if (regra.frente) regras['frente1'] = regra.frente._id;
-    if (regra.ano) regras['ano'] = regra.ano;
-    return regras;
   }
 
   private generateFrentesCombinations(text: string) {

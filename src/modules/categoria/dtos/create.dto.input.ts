@@ -1,16 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { RegraDTO } from './regra.dto';
 import {
-  IsArray,
   IsBoolean,
   IsMongoId,
   IsNumber,
   IsOptional,
   IsString,
-  ValidateNested,
 } from 'class-validator';
 import { CategoriaUnique } from '../validator/categoria-unique.validator';
-import { Type } from 'class-transformer';
 import { ExameExist } from '../../exame/validator/exame-exist.validator';
 
 export class CreateCategoriaDTOInput {
@@ -27,13 +23,6 @@ export class CreateCategoriaDTOInput {
   @IsNumber()
   @IsOptional()
   public quantidadeTotalQuestao: number;
-
-  @ApiProperty({ type: [RegraDTO], required: false })
-  @IsArray()
-  @IsOptional()
-  @ValidateNested({ each: true })
-  @Type(() => RegraDTO)
-  public regras: RegraDTO[];
 
   @ApiProperty()
   @IsMongoId()
