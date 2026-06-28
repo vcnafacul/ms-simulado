@@ -9,6 +9,8 @@ import { MateriaExistValidator } from '../materia/validator/materia-exist.valida
 import { FrenteExistValidator } from '../frente/validator/frente-exist.validator';
 import { FrenteModule } from '../frente/frente.module';
 import { MateriaModule } from '../materia/materia.module';
+import { ExameModule } from '../exame/exame.module';
+import { ExameExistValidator } from '../exame/validator/exame-exist.validator';
 
 @Module({
   imports: [
@@ -17,6 +19,7 @@ import { MateriaModule } from '../materia/materia.module';
     ]),
     FrenteModule,
     MateriaModule,
+    ExameModule,
   ],
   controllers: [CategoriaController],
   providers: [
@@ -25,6 +28,7 @@ import { MateriaModule } from '../materia/materia.module';
     CategoriaUniqueValidator,
     MateriaExistValidator,
     FrenteExistValidator,
+    ExameExistValidator,
   ],
   exports: [CategoriaRepository],
 })
