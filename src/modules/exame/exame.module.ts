@@ -6,6 +6,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ExameSchema } from './exame.schema';
 import { ExameUniqueValidator } from './validator/exame-unique.validator';
 import { ExameExistValidator } from './validator/exame-exist.validator';
+import { ExameSeedService } from './exame-seed.service';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ExameExistValidator } from './validator/exame-exist.validator';
     ExameRepository,
     ExameUniqueValidator,
     ExameExistValidator,
+    ExameSeedService,
   ],
   exports: [ExameService, ExameRepository],
 })

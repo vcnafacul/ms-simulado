@@ -6,10 +6,10 @@ import { MateriaModule } from '../materia/materia.module';
 import { QuestaoModule } from '../questao/questao.module';
 import { SimuladoModule } from '../simulado/simulado.module';
 import {
-  TipoSimulado,
-  TipoSimuladoSchema,
-} from '../tipo-simulado/schemas/tipo-simulado.schema';
-import { TipoSimuladoRepository } from '../tipo-simulado/tipo-simulado.repository';
+  Categoria,
+  CategoriaSchema,
+} from '../categoria/schemas/categoria.schema';
+import { CategoriaRepository } from '../categoria/categoria.repository';
 import { ProvaFactory } from './factory/prova_factory';
 import { ProvaController } from './prova.controller';
 import { ProvaRepository } from './prova.repository';
@@ -22,7 +22,7 @@ import { EnemService } from './services/enem_service';
   imports: [
     MongooseModule.forFeature([
       { name: Prova.name, schema: ProvaSchema },
-      { name: TipoSimulado.name, schema: TipoSimuladoSchema },
+      { name: Categoria.name, schema: CategoriaSchema },
     ]),
     ExameModule,
     QuestaoModule,
@@ -35,7 +35,7 @@ import { EnemService } from './services/enem_service';
     ProvaService,
     ProvaRepository,
     ProvaExistValidator,
-    TipoSimuladoRepository,
+    CategoriaRepository,
     ProvaFactory,
     EnemService,
   ],

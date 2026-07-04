@@ -3,7 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import mongoose, { Types } from 'mongoose';
 import { BaseSchema } from 'src/shared/base/base.schema';
 import { Questao } from '../../questao/questao.schema';
-import { TipoSimulado } from '../../tipo-simulado/schemas/tipo-simulado.schema';
+import { Categoria } from '../../categoria/schemas/categoria.schema';
 
 @Schema({ timestamps: true, versionKey: false })
 export class Simulado extends BaseSchema {
@@ -15,9 +15,9 @@ export class Simulado extends BaseSchema {
   @ApiProperty()
   descricao: string;
 
-  @Prop({ ref: TipoSimulado.name, type: Types.ObjectId })
+  @Prop({ ref: Categoria.name, type: Types.ObjectId })
   @ApiProperty()
-  tipo: TipoSimulado;
+  categoria: Categoria;
 
   @Prop({
     type: [{ ref: 'Questao', type: mongoose.Schema.Types.ObjectId }],

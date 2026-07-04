@@ -17,8 +17,6 @@ import { ProvaFactory } from '../prova/factory/prova_factory';
 import { ProvaRepository } from '../prova/prova.repository';
 import { ProvaService } from '../prova/prova.service';
 import { SimuladoService } from '../simulado/simulado.service';
-import { Regra } from '../tipo-simulado/schemas/regra.schemas';
-import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
 import { QuestaoAllDTO } from './dtos/questao.all.dto.output';
 import { QuestaoDTOInput } from './dtos/questao.dto.input';
@@ -49,7 +47,7 @@ export class QuestaoService {
 
   public async create(item: CreateQuestaoDTOInput): Promise<Questao> {
     const prova = await this.provaRepository.getById(item.prova);
-    const factory = this.provaFactory.getFactory(prova.exame, prova.ano);
+    const factory = this.provaFactory.getFactory(prova.categoria.exame as any, prova.ano);
     if (item.numero == null || await factory.verifyNumberProva(prova._id, item.numero)) {
       return await factory.createQuestion(item);
     }
@@ -160,23 +158,6 @@ export class QuestaoService {
     }
   }
 
-  public async GeyManyQuestao(tipo: TipoSimulado): Promise<Questao[]> {
-    let questoes: Questao[] = [];
-    await Promise.all(
-      tipo.regras.map(async (regra) => {
-        questoes = questoes.concat(await this.getQuestaoByRegras(regra));
-      }),
-    );
-
-    if (tipo.quantidadeTotalQuestao > questoes.length) {
-      questoes = questoes.concat(
-        await this.getQuestoes(tipo.quantidadeTotalQuestao - questoes.length),
-      );
-    }
-    await this.repository.IncrementaSimulado(questoes.map((q) => q._id));
-    return questoes;
-  }
-
   public async getInfos() {
     const param: GetAllInput = {
       page: 1,
@@ -242,7 +223,7 @@ export class QuestaoService {
       throw new HttpException('Prova não informada', HttpStatus.BAD_REQUEST);
     }
     const prova = await this.provaRepository.getById(question.prova);
-    const factory = this.provaFactory.getFactory(prova.exame, prova.ano);
+    const factory = this.provaFactory.getFactory(prova.categoria.exame as any, prova.ano);
     try {
       await factory.updateQuestion(question);
     } catch (error: any) {
@@ -363,11 +344,6 @@ export class QuestaoService {
     }
   }
 
-  private async getQuestaoByRegras(regra: Regra) {
-    const regras = this.MontaFiltro(regra);
-    return await this.getQuestoesByFiltro(regras, regra.quantidade as number);
-  }
-
   private async getQuestoes(amount: number) {
     return await this.getQuestoesByFiltro({}, amount);
   }
@@ -386,14 +362,6 @@ export class QuestaoService {
       );
     }
     return questoes;
-  }
-
-  private MontaFiltro(regra: Regra) {
-    const regras: { [key: string]: any } = {};
-    regras['materia'] = regra.materia._id;
-    if (regra.frente) regras['frente1'] = regra.frente._id;
-    if (regra.ano) regras['ano'] = regra.ano;
-    return regras;
   }
 
   private generateFrentesCombinations(text: string) {

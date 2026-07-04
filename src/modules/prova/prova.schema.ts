@@ -1,20 +1,18 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { Types } from 'mongoose';
 import { BaseSchema } from 'src/shared/base/base.schema';
-import { Exame } from '../exame/exame.schema';
 import { Questao } from '../questao/questao.schema';
 import { Simulado } from '../simulado/schemas/simulado.schema';
-import { TipoSimulado } from '../tipo-simulado/schemas/tipo-simulado.schema';
+import { Categoria } from '../categoria/schemas/categoria.schema';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
 import { Edicao } from './enums/edicao.enum';
 
 @Schema({ timestamps: true, versionKey: false })
 export class Prova extends BaseSchema {
-  constructor(item: CreateProvaDTOInput, exame: Exame, tipo: TipoSimulado) {
+  constructor(item: CreateProvaDTOInput, categoria: Categoria) {
     super();
     this.edicao = item.edicao;
-    this.exame = exame;
-    this.tipo = tipo;
+    this.categoria = categoria;
     this.ano = item.ano;
     this.filename = item.filename;
     this.gabarito = item.gabarito;
@@ -22,6 +20,7 @@ export class Prova extends BaseSchema {
     this.simulados = [];
     this.questoes = [];
   }
+
   @Prop({ enum: Edicao })
   public edicao: Edicao;
 
@@ -31,11 +30,8 @@ export class Prova extends BaseSchema {
   @Prop()
   public ano: number;
 
-  @Prop({ ref: Exame.name, type: Types.ObjectId })
-  public exame: Exame;
-
-  @Prop({ ref: TipoSimulado.name, type: Types.ObjectId })
-  public tipo: TipoSimulado;
+  @Prop({ ref: Categoria.name, type: Types.ObjectId })
+  public categoria: Categoria;
 
   @Prop({
     type: [{ ref: 'Simulado', type: mongoose.Schema.Types.ObjectId }],

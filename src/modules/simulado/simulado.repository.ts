@@ -15,7 +15,7 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
   async getById(id: string): Promise<Simulado | null> {
     return await this.model
       .findById(id)
-      .populate('tipo')
+      .populate('categoria')
       .populate({
         path: 'questoes',
         populate: ['frente1', 'materia'],
@@ -50,7 +50,7 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
   }: GetAllInput): Promise<GetAllOutput<Simulado>> {
     const data = await this.model
       .find()
-      .populate(['tipo'])
+      .populate(['categoria'])
       .skip((page - 1) * limit)
       .limit(limit);
     const totalItems = await this.model.countDocuments();
@@ -72,10 +72,10 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
     });
   }
 
-  async getAvailable(tipo: string) {
+  async getAvailable(categoriaId: string) {
     return await this.model
       .find()
-      .where({ tipo, bloqueado: false })
+      .where({ categoria: categoriaId, bloqueado: false })
       .select(['nome', '_id']);
   }
 

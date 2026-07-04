@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Edicao } from '../enums/edicao.enum';
 import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
-import { ExameExist } from 'src/modules/exame/validator/exame-exist.validator';
+import { CategoriaExist } from 'src/modules/categoria/validator/categoria-exist.validator';
 
 export class CreateProvaDTOInput {
   @ApiProperty({ enum: Edicao, required: false, default: Edicao.Regular })
@@ -18,12 +18,8 @@ export class CreateProvaDTOInput {
 
   @ApiProperty()
   @IsString()
-  @ExameExist({ message: 'exame não existe' })
-  exame: string;
-
-  @ApiProperty()
-  @IsString() //Verificar se o tipo existe
-  tipo: string;
+  @CategoriaExist({ message: 'categoria não existe' })
+  categoria: string;
 
   @ApiProperty()
   @IsString()
