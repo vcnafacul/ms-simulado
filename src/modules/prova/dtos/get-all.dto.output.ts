@@ -37,7 +37,4 @@ export class GetProvaDTOOutout {
 
   @ApiProperty()
   enemAreas: string[];
-
-  @ApiProperty()
-  createdAt: Date;
 }

@@ -94,7 +94,6 @@ export class ProvaService {
           filename: prova.filename,
           enemAreas: prova.enemAreas,
           totalQuestaoCadastradas: prova.questoes.length,
-          createdAt: prova.createdAt,
         };
       }),
     };
