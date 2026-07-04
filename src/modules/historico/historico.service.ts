@@ -76,6 +76,7 @@ export class HistoricoService {
             (times * materiaExistente.aproveitamento + materia.aproveitamento) /
             (times + 1);
           times = times + 1;
+          materiaTimesMap.set(materia.nome, times);
         }
 
         // Atualiza ou adiciona a média das frentes no frentesMap
@@ -85,10 +86,12 @@ export class HistoricoService {
             frenteTimesMap.set(frente.nome, 1);
           } else {
             const frenteExistente = frentesMap.get(frente.nome)!;
-            const times = frenteTimesMap.get(frente.nome)!;
+            let times = frenteTimesMap.get(frente.nome)!;
             frenteExistente.aproveitamento =
               (times * frenteExistente.aproveitamento + frente.aproveitamento) /
               (times + 1);
+            times = times + 1;
+            frenteTimesMap.set(frente.nome, times);
           }
         });
       });
