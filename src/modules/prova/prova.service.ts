@@ -62,6 +62,7 @@ export class ProvaService {
         filename: result.filename,
         gabarito: result.gabarito,
         enemAreas: result.enemAreas,
+        createdAt: result.createdAt,
       } as GetProvaDTOOutout;
     } catch (error: any) {
       throw new HttpException(error.message, HttpStatus.CONFLICT);
@@ -505,6 +506,7 @@ export class ProvaService {
       filename: prova.filename,
       gabarito: prova.gabarito,
       enemAreas: prova.enemAreas,
+      createdAt: prova.createdAt,
     } as GetProvaDTOOutout;
   }
 }
