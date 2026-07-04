@@ -15,6 +15,9 @@ export class GetProvaDTOOutout {
   ano: number;
 
   @ApiProperty()
+  categoria: string;
+
+  @ApiProperty()
   exame: string;
 
   @ApiProperty()

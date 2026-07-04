@@ -39,7 +39,10 @@ export class ProvaService {
 
   public async create(item: CreateProvaDTOInput): Promise<GetProvaDTOOutout> {
     const categoria = await this.categoriaRepository.getById(item.categoria);
-    const factory = this.provaFactory.getFactory(categoria.exame as any, item.ano);
+    const factory = this.provaFactory.getFactory(
+      categoria.exame as any,
+      item.ano,
+    );
     try {
       const prova = await factory.createProva(item);
       await factory.createSimulados(prova);
@@ -81,6 +84,7 @@ export class ProvaService {
           edicao: prova.edicao,
           aplicacao: prova.aplicacao,
           ano: prova.ano,
+          categoria: prova.categoria.nome,
           exame: prova.categoria.exame.nome,
           nome: prova.nome,
           totalQuestao: prova.totalQuestao,
@@ -111,7 +115,8 @@ export class ProvaService {
         if (!containsQuestion) return;
 
         const hasRequiredCount =
-          simulado.questoes.length === simulado.categoria.quantidadeTotalQuestao;
+          simulado.questoes.length ===
+          simulado.categoria.quantidadeTotalQuestao;
         const allApproved = simulado.questoes.every(
           (q) =>
             q.status === Status.Approved || q._id.toString() === questionId,
@@ -147,7 +152,8 @@ export class ProvaService {
 
         // Recalcula bloqueado considerando a questão sendo rejeitada
         const hasRequiredCount =
-          simulado.questoes.length === simulado.categoria.quantidadeTotalQuestao;
+          simulado.questoes.length ===
+          simulado.categoria.quantidadeTotalQuestao;
         const allApproved =
           hasRequiredCount &&
           simulado.questoes.every((q) => {
@@ -335,7 +341,8 @@ export class ProvaService {
 
             // C2: Recalcular bloqueado
             const hasRequiredCount = simulado.categoria
-              ? newSimQuestoes.length === simulado.categoria.quantidadeTotalQuestao
+              ? newSimQuestoes.length ===
+                simulado.categoria.quantidadeTotalQuestao
               : false;
             const allApproved =
               newSimQuestoes.length > 0 &&
@@ -409,7 +416,9 @@ export class ProvaService {
     frenteEspanhol: Frente,
   ): Questao[] {
     const nome = simulado.nome;
-    const tipoNomeAno = prova.categoria ? `${prova.categoria.nome} ${prova.ano}` : '';
+    const tipoNomeAno = prova.categoria
+      ? `${prova.categoria.nome} ${prova.ano}`
+      : '';
 
     return questoesDaProva.filter((q) => {
       const frente1Id = q.frente1?._id?.toString() || '';
