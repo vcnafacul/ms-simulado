@@ -22,6 +22,7 @@ import { ProvaFactory } from './factory/prova_factory';
 import { ProvaRepository } from './prova.repository';
 import { Prova } from './prova.schema';
 import { UpdateProvaFilesDTO } from './dtos/update-files.dto.input';
+import { atingiuQuantidade } from '../simulado/helpers/bloqueado';
 
 @Injectable()
 export class ProvaService {
@@ -39,10 +40,7 @@ export class ProvaService {
 
   public async create(item: CreateProvaDTOInput): Promise<GetProvaDTOOutout> {
     const categoria = await this.categoriaRepository.getById(item.categoria);
-    const factory = this.provaFactory.getFactory(
-      categoria.exame as any,
-      item.ano,
-    );
+    const factory = this.provaFactory.getFactory(categoria, item.ano);
     try {
       const prova = await factory.createProva(item);
       await factory.createSimulados(prova);
@@ -117,9 +115,10 @@ export class ProvaService {
         );
         if (!containsQuestion) return;
 
-        const hasRequiredCount =
-          simulado.questoes.length ===
-          simulado.categoria.quantidadeTotalQuestao;
+        const hasRequiredCount = atingiuQuantidade(
+          simulado.categoria.quantidadeTotalQuestao,
+          simulado.questoes.length,
+        );
         const allApproved = simulado.questoes.every(
           (q) =>
             q.status === Status.Approved || q._id.toString() === questionId,
@@ -154,9 +153,10 @@ export class ProvaService {
         if (!containsQuestion) return;
 
         // Recalcula bloqueado considerando a questão sendo rejeitada
-        const hasRequiredCount =
-          simulado.questoes.length ===
-          simulado.categoria.quantidadeTotalQuestao;
+        const hasRequiredCount = atingiuQuantidade(
+          simulado.categoria.quantidadeTotalQuestao,
+          simulado.questoes.length,
+        );
         const allApproved =
           hasRequiredCount &&
           simulado.questoes.every((q) => {
@@ -173,10 +173,7 @@ export class ProvaService {
 
   public async getMissingNumbers(id: string) {
     const prova = await this.repository.getProvaWithQuestion(id);
-    const factory = this.provaFactory.getFactory(
-      prova.categoria.exame as any,
-      prova.ano,
-    );
+    const factory = this.provaFactory.getFactory(prova.categoria, prova.ano);
     return factory.getMissingNumbers(prova);
   }
 
@@ -344,8 +341,10 @@ export class ProvaService {
 
             // C2: Recalcular bloqueado
             const hasRequiredCount = simulado.categoria
-              ? newSimQuestoes.length ===
-                simulado.categoria.quantidadeTotalQuestao
+              ? atingiuQuantidade(
+                  simulado.categoria.quantidadeTotalQuestao,
+                  newSimQuestoes.length,
+                )
               : false;
             const allApproved =
               newSimQuestoes.length > 0 &&
@@ -418,6 +417,12 @@ export class ProvaService {
     frenteIngles: Frente,
     frenteEspanhol: Frente,
   ): Questao[] {
+    // Prova custom: nome do simulado é livre, então não há string matching —
+    // todas as questões da prova entram no único simulado.
+    if (prova.categoria?.custom) {
+      return [...questoesDaProva];
+    }
+
     const nome = simulado.nome;
     const tipoNomeAno = prova.categoria
       ? `${prova.categoria.nome} ${prova.ano}`

@@ -16,6 +16,7 @@ import { Status } from '../questao/enums/status.enum';
 import { QuestaoRepository } from '../questao/questao.repository';
 import { Questao } from '../questao/questao.schema';
 import { CategoriaRepository } from '../categoria/categoria.repository';
+import { atingiuQuantidade } from './helpers/bloqueado';
 import { AnswerSimuladoDto } from './dtos/answer-simulado.dto.input';
 import { AvailableSimuladoDTOoutput } from './dtos/available-simulado.dto.output';
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
@@ -67,8 +68,11 @@ export class SimuladoService {
         sml.questoes.push(question);
 
         // Verifica se o simulador atingiu a quantidade total de questões
-        const atingiuQuantidadeTotal =
-          sml.questoes.length === sml.categoria.quantidadeTotalQuestao;
+        // (categoria livre / quantidadeTotalQuestao null sempre "atinge")
+        const atingiuQuantidadeTotal = atingiuQuantidade(
+          sml.categoria.quantidadeTotalQuestao,
+          sml.questoes.length,
+        );
         // Verifica se todas as questões estão aprovadas
         const todasAprovadas = sml.questoes.every(
           (q) => q.status === Status.Approved,
