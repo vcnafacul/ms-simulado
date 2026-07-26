@@ -6,14 +6,21 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
-import { CategoriaUnique } from '../validator/categoria-unique.validator';
 import { ExameExist } from '../../exame/validator/exame-exist.validator';
 
 export class CreateCategoriaDTOInput {
-  @ApiProperty()
+  @ApiProperty({ required: false })
   @IsString()
-  @CategoriaUnique({ message: 'nome categoria já existe' })
-  public nome: string;
+  @IsOptional()
+  public nome?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Prefixo para auto-gerar o nome quando "nome" não é enviado',
+  })
+  @IsString()
+  @IsOptional()
+  public prefixo?: string;
 
   @ApiProperty()
   @IsNumber()
