@@ -5,6 +5,7 @@ import { CategoriaRepository } from './categoria.repository';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Categoria, CategoriaSchema } from './schemas/categoria.schema';
 import { CategoriaUniqueValidator } from './validator/categoria-unique.validator';
+import { CategoriaExistValidator } from './validator/categoria-exist.validator';
 import { MateriaExistValidator } from '../materia/validator/materia-exist.validator';
 import { FrenteExistValidator } from '../frente/validator/frente-exist.validator';
 import { FrenteModule } from '../frente/frente.module';
@@ -28,6 +29,7 @@ import { SimuladoModule } from '../simulado/simulado.module';
     CategoriaService,
     CategoriaRepository,
     CategoriaUniqueValidator,
+    CategoriaExistValidator,
     MateriaExistValidator,
     FrenteExistValidator,
     ExameExistValidator,

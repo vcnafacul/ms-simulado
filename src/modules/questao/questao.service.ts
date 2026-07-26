@@ -47,7 +47,7 @@ export class QuestaoService {
 
   public async create(item: CreateQuestaoDTOInput): Promise<Questao> {
     const prova = await this.provaRepository.getById(item.prova);
-    const factory = this.provaFactory.getFactory(prova.categoria.exame as any, prova.ano);
+    const factory = this.provaFactory.getFactory(prova.categoria, prova.ano);
     if (item.numero == null || await factory.verifyNumberProva(prova._id, item.numero)) {
       return await factory.createQuestion(item);
     }
@@ -223,7 +223,7 @@ export class QuestaoService {
       throw new HttpException('Prova não informada', HttpStatus.BAD_REQUEST);
     }
     const prova = await this.provaRepository.getById(question.prova);
-    const factory = this.provaFactory.getFactory(prova.categoria.exame as any, prova.ano);
+    const factory = this.provaFactory.getFactory(prova.categoria, prova.ano);
     try {
       await factory.updateQuestion(question);
     } catch (error: any) {

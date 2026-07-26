@@ -38,6 +38,14 @@ export class Simulado extends BaseSchema {
   @Prop({ required: false, default: true })
   @ApiProperty()
   bloqueado?: boolean;
+
+  @Prop({ required: false })
+  @ApiProperty()
+  criadorId?: string;
+
+  @Prop({ required: false, default: null })
+  @ApiProperty()
+  cursinhoId?: string | null;
 }
 
 export const SimuladoSchema = SchemaFactory.createForClass(Simulado);
