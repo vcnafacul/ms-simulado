@@ -21,13 +21,15 @@ export class CategoriaRepository extends BaseRepository<Categoria> {
     limit,
     where,
   }: GetAllWhereInput): Promise<GetAllOutput<Categoria>> {
+    // guard por último: caller não pode sobrescrever o filtro de soft-delete
+    const filter = { ...where, deleted: { $ne: true } };
     const data = await this.model
       .find()
       .skip((page - 1) * limit)
       .limit(limit ?? Infinity)
-      .where({ ...where })
+      .where(filter)
       .populate('exame');
-    const totalItems = await this.model.where({ ...where }).countDocuments();
+    const totalItems = await this.model.where(filter).countDocuments();
     return { data, page, limit, totalItems };
   }
 }
