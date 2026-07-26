@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -20,9 +21,44 @@ export class CategoriaService {
     private readonly simuladoRepository: SimuladoRepository,
   ) {}
 
-  public async add(item: CreateCategoriaDTOInput): Promise<Categoria> {
-    const categoria = Object.assign(new Categoria(), item);
+  public async add(dto: CreateCategoriaDTOInput): Promise<Categoria> {
+    const nomeAplicado = dto.nome ?? this.gerarNomeAuto(dto);
+
+    // colisão ANTES do pattern: nomes seedados (ex.: "Enem Dia 1") não seguem
+    // o pattern de categoria custom, então precisam bater 409 (não 400).
+    const collision = await this.repository.getByFilter({ nome: nomeAplicado });
+    if (collision) {
+      throw new ConflictException('Já existe uma categoria com esse nome');
+    }
+
+    this.validarPatternNome(nomeAplicado);
+
+    // backend é fonte de verdade: força os campos de segurança (ignora o DTO).
+    const categoria = Object.assign(new Categoria(), dto, {
+      nome: nomeAplicado,
+      custom: true,
+      selecionavel: true,
+    });
+
     return await this.repository.create(categoria);
+  }
+
+  private gerarNomeAuto(dto: CreateCategoriaDTOInput): string {
+    // normaliza whitespace interno: nome tem índice unique, então "Mini  X" e
+    // "Mini X" não podem virar categorias distintas.
+    const prefixo = dto.prefixo?.trim().replace(/\s+/g, ' ') || 'Personalizado';
+    const qtd = dto.quantidadeTotalQuestao ?? 'livre';
+    const parteQtd = qtd === 'livre' ? 'livre' : `${qtd}q`;
+    return `${prefixo} ${parteQtd} ${dto.duracao}min`;
+  }
+
+  private validarPatternNome(nome: string): void {
+    const pattern = /^(?:\S+\s+)*?(?:\d+q|livre)\s+\d+min$/;
+    if (!pattern.test(nome)) {
+      throw new BadRequestException(
+        `Nome '${nome}' não segue o pattern '<Prefixo> <Nq>|livre <Dmin>' (ex.: 'Personalizado 30q 60min')`,
+      );
+    }
   }
 
   public async getById(id: string): Promise<Categoria> {
