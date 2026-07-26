@@ -1,13 +1,24 @@
-import { Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  forwardRef,
+} from '@nestjs/common';
 import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
+import { SimuladoRepository } from '../simulado/simulado.repository';
 import { CreateCategoriaDTOInput } from './dtos/create.dto.input';
 import { Categoria } from './schemas/categoria.schema';
 import { CategoriaRepository } from './categoria.repository';
 
 @Injectable()
 export class CategoriaService {
-  constructor(private readonly repository: CategoriaRepository) {}
+  constructor(
+    private readonly repository: CategoriaRepository,
+    @Inject(forwardRef(() => SimuladoRepository))
+    private readonly simuladoRepository: SimuladoRepository,
+  ) {}
 
   public async add(item: CreateCategoriaDTOInput): Promise<Categoria> {
     const categoria = Object.assign(new Categoria(), item);
@@ -23,6 +34,19 @@ export class CategoriaService {
   }
 
   public async delete(id: string): Promise<void> {
+    const categoria = await this.repository.getById(id);
+    if (!categoria) {
+      throw new NotFoundException(`Categoria ${id} não encontrada`);
+    }
+
+    const simuladosUsando = await this.simuladoRepository.countByCategoria(id);
+    if (simuladosUsando > 0) {
+      throw new ConflictException({
+        message: 'Categoria em uso e não pode ser excluída',
+        simuladosUsando,
+      });
+    }
+
     await this.repository.delete(id);
   }
 }

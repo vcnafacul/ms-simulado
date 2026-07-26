@@ -12,6 +12,13 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
     super(model);
   }
 
+  async countByCategoria(categoriaId: string): Promise<number> {
+    return this.model.countDocuments({
+      categoria: categoriaId,
+      deleted: { $ne: true },
+    });
+  }
+
   async getById(id: string): Promise<Simulado | null> {
     return await this.model
       .findById(id)

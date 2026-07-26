@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { CategoriaService } from './categoria.service';
 import { CategoriaController } from './categoria.controller';
 import { CategoriaRepository } from './categoria.repository';
@@ -11,9 +11,11 @@ import { FrenteModule } from '../frente/frente.module';
 import { MateriaModule } from '../materia/materia.module';
 import { ExameModule } from '../exame/exame.module';
 import { ExameExistValidator } from '../exame/validator/exame-exist.validator';
+import { SimuladoModule } from '../simulado/simulado.module';
 
 @Module({
   imports: [
+    forwardRef(() => SimuladoModule),
     MongooseModule.forFeature([
       { name: Categoria.name, schema: CategoriaSchema },
     ]),
