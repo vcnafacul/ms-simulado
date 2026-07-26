@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { QueueModule } from 'src/shared/modules/queue/queue.module';
 import { ExameModule } from '../exame/exame.module';
@@ -23,7 +23,7 @@ import { SimuladoService } from './simulado.service';
     ]),
     QueueModule,
     QuestaoModule,
-    CategoriaModule,
+    forwardRef(() => CategoriaModule),
     ExameModule,
     FrenteModule,
     MateriaModule,
