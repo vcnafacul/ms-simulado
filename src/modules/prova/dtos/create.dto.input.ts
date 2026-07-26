@@ -21,11 +21,29 @@ export class CreateProvaDTOInput {
   @CategoriaExist({ message: 'categoria não existe' })
   categoria: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  filename: string;
+  filename?: string;
 
   @ApiProperty()
   @IsOptional()
   gabarito?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  nome?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  nomeSimulado?: string;
+
+  // Campo INTERNO: injetado pelo api-vcnafacul a partir do JWT (req.user.id),
+  // não vem do cliente. Precisa de @IsString() para sobreviver ao whitelist do
+  // ValidationPipe. Obrigatório em toda prova nova (oficial ou custom).
+  @ApiProperty()
+  @IsString()
+  criadorId: string;
 }

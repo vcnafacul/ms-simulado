@@ -17,6 +17,8 @@ export class Prova extends BaseSchema {
     this.filename = item.filename;
     this.gabarito = item.gabarito;
     this.aplicacao = item.aplicacao;
+    this.criadorId = item.criadorId;
+    this.cursinhoId = null;
     this.simulados = [];
     this.questoes = [];
   }
@@ -65,6 +67,12 @@ export class Prova extends BaseSchema {
 
   @Prop({ default: 1 })
   public inicialNumero: number = 1;
+
+  @Prop({ required: true })
+  public criadorId: string;
+
+  @Prop({ required: false, default: null })
+  public cursinhoId?: string | null;
 }
 
 export const ProvaSchema = SchemaFactory.createForClass(Prova);
