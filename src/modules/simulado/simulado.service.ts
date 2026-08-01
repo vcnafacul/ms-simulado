@@ -11,7 +11,6 @@ import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { QueueProducer } from 'src/shared/modules/queue/queue.producer';
 import { HistoricoRepository } from '../historico/historico.repository';
 import { HistoricoStatus } from '../historico/enums/historico-status.enum';
-import { Historico } from '../historico/historico.schema';
 import {
   AproveitamentoHistorico,
   MateriaAproveitamento,
