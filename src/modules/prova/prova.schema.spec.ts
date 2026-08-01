@@ -19,6 +19,19 @@ describe('Prova schema — criadorId / cursinhoId', () => {
     expect(prova.cursinhoId).toBeNull();
   });
 
+  it('constructor lê cursinhoId do item quando presente', () => {
+    const item = {
+      criadorId: 'user-1',
+      cursinhoId: 'curs-1',
+      ano: 2023,
+      filename: 'f.pdf',
+    } as unknown as CreateProvaDTOInput;
+
+    const prova = new Prova(item, categoria);
+
+    expect(prova.cursinhoId).toBe('curs-1');
+  });
+
   describe('validação do schema Mongoose', () => {
     let Model: mongoose.Model<Prova>;
 
@@ -41,5 +54,15 @@ describe('Prova schema — criadorId / cursinhoId', () => {
       await expect(doc.validate()).resolves.toBeUndefined();
       expect(doc.cursinhoId).toBeNull();
     });
+  });
+});
+
+describe('ProvaSchema — índices', () => {
+  it('declara índice em cursinhoId', () => {
+    const indexes = ProvaSchema.indexes();
+    const hasCursinhoIndex = indexes.some(
+      ([fields]) => (fields as Record<string, number>).cursinhoId === 1,
+    );
+    expect(hasCursinhoIndex).toBe(true);
   });
 });

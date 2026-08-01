@@ -19,7 +19,6 @@ export class EnemService {
 
   public async createSimuladoIdiomatica(prova: Prova) {
     const mainName = `${prova.categoria.nome} ${prova.ano}`;
-    const exameId = prova.categoria.exame._id.toString();
     await this.createSimuladoLinguagem(prova);
     prova.simulados.push(
       await this.simuladoRepository.create({
@@ -27,6 +26,8 @@ export class EnemService {
         categoria: prova.categoria,
         questoes: [],
         descricao: `${prova.categoria.exame.nome} Inglês`,
+        criadorId: prova.criadorId,
+        cursinhoId: prova.cursinhoId,
       }),
     );
     prova.simulados.push(
@@ -35,37 +36,40 @@ export class EnemService {
         categoria: prova.categoria,
         questoes: [],
         descricao: `${prova.categoria.exame.nome} Espanhol`,
+        criadorId: prova.criadorId,
+        cursinhoId: prova.cursinhoId,
       }),
     );
   }
 
   public async createSimuladoLinguagem(prova: Prova) {
-    const mainName = `${prova.categoria.nome} ${prova.ano}`;
-    const exameId = prova.categoria.exame._id.toString();
     prova.simulados.push(
-      await this.createSimuladoArea(mainName, EnemArea.Linguagens, exameId, 'Inglês'),
+      await this.createSimuladoArea(prova, EnemArea.Linguagens, 'Inglês'),
     );
     prova.simulados.push(
-      await this.createSimuladoArea(mainName, EnemArea.Linguagens, exameId, 'Espanhol'),
+      await this.createSimuladoArea(prova, EnemArea.Linguagens, 'Espanhol'),
     );
   }
 
   public async createSimuladoArea(
-    defaultName: string,
+    prova: Prova,
     nomeTipo: string,
-    exameId: string,
     complemento?: string,
   ) {
+    const mainName = `${prova.categoria.nome} ${prova.ano}`;
+    const exameId = prova.categoria.exame._id.toString();
     const simuladoArea = new Simulado();
     const categoria = await this.categoriaRepository.getByFilter({
       nome: nomeTipo,
       exame: exameId,
     });
     simuladoArea.categoria = categoria;
-    simuladoArea.nome = `${defaultName} ${nomeTipo}`;
+    simuladoArea.nome = `${mainName} ${nomeTipo}`;
     if (complemento) {
       simuladoArea.nome = `${simuladoArea.nome} ${complemento}`;
     }
+    simuladoArea.criadorId = prova.criadorId;
+    simuladoArea.cursinhoId = prova.cursinhoId;
     return await this.simuladoRepository.create(simuladoArea);
   }
 

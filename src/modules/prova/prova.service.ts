@@ -72,30 +72,46 @@ export class ProvaService {
     return prova;
   }
 
+  private toProvaDTO(prova: Prova): GetProvaDTOOutout {
+    return {
+      _id: prova._id,
+      edicao: prova.edicao,
+      aplicacao: prova.aplicacao,
+      ano: prova.ano,
+      categoria: prova.categoria.nome,
+      exame: prova.categoria.exame.nome,
+      nome: prova.nome,
+      totalQuestao: prova.totalQuestao,
+      gabarito: prova.gabarito,
+      totalQuestaoValidadas: prova.totalQuestaoValidadas,
+      filename: prova.filename,
+      enemAreas: prova.enemAreas,
+      totalQuestaoCadastradas: prova.questoes.length,
+      createdAt: prova.createdAt,
+    } as GetProvaDTOOutout;
+  }
+
   public async getAll(
     param: GetAllInput,
   ): Promise<GetAllOutput<GetProvaDTOOutout>> {
     const provas = await this.repository.getAll(param);
     return {
       ...provas,
-      data: provas.data.map((prova) => {
-        return {
-          _id: prova._id,
-          edicao: prova.edicao,
-          aplicacao: prova.aplicacao,
-          ano: prova.ano,
-          categoria: prova.categoria.nome,
-          exame: prova.categoria.exame.nome,
-          nome: prova.nome,
-          totalQuestao: prova.totalQuestao,
-          gabarito: prova.gabarito,
-          totalQuestaoValidadas: prova.totalQuestaoValidadas,
-          filename: prova.filename,
-          enemAreas: prova.enemAreas,
-          totalQuestaoCadastradas: prova.questoes.length,
-          createdAt: prova.createdAt,
-        };
-      }),
+      data: provas.data.map((prova) => this.toProvaDTO(prova)),
+    };
+  }
+
+  public async getAllByCursinho(
+    cursinhoId: string,
+    param: GetAllInput,
+  ): Promise<GetAllOutput<GetProvaDTOOutout>> {
+    const provas = await this.repository.getAll({
+      ...param,
+      where: { cursinhoId },
+    });
+    return {
+      ...provas,
+      data: provas.data.map((prova) => this.toProvaDTO(prova)),
     };
   }
 
