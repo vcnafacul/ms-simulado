@@ -49,6 +49,20 @@ export class ProvaController {
     return await this.service.getAll(query);
   }
 
+  @Get('cursinho/:cursinhoId')
+  @ApiResponse({
+    status: 200,
+    description: 'busca provas de um cursinho',
+    type: Prova,
+    isArray: true,
+  })
+  public async getAllByCursinho(
+    @Param('cursinhoId') cursinhoId: string,
+    @Query() query: GetAllDtoInput,
+  ): Promise<GetAllDtoOutput<GetProvaDTOOutout>> {
+    return await this.service.getAllByCursinho(cursinhoId, query);
+  }
+
   @Get('summary')
   async getSummary() {
     return await this.service.getSummary();

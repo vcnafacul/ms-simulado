@@ -105,3 +105,80 @@ describe('ProvaService.selectQuestionsForSimulado — branch custom', () => {
     expect(result).toHaveLength(2);
   });
 });
+
+describe('ProvaService.getAllByCursinho', () => {
+  function makeProva(id: string) {
+    return {
+      _id: id,
+      edicao: 'Regular',
+      aplicacao: 1,
+      ano: 2024,
+      categoria: { nome: 'Personalizado', exame: { nome: 'Personalizado' } },
+      nome: `Prova ${id}`,
+      totalQuestao: 30,
+      gabarito: 'x',
+      totalQuestaoValidadas: 0,
+      filename: 'f.pdf',
+      enemAreas: [] as any[],
+      questoes: [] as any[],
+      createdAt: new Date('2024-01-01T00:00:00.000Z'),
+    };
+  }
+
+  function makeServiceWithGetAll(getAll: jest.Mock) {
+    const repository = { getAll };
+    const service = new ProvaService(
+      {} as any, // provaFactory
+      repository as any,
+      {} as any, // categoriaRepository
+      {} as any, // simuladoRepository
+      {} as any, // questaoRepository
+      {} as any, // frenteRepository
+    );
+    return { service, repository };
+  }
+
+  it('filtra por cursinhoId via where e mantém a paginação', async () => {
+    const getAll = jest.fn().mockResolvedValue({
+      data: [makeProva('p1')],
+      page: 1,
+      limit: 40,
+      totalItems: 1,
+    });
+    const { service } = makeServiceWithGetAll(getAll);
+
+    const result = await service.getAllByCursinho('curs-1', {
+      page: 1,
+      limit: 40,
+    });
+
+    expect(getAll).toHaveBeenCalledWith({
+      page: 1,
+      limit: 40,
+      where: { cursinhoId: 'curs-1' },
+    });
+    expect(result.totalItems).toBe(1);
+    expect(result.data[0]._id).toBe('p1');
+    expect(result.data[0].categoria).toBe('Personalizado');
+    expect(result.data[0].exame).toBe('Personalizado');
+    expect(result.data[0].totalQuestaoCadastradas).toBe(0);
+  });
+
+  it('cursinho sem provas retorna data vazia (não lança)', async () => {
+    const getAll = jest.fn().mockResolvedValue({
+      data: [],
+      page: 1,
+      limit: 40,
+      totalItems: 0,
+    });
+    const { service } = makeServiceWithGetAll(getAll);
+
+    const result = await service.getAllByCursinho('curs-x', {
+      page: 1,
+      limit: 40,
+    });
+
+    expect(result.data).toEqual([]);
+    expect(result.totalItems).toBe(0);
+  });
+});
