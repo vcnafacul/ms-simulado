@@ -14,3 +14,55 @@ describe('SimuladoRepository.countByCategoria', () => {
     });
   });
 });
+
+describe('SimuladoRepository.updateDisponibilidade', () => {
+  it('faz $set apenas com os campos fornecidos', async () => {
+    const updateOne = jest.fn().mockResolvedValue({ acknowledged: true });
+    const repo = new SimuladoRepository({ updateOne } as any);
+
+    const de = new Date('2026-01-10T00:00:00.000Z');
+    await repo.updateDisponibilidade('sim-1', { disponivelDe: de });
+
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: 'sim-1' },
+      { $set: { disponivelDe: de } },
+    );
+  });
+
+  it('propaga null explícito no $set (para limpar)', async () => {
+    const updateOne = jest.fn().mockResolvedValue({ acknowledged: true });
+    const repo = new SimuladoRepository({ updateOne } as any);
+
+    await repo.updateDisponibilidade('sim-1', {
+      disponivelDe: null,
+      disponivelAte: null,
+    });
+
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: 'sim-1' },
+      { $set: { disponivelDe: null, disponivelAte: null } },
+    );
+  });
+});
+
+describe('SimuladoRepository.getAvailable', () => {
+  it('filtra por categoria, desbloqueado e dentro da janela temporal', async () => {
+    const select = jest.fn().mockResolvedValue([{ _id: 's1', nome: 'S1' }]);
+    const find = jest.fn().mockReturnValue({ select });
+    const repo = new SimuladoRepository({ find } as any);
+
+    const result = await repo.getAvailable('cat-1');
+
+    expect(result).toEqual([{ _id: 's1', nome: 'S1' }]);
+    const filtro = find.mock.calls[0][0];
+    expect(filtro.categoria).toBe('cat-1');
+    expect(filtro.bloqueado).toBe(false);
+    // janela: disponivelDe null OU <= agora ; disponivelAte null OU >= agora
+    expect(filtro.$and).toHaveLength(2);
+    expect(filtro.$and[0].$or[0]).toEqual({ disponivelDe: null });
+    expect(filtro.$and[0].$or[1].disponivelDe.$lte).toBeInstanceOf(Date);
+    expect(filtro.$and[1].$or[0]).toEqual({ disponivelAte: null });
+    expect(filtro.$and[1].$or[1].disponivelAte.$gte).toBeInstanceOf(Date);
+    expect(select).toHaveBeenCalledWith(['nome', '_id']);
+  });
+});
