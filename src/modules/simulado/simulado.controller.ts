@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   Param,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
@@ -14,6 +15,7 @@ import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
 import { AnswerSimuladoDto } from './dtos/answer-simulado.dto.input';
 import { AvailableSimuladoDTOoutput } from './dtos/available-simulado.dto.output';
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
+import { UpdateDisponibilidadeDTO } from './dtos/update-disponibilidade.dto.input';
 import { Simulado } from './schemas/simulado.schema';
 import { SimuladoService } from './simulado.service';
 
@@ -50,6 +52,20 @@ export class SimuladoController {
   @HttpCode(202)
   public async answer(@Body() answer: AnswerSimuladoDto) {
     return this.service.answer(answer);
+  }
+
+  @Patch(':id/disponibilidade')
+  @ApiResponse({
+    status: 200,
+    description: 'atualiza a janela de disponibilidade do simulado',
+    type: Simulado,
+    isArray: false,
+  })
+  public async updateDisponibilidade(
+    @Param('id') id: string,
+    @Body() dto: UpdateDisponibilidadeDTO,
+  ): Promise<Simulado> {
+    return await this.service.updateDisponibilidade(id, dto);
   }
 
   @Get('available')
