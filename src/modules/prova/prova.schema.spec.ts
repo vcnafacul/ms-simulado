@@ -19,6 +19,19 @@ describe('Prova schema — criadorId / cursinhoId', () => {
     expect(prova.cursinhoId).toBeNull();
   });
 
+  it('constructor lê cursinhoId do item quando presente', () => {
+    const item = {
+      criadorId: 'user-1',
+      cursinhoId: 'curs-1',
+      ano: 2023,
+      filename: 'f.pdf',
+    } as unknown as CreateProvaDTOInput;
+
+    const prova = new Prova(item, categoria);
+
+    expect(prova.cursinhoId).toBe('curs-1');
+  });
+
   describe('validação do schema Mongoose', () => {
     let Model: mongoose.Model<Prova>;
 

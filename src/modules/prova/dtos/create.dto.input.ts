@@ -46,4 +46,12 @@ export class CreateProvaDTOInput {
   @ApiProperty()
   @IsString()
   criadorId: string;
+
+  // Campo INTERNO: injetado pelo api-vcnafacul (Card 03) a partir do Collaborator
+  // do usuário. Não vem do cliente final. @IsOptional + @IsString para sobreviver
+  // ao whitelist do ValidationPipe e aceitar ausência/null.
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  @IsString()
+  cursinhoId?: string | null;
 }

@@ -18,7 +18,7 @@ export class Prova extends BaseSchema {
     this.gabarito = item.gabarito;
     this.aplicacao = item.aplicacao;
     this.criadorId = item.criadorId;
-    this.cursinhoId = null;
+    this.cursinhoId = item.cursinhoId ?? null;
     this.simulados = [];
     this.questoes = [];
   }
