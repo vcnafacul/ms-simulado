@@ -57,16 +57,14 @@ export class Enem2010_2017Factory implements IProvaFactory {
 
   public async createSimuladoDia1(prova: Prova) {
     const mainName = `${prova.categoria.nome} ${prova.ano}`;
-    const exameId = prova.categoria.exame._id.toString();
     prova.simulados.push(
       await this.enemService.createSimuladoArea(
-        mainName,
+        prova,
         EnemArea.CienciasHumanas,
-        exameId,
       ),
     );
     prova.simulados.push(
-      await this.enemService.createSimuladoArea(mainName, EnemArea.BioExatas, exameId),
+      await this.enemService.createSimuladoArea(prova, EnemArea.BioExatas),
     );
     prova.simulados.push(
       await this.simuladoRepository.create({
@@ -74,16 +72,16 @@ export class Enem2010_2017Factory implements IProvaFactory {
         categoria: prova.categoria,
         questoes: [],
         descricao: `${prova.categoria.exame.nome}`,
+        criadorId: prova.criadorId,
+        cursinhoId: prova.cursinhoId,
       }),
     );
   }
 
   public async createSimuladoDia2(prova: Prova) {
-    const mainName = `${prova.categoria.nome} ${prova.ano}`;
-    const exameId = prova.categoria.exame._id.toString();
     await this.enemService.createSimuladoIdiomatica(prova);
     prova.simulados.push(
-      await this.enemService.createSimuladoArea(mainName, EnemArea.Matematica, exameId),
+      await this.enemService.createSimuladoArea(prova, EnemArea.Matematica),
     );
   }
 
