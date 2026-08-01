@@ -56,3 +56,13 @@ describe('Prova schema — criadorId / cursinhoId', () => {
     });
   });
 });
+
+describe('ProvaSchema — índices', () => {
+  it('declara índice em cursinhoId', () => {
+    const indexes = ProvaSchema.indexes();
+    const hasCursinhoIndex = indexes.some(
+      ([fields]) => (fields as Record<string, number>).cursinhoId === 1,
+    );
+    expect(hasCursinhoIndex).toBe(true);
+  });
+});

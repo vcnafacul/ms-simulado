@@ -76,3 +76,5 @@ export class Prova extends BaseSchema {
 }
 
 export const ProvaSchema = SchemaFactory.createForClass(Prova);
+
+ProvaSchema.index({ cursinhoId: 1 });
