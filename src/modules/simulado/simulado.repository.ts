@@ -80,10 +80,32 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
   }
 
   async getAvailable(categoriaId: string) {
+    const now = new Date();
     return await this.model
-      .find()
-      .where({ categoria: categoriaId, bloqueado: false })
+      .find({
+        categoria: categoriaId,
+        bloqueado: false,
+        $and: [
+          { $or: [{ disponivelDe: null }, { disponivelDe: { $lte: now } }] },
+          { $or: [{ disponivelAte: null }, { disponivelAte: { $gte: now } }] },
+        ],
+      })
       .select(['nome', '_id']);
+  }
+
+  async updateDisponibilidade(
+    id: string,
+    fields: { disponivelDe?: Date | null; disponivelAte?: Date | null },
+  ) {
+    await this.model.updateOne({ _id: id }, { $set: fields });
+  }
+
+  async getAvailabilityById(id: string): Promise<Simulado | null> {
+    return await this.model
+      .findById(id)
+      .select('bloqueado disponivelDe disponivelAte')
+      .lean<Simulado>()
+      .exec();
   }
 
   public removeDuplicatedSimulados(

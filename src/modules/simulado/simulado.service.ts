@@ -1,11 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ClientSession } from 'mongoose';
 import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { QueueProducer } from 'src/shared/modules/queue/queue.producer';
 import { HistoricoRepository } from '../historico/historico.repository';
 import { HistoricoStatus } from '../historico/enums/historico-status.enum';
-import { Historico } from '../historico/historico.schema';
 import {
   AproveitamentoHistorico,
   MateriaAproveitamento,
@@ -17,6 +22,11 @@ import { QuestaoRepository } from '../questao/questao.repository';
 import { Questao } from '../questao/questao.schema';
 import { CategoriaRepository } from '../categoria/categoria.repository';
 import { atingiuQuantidade } from './helpers/bloqueado';
+import {
+  getAvailabilityStatus,
+  isSimuladoAvailable,
+} from './helpers/availability';
+import { UpdateDisponibilidadeDTO } from './dtos/update-disponibilidade.dto.input';
 import { AnswerSimuladoDto } from './dtos/answer-simulado.dto.input';
 import { AvailableSimuladoDTOoutput } from './dtos/available-simulado.dto.output';
 import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
@@ -50,11 +60,62 @@ export class SimuladoService {
   public async getToAnswer(
     simuladoId: string,
   ): Promise<SimuladoAnswerDTOOutput> {
+    const simulado =
+      await this.simuladoRepository.getAvailabilityById(simuladoId);
+    if (!simulado) return null;
+
+    // Gate rodado ANTES do try/catch: o try engole erros e retorna null,
+    // então o 403 precisa ser lançado fora dele para propagar.
+    if (!isSimuladoAvailable(simulado)) {
+      throw new HttpException(
+        {
+          message: 'Simulado fora da janela de disponibilidade',
+          status: getAvailabilityStatus(simulado),
+        },
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
     try {
       return await this.GetSimulado(simuladoId);
     } catch (error) {
       return null;
     }
+  }
+
+  public async updateDisponibilidade(
+    id: string,
+    dto: UpdateDisponibilidadeDTO,
+  ): Promise<Simulado> {
+    const simulado = await this.simuladoRepository.getById(id);
+    if (!simulado) throw new NotFoundException();
+
+    // Valida contra os valores FINAIS (existente mesclado com o dto),
+    // não só quando ambos vêm no payload — evita janela invertida
+    // criada ao patchar um campo só.
+    const finalDe =
+      dto.disponivelDe !== undefined ? dto.disponivelDe : simulado.disponivelDe;
+    const finalAte =
+      dto.disponivelAte !== undefined
+        ? dto.disponivelAte
+        : simulado.disponivelAte;
+    if (finalDe && finalAte && finalDe >= finalAte) {
+      throw new BadRequestException(
+        'disponivelDe deve ser anterior a disponivelAte',
+      );
+    }
+
+    // PATCH parcial: só grava as chaves presentes no dto.
+    // Omitido = inalterado; null explícito = limpa.
+    const fields: { disponivelDe?: Date | null; disponivelAte?: Date | null } =
+      {};
+    if (dto.disponivelDe !== undefined) fields.disponivelDe = dto.disponivelDe;
+    if (dto.disponivelAte !== undefined) {
+      fields.disponivelAte = dto.disponivelAte;
+    }
+
+    await this.simuladoRepository.updateDisponibilidade(id, fields);
+    return this.simuladoRepository.getById(id);
   }
 
   public async addQuestionSimulados(
@@ -132,20 +193,24 @@ export class SimuladoService {
       const historico = await this.historicoRepository.getById(histId);
 
       if (!historico?.rawRespostas) {
-        await this.historicoRepository.updateStatus(histId, HistoricoStatus.Failed);
+        await this.historicoRepository.updateStatus(
+          histId,
+          HistoricoStatus.Failed,
+        );
         return;
       }
 
-      const simuladoId = (historico.simulado as any)?._id?.toString()
-        ?? historico.simulado.toString();
+      const simuladoId =
+        (historico.simulado as any)?._id?.toString() ??
+        historico.simulado.toString();
       const simulado = await this.simuladoRepository.answer(simuladoId);
 
       const ano = (
         await this.questoesRepository.getById(simulado.questoes[0]._id)
       ).prova.ano;
 
-      const respostasAproveitamento: RespostaAproveitamento[] = simulado.questoes.map(
-        (questao) => {
+      const respostasAproveitamento: RespostaAproveitamento[] =
+        simulado.questoes.map((questao) => {
           const resposta = historico.rawRespostas!.find(
             (r: any) => r.questao === questao._id.toString(),
           );
@@ -156,11 +221,14 @@ export class SimuladoService {
             materia: questao.materia,
             frente: questao.frente1,
           };
-        },
-      );
+        });
 
-      const aproveitamento = await this.criaAproveitamento(respostasAproveitamento);
-      await this.questoesRepository.updateQuestionAnswered(respostasAproveitamento);
+      const aproveitamento = await this.criaAproveitamento(
+        respostasAproveitamento,
+      );
+      await this.questoesRepository.updateQuestionAnswered(
+        respostasAproveitamento,
+      );
 
       await this.historicoRepository.completeProcessing(histId, {
         ano,
@@ -173,7 +241,10 @@ export class SimuladoService {
         aproveitamento,
       });
     } catch (err) {
-      await this.historicoRepository.updateStatus(histId, HistoricoStatus.Failed);
+      await this.historicoRepository.updateStatus(
+        histId,
+        HistoricoStatus.Failed,
+      );
       throw err;
     }
   }

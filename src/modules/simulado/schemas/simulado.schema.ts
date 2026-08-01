@@ -46,6 +46,23 @@ export class Simulado extends BaseSchema {
   @Prop({ required: false, default: null })
   @ApiProperty()
   cursinhoId?: string | null;
+
+  @Prop({ required: false, default: null })
+  @ApiProperty({ required: false, nullable: true })
+  disponivelDe?: Date | null;
+
+  @Prop({ required: false, default: null })
+  @ApiProperty({ required: false, nullable: true })
+  disponivelAte?: Date | null;
 }
 
 export const SimuladoSchema = SchemaFactory.createForClass(Simulado);
+
+// Índice composto para o filtro de availability do getAvailable (Card 02).
+// autoIndex (default true no MongooseModule) cria automaticamente no boot.
+SimuladoSchema.index({
+  categoria: 1,
+  bloqueado: 1,
+  disponivelDe: 1,
+  disponivelAte: 1,
+});
