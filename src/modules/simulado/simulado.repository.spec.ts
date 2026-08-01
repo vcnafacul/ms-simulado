@@ -66,3 +66,27 @@ describe('SimuladoRepository.getAvailable', () => {
     expect(select).toHaveBeenCalledWith(['nome', '_id']);
   });
 });
+
+describe('SimuladoRepository.getAvailabilityById', () => {
+  it('lê só os campos de disponibilidade, sem populate', async () => {
+    const exec = jest.fn().mockResolvedValue({
+      bloqueado: false,
+      disponivelDe: null,
+      disponivelAte: null,
+    });
+    const lean = jest.fn().mockReturnValue({ exec });
+    const select = jest.fn().mockReturnValue({ lean });
+    const findById = jest.fn().mockReturnValue({ select });
+    const repo = new SimuladoRepository({ findById } as any);
+
+    const result = await repo.getAvailabilityById('sim-1');
+
+    expect(findById).toHaveBeenCalledWith('sim-1');
+    expect(select).toHaveBeenCalledWith('bloqueado disponivelDe disponivelAte');
+    expect(result).toEqual({
+      bloqueado: false,
+      disponivelDe: null,
+      disponivelAte: null,
+    });
+  });
+});

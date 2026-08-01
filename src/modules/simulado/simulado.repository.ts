@@ -100,6 +100,14 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
     await this.model.updateOne({ _id: id }, { $set: fields });
   }
 
+  async getAvailabilityById(id: string): Promise<Simulado | null> {
+    return await this.model
+      .findById(id)
+      .select('bloqueado disponivelDe disponivelAte')
+      .lean<Simulado>()
+      .exec();
+  }
+
   public removeDuplicatedSimulados(
     simuladosToCheck: Simulado[],
     simuladosToCompare: Simulado[],

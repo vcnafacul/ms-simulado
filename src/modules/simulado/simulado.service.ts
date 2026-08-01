@@ -60,7 +60,8 @@ export class SimuladoService {
   public async getToAnswer(
     simuladoId: string,
   ): Promise<SimuladoAnswerDTOOutput> {
-    const simulado = await this.simuladoRepository.getById(simuladoId);
+    const simulado =
+      await this.simuladoRepository.getAvailabilityById(simuladoId);
     if (!simulado) return null;
 
     // Gate rodado ANTES do try/catch: o try engole erros e retorna null,

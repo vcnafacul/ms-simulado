@@ -24,14 +24,14 @@ const ATE = new Date('2026-01-20T00:00:00.000Z');
 describe('SimuladoService.getToAnswer (gate de disponibilidade)', () => {
   it('retorna null quando o simulado não existe', async () => {
     const service = makeService({
-      getById: jest.fn().mockResolvedValue(null),
+      getAvailabilityById: jest.fn().mockResolvedValue(null),
     });
     await expect(service.getToAnswer('x')).resolves.toBeNull();
   });
 
   it('lança 403 com status "bloqueado" quando bloqueado', async () => {
     const service = makeService({
-      getById: jest.fn().mockResolvedValue({ bloqueado: true }),
+      getAvailabilityById: jest.fn().mockResolvedValue({ bloqueado: true }),
     });
     await expect(service.getToAnswer('x')).rejects.toBeInstanceOf(
       HttpException,
@@ -48,7 +48,7 @@ describe('SimuladoService.getToAnswer (gate de disponibilidade)', () => {
 
   it('lança 403 com status "antes_da_janela" quando antes da janela', async () => {
     const service = makeService({
-      getById: jest.fn().mockResolvedValue({
+      getAvailabilityById: jest.fn().mockResolvedValue({
         bloqueado: false,
         disponivelDe: new Date(Date.now() + 60 * 60 * 1000),
         disponivelAte: null,
@@ -66,7 +66,7 @@ describe('SimuladoService.getToAnswer (gate de disponibilidade)', () => {
 
   it('lança 403 com status "depois_da_janela" quando depois da janela', async () => {
     const service = makeService({
-      getById: jest.fn().mockResolvedValue({
+      getAvailabilityById: jest.fn().mockResolvedValue({
         bloqueado: false,
         disponivelDe: null,
         disponivelAte: new Date(Date.now() - 60 * 60 * 1000),
@@ -94,6 +94,11 @@ describe('SimuladoService.getToAnswer (gate de disponibilidade)', () => {
       questoes: [],
     } as any;
     const service = makeService({
+      getAvailabilityById: jest.fn().mockResolvedValue({
+        bloqueado: false,
+        disponivelDe: null,
+        disponivelAte: null,
+      }),
       getById: jest.fn().mockResolvedValue(simulado),
     });
     const result = await service.getToAnswer('s1');
