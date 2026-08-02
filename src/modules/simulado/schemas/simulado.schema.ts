@@ -4,6 +4,10 @@ import mongoose, { Types } from 'mongoose';
 import { BaseSchema } from 'src/shared/base/base.schema';
 import { Questao } from '../../questao/questao.schema';
 import { Categoria } from '../../categoria/schemas/categoria.schema';
+import {
+  QuestaoNaContainer,
+  QuestaoNaContainerSchema,
+} from '../../prova/schemas/questao-na-container.schema';
 
 @Schema({ timestamps: true, versionKey: false })
 export class Simulado extends BaseSchema {
@@ -26,6 +30,10 @@ export class Simulado extends BaseSchema {
   })
   @ApiProperty({ type: Questao, isArray: true })
   questoes: Questao[];
+
+  @Prop({ type: [QuestaoNaContainerSchema], default: [] })
+  @ApiProperty({ type: QuestaoNaContainer, isArray: true, required: false })
+  questoesNovo?: QuestaoNaContainer[];
 
   @Prop({ required: false, default: 0 })
   @ApiProperty()
