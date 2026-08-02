@@ -6,6 +6,10 @@ import { Simulado } from '../simulado/schemas/simulado.schema';
 import { Categoria } from '../categoria/schemas/categoria.schema';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
 import { Edicao } from './enums/edicao.enum';
+import {
+  QuestaoNaContainer,
+  QuestaoNaContainerSchema,
+} from './schemas/questao-na-container.schema';
 
 @Schema({ timestamps: true, versionKey: false })
 export class Prova extends BaseSchema {
@@ -21,6 +25,7 @@ export class Prova extends BaseSchema {
     this.cursinhoId = item.cursinhoId ?? null;
     this.simulados = [];
     this.questoes = [];
+    this.questoesNovo = [];
   }
 
   @Prop({ enum: Edicao })
@@ -46,6 +51,9 @@ export class Prova extends BaseSchema {
     default: [],
   })
   questoes: Questao[];
+
+  @Prop({ type: [QuestaoNaContainerSchema], default: [] })
+  public questoesNovo: QuestaoNaContainer[];
 
   @Prop()
   public nome: string;
