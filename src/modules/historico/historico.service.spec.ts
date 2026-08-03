@@ -30,7 +30,7 @@ function makeHistorico(aproveitamento: AproveitamentoHistorico) {
     _id: 'hist-id',
     simulado: {
       nome: 'Simulado',
-      questoes: [] as any[],
+      questoesNovo: [{}, {}] as any[],
       aproveitamento: 0,
       vezesRespondido: 0,
     },
@@ -67,5 +67,6 @@ describe('HistoricoService.calcularMediaAproveitamento', () => {
     const expected = (0.5 + 0.8 + 1.0) / 3; // ≈ 0.7667
     expect(result.performanceMateriaFrente.materias[0].aproveitamento).toBeCloseTo(expected, 5);
     expect(result.performanceMateriaFrente.frentes[0].aproveitamento).toBeCloseTo(expected, 5);
+    expect(result.historicos[0].totalQuestionsTest).toBe(2);
   });
 });

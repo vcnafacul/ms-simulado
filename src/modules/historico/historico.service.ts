@@ -32,7 +32,7 @@ export class HistoricoService {
       performance: historico.aproveitamento,
       timeSpent: historico.tempoRealizado,
       questionsAnswered: historico.questoesRespondidas,
-      totalQuestionsTest: historico.simulado.questoes.length,
+      totalQuestionsTest: historico.simulado.questoesNovo.length,
       testPerformance: historico.simulado.aproveitamento,
       testAttempts: historico.simulado.vezesRespondido,
       createdAt: historico.createdAt,
