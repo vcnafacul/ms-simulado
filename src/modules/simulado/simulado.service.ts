@@ -125,12 +125,13 @@ export class SimuladoService {
   public async addQuestionSimulados(
     simulados: Simulado[],
     question: Questao,
+    numero: number,
     session?: ClientSession,
   ) {
     await Promise.all(
       simulados.map(async (sml) => {
         // Adiciona a nova questão (single-write em questoes).
-        addQuestaoToContainer(sml, question);
+        addQuestaoToContainer(sml, question, numero);
 
         // Verifica se o simulado atingiu a quantidade total de questões
         // (categoria livre / quantidadeTotalQuestao null sempre "atinge")

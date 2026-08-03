@@ -41,9 +41,9 @@ export class ProvaRepository extends BaseRepository<Prova> {
       });
   }
 
-  public async addQuestion(id: string, question: Questao) {
+  public async addQuestion(id: string, question: Questao, numero: number) {
     const prova = await this.model.findById(id);
-    addQuestaoToContainer(prova, question);
+    addQuestaoToContainer(prova, question, numero);
     if (question.status === Status.Approved) {
       prova.totalQuestaoValidadas += 1;
     }

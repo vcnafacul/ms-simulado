@@ -236,7 +236,7 @@ describe('SimuladoService.addQuestionSimulados (single-write questoes)', () => {
       status: Status.Approved,
     };
 
-    await service.addQuestionSimulados([sml], question);
+    await service.addQuestionSimulados([sml], question, 1);
 
     expect(sml.questoes).toHaveLength(1);
     expect(sml.bloqueado).toBe(false);
@@ -254,11 +254,15 @@ describe('SimuladoService.addQuestionSimulados (single-write questoes)', () => {
       bloqueado: true,
     };
 
-    await service.addQuestionSimulados([sml], {
-      _id: 'q1',
-      numero: 1,
-      status: Status.Approved,
-    } as any);
+    await service.addQuestionSimulados(
+      [sml],
+      {
+        _id: 'q1',
+        numero: 1,
+        status: Status.Approved,
+      } as any,
+      1,
+    );
 
     expect(sml.bloqueado).toBe(true);
   });

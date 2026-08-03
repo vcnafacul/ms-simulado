@@ -10,7 +10,7 @@ describe('question-container.helpers', () => {
     const container: any = { questoes: [] };
     const questao: any = { _id: new Types.ObjectId(), numero: 7, status: 'approved' };
 
-    addQuestaoToContainer(container, questao);
+    addQuestaoToContainer(container, questao, 7);
 
     expect(container.questoes).toHaveLength(1);
     expect(container.questoes[0].numero).toBe(7);
@@ -24,8 +24,8 @@ describe('question-container.helpers', () => {
     const q1: any = { _id: new Types.ObjectId(), numero: 1 };
     const q2: any = { _id: new Types.ObjectId(), numero: 1 };
 
-    addQuestaoToContainer(container, q1);
-    addQuestaoToContainer(container, q2);
+    addQuestaoToContainer(container, q1, 1);
+    addQuestaoToContainer(container, q2, 1);
 
     expect(container.questoes).toHaveLength(2);
     expect(container.questoes.map((qc: any) => qc.numero)).toEqual([1, 1]);

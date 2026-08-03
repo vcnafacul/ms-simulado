@@ -174,9 +174,14 @@ export class Enem2017PlusFactory implements IProvaFactory {
       await this.simuladoService.addQuestionSimulados(
         simuladosToEnter,
         result,
+        question.numero,
         session,
       );
-      await this.provaRepository.addQuestion(question.prova, result);
+      await this.provaRepository.addQuestion(
+        question.prova,
+        result,
+        question.numero,
+      );
       await session.commitTransaction();
       return result;
     } catch (error) {
@@ -274,9 +279,14 @@ export class Enem2017PlusFactory implements IProvaFactory {
         await this.simuladoService.addQuestionSimulados(
           simuladosActuallyEnter,
           questao,
+          question.numero,
           session,
         );
-        await this.provaRepository.addQuestion(question.prova, questao);
+        await this.provaRepository.addQuestion(
+          question.prova,
+          questao,
+          question.numero,
+        );
       }
       await this.questaoRepository.updateQuestion(question);
       await session.commitTransaction();

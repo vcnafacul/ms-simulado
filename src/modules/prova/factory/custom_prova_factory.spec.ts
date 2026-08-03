@@ -172,9 +172,10 @@ describe('CustomProvaFactory.createQuestion', () => {
     expect(simuladoService.addQuestionSimulados).toHaveBeenCalledWith(
       provaToEnter.simulados,
       result,
+      1,
       session,
     );
-    expect(provaRepository.addQuestion).toHaveBeenCalledWith('p1', result);
+    expect(provaRepository.addQuestion).toHaveBeenCalledWith('p1', result, 1);
     expect(session.commitTransaction).toHaveBeenCalledTimes(1);
     expect(session.abortTransaction).not.toHaveBeenCalled();
     expect(session.endSession).toHaveBeenCalledTimes(1);
@@ -243,11 +244,13 @@ describe('CustomProvaFactory.updateQuestion', () => {
     expect(simuladoService.addQuestionSimulados).toHaveBeenCalledWith(
       newProva.simulados,
       questaoAtual,
+      undefined,
       expect.anything(),
     );
     expect(provaRepository.addQuestion).toHaveBeenCalledWith(
       'p-new',
       questaoAtual,
+      undefined,
     );
   });
 });

@@ -18,7 +18,7 @@ describe('ProvaRepository.addQuestion (single-write questoes)', () => {
       numero: 3,
       status: Status.Approved,
     };
-    await repo.addQuestion('p1', questao);
+    await repo.addQuestion('p1', questao, 3);
 
     expect(prova.questoes).toHaveLength(1);
     expect(prova.questoes[0].numero).toBe(3);
@@ -38,11 +38,15 @@ describe('ProvaRepository.addQuestion (single-write questoes)', () => {
       updateOne: jest.fn().mockResolvedValue({}),
     } as any);
 
-    await repo.addQuestion('p1', {
-      _id: new Types.ObjectId(),
-      numero: 1,
-      status: Status.Pending,
-    } as any);
+    await repo.addQuestion(
+      'p1',
+      {
+        _id: new Types.ObjectId(),
+        numero: 1,
+        status: Status.Pending,
+      } as any,
+      1,
+    );
 
     expect(prova.totalQuestaoValidadas).toBe(0);
   });
