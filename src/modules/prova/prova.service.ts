@@ -279,9 +279,9 @@ export class ProvaService {
           // Passo A: Reconstruir prova.questoes a partir das questoes que apontam para esta prova
           const questoesDaProva =
             questoesByProva.get(prova._id.toString()) || [];
-          const oldQuestaoIds = (prova.questoes || [])
-            .filter((q) => q !== null && q._id !== undefined)
-            .map((q) => q._id.toString())
+          const oldQuestaoIds = (prova.questoesNovo || [])
+            .filter((qc) => qc != null && qc.questao != null)
+            .map((qc) => ((qc.questao as any)._id ?? qc.questao).toString())
             .sort();
           const newQuestaoIds = questoesDaProva
             .map((q) => q._id.toString())
@@ -298,9 +298,11 @@ export class ProvaService {
               detail: `Reconstruido array de questoes da prova`,
             });
           }
-          prova.questoes = questoesDaProva.sort(
-            (a, b) => a.numero - b.numero,
-          ) as any;
+          questoesDaProva.sort((a, b) => a.numero - b.numero);
+          prova.questoesNovo = questoesDaProva.map((q) => ({
+            questao: q._id,
+            numero: q.numero,
+          })) as any;
 
           // Passo B: Recalcular totalQuestaoValidadas
           const actualApproved = questoesDaProva.filter(
@@ -335,9 +337,9 @@ export class ProvaService {
               frenteIngles,
               frenteEspanhol,
             );
-            const oldSimQuestaoIds = (simulado.questoes || [])
-              .filter((q) => q !== null && q._id !== undefined)
-              .map((q) => q._id.toString())
+            const oldSimQuestaoIds = (simulado.questoesNovo || [])
+              .filter((qc) => qc != null && qc.questao != null)
+              .map((qc) => ((qc.questao as any)._id ?? qc.questao).toString())
               .sort();
             const newSimQuestaoIds = newSimQuestoes
               .map((q) => q._id.toString())
@@ -381,9 +383,11 @@ export class ProvaService {
             }
 
             // C3: Atualizar simulado com questoes reconstruidas e ordenadas
-            simulado.questoes = newSimQuestoes.sort(
-              (a, b) => a.numero - b.numero,
-            ) as any;
+            newSimQuestoes.sort((a, b) => a.numero - b.numero);
+            simulado.questoesNovo = newSimQuestoes.map((q) => ({
+              questao: q._id,
+              numero: q.numero,
+            })) as any;
             simulado.bloqueado = shouldBeBlocked;
 
             // C4: Sempre persistir simulado para garantir consistencia

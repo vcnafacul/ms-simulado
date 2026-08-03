@@ -216,3 +216,66 @@ describe('ProvaService.refuseQuestion — recompute questoesNovo', () => {
     expect(repository.update).toHaveBeenCalledWith(prova);
   });
 });
+
+describe('ProvaService.executeSync (single-write questoesNovo)', () => {
+  it('grava questoesNovo na prova e no simulado (custom) e não escreve questoes', async () => {
+    const questao: any = {
+      _id: 'qA',
+      numero: 1,
+      status: Status.Approved,
+      prova: 'p1',
+      frente1: { _id: 'f1' },
+      enemArea: 'Matemática',
+    };
+    const simulado: any = {
+      _id: 's1',
+      nome: 'Sim custom',
+      categoria: { quantidadeTotalQuestao: 1 },
+      questoes: [],
+      questoesNovo: [],
+      bloqueado: true,
+    };
+    const prova: any = {
+      _id: 'p1',
+      nome: 'Prova custom',
+      ano: 2020,
+      categoria: { custom: true, quantidadeTotalQuestao: 1, exame: {} },
+      simulados: [simulado],
+      questoes: [],
+      questoesNovo: [],
+    };
+
+    const repository: any = {
+      getAllPopulated: jest.fn().mockResolvedValue([prova]),
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+    const simuladoRepository: any = {
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+    const questaoRepository: any = {
+      getAllByProvaIds: jest.fn().mockResolvedValue([questao]),
+    };
+    const frenteRepository: any = {
+      getByFilter: jest.fn().mockResolvedValue({ _id: 'fx' }),
+    };
+
+    const service = new ProvaService(
+      {} as any, // provaFactory
+      repository,
+      {} as any, // categoriaRepository
+      simuladoRepository,
+      questaoRepository,
+      frenteRepository,
+    );
+
+    await (service as any).executeSync();
+
+    expect(repository.update).toHaveBeenCalledWith(prova);
+    expect(prova.questoesNovo).toEqual([{ questao: 'qA', numero: 1 }]);
+    expect(prova.questoes).toEqual([]);
+    expect(simuladoRepository.update).toHaveBeenCalledWith(simulado);
+    expect(simulado.questoesNovo).toEqual([{ questao: 'qA', numero: 1 }]);
+    expect(simulado.questoes).toEqual([]);
+    expect(simulado.bloqueado).toBe(false);
+  });
+});
