@@ -221,6 +221,13 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     await this.model.deleteOne({ _id });
   }
 
+  async findProvasContendo(questaoId: string): Promise<Prova[]> {
+    return await this.provaModel
+      .find({ 'questoes.questao': questaoId })
+      .populate('simulados')
+      .exec();
+  }
+
   async canInsertQuestion(
     provaId: string,
     numero: number,

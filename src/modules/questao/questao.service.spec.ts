@@ -90,3 +90,43 @@ describe('QuestaoService.create', () => {
     expect(mockFactory.createQuestion).not.toHaveBeenCalled();
   });
 });
+
+describe('QuestaoService.delete (reverse-lookup provas contendo a questão)', () => {
+  it('remove a questão das provas/simulados que a contêm e deleta', async () => {
+    const question: any = { _id: 'q1', status: 'pending' };
+    const prova: any = { _id: 'pr1', simulados: [{ _id: 's1' }] };
+    const session = {
+      startTransaction: jest.fn(),
+      commitTransaction: jest.fn().mockResolvedValue(undefined),
+      abortTransaction: jest.fn().mockResolvedValue(undefined),
+      endSession: jest.fn(),
+    };
+    const repository: any = {
+      getByIdToDelete: jest.fn().mockResolvedValue(question),
+      startSession: jest.fn().mockResolvedValue(session),
+      delete: jest.fn().mockResolvedValue(undefined),
+      findProvasContendo: jest.fn().mockResolvedValue([prova]),
+    };
+    const simuladoService: any = { removeQuestionSimulados: jest.fn().mockResolvedValue(undefined) };
+    const provaRepository: any = { removeQuestion: jest.fn().mockResolvedValue(undefined) };
+    const { QuestaoService } = require('./questao.service');
+    const service = new QuestaoService(
+      repository,        // repository
+      {} as any,         // provaService
+      provaRepository,   // provaRepository
+      {} as any,         // exameRepository
+      {} as any,         // materiaRepository
+      {} as any,         // frenteRepository
+      {} as any,         // auditLogService
+      simuladoService,   // simuladoService
+      {} as any,         // provaFactory
+    );
+
+    await service.delete('q1');
+
+    expect(simuladoService.removeQuestionSimulados).toHaveBeenCalledWith([{ _id: 's1' }], question, session);
+    expect(provaRepository.removeQuestion).toHaveBeenCalledWith('pr1', question);
+    expect(repository.delete).toHaveBeenCalledWith('q1');
+    expect(session.commitTransaction).toHaveBeenCalled();
+  });
+});
