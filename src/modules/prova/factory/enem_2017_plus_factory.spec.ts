@@ -87,3 +87,84 @@ describe('Enem2017PlusFactory.verifyNumberProva (Regra C)', () => {
     expect(await factory.verifyNumberProva('p1', 10)).toBe(false);
   });
 });
+
+describe('Enem2017PlusFactory.updateQuestion — numero-sync (mudança pura de número)', () => {
+  function makeSession() {
+    return {
+      startTransaction: jest.fn(),
+      commitTransaction: jest.fn().mockResolvedValue(undefined),
+      abortTransaction: jest.fn().mockResolvedValue(undefined),
+      endSession: jest.fn(),
+    };
+  }
+
+  it('reconcilia o numero no subdoc da prova e do simulado quando só o número muda', async () => {
+    const simulado: any = {
+      _id: 's1',
+      questoesNovo: [{ questao: { _id: 'qX' }, numero: 10 }],
+    };
+    const prova: any = {
+      _id: 'p1',
+      simulados: [simulado],
+      questoesNovo: [{ questao: { _id: 'qX' }, numero: 10 }],
+    };
+
+    const session = makeSession();
+    const questaoRepository: any = {
+      startSession: jest.fn().mockResolvedValue(session),
+      getByIdToUpdate: jest.fn().mockResolvedValue({
+        _id: 'qX',
+        numero: 10,
+        enemArea: 'X',
+        prova: { _id: { toString: () => 'p1' } },
+        frente1: { _id: { toString: () => 'f0' } },
+      }),
+      updateQuestion: jest.fn().mockResolvedValue(undefined),
+    };
+    const provaRepository: any = {
+      getById: jest.fn().mockResolvedValue(prova),
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+    const frenteRepository: any = {
+      getByFilter: jest.fn().mockResolvedValue({ _id: { toString: () => 'fi' } }),
+    };
+    const simuladoService: any = {
+      addQuestionSimulados: jest.fn().mockResolvedValue(undefined),
+      removeQuestionSimulados: jest.fn().mockResolvedValue(undefined),
+    };
+    const simuladoRepository: any = {
+      update: jest.fn().mockResolvedValue(undefined),
+      removeDuplicatedSimulados: jest.fn().mockReturnValue([]),
+    };
+    const enemService: any = {
+      validate: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const factory = new Enem2017PlusFactory(
+      {} as any, // categoriaRepository
+      questaoRepository,
+      provaRepository,
+      frenteRepository,
+      simuladoService,
+      simuladoRepository,
+      enemService,
+    );
+
+    await factory.updateQuestion({
+      _id: 'qX',
+      numero: 11,
+      prova: 'p1',
+      enemArea: 'X',
+      frente1: 'f0',
+    } as any);
+
+    // nenhuma operação estrutural (mesma prova/área)
+    expect(simuladoService.addQuestionSimulados).not.toHaveBeenCalled();
+    expect(simuladoService.removeQuestionSimulados).not.toHaveBeenCalled();
+    // numero-sync reconciliou prova + simulado
+    expect(prova.questoesNovo[0].numero).toBe(11);
+    expect(provaRepository.update).toHaveBeenCalledWith(prova);
+    expect(simulado.questoesNovo[0].numero).toBe(11);
+    expect(simuladoRepository.update).toHaveBeenCalledWith(simulado);
+  });
+});
