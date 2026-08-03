@@ -115,14 +115,13 @@ describe('ProvaRepository.getById (popula questoesNovo.questao)', () => {
     expect(findById).toHaveBeenCalledWith('p1');
     // populate top-level de questoesNovo.questao
     expect(populateCalls).toContain('questoesNovo.questao');
+    expect(populateCalls).not.toContain('questoes');
     // populate aninhado nos simulados inclui questoesNovo.questao
     const nested = populateCalls.find(
       (c) => c && typeof c === 'object' && c.path === 'simulados',
     );
     expect(nested).toBeDefined();
-    expect(nested.populate).toEqual(
-      expect.arrayContaining([{ path: 'questoesNovo.questao' }]),
-    );
+    expect(nested.populate).toEqual(['categoria', { path: 'questoesNovo.questao' }]);
   });
 });
 
