@@ -27,6 +27,10 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
         path: 'questoes',
         populate: ['frente1', 'materia'],
       })
+      .populate({
+        path: 'questoesNovo.questao',
+        populate: ['frente1', 'materia'],
+      })
       .exec();
   }
 
@@ -44,7 +48,7 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
     return await this.model
       .findById(id)
       .populate({
-        path: 'questoes',
+        path: 'questoesNovo.questao',
         populate: ['frente1', 'materia'],
         select: 'alternativa',
       })
