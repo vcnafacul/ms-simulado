@@ -25,7 +25,6 @@ export class ProvaRepository extends BaseRepository<Prova> {
   async getProvaWithQuestion(id: string): Promise<Prova> {
     return await this.model
       .findById(id)
-      .populate('questoes')
       .populate({ path: 'categoria', populate: 'exame' })
       .exec();
   }
@@ -86,9 +85,8 @@ export class ProvaRepository extends BaseRepository<Prova> {
       .populate({ path: 'categoria', populate: 'exame' })
       .populate({
         path: 'simulados',
-        populate: ['categoria', 'questoes'],
+        populate: ['categoria'],
       })
-      .populate('questoes')
       .exec();
   }
 
