@@ -18,7 +18,18 @@ export class HistoricoService {
   }
 
   async getById(id: string) {
-    return await this.repository.getById(id);
+    const historico = await this.repository.getById(id);
+    if (!historico) return historico;
+    const obj: any = (historico as any).toObject
+      ? (historico as any).toObject()
+      : historico;
+    if (obj.simulado && Array.isArray(obj.simulado.questoesNovo)) {
+      obj.simulado.questoes = obj.simulado.questoesNovo.map(
+        (qc: any) => qc.questao,
+      );
+      delete obj.simulado.questoesNovo;
+    }
+    return obj;
   }
 
   async getPerformance(userId: string): Promise<GetPerformanceHistories> {

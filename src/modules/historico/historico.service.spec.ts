@@ -70,3 +70,37 @@ describe('HistoricoService.calcularMediaAproveitamento', () => {
     expect(result.historicos[0].totalQuestionsTest).toBe(2);
   });
 });
+
+describe('HistoricoService.getById (remap questoesNovo → simulado.questoes)', () => {
+  it('achata questoesNovo.questao em simulado.questoes e remove questoesNovo', async () => {
+    const historico = {
+      toObject: () => ({
+        _id: 'h1',
+        simulado: {
+          _id: 's1',
+          nome: 'S',
+          questoesNovo: [
+            { questao: { _id: 'q1', textoQuestao: 'a', numero: 5, prova: 'p1' }, numero: 1 },
+            { questao: { _id: 'q2', textoQuestao: 'b', numero: 6, prova: 'p1' }, numero: 2 },
+          ],
+        },
+      }),
+    };
+    const repository: any = { getById: jest.fn().mockResolvedValue(historico) };
+    const service = new HistoricoService(repository);
+
+    const result: any = await service.getById('h1');
+
+    expect(result.simulado.questoes).toEqual([
+      { _id: 'q1', textoQuestao: 'a', numero: 5, prova: 'p1' },
+      { _id: 'q2', textoQuestao: 'b', numero: 6, prova: 'p1' },
+    ]);
+    expect(result.simulado.questoesNovo).toBeUndefined();
+  });
+
+  it('retorna null quando não encontra', async () => {
+    const repository: any = { getById: jest.fn().mockResolvedValue(null) };
+    const service = new HistoricoService(repository);
+    expect(await service.getById('x')).toBeNull();
+  });
+});
