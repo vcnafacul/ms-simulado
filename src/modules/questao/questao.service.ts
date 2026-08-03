@@ -79,7 +79,7 @@ export class QuestaoService {
     frente,
     prova,
     enemArea,
-    sortColumn = 'updatedAt' as QuestaoDTOInput['sortColumn'],
+    sortColumn = 'updatedAt',
     sortOrder = 'desc',
   }: QuestaoDTOInput): Promise<GetAllOutput<QuestaoAllDTO>> {
     const textConditions: any[] = text
