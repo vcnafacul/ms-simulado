@@ -28,12 +28,12 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     limit,
     where,
     or,
-    sortColumn = 'numero',
+    sortColumn = 'updatedAt',
     sortOrder = 'asc',
   }: GetAllWhereInput): Promise<GetAllOutput<Questao>> {
     const sortDirection: 1 | -1 = sortOrder === 'desc' ? -1 : 1;
     const sort: Record<string, 1 | -1> = {
-      [sortColumn ?? 'numero']: sortDirection,
+      [sortColumn ?? 'updatedAt']: sortDirection,
     };
 
     const query = this.model
@@ -41,7 +41,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       .sort(sort)
       .skip((page - 1) * limit)
       .limit(limit ?? Infinity)
-      .populate(['materia', 'prova'])
+      .populate(['materia'])
       .select('+alternativa');
 
     const queryCount = this.model.where({ ...where });
@@ -226,6 +226,37 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       .find({ 'questoes.questao': questaoId })
       .populate('simulados')
       .exec();
+  }
+
+  async findQuestaoIdsByProva(provaId: string): Promise<string[]> {
+    const prova = await this.provaModel.findById(provaId).select('questoes').exec();
+    if (!prova) return [];
+    return prova.questoes.map((qc: any) =>
+      ((qc.questao as any)?._id ?? qc.questao).toString(),
+    );
+  }
+
+  async findProvasContendoMany(
+    questaoIds: string[],
+  ): Promise<Map<string, { provaId: string; provaNome: string; numero: number }[]>> {
+    const provas = await this.provaModel
+      .find({ 'questoes.questao': { $in: questaoIds } })
+      .select('nome questoes')
+      .exec();
+    const map = new Map<string, { provaId: string; provaNome: string; numero: number }[]>();
+    for (const prova of provas) {
+      for (const qc of (prova as any).questoes) {
+        const qId = ((qc.questao as any)?._id ?? qc.questao).toString();
+        if (!questaoIds.includes(qId)) continue;
+        if (!map.has(qId)) map.set(qId, []);
+        map.get(qId)!.push({
+          provaId: (prova as any)._id.toString(),
+          provaNome: (prova as any).nome,
+          numero: qc.numero,
+        });
+      }
+    }
+    return map;
   }
 
   async canInsertQuestion(

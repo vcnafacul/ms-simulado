@@ -164,3 +164,25 @@ describe('QuestaoService.updateStatus (reverse-lookup provas)', () => {
     await expect(service.updateStatus('q1', Status.Approved, 'user1')).rejects.toBeTruthy();
   });
 });
+
+describe('QuestaoService.getAll (provasContendo)', () => {
+  it('monta provasContendo por questão via reverse-lookup', async () => {
+    const repository: any = {
+      getAll: jest.fn().mockResolvedValue({
+        data: [{ _id: 'q1', enemArea: 'Mat', materia: { nome: 'M' }, status: 1, updatedAt: 'd' }],
+        page: 1, limit: 10, totalItems: 1,
+      }),
+      findProvasContendoMany: jest.fn().mockResolvedValue(
+        new Map([['q1', [{ provaId: 'pr1', provaNome: 'Prova 1', numero: 5 }]]]),
+      ),
+    };
+    const { QuestaoService } = require('./questao.service');
+    const service = new QuestaoService(
+      repository, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any,
+    );
+    const res = await service.getAll({ page: 1, limit: 10 });
+    expect(res.data[0].provasContendo).toEqual([{ provaId: 'pr1', provaNome: 'Prova 1', numero: 5 }]);
+    expect((res.data[0] as any).prova).toBeUndefined();
+    expect((res.data[0] as any).numero).toBeUndefined();
+  });
+});

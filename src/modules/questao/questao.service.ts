@@ -79,8 +79,8 @@ export class QuestaoService {
     frente,
     prova,
     enemArea,
-    sortColumn = 'numero',
-    sortOrder = 'asc',
+    sortColumn = 'updatedAt' as QuestaoDTOInput['sortColumn'],
+    sortOrder = 'desc',
   }: QuestaoDTOInput): Promise<GetAllOutput<QuestaoAllDTO>> {
     const textConditions: any[] = text
       ? this.generateTextCombinations(text)
@@ -94,10 +94,12 @@ export class QuestaoService {
       combineConditions.push(frenteorConditions);
     if (textConditions.length > 0) combineConditions.push(textConditions);
 
-    const where: Record<string, string | number> = {};
+    const where: Record<string, string | number | { $in: string[] }> = {};
     if (status !== undefined) where['status'] = status;
     if (materia) where['materia'] = materia;
-    if (prova) where['prova'] = prova;
+    if (prova) {
+      where['_id'] = { $in: await this.repository.findQuestaoIdsByProva(prova) };
+    }
     if (enemArea) where['enemArea'] = enemArea;
 
     const questoes = await this.repository.getAll({
@@ -109,12 +111,13 @@ export class QuestaoService {
       sortOrder,
     });
 
+    const ids = questoes.data.map((q) => q._id.toString());
+    const provasMap = await this.repository.findProvasContendoMany(ids);
     const questoesAll: QuestaoAllDTO[] = questoes.data.map((questao) => ({
       _id: questao._id,
-      prova: questao.prova.nome,
+      provasContendo: provasMap.get(questao._id.toString()) ?? [],
       enemArea: questao.enemArea,
       materia: questao.materia?.nome,
-      numero: questao.numero,
       status: questao.status,
       updatedAt: questao.updatedAt,
     }));
@@ -400,11 +403,6 @@ export class QuestaoService {
     combinations.push({
       textoAlternativaE: { $regex: text, $options: 'i' },
     });
-
-    const num = Number.parseInt(text);
-    if (!isNaN(num)) {
-      combinations.push({ numero: num });
-    }
 
     return combinations;
   }
