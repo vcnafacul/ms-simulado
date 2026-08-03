@@ -13,7 +13,6 @@ function makeService(overrides?: { getById?: jest.Mock }) {
     {} as any, // categoriaRepository
     simuladoRepository as any,
     {} as any, // questaoRepository
-    {} as any, // frenteRepository
   );
   return { service, repository, simuladoRepository };
 }
@@ -61,52 +60,6 @@ describe('ProvaService.approvedQuestion — regra bloqueado com qtd null', () =>
   });
 });
 
-describe('ProvaService.selectQuestionsForSimulado — branch custom', () => {
-  it('prova custom: retorna TODAS as questões da prova (sem string matching)', () => {
-    const { service } = makeService();
-    const questoes = [
-      { _id: 'q1', numero: 1 },
-      { _id: 'q2', numero: 2 },
-    ];
-    const simulado: any = { nome: 'Nome livre qualquer' } as any;
-    const prova = { categoria: { custom: true }, ano: 2024 } as any;
-
-    const result = (service as any).selectQuestionsForSimulado(
-      simulado,
-      questoes,
-      prova,
-      undefined,
-      undefined,
-    );
-
-    expect(result).toHaveLength(2);
-    expect(result).toEqual(questoes);
-  });
-
-  it('prova oficial: simulado padrão recebe todas as questões (string matching preservado)', () => {
-    const { service } = makeService();
-    const questoes = [
-      { _id: 'q1', numero: 1, enemArea: 'Matemática' },
-      { _id: 'q2', numero: 2, enemArea: 'Matemática' },
-    ];
-    const prova = {
-      categoria: { custom: false, nome: 'Enem Dia 2' },
-      ano: 2023,
-    } as any;
-    const simulado: any = { nome: 'Enem Dia 2 2023' } as any; // === `${nome} ${ano}`
-
-    const result = (service as any).selectQuestionsForSimulado(
-      simulado,
-      questoes,
-      prova,
-      { _id: 'fi' },
-      { _id: 'fe' },
-    );
-
-    expect(result).toHaveLength(2);
-  });
-});
-
 describe('ProvaService.getAllByCursinho', () => {
   function makeProva(id: string) {
     return {
@@ -134,7 +87,6 @@ describe('ProvaService.getAllByCursinho', () => {
       {} as any, // categoriaRepository
       {} as any, // simuladoRepository
       {} as any, // questaoRepository
-      {} as any, // frenteRepository
     );
     return { service, repository };
   }
@@ -214,68 +166,5 @@ describe('ProvaService.refuseQuestion — recompute questoesNovo', () => {
     expect(simulado.bloqueado).toBe(true);
     expect(simuladoRepository.update).toHaveBeenCalledWith(simulado);
     expect(repository.update).toHaveBeenCalledWith(prova);
-  });
-});
-
-describe('ProvaService.executeSync (single-write questoesNovo)', () => {
-  it('grava questoesNovo na prova e no simulado (custom) e não escreve questoes', async () => {
-    const questao: any = {
-      _id: 'qA',
-      numero: 1,
-      status: Status.Approved,
-      prova: 'p1',
-      frente1: { _id: 'f1' },
-      enemArea: 'Matemática',
-    };
-    const simulado: any = {
-      _id: 's1',
-      nome: 'Sim custom',
-      categoria: { quantidadeTotalQuestao: 1 },
-      questoes: [],
-      questoesNovo: [],
-      bloqueado: true,
-    };
-    const prova: any = {
-      _id: 'p1',
-      nome: 'Prova custom',
-      ano: 2020,
-      categoria: { custom: true, quantidadeTotalQuestao: 1, exame: {} },
-      simulados: [simulado],
-      questoes: [],
-      questoesNovo: [],
-    };
-
-    const repository: any = {
-      getAllPopulated: jest.fn().mockResolvedValue([prova]),
-      update: jest.fn().mockResolvedValue(undefined),
-    };
-    const simuladoRepository: any = {
-      update: jest.fn().mockResolvedValue(undefined),
-    };
-    const questaoRepository: any = {
-      getAllByProvaIds: jest.fn().mockResolvedValue([questao]),
-    };
-    const frenteRepository: any = {
-      getByFilter: jest.fn().mockResolvedValue({ _id: 'fx' }),
-    };
-
-    const service = new ProvaService(
-      {} as any, // provaFactory
-      repository,
-      {} as any, // categoriaRepository
-      simuladoRepository,
-      questaoRepository,
-      frenteRepository,
-    );
-
-    await (service as any).executeSync();
-
-    expect(repository.update).toHaveBeenCalledWith(prova);
-    expect(prova.questoesNovo).toEqual([{ questao: 'qA', numero: 1 }]);
-    expect(prova.questoes).toEqual([]);
-    expect(simuladoRepository.update).toHaveBeenCalledWith(simulado);
-    expect(simulado.questoesNovo).toEqual([{ questao: 'qA', numero: 1 }]);
-    expect(simulado.questoes).toEqual([]);
-    expect(simulado.bloqueado).toBe(false);
   });
 });

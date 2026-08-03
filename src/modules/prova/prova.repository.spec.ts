@@ -148,26 +148,3 @@ describe('ProvaRepository.getProvaWithQuestion (sem populate de questoes)', () =
     ).toBe(true);
   });
 });
-
-describe('ProvaRepository.getAllPopulated (sem populate de questoes)', () => {
-  it('popula categoria e simulados.categoria, NÃO popula questoes', async () => {
-    const populateArgs: any[] = [];
-    const exec = jest.fn().mockResolvedValue([]);
-    const query: any = { exec };
-    query.find = jest.fn().mockReturnValue(query);
-    query.populate = jest.fn((arg: any) => {
-      populateArgs.push(arg);
-      return query;
-    });
-    const repo = new ProvaRepository({ find: query.find } as any);
-
-    await repo.getAllPopulated();
-
-    expect(populateArgs).not.toContain('questoes');
-    const simuladosPop = populateArgs.find(
-      (a) => a && typeof a === 'object' && a.path === 'simulados',
-    );
-    expect(simuladosPop).toBeDefined();
-    expect(simuladosPop.populate).toEqual(['categoria']);
-  });
-});
