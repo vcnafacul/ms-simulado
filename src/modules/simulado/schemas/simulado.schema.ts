@@ -33,7 +33,7 @@ export class Simulado extends BaseSchema {
 
   @Prop({ type: [QuestaoNaContainerSchema], default: [] })
   @ApiProperty({ type: QuestaoNaContainer, isArray: true, required: false })
-  questoesNovo?: QuestaoNaContainer[];
+  questoesNovo: QuestaoNaContainer[];
 
   @Prop({ required: false, default: 0 })
   @ApiProperty()

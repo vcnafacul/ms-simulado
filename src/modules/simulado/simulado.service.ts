@@ -130,21 +130,16 @@ export class SimuladoService {
     await Promise.all(
       simulados.map(async (sml) => {
         // Adiciona a nova questão (single-write em questoesNovo).
-        // `questoesNovo` é opcional no tipo Simulado mas sempre existe em
-        // runtime (default: [] no schema); cast p/ satisfazer o helper.
-        addQuestaoToContainer(
-          sml as Required<Pick<Simulado, 'questoesNovo'>>,
-          question,
-        );
+        addQuestaoToContainer(sml, question);
 
         // Verifica se o simulado atingiu a quantidade total de questões
         // (categoria livre / quantidadeTotalQuestao null sempre "atinge")
         const atingiuQuantidadeTotal = atingiuQuantidade(
           sml.categoria.quantidadeTotalQuestao,
-          sml.questoesNovo!.length,
+          sml.questoesNovo.length,
         );
         // Verifica se todas as questões estão aprovadas
-        const todasAprovadas = sml.questoesNovo!.every(
+        const todasAprovadas = sml.questoesNovo.every(
           (qc) => qc.questao.status === Status.Approved,
         );
 
@@ -163,12 +158,9 @@ export class SimuladoService {
   ) {
     await Promise.all(
       simulados.map(async (sml) => {
-        const before = sml.questoesNovo!.length;
-        removeQuestaoFromContainer(
-          sml as Required<Pick<Simulado, 'questoesNovo'>>,
-          question._id,
-        );
-        if (sml.questoesNovo!.length !== before) {
+        const before = sml.questoesNovo.length;
+        removeQuestaoFromContainer(sml, question._id);
+        if (sml.questoesNovo.length !== before) {
           sml.bloqueado = true;
           await this.simuladoRepository.updateSession(sml, session);
         }

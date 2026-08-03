@@ -78,6 +78,7 @@ export class Enem2017PlusFactory implements IProvaFactory {
         nome: `${mainName}`,
         categoria: prova.categoria,
         questoes: [],
+        questoesNovo: [],
         descricao: `${prova.categoria.exame.nome}`,
         criadorId: prova.criadorId,
         cursinhoId: prova.cursinhoId,
