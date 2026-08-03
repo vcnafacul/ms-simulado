@@ -1,11 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { GetAllWhereInput } from 'src/shared/base/interfaces/get-all.input';
 import { Status } from '../questao/enums/status.enum';
 import { Questao } from '../questao/questao.schema';
+import {
+  addQuestaoToContainer,
+  removeQuestaoFromContainer,
+} from './helpers/question-container.helpers';
 import { Prova } from './prova.schema';
 
 @Injectable()
@@ -30,16 +34,17 @@ export class ProvaRepository extends BaseRepository<Prova> {
     return await this.model
       .findById(id)
       .populate(['simulados', 'questoes'])
+      .populate('questoesNovo.questao')
       .populate({ path: 'categoria', populate: 'exame' })
       .populate({
         path: 'simulados',
-        populate: ['categoria', 'questoes'],
+        populate: ['categoria', 'questoes', { path: 'questoesNovo.questao' }],
       });
   }
 
   public async addQuestion(id: string, question: Questao) {
     const prova = await this.model.findById(id);
-    prova.questoes.push(question);
+    addQuestaoToContainer(prova, question);
     if (question.status === Status.Approved) {
       prova.totalQuestaoValidadas += 1;
     }
@@ -48,16 +53,15 @@ export class ProvaRepository extends BaseRepository<Prova> {
 
   public async removeQuestion(id: string, oldQuestao: Questao) {
     const prova = await this.model.findById(id);
-    const index = prova.questoes.findIndex(
-      (questao) => questao._id.toString() === oldQuestao._id.toString(),
-    );
-    if (index !== -1) {
-      prova.questoes.splice(index, 1);
-      if (oldQuestao.status === Status.Approved) {
-        prova.totalQuestaoValidadas -= 1;
-      }
-      await this.model.updateOne({ _id: prova._id }, prova);
+    const before = prova.questoesNovo.length;
+    removeQuestaoFromContainer(prova, oldQuestao._id as unknown as Types.ObjectId);
+    if (
+      prova.questoesNovo.length !== before &&
+      oldQuestao.status === Status.Approved
+    ) {
+      prova.totalQuestaoValidadas -= 1;
     }
+    await this.model.updateOne({ _id: prova._id }, prova);
   }
 
   async getAll({
