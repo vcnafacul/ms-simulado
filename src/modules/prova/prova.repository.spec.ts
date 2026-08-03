@@ -96,3 +96,32 @@ describe('ProvaRepository.removeQuestion (single-write questoesNovo)', () => {
     expect(prova.totalQuestaoValidadas).toBe(1);
   });
 });
+
+describe('ProvaRepository.getById (popula questoesNovo.questao)', () => {
+  it('popula questoesNovo.questao no topo e aninhado nos simulados', async () => {
+    const populateCalls: any[] = [];
+    const query: any = {};
+    query.populate = jest.fn((arg: any) => {
+      populateCalls.push(arg);
+      return query;
+    });
+    // torna a query "thenable" (getById faz await sem .exec())
+    query.then = (resolve: any) => resolve({ _id: 'p1' });
+    const findById = jest.fn().mockReturnValue(query);
+    const repo = new ProvaRepository({ findById } as any);
+
+    await repo.getById('p1');
+
+    expect(findById).toHaveBeenCalledWith('p1');
+    // populate top-level de questoesNovo.questao
+    expect(populateCalls).toContain('questoesNovo.questao');
+    // populate aninhado nos simulados inclui questoesNovo.questao
+    const nested = populateCalls.find(
+      (c) => c && typeof c === 'object' && c.path === 'simulados',
+    );
+    expect(nested).toBeDefined();
+    expect(nested.populate).toEqual(
+      expect.arrayContaining([{ path: 'questoesNovo.questao' }]),
+    );
+  });
+});
