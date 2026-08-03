@@ -248,3 +248,55 @@ describe('SimuladoService.removeQuestionSimulados (single-write questoesNovo)', 
     expect(updateSession).not.toHaveBeenCalled();
   });
 });
+
+describe('SimuladoService.processAnswer (lê questoesNovo)', () => {
+  it('mapeia respostas a partir de questoesNovo e completa o histórico', async () => {
+    const questao: any = {
+      _id: { toString: () => 'q1' },
+      alternativa: 'A',
+      materia: { _id: { toString: () => 'm1' }, nome: 'Mat' },
+      frente1: { _id: { toString: () => 'f1' }, nome: 'Fr' },
+    };
+    const simulado: any = {
+      _id: 's1',
+      questoesNovo: [{ questao, numero: 1 }],
+    };
+
+    const historicoRepository: any = {
+      claimForProcessing: jest.fn().mockResolvedValue(true),
+      getById: jest.fn().mockResolvedValue({
+        simulado: 's1',
+        rawRespostas: [{ questao: 'q1', alternativaEstudante: 'A' }],
+      }),
+      updateStatus: jest.fn().mockResolvedValue(undefined),
+      completeProcessing: jest.fn().mockResolvedValue(undefined),
+    };
+    const simuladoRepository: any = {
+      answer: jest.fn().mockResolvedValue(simulado),
+    };
+    const questoesRepository: any = {
+      getById: jest.fn().mockResolvedValue({ prova: { ano: 2023 } }),
+      updateQuestionAnswered: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const service = new SimuladoService(
+      simuladoRepository,
+      questoesRepository,
+      {} as any, // categoriaRepository
+      historicoRepository,
+      {} as any, // materiaRepository
+      {} as any, // queueProducer
+    );
+
+    await service.processAnswer('hist1');
+
+    // buscou o ano pela primeira questão de questoesNovo
+    expect(questoesRepository.getById).toHaveBeenCalledWith(questao._id);
+    // completou com 1 resposta mapeada de questoesNovo
+    const payload = historicoRepository.completeProcessing.mock.calls[0][1];
+    expect(payload.ano).toBe(2023);
+    expect(payload.respostas).toHaveLength(1);
+    expect(payload.respostas[0].alternativaEstudante).toBe('A');
+    expect(payload.respostas[0].alternativaCorreta).toBe('A');
+  });
+});
