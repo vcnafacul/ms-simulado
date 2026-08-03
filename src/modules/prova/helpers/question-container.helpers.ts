@@ -34,3 +34,26 @@ export function removeQuestaoFromContainer(
     return cur.toString() !== idStr;
   });
 }
+
+/**
+ * Atualiza in-place o `numero` das entries que referenciam `questaoId`.
+ * Usado no cutover: `numero` vive no subdoc, então editar o número de uma
+ * questão exige reconciliar os containers (prova + simulados). Retorna se
+ * alguma entry mudou (pra evitar persistência desnecessária).
+ */
+export function updateNumeroNoContainer(
+  container: QuestaoContainer,
+  questaoId: Types.ObjectId | string,
+  numero: number,
+): boolean {
+  const idStr = questaoId.toString();
+  let changed = false;
+  for (const qc of container.questoesNovo) {
+    const cur = (qc.questao as any)?._id ?? qc.questao;
+    if (cur.toString() === idStr && qc.numero !== numero) {
+      qc.numero = numero;
+      changed = true;
+    }
+  }
+  return changed;
+}
