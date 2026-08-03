@@ -249,8 +249,8 @@ export class QuestaoService {
       throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
     }
 
-    const provaChanged =
-      classificacao.prova !== questao.prova?._id?.toString();
+    const provaAtual = await this.repository.findProvaAtual(id);
+    const provaChanged = classificacao.prova !== provaAtual;
     const enemAreaChanged = classificacao.enemArea !== questao.enemArea;
     const frente1Changed =
       classificacao.frente1 !== questao.frente1?._id?.toString();

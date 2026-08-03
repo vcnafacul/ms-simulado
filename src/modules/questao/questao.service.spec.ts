@@ -186,3 +186,26 @@ describe('QuestaoService.getAll (provasContendo)', () => {
     expect((res.data[0] as any).numero).toBeUndefined();
   });
 });
+
+describe('QuestaoService.updateClassificacao (provaChanged via reverse-lookup)', () => {
+  it('detecta mudança de prova via findProvaAtual e dispara updateQuestion', async () => {
+    const questao: any = { _id: 'q1', enemArea: 'Mat', frente1: { _id: { toString: () => 'f1' } }, alternativa: 'A' };
+    const repository: any = {
+      getByIdToUpdate: jest.fn().mockResolvedValue(questao),
+      findProvaAtual: jest.fn().mockResolvedValue('provaAntiga'),
+      updateClassificacao: jest.fn().mockResolvedValue(undefined),
+    };
+    const provaRepository: any = { getById: jest.fn().mockResolvedValue({ _id: 'provaNova', categoria: {}, ano: 2020 }) };
+    const provaFactory: any = { getFactory: jest.fn().mockReturnValue({ updateQuestion: jest.fn().mockResolvedValue(undefined) }) };
+    const { QuestaoService } = require('./questao.service');
+    const service = new QuestaoService(
+      repository, {} as any, provaRepository, {} as any, {} as any, {} as any, {} as any, {} as any, provaFactory,
+    );
+    await service.updateClassificacao('q1', {
+      prova: 'provaNova', enemArea: 'Mat', frente1: 'f1', materia: 'm1', numero: 3,
+    } as any);
+    // prova mudou (provaAntiga -> provaNova) → chamou updateQuestion via factory
+    expect(provaFactory.getFactory).toHaveBeenCalled();
+    expect(repository.updateClassificacao).toHaveBeenCalledWith('q1', expect.anything());
+  });
+});

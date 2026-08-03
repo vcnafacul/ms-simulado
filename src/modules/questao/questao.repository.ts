@@ -74,22 +74,26 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     return await this.model.findById(id).select('+alternativa');
   }
 
+  async findProvaAtual(questaoId: string): Promise<string | undefined> {
+    const prova = await this.provaModel
+      .findOne({ 'questoes.questao': questaoId })
+      .select('_id')
+      .exec();
+    return prova?._id?.toString();
+  }
+
   async getByIdToUpdate(id: string) {
     return await this.model
       .findById(id)
       .select('+alternativa')
-      .populate(['frente1', 'materia', 'prova']);
+      .populate(['frente1', 'materia']);
   }
 
   async getByIdToDelete(id: string) {
     return await this.model
       .findById(id)
       .select('+alternativa')
-      .populate(['frente1', 'materia', 'prova'])
-      .populate({
-        path: 'prova',
-        populate: 'simulados',
-      });
+      .populate(['frente1', 'materia']);
   }
 
   async getQuestaoByFiltro(filtro: object, quant: number): Promise<Questao[]> {
@@ -128,8 +132,6 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     classificacao: UpdateClassificacaoDTOInput,
   ) {
     const updateData: any = {
-      prova: classificacao.prova,
-      numero: classificacao.numero,
       enemArea: classificacao.enemArea,
       materia: classificacao.materia,
       frente1: classificacao.frente1,
