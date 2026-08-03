@@ -51,7 +51,7 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       .findById(id)
       .populate({
         path: 'simulado',
-        populate: ['tipo', 'questoes'],
+        populate: ['tipo', { path: 'questoesNovo.questao' }],
       })
       .exec();
   }
