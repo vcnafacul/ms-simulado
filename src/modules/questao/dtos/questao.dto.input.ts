@@ -8,7 +8,7 @@ import {
 import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
 import { Status } from '../enums/status.enum';
 
-export const QUESTAO_SORT_COLUMNS = ['numero', 'updatedAt'] as const;
+export const QUESTAO_SORT_COLUMNS = ['updatedAt'] as const;
 export type QuestaoSortColumn = (typeof QUESTAO_SORT_COLUMNS)[number];
 
 export const SORT_ORDER = ['asc', 'desc'] as const;
@@ -41,7 +41,7 @@ export class QuestaoDTOInput extends GetAllDtoInput {
   @IsOptional()
   text: string = '';
 
-  /** Coluna para ordenação. Permitido: "numero" (legado) ou "updatedAt" (padrão). */
+  /** Coluna para ordenação. Ordena por "updatedAt" (padrão). */
   @ApiProperty({ enum: QUESTAO_SORT_COLUMNS, default: 'updatedAt' })
   @IsOptional()
   @IsIn(QUESTAO_SORT_COLUMNS)
