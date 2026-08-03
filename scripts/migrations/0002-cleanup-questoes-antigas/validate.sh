@@ -19,5 +19,11 @@ mongosh "$MONGODB" --quiet --eval '
   });
   if (provaShapeRuim > 0) throw new Error("FALHA: " + provaShapeRuim + " provas com questoes fora do shape subdoc");
 
+  const simuladoShapeRuim = db.simulados.countDocuments({
+    "questoes.0": { $exists: true },
+    "questoes.questao": { $exists: false },
+  });
+  if (simuladoShapeRuim > 0) throw new Error("FALHA: " + simuladoShapeRuim + " simulados com questoes fora do shape subdoc");
+
   print("validate 0002 OK");
 '

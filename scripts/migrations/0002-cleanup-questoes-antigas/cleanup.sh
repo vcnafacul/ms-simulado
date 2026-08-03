@@ -3,13 +3,21 @@ set -euo pipefail
 : "${MONGODB:?defina MONGODB (ex.: MONGODB='mongodb://localhost:27017/simulado')}"
 
 mongosh "$MONGODB" --quiet --eval '
-  // Pré-check: aborta se alguma prova tem questoesNovo vazio mas questoes antigo populado
-  const ruins = db.provas.countDocuments({
+  // Pré-check: aborta se alguma prova/simulado tem questoesNovo vazio mas questoes antigo populado
+  const provasRuins = db.provas.countDocuments({
     questoesNovo: { $in: [null, []] },
     "questoes.0": { $exists: true },
   });
-  if (ruins > 0) {
-    throw new Error("ABORTA: " + ruins + " provas com questoesNovo vazio mas questoes antigo populado. Rode a migracao 0001 antes.");
+  const simuladosRuins = db.simulados.countDocuments({
+    questoesNovo: { $in: [null, []] },
+    "questoes.0": { $exists: true },
+  });
+  if (provasRuins > 0 || simuladosRuins > 0) {
+    throw new Error(
+      "ABORTA: " + provasRuins + " provas e " + simuladosRuins +
+      " simulados com questoesNovo vazio mas questoes antigo populado. " +
+      "Se o banco JA foi migrado (questoes ja no shape subdoc, sem questoesNovo), NAO rode este script de novo — ele so deve rodar UMA vez. Caso contrario, rode a migracao 0001 antes."
+    );
   }
 
   // Prova: derruba o array antigo e renomeia o subdoc

@@ -64,6 +64,18 @@ não deixar o banco no shape novo com código antigo em execução.
 Repetir 1→4 em janela de manutenção, sem deploys/writes concorrentes. Backup
 obrigatório antes. Se algo falhar → `rollback.md`.
 
+## Recuperação em caso de falha no meio
+
+- Este script deve rodar **uma única vez**, numa janela de manutenção **sem
+  escritas concorrentes**.
+- Se ele **falhar no meio** (as operações são 5 `updateMany` separados,
+  **não-transacionais**), **NÃO re-execute**. Restaure o backup (ver
+  `rollback.md`) e recomece do zero — um estado parcial pode fazer o pré-check
+  abortar, ou uma re-execução dropar dados já renomeados.
+- O pré-check **aborta** se detectar estado inconsistente (inclusive um banco
+  **já migrado**). Isso é **proteção**, não um erro a "forçar": se ele abortar,
+  investigue o estado do banco, não contorne o script.
+
 ## Nota
 
 `$unset` roda **antes** do `$rename` para evitar colisão de campo (o destino
