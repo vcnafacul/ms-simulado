@@ -190,16 +190,21 @@ export class QuestaoService {
           HttpStatus.NOT_MODIFIED,
         );
       }
-      if (!question.prova) {
+      const provas = await this.repository.findProvasContendo(id);
+      if (provas.length === 0) {
         throw new HttpException(
-          'Para aprovar ou rejeitar, a prova não pode ser nula',
+          'Para aprovar ou rejeitar, a questão precisa estar em ao menos uma prova',
           HttpStatus.BAD_REQUEST,
         );
       }
       if (status === Status.Approved) {
-        await this.provaService.approvedQuestion(question.prova._id, id);
+        for (const prova of provas) {
+          await this.provaService.approvedQuestion(prova._id, id);
+        }
       } else if (question.status === Status.Approved) {
-        await this.provaService.refuseQuestion(question.prova._id, id);
+        for (const prova of provas) {
+          await this.provaService.refuseQuestion(prova._id, id);
+        }
       }
       await this.repository.UpdateStatus(id, status);
       await this.auditLogService.create({

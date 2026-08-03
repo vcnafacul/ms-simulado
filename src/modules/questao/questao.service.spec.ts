@@ -130,3 +130,37 @@ describe('QuestaoService.delete (reverse-lookup provas contendo a questão)', ()
     expect(session.commitTransaction).toHaveBeenCalled();
   });
 });
+
+describe('QuestaoService.updateStatus (reverse-lookup provas)', () => {
+  it('aprova a questão em cada prova que a contém', async () => {
+    const question: any = { _id: 'q1', status: 0 };
+    const repository: any = {
+      getByIdToUpdate: jest.fn().mockResolvedValue(question),
+      UpdateStatus: jest.fn().mockResolvedValue(undefined),
+      findProvasContendo: jest.fn().mockResolvedValue([{ _id: 'pr1' }, { _id: 'pr2' }]),
+    };
+    const provaService: any = { approvedQuestion: jest.fn().mockResolvedValue(undefined), refuseQuestion: jest.fn() };
+    const auditLogService: any = { create: jest.fn().mockResolvedValue(undefined) };
+    const { QuestaoService } = require('./questao.service');
+    const service = new QuestaoService(
+      repository, provaService, {} as any, {} as any, {} as any, {} as any, auditLogService, {} as any, {} as any,
+    );
+    const { Status } = require('./enums/status.enum');
+    await service.updateStatus('q1', Status.Approved, 'user1');
+    expect(provaService.approvedQuestion).toHaveBeenCalledWith('pr1', 'q1');
+    expect(provaService.approvedQuestion).toHaveBeenCalledWith('pr2', 'q1');
+  });
+
+  it('lança quando a questão não está em nenhuma prova', async () => {
+    const { Status } = require('./enums/status.enum');
+    const repository: any = {
+      getByIdToUpdate: jest.fn().mockResolvedValue({ _id: 'q1', status: 0 }),
+      findProvasContendo: jest.fn().mockResolvedValue([]),
+    };
+    const { QuestaoService } = require('./questao.service');
+    const service = new QuestaoService(
+      repository, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any,
+    );
+    await expect(service.updateStatus('q1', Status.Approved, 'user1')).rejects.toBeTruthy();
+  });
+});
