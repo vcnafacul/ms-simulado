@@ -22,12 +22,12 @@ describe('ProvaService.approvedQuestion — regra bloqueado com qtd null', () =>
   it('desbloqueia simulado de categoria livre (null) quando todas aprovadas', async () => {
     const simulado: any = {
       _id: 's1',
-      questoes: [{ _id: 'q1', status: Status.Pending, numero: 1 }],
+      questoesNovo: [{ questao: { _id: 'q1', status: Status.Pending }, numero: 1 }],
       categoria: { quantidadeTotalQuestao: null },
       bloqueado: true,
     };
     const prova = {
-      questoes: [{ _id: 'q1', status: Status.Pending }],
+      questoesNovo: [{ questao: { _id: 'q1', status: Status.Pending }, numero: 1 }],
       simulados: [simulado],
     };
     const { service } = makeService({
@@ -42,12 +42,12 @@ describe('ProvaService.approvedQuestion — regra bloqueado com qtd null', () =>
   it('mantém bloqueado quando categoria numérica ainda não atingiu a quantidade', async () => {
     const simulado: any = {
       _id: 's1',
-      questoes: [{ _id: 'q1', status: Status.Pending, numero: 1 }],
+      questoesNovo: [{ questao: { _id: 'q1', status: Status.Pending }, numero: 1 }],
       categoria: { quantidadeTotalQuestao: 30 },
       bloqueado: true,
     };
     const prova = {
-      questoes: [{ _id: 'q1', status: Status.Pending }],
+      questoesNovo: [{ questao: { _id: 'q1', status: Status.Pending }, numero: 1 }],
       simulados: [simulado],
     };
     const { service } = makeService({
@@ -120,7 +120,7 @@ describe('ProvaService.getAllByCursinho', () => {
       totalQuestaoValidadas: 0,
       filename: 'f.pdf',
       enemAreas: [] as any[],
-      questoes: [] as any[],
+      questoesNovo: [] as any[],
       createdAt: new Date('2024-01-01T00:00:00.000Z'),
     };
   }

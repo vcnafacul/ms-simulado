@@ -55,7 +55,7 @@ export class ProvaService {
         exame: result.categoria.exame.nome,
         nome: result.nome,
         totalQuestao: result.totalQuestao,
-        totalQuestaoCadastradas: result.questoes.length,
+        totalQuestaoCadastradas: result.questoesNovo.length,
         totalQuestaoValidadas: result.totalQuestaoValidadas,
         filename: result.filename,
         gabarito: result.gabarito,
@@ -86,7 +86,7 @@ export class ProvaService {
       totalQuestaoValidadas: prova.totalQuestaoValidadas,
       filename: prova.filename,
       enemAreas: prova.enemAreas,
-      totalQuestaoCadastradas: prova.questoes.length,
+      totalQuestaoCadastradas: prova.questoesNovo.length,
       createdAt: prova.createdAt,
     } as GetProvaDTOOutout;
   }
@@ -119,30 +119,31 @@ export class ProvaService {
     const prova = await this.repository.getById(id);
 
     // Recalcula totalQuestaoValidadas contando a questão sendo aprovada
-    prova.totalQuestaoValidadas = prova.questoes.filter((q) => {
-      if (q._id.toString() === questionId) return true;
-      return q.status === Status.Approved;
+    prova.totalQuestaoValidadas = prova.questoesNovo.filter((qc) => {
+      if (qc.questao._id.toString() === questionId) return true;
+      return qc.questao.status === Status.Approved;
     }).length;
 
     await Promise.all(
       prova.simulados.map(async (simulado) => {
-        const containsQuestion = simulado.questoes.find(
-          (q) => q._id.toString() === questionId,
+        const containsQuestion = simulado.questoesNovo.find(
+          (qc) => qc.questao._id.toString() === questionId,
         );
         if (!containsQuestion) return;
 
         const hasRequiredCount = atingiuQuantidade(
           simulado.categoria.quantidadeTotalQuestao,
-          simulado.questoes.length,
+          simulado.questoesNovo.length,
         );
-        const allApproved = simulado.questoes.every(
-          (q) =>
-            q.status === Status.Approved || q._id.toString() === questionId,
+        const allApproved = simulado.questoesNovo.every(
+          (qc) =>
+            qc.questao.status === Status.Approved ||
+            qc.questao._id.toString() === questionId,
         );
 
         simulado.bloqueado = !(hasRequiredCount && allApproved);
         if (!simulado.bloqueado) {
-          simulado.questoes = simulado.questoes.sort(
+          simulado.questoesNovo = simulado.questoesNovo.sort(
             (a, b) => a.numero - b.numero,
           );
         }
@@ -156,28 +157,28 @@ export class ProvaService {
     const prova = await this.repository.getById(id);
 
     // Recalcula totalQuestaoValidadas excluindo a questão sendo rejeitada
-    prova.totalQuestaoValidadas = prova.questoes.filter((q) => {
-      if (q._id.toString() === questionId) return false;
-      return q.status === Status.Approved;
+    prova.totalQuestaoValidadas = prova.questoesNovo.filter((qc) => {
+      if (qc.questao._id.toString() === questionId) return false;
+      return qc.questao.status === Status.Approved;
     }).length;
 
     await Promise.all(
       prova.simulados.map(async (simulado) => {
-        const containsQuestion = simulado.questoes.some(
-          (q) => q._id.toString() === questionId,
+        const containsQuestion = simulado.questoesNovo.some(
+          (qc) => qc.questao._id.toString() === questionId,
         );
         if (!containsQuestion) return;
 
         // Recalcula bloqueado considerando a questão sendo rejeitada
         const hasRequiredCount = atingiuQuantidade(
           simulado.categoria.quantidadeTotalQuestao,
-          simulado.questoes.length,
+          simulado.questoesNovo.length,
         );
         const allApproved =
           hasRequiredCount &&
-          simulado.questoes.every((q) => {
-            if (q._id.toString() === questionId) return false;
-            return q.status === Status.Approved;
+          simulado.questoesNovo.every((qc) => {
+            if (qc.questao._id.toString() === questionId) return false;
+            return qc.questao.status === Status.Approved;
           });
 
         simulado.bloqueado = !allApproved;
@@ -522,7 +523,7 @@ export class ProvaService {
       exame: prova.categoria.exame.nome,
       nome: prova.nome,
       totalQuestao: prova.totalQuestao,
-      totalQuestaoCadastradas: prova.questoes.length,
+      totalQuestaoCadastradas: prova.questoesNovo.length,
       totalQuestaoValidadas: prova.totalQuestaoValidadas,
       filename: prova.filename,
       gabarito: prova.gabarito,
