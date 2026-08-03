@@ -4,6 +4,7 @@ import { Model, Types } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllWhereInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
+import { Prova } from '../prova/prova.schema';
 import { Resposta } from '../historico/types/resposta';
 import { UpdateClassificacaoDTOInput } from './dtos/update-classificacao.dto.input';
 import { UpdateContentDTOInput } from './dtos/update-content.dto.input';
@@ -15,7 +16,10 @@ import { Questao } from './questao.schema';
 
 @Injectable()
 export class QuestaoRepository extends BaseRepository<Questao> {
-  constructor(@InjectModel(Questao.name) model: Model<Questao>) {
+  constructor(
+    @InjectModel(Questao.name) model: Model<Questao>,
+    @InjectModel(Prova.name) private readonly provaModel: Model<Prova>,
+  ) {
     super(model);
   }
 
@@ -222,13 +226,17 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     numero: number,
     frente1: string,
   ): Promise<boolean> {
-    const questaoExistente = await this.model.findOne({
-      prova: provaId,
-      numero,
-      frente1,
-    });
-
-    return !questaoExistente; // se já existe, não pode cadastrar → false
+    const prova = await this.provaModel
+      .findById(provaId)
+      .populate('questoes.questao')
+      .exec();
+    if (!prova) return true;
+    const jaExiste = prova.questoes.some(
+      (qc: any) =>
+        qc.numero === numero &&
+        (qc.questao as any)?.frente1?.toString() === frente1,
+    );
+    return !jaExiste;
   }
 
   async getTotalEntity() {
