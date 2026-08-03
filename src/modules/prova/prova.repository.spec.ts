@@ -6,7 +6,6 @@ describe('ProvaRepository.addQuestion (single-write questoesNovo)', () => {
   it('empurra a questão em questoesNovo e incrementa totalQuestaoValidadas quando aprovada', async () => {
     const prova: any = {
       _id: 'p1',
-      questoes: [],
       questoesNovo: [],
       totalQuestaoValidadas: 0,
     };
@@ -23,7 +22,6 @@ describe('ProvaRepository.addQuestion (single-write questoesNovo)', () => {
 
     expect(prova.questoesNovo).toHaveLength(1);
     expect(prova.questoesNovo[0].numero).toBe(3);
-    expect(prova.questoes).toHaveLength(0); // array antigo congelado
     expect(prova.totalQuestaoValidadas).toBe(1);
     expect(updateOne).toHaveBeenCalledWith({ _id: 'p1' }, prova);
   });
@@ -31,7 +29,6 @@ describe('ProvaRepository.addQuestion (single-write questoesNovo)', () => {
   it('não incrementa totalQuestaoValidadas quando a questão não está aprovada', async () => {
     const prova: any = {
       _id: 'p1',
-      questoes: [],
       questoesNovo: [],
       totalQuestaoValidadas: 0,
     };
@@ -56,7 +53,6 @@ describe('ProvaRepository.removeQuestion (single-write questoesNovo)', () => {
     const alvo = new Types.ObjectId();
     const prova: any = {
       _id: 'p1',
-      questoes: [],
       questoesNovo: [{ questao: { _id: alvo }, numero: 1 }],
       totalQuestaoValidadas: 1,
     };
@@ -77,7 +73,6 @@ describe('ProvaRepository.removeQuestion (single-write questoesNovo)', () => {
   it('não decrementa quando a questão não estava no container', async () => {
     const prova: any = {
       _id: 'p1',
-      questoes: [],
       questoesNovo: [{ questao: { _id: new Types.ObjectId() }, numero: 1 }],
       totalQuestaoValidadas: 1,
     };

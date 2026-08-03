@@ -226,7 +226,6 @@ describe('SimuladoService.addQuestionSimulados (single-write questoesNovo)', () 
     const service = makeService({ updateSession });
     const sml: any = {
       _id: 's1',
-      questoes: [],
       questoesNovo: [],
       categoria: { quantidadeTotalQuestao: 1 },
       bloqueado: true,
@@ -240,7 +239,6 @@ describe('SimuladoService.addQuestionSimulados (single-write questoesNovo)', () 
     await service.addQuestionSimulados([sml], question);
 
     expect(sml.questoesNovo).toHaveLength(1);
-    expect(sml.questoes).toHaveLength(0); // congelado
     expect(sml.bloqueado).toBe(false);
     expect(updateSession).toHaveBeenCalledWith(sml, undefined);
   });

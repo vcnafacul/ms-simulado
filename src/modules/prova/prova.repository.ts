@@ -71,7 +71,6 @@ export class ProvaRepository extends BaseRepository<Prova> {
     const data = await this.model
       .find()
       .populate({ path: 'categoria', populate: { path: 'exame' } })
-      .populate('questoes')
       .skip((page - 1) * limit)
       .limit(limit ?? Infinity)
       .where({ ...where });
