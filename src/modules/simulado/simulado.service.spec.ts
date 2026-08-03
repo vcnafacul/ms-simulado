@@ -152,7 +152,6 @@ describe('SimuladoService.getToAnswer (gate de disponibilidade)', () => {
         materia: { _id: 'm1' },
         numero: 7,
         imageId: 'img1',
-        prova: 'p1',
       },
     ]);
   });
@@ -328,7 +327,7 @@ describe('SimuladoService.processAnswer (lê questoes)', () => {
       answer: jest.fn().mockResolvedValue(simulado),
     };
     const questoesRepository: any = {
-      getById: jest.fn().mockResolvedValue({ prova: { ano: 2023 } }),
+      findAnoByQuestao: jest.fn().mockResolvedValue(2023),
       updateQuestionAnswered: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -343,8 +342,10 @@ describe('SimuladoService.processAnswer (lê questoes)', () => {
 
     await service.processAnswer('hist1');
 
-    // buscou o ano pela primeira questão de questoes
-    expect(questoesRepository.getById).toHaveBeenCalledWith(questao._id);
+    // buscou o ano pela primeira questão de questoes (reverse-lookup)
+    expect(questoesRepository.findAnoByQuestao).toHaveBeenCalledWith(
+      questao._id,
+    );
     // completou com 1 resposta mapeada de questoes
     const payload = historicoRepository.completeProcessing.mock.calls[0][1];
     expect(payload.ano).toBe(2023);

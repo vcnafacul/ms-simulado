@@ -82,6 +82,14 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     return prova?._id?.toString();
   }
 
+  async findAnoByQuestao(questaoId: string): Promise<number | undefined> {
+    const prova = await this.provaModel
+      .findOne({ 'questoes.questao': questaoId })
+      .select('ano')
+      .exec();
+    return prova?.ano;
+  }
+
   async getByIdToUpdate(id: string) {
     return await this.model
       .findById(id)

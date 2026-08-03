@@ -207,11 +207,9 @@ export class SimuladoService {
         historico.simulado.toString();
       const simulado = await this.simuladoRepository.answer(simuladoId);
 
-      const ano = (
-        await this.questoesRepository.getById(
-          simulado.questoes[0].questao._id,
-        )
-      ).prova.ano;
+      const ano = await this.questoesRepository.findAnoByQuestao(
+        simulado.questoes[0].questao._id,
+      );
 
       const respostasAproveitamento: RespostaAproveitamento[] =
         simulado.questoes.map((qc) => {
@@ -281,7 +279,6 @@ export class SimuladoService {
             materia: qc.questao.materia,
             numero: qc.numero,
             imageId: qc.questao.imageId,
-            prova: qc.questao.prova,
           })),
           inicio: inicio,
           duracao: simulado.categoria.duracao,
