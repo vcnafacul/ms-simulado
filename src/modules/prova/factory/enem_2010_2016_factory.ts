@@ -91,13 +91,12 @@ export class Enem2010_2017Factory implements IProvaFactory {
     const missingQuestion = [];
     if (day2) {
       for (let index = prova.inicialNumero; index <= 180; index++) {
-        if (!prova.questoes.find((quest) => quest.numero === index)) {
+        if (!prova.questoesNovo.find((qc) => qc.numero === index)) {
           missingQuestion.push(index);
         } else {
           if (index > 90 && index < 96) {
             const hasAllQuestion =
-              prova.questoes.filter((quest) => quest.numero === index).length <
-              2;
+              prova.questoesNovo.filter((qc) => qc.numero === index).length < 2;
             if (hasAllQuestion) {
               missingQuestion.push(index);
             }
@@ -106,7 +105,7 @@ export class Enem2010_2017Factory implements IProvaFactory {
       }
     } else {
       for (let index = prova.inicialNumero; index <= 90; index++) {
-        if (!prova.questoes.find((quest) => quest.numero === index)) {
+        if (!prova.questoesNovo.find((qc) => qc.numero === index)) {
           missingQuestion.push(index);
         }
       }
@@ -119,10 +118,10 @@ export class Enem2010_2017Factory implements IProvaFactory {
     numberQuestion: number,
   ): Promise<boolean> {
     const prova = await this.provaRepository.getProvaWithQuestion(id);
-    if (prova.questoes.some((quest) => quest.numero === numberQuestion)) {
+    if (prova.questoesNovo.some((qc) => qc.numero === numberQuestion)) {
       if (numberQuestion > 90 && numberQuestion < 96) {
         return (
-          prova.questoes.filter((quest) => quest.numero === numberQuestion)
+          prova.questoesNovo.filter((qc) => qc.numero === numberQuestion)
             .length < 2
         );
       }
