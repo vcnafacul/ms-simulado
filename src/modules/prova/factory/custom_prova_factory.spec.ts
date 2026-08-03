@@ -250,7 +250,7 @@ describe('CustomProvaFactory.verifyNumberProva', () => {
     const { factory } = makeFactory({
       getProvaWithQuestion: jest
         .fn()
-        .mockResolvedValue({ questoes: [{ numero: 5 }] }),
+        .mockResolvedValue({ questoesNovo: [{ numero: 5 }] }),
     });
     expect(await factory.verifyNumberProva('p1', 5)).toBe(false);
   });
@@ -259,7 +259,7 @@ describe('CustomProvaFactory.verifyNumberProva', () => {
     const { factory } = makeFactory({
       getProvaWithQuestion: jest
         .fn()
-        .mockResolvedValue({ questoes: [{ numero: 5 }] }),
+        .mockResolvedValue({ questoesNovo: [{ numero: 5 }] }),
     });
     expect(await factory.verifyNumberProva('p1', 7)).toBe(true);
   });
@@ -270,7 +270,7 @@ describe('CustomProvaFactory.getMissingNumbers', () => {
     const { factory } = makeFactory();
     const prova = {
       categoria: { quantidadeTotalQuestao: null },
-      questoes: [],
+      questoesNovo: [],
     } as any;
     expect(await factory.getMissingNumbers(prova)).toEqual([]);
   });
@@ -279,7 +279,7 @@ describe('CustomProvaFactory.getMissingNumbers', () => {
     const { factory } = makeFactory();
     const prova = {
       categoria: { quantidadeTotalQuestao: 4 },
-      questoes: [{ numero: 2 }, { numero: 4 }],
+      questoesNovo: [{ numero: 2 }, { numero: 4 }],
     } as any;
     expect(await factory.getMissingNumbers(prova)).toEqual([1, 3]);
   });
