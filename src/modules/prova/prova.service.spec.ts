@@ -29,7 +29,7 @@ describe('ProvaService.approvedQuestion — regra bloqueado com qtd null', () =>
     const prova = {
       questoesNovo: [{ questao: { _id: 'q1', status: Status.Pending }, numero: 1 }],
       simulados: [simulado],
-    };
+    } as any;
     const { service } = makeService({
       getById: jest.fn().mockResolvedValue(prova),
     });
@@ -37,6 +37,7 @@ describe('ProvaService.approvedQuestion — regra bloqueado com qtd null', () =>
     await service.approvedQuestion('p1', 'q1');
 
     expect(simulado.bloqueado).toBe(false);
+    expect(prova.totalQuestaoValidadas).toBe(1);
   });
 
   it('mantém bloqueado quando categoria numérica ainda não atingiu a quantidade', async () => {
@@ -180,5 +181,38 @@ describe('ProvaService.getAllByCursinho', () => {
 
     expect(result.data).toEqual([]);
     expect(result.totalItems).toBe(0);
+  });
+});
+
+describe('ProvaService.refuseQuestion — recompute questoesNovo', () => {
+  it('exclui a questão recusada da contagem e bloqueia o simulado', async () => {
+    const simulado: any = {
+      _id: 's1',
+      questoesNovo: [
+        { questao: { _id: 'q1', status: Status.Approved }, numero: 1 },
+        { questao: { _id: 'q2', status: Status.Approved }, numero: 2 },
+      ],
+      categoria: { quantidadeTotalQuestao: 2 },
+      bloqueado: false,
+    };
+    const prova = {
+      questoesNovo: [
+        { questao: { _id: 'q1', status: Status.Approved }, numero: 1 },
+        { questao: { _id: 'q2', status: Status.Approved }, numero: 2 },
+      ],
+      simulados: [simulado],
+    } as any;
+    const { service, simuladoRepository, repository } = makeService({
+      getById: jest.fn().mockResolvedValue(prova),
+    });
+
+    await service.refuseQuestion('p1', 'q1');
+
+    // q1 recusada não conta; sobra q2 aprovada
+    expect(prova.totalQuestaoValidadas).toBe(1);
+    // simulado tinha q1 → recalcula bloqueado (q1 excluída => nem todas aprovadas)
+    expect(simulado.bloqueado).toBe(true);
+    expect(simuladoRepository.update).toHaveBeenCalledWith(simulado);
+    expect(repository.update).toHaveBeenCalledWith(prova);
   });
 });
