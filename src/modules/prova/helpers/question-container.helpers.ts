@@ -26,7 +26,7 @@ export function addQuestaoToContainer(
  */
 export function removeQuestaoFromContainer(
   container: QuestaoContainer,
-  questaoId: Types.ObjectId,
+  questaoId: Types.ObjectId | string,
 ): void {
   const idStr = questaoId.toString();
   container.questoesNovo = container.questoesNovo.filter((qc) => {

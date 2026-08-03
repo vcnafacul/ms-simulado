@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { GetAllWhereInput } from 'src/shared/base/interfaces/get-all.input';
@@ -54,7 +54,7 @@ export class ProvaRepository extends BaseRepository<Prova> {
   public async removeQuestion(id: string, oldQuestao: Questao) {
     const prova = await this.model.findById(id);
     const before = prova.questoesNovo.length;
-    removeQuestaoFromContainer(prova, oldQuestao._id as unknown as Types.ObjectId);
+    removeQuestaoFromContainer(prova, oldQuestao._id);
     if (
       prova.questoesNovo.length !== before &&
       oldQuestao.status === Status.Approved
