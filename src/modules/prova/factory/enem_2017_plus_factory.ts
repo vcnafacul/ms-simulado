@@ -299,7 +299,7 @@ export class Enem2017PlusFactory implements IProvaFactory {
 
     // Numero-sync (cutover): numero vive no subdoc; se mudou, reconcilia in-place
     // na prova de destino e seus simulados que referenciam a questão.
-    if (question.numero != null && question.numero !== questao.numero) {
+    if (question.numero != null) {
       const provaAtual = await this.provaRepository.getById(question.prova);
       if (updateNumeroNoContainer(provaAtual, question._id, question.numero)) {
         await this.provaRepository.update(provaAtual);

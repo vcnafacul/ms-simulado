@@ -330,7 +330,7 @@ describe('CustomProvaFactory.updateQuestion — numero-sync', () => {
     expect(simuladoRepository.update).toHaveBeenCalledWith(simulado);
   });
 
-  it('NÃO reconcilia quando o número não muda', async () => {
+  it('NÃO reconcilia quando o input não traz numero', async () => {
     const prova: any = {
       _id: 'p1',
       simulados: [],
@@ -339,7 +339,6 @@ describe('CustomProvaFactory.updateQuestion — numero-sync', () => {
     const getById = jest.fn().mockResolvedValue(prova);
     const getByIdToUpdate = jest.fn().mockResolvedValue({
       _id: 'qX',
-      numero: 5,
       prova: { _id: 'p1' },
     });
     const { factory, provaRepository } = makeFactory({
@@ -350,7 +349,6 @@ describe('CustomProvaFactory.updateQuestion — numero-sync', () => {
 
     await factory.updateQuestion({
       _id: 'qX',
-      numero: 5,
       prova: 'p1',
     } as any);
 

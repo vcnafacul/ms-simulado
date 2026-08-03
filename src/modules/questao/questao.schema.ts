@@ -3,7 +3,6 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { Frente } from '../frente/frente.schema';
 import { Materia } from '../materia/materia.schema';
-import { Prova } from '../prova/prova.schema';
 import { Alternativa } from './enums/alternativa.enum';
 import { EnemArea } from './enums/enem-area.enum';
 import { Status } from './enums/status.enum';
@@ -30,10 +29,6 @@ export class Questao extends QuestaoReview {
   @Prop({ ref: Materia.name, type: Types.ObjectId })
   @ApiProperty()
   public materia: Materia;
-
-  @Prop({ required: false, default: null })
-  @ApiProperty({ required: false, nullable: true })
-  public numero: number | null;
 
   @Prop({ required: false, default: '' })
   @ApiProperty()
@@ -105,10 +100,6 @@ export class Questao extends QuestaoReview {
   @Prop({ required: false, default: Status.Pending, enum: Status })
   @ApiProperty()
   public status: Status;
-
-  @Prop({ ref: Prova.name, type: Types.ObjectId, required: false })
-  @ApiProperty()
-  public prova?: Prova;
 
   @Prop({ required: false, default: [], type: [String] })
   @ApiProperty()
