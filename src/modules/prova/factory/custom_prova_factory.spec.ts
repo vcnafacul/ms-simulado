@@ -32,6 +32,7 @@ function makeFactory(overrides?: {
     getProvaWithQuestion: overrides?.getProvaWithQuestion ?? jest.fn(),
     addQuestion: jest.fn().mockResolvedValue(undefined),
     removeQuestion: jest.fn().mockResolvedValue(undefined),
+    update: jest.fn().mockResolvedValue(undefined),
   };
   const simuladoService = {
     addQuestionSimulados: jest.fn().mockResolvedValue(undefined),
@@ -39,6 +40,7 @@ function makeFactory(overrides?: {
   };
   const simuladoRepository = {
     create: jest.fn().mockImplementation(async (s) => ({ ...s, _id: 's-new' })),
+    update: jest.fn().mockResolvedValue(undefined),
   };
   const categoria = {
     nome: 'Personalizado 30q 60min',
@@ -282,5 +284,66 @@ describe('CustomProvaFactory.getMissingNumbers', () => {
       questoesNovo: [{ numero: 2 }, { numero: 4 }],
     } as any;
     expect(await factory.getMissingNumbers(prova)).toEqual([1, 3]);
+  });
+});
+
+describe('CustomProvaFactory.updateQuestion — numero-sync', () => {
+  it('reconcilia o numero no subdoc da prova e do simulado quando o número muda', async () => {
+    const simulado: any = {
+      _id: 's1',
+      questoesNovo: [{ questao: { _id: 'qX' }, numero: 5 }],
+    };
+    const prova: any = {
+      _id: 'p1',
+      simulados: [simulado],
+      questoesNovo: [{ questao: { _id: 'qX' }, numero: 5 }],
+    };
+    const getById = jest.fn().mockResolvedValue(prova);
+    const getByIdToUpdate = jest.fn().mockResolvedValue({
+      _id: 'qX',
+      numero: 5,
+      prova: { _id: 'p1' },
+    });
+    const { factory, provaRepository, simuladoRepository } = makeFactory({
+      getById,
+      getByIdToUpdate,
+    });
+
+    await factory.updateQuestion({
+      _id: 'qX',
+      numero: 6,
+      prova: 'p1',
+    } as any);
+
+    expect(prova.questoesNovo[0].numero).toBe(6);
+    expect(provaRepository.update).toHaveBeenCalledWith(prova);
+    expect(simulado.questoesNovo[0].numero).toBe(6);
+    expect(simuladoRepository.update).toHaveBeenCalledWith(simulado);
+  });
+
+  it('NÃO reconcilia quando o número não muda', async () => {
+    const prova: any = {
+      _id: 'p1',
+      simulados: [],
+      questoesNovo: [{ questao: { _id: 'qX' }, numero: 5 }],
+    };
+    const getById = jest.fn().mockResolvedValue(prova);
+    const getByIdToUpdate = jest.fn().mockResolvedValue({
+      _id: 'qX',
+      numero: 5,
+      prova: { _id: 'p1' },
+    });
+    const { factory, provaRepository } = makeFactory({
+      getById,
+      getByIdToUpdate,
+    });
+
+    await factory.updateQuestion({
+      _id: 'qX',
+      numero: 5,
+      prova: 'p1',
+    } as any);
+
+    expect(provaRepository.update).not.toHaveBeenCalled();
   });
 });
