@@ -204,7 +204,9 @@ export class Enem2017PlusFactory implements IProvaFactory {
       5,
     );
 
-    const provaToLeaveId = questao.prova?._id.toString();
+    const provaToLeaveId = await this.questaoRepository.findProvaAtual(
+      question._id,
+    );
     const provaToEnter = await this.provaRepository.getById(question.prova);
     const changeProva = provaToLeaveId !== provaToEnter._id.toString();
     const changeSimulados =

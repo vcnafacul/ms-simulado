@@ -109,7 +109,9 @@ export class CustomProvaFactory implements IProvaFactory {
 
   public async updateQuestion(question: UpdateDTOInput): Promise<void> {
     const questao = await this.questaoRepository.getByIdToUpdate(question._id);
-    const provaToLeaveId = questao.prova?._id.toString();
+    const provaToLeaveId = await this.questaoRepository.findProvaAtual(
+      question._id,
+    );
     const provaToEnter = await this.provaRepository.getById(question.prova);
     const changeProva = provaToLeaveId !== provaToEnter._id.toString();
 

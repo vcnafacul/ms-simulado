@@ -119,6 +119,7 @@ describe('Enem2017PlusFactory.updateQuestion — numero-sync (mudança pura de n
         prova: { _id: { toString: () => 'p1' } },
         frente1: { _id: { toString: () => 'f0' } },
       }),
+      findProvaAtual: jest.fn().mockResolvedValue('p1'),
       updateQuestion: jest.fn().mockResolvedValue(undefined),
     };
     const provaRepository: any = {

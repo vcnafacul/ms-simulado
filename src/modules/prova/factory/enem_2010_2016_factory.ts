@@ -230,7 +230,9 @@ export class Enem2010_2017Factory implements IProvaFactory {
     );
 
     // Determina se houve mudança de prova ou de simulados
-    const provaToLeaveId = questao.prova?._id.toString();
+    const provaToLeaveId = await this.questaoRepository.findProvaAtual(
+      question._id,
+    );
     const provaToEnter = await this.provaRepository.getById(question.prova);
     const changeProva = provaToLeaveId !== provaToEnter._id.toString();
     const changeSimulados =
