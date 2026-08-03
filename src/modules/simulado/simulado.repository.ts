@@ -24,10 +24,6 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
       .findById(id)
       .populate('categoria')
       .populate({
-        path: 'questoes',
-        populate: ['frente1', 'materia'],
-      })
-      .populate({
         path: 'questoesNovo.questao',
         populate: ['frente1', 'materia'],
       })

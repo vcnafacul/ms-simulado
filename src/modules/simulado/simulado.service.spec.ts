@@ -92,7 +92,7 @@ describe('SimuladoService.getToAnswer (gate de disponibilidade)', () => {
       disponivelDe: null,
       disponivelAte: null,
       categoria: { _id: 'c1', duracao: 60 },
-      questoes: [],
+      questoesNovo: [],
     } as any;
     const service = makeService({
       getAvailabilityById: jest.fn().mockResolvedValue({
@@ -104,6 +104,57 @@ describe('SimuladoService.getToAnswer (gate de disponibilidade)', () => {
     });
     const result = await service.getToAnswer('s1');
     expect(result).toMatchObject({ _id: 's1', nome: 'S', duracao: 60 });
+  });
+
+  it('monta questoes a partir de questoesNovo (numero do subdoc)', async () => {
+    const simulado = {
+      _id: 's1',
+      nome: 'S',
+      descricao: 'd',
+      bloqueado: false,
+      disponivelDe: null,
+      disponivelAte: null,
+      categoria: { _id: 'c1', duracao: 60 },
+      questoesNovo: [
+        {
+          questao: {
+            _id: 'q1',
+            enemArea: 'Mat',
+            frente1: { _id: 'f1' },
+            frente2: null,
+            frente3: null,
+            materia: { _id: 'm1' },
+            imageId: 'img1',
+            prova: 'p1',
+          },
+          numero: 7,
+        },
+      ],
+    } as any;
+    const service = makeService({
+      getAvailabilityById: jest.fn().mockResolvedValue({
+        bloqueado: false,
+        disponivelDe: null,
+        disponivelAte: null,
+      }),
+      getById: jest.fn().mockResolvedValue(simulado),
+    });
+
+    const result = await service.getToAnswer('s1');
+
+    expect(result!.questoes).toEqual([
+      {
+        _id: 'q1',
+        enemArea: 'Mat',
+        frente1: { _id: 'f1' },
+        frente2: null,
+        frente3: null,
+        materia: { _id: 'm1' },
+        numero: 7,
+        imageId: 'img1',
+        prova: 'p1',
+      },
+    ]);
   });
 });
 

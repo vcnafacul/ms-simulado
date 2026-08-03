@@ -108,3 +108,29 @@ describe('SimuladoRepository.answer (popula questoesNovo.questao)', () => {
     });
   });
 });
+
+describe('SimuladoRepository.getById (popula questoesNovo.questao, sem questoes)', () => {
+  it('popula categoria + questoesNovo.questao e NÃO popula questoes', async () => {
+    const populateArgs: any[] = [];
+    const exec = jest.fn().mockResolvedValue({ _id: 's1' });
+    const query: any = { exec };
+    query.populate = jest.fn((arg: any) => {
+      populateArgs.push(arg);
+      return query;
+    });
+    const findById = jest.fn().mockReturnValue(query);
+    const repo = new SimuladoRepository({ findById } as any);
+
+    await repo.getById('s1');
+
+    expect(populateArgs).toContainEqual({
+      path: 'questoesNovo.questao',
+      populate: ['frente1', 'materia'],
+    });
+    expect(
+      populateArgs.some(
+        (a) => a && typeof a === 'object' && a.path === 'questoes',
+      ),
+    ).toBe(false);
+  });
+});
