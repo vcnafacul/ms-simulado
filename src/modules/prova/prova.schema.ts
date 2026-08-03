@@ -1,7 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { Types } from 'mongoose';
 import { BaseSchema } from 'src/shared/base/base.schema';
-import { Questao } from '../questao/questao.schema';
 import { Simulado } from '../simulado/schemas/simulado.schema';
 import { Categoria } from '../categoria/schemas/categoria.schema';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
@@ -25,7 +24,6 @@ export class Prova extends BaseSchema {
     this.cursinhoId = item.cursinhoId ?? null;
     this.simulados = [];
     this.questoes = [];
-    this.questoesNovo = [];
   }
 
   @Prop({ enum: Edicao })
@@ -46,14 +44,8 @@ export class Prova extends BaseSchema {
   })
   public simulados: Simulado[];
 
-  @Prop({
-    type: [{ ref: 'Questao', type: mongoose.Schema.Types.ObjectId }],
-    default: [],
-  })
-  questoes: Questao[];
-
   @Prop({ type: [QuestaoNaContainerSchema], default: [] })
-  public questoesNovo: QuestaoNaContainer[];
+  public questoes: QuestaoNaContainer[];
 
   @Prop()
   public nome: string;

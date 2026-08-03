@@ -41,7 +41,7 @@ export class ProvaService {
         exame: result.categoria.exame.nome,
         nome: result.nome,
         totalQuestao: result.totalQuestao,
-        totalQuestaoCadastradas: result.questoesNovo.length,
+        totalQuestaoCadastradas: result.questoes.length,
         totalQuestaoValidadas: result.totalQuestaoValidadas,
         filename: result.filename,
         gabarito: result.gabarito,
@@ -72,7 +72,7 @@ export class ProvaService {
       totalQuestaoValidadas: prova.totalQuestaoValidadas,
       filename: prova.filename,
       enemAreas: prova.enemAreas,
-      totalQuestaoCadastradas: prova.questoesNovo.length,
+      totalQuestaoCadastradas: prova.questoes.length,
       createdAt: prova.createdAt,
     } as GetProvaDTOOutout;
   }
@@ -105,23 +105,23 @@ export class ProvaService {
     const prova = await this.repository.getById(id);
 
     // Recalcula totalQuestaoValidadas contando a questão sendo aprovada
-    prova.totalQuestaoValidadas = prova.questoesNovo.filter((qc) => {
+    prova.totalQuestaoValidadas = prova.questoes.filter((qc) => {
       if (qc.questao._id.toString() === questionId) return true;
       return qc.questao.status === Status.Approved;
     }).length;
 
     await Promise.all(
       prova.simulados.map(async (simulado) => {
-        const containsQuestion = simulado.questoesNovo.find(
+        const containsQuestion = simulado.questoes.find(
           (qc) => qc.questao._id.toString() === questionId,
         );
         if (!containsQuestion) return;
 
         const hasRequiredCount = atingiuQuantidade(
           simulado.categoria.quantidadeTotalQuestao,
-          simulado.questoesNovo.length,
+          simulado.questoes.length,
         );
-        const allApproved = simulado.questoesNovo.every(
+        const allApproved = simulado.questoes.every(
           (qc) =>
             qc.questao.status === Status.Approved ||
             qc.questao._id.toString() === questionId,
@@ -129,7 +129,7 @@ export class ProvaService {
 
         simulado.bloqueado = !(hasRequiredCount && allApproved);
         if (!simulado.bloqueado) {
-          simulado.questoesNovo = simulado.questoesNovo.sort(
+          simulado.questoes = simulado.questoes.sort(
             (a, b) => a.numero - b.numero,
           );
         }
@@ -143,14 +143,14 @@ export class ProvaService {
     const prova = await this.repository.getById(id);
 
     // Recalcula totalQuestaoValidadas excluindo a questão sendo rejeitada
-    prova.totalQuestaoValidadas = prova.questoesNovo.filter((qc) => {
+    prova.totalQuestaoValidadas = prova.questoes.filter((qc) => {
       if (qc.questao._id.toString() === questionId) return false;
       return qc.questao.status === Status.Approved;
     }).length;
 
     await Promise.all(
       prova.simulados.map(async (simulado) => {
-        const containsQuestion = simulado.questoesNovo.some(
+        const containsQuestion = simulado.questoes.some(
           (qc) => qc.questao._id.toString() === questionId,
         );
         if (!containsQuestion) return;
@@ -158,11 +158,11 @@ export class ProvaService {
         // Recalcula bloqueado considerando a questão sendo rejeitada
         const hasRequiredCount = atingiuQuantidade(
           simulado.categoria.quantidadeTotalQuestao,
-          simulado.questoesNovo.length,
+          simulado.questoes.length,
         );
         const allApproved =
           hasRequiredCount &&
-          simulado.questoesNovo.every((qc) => {
+          simulado.questoes.every((qc) => {
             if (qc.questao._id.toString() === questionId) return false;
             return qc.questao.status === Status.Approved;
           });
@@ -237,7 +237,7 @@ export class ProvaService {
       exame: prova.categoria.exame.nome,
       nome: prova.nome,
       totalQuestao: prova.totalQuestao,
-      totalQuestaoCadastradas: prova.questoesNovo.length,
+      totalQuestaoCadastradas: prova.questoes.length,
       totalQuestaoValidadas: prova.totalQuestaoValidadas,
       filename: prova.filename,
       gabarito: prova.gabarito,

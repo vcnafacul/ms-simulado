@@ -91,9 +91,9 @@ describe('SimuladoRepository.getAvailabilityById', () => {
   });
 });
 
-describe('SimuladoRepository.answer (popula questoesNovo.questao)', () => {
-  it('popula questoesNovo.questao com frente1/materia e alternativa', async () => {
-    const exec = jest.fn().mockResolvedValue({ _id: 's1', questoesNovo: [] });
+describe('SimuladoRepository.answer (popula questoes.questao)', () => {
+  it('popula questoes.questao com frente1/materia e alternativa', async () => {
+    const exec = jest.fn().mockResolvedValue({ _id: 's1', questoes: [] });
     const populate = jest.fn().mockReturnValue({ exec });
     const findById = jest.fn().mockReturnValue({ populate });
     const repo = new SimuladoRepository({ findById } as any);
@@ -102,15 +102,15 @@ describe('SimuladoRepository.answer (popula questoesNovo.questao)', () => {
 
     expect(findById).toHaveBeenCalledWith('s1');
     expect(populate).toHaveBeenCalledWith({
-      path: 'questoesNovo.questao',
+      path: 'questoes.questao',
       populate: ['frente1', 'materia'],
       select: 'alternativa',
     });
   });
 });
 
-describe('SimuladoRepository.getById (popula questoesNovo.questao, sem questoes)', () => {
-  it('popula categoria + questoesNovo.questao e NÃO popula questoes', async () => {
+describe('SimuladoRepository.getById (popula questoes.questao, sem questoes)', () => {
+  it('popula categoria + questoes.questao e NÃO popula questoes', async () => {
     const populateArgs: any[] = [];
     const exec = jest.fn().mockResolvedValue({ _id: 's1' });
     const query: any = { exec };
@@ -124,7 +124,7 @@ describe('SimuladoRepository.getById (popula questoesNovo.questao, sem questoes)
     await repo.getById('s1');
 
     expect(populateArgs).toContainEqual({
-      path: 'questoesNovo.questao',
+      path: 'questoes.questao',
       populate: ['frente1', 'materia'],
     });
     expect(

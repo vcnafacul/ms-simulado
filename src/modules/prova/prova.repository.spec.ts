@@ -2,11 +2,11 @@ import { Types } from 'mongoose';
 import { Status } from '../questao/enums/status.enum';
 import { ProvaRepository } from './prova.repository';
 
-describe('ProvaRepository.addQuestion (single-write questoesNovo)', () => {
-  it('empurra a questão em questoesNovo e incrementa totalQuestaoValidadas quando aprovada', async () => {
+describe('ProvaRepository.addQuestion (single-write questoes)', () => {
+  it('empurra a questão em questoes e incrementa totalQuestaoValidadas quando aprovada', async () => {
     const prova: any = {
       _id: 'p1',
-      questoesNovo: [],
+      questoes: [],
       totalQuestaoValidadas: 0,
     };
     const updateOne = jest.fn().mockResolvedValue({ acknowledged: true });
@@ -20,8 +20,8 @@ describe('ProvaRepository.addQuestion (single-write questoesNovo)', () => {
     };
     await repo.addQuestion('p1', questao);
 
-    expect(prova.questoesNovo).toHaveLength(1);
-    expect(prova.questoesNovo[0].numero).toBe(3);
+    expect(prova.questoes).toHaveLength(1);
+    expect(prova.questoes[0].numero).toBe(3);
     expect(prova.totalQuestaoValidadas).toBe(1);
     expect(updateOne).toHaveBeenCalledWith({ _id: 'p1' }, prova);
   });
@@ -29,7 +29,7 @@ describe('ProvaRepository.addQuestion (single-write questoesNovo)', () => {
   it('não incrementa totalQuestaoValidadas quando a questão não está aprovada', async () => {
     const prova: any = {
       _id: 'p1',
-      questoesNovo: [],
+      questoes: [],
       totalQuestaoValidadas: 0,
     };
     const findById = jest.fn().mockResolvedValue(prova);
@@ -48,12 +48,12 @@ describe('ProvaRepository.addQuestion (single-write questoesNovo)', () => {
   });
 });
 
-describe('ProvaRepository.removeQuestion (single-write questoesNovo)', () => {
-  it('remove de questoesNovo e decrementa totalQuestaoValidadas quando aprovada', async () => {
+describe('ProvaRepository.removeQuestion (single-write questoes)', () => {
+  it('remove de questoes e decrementa totalQuestaoValidadas quando aprovada', async () => {
     const alvo = new Types.ObjectId();
     const prova: any = {
       _id: 'p1',
-      questoesNovo: [{ questao: { _id: alvo }, numero: 1 }],
+      questoes: [{ questao: { _id: alvo }, numero: 1 }],
       totalQuestaoValidadas: 1,
     };
     const updateOne = jest.fn().mockResolvedValue({ acknowledged: true });
@@ -65,7 +65,7 @@ describe('ProvaRepository.removeQuestion (single-write questoesNovo)', () => {
       status: Status.Approved,
     } as any);
 
-    expect(prova.questoesNovo).toHaveLength(0);
+    expect(prova.questoes).toHaveLength(0);
     expect(prova.totalQuestaoValidadas).toBe(0);
     expect(updateOne).toHaveBeenCalledWith({ _id: 'p1' }, prova);
   });
@@ -73,7 +73,7 @@ describe('ProvaRepository.removeQuestion (single-write questoesNovo)', () => {
   it('não decrementa quando a questão não estava no container', async () => {
     const prova: any = {
       _id: 'p1',
-      questoesNovo: [{ questao: { _id: new Types.ObjectId() }, numero: 1 }],
+      questoes: [{ questao: { _id: new Types.ObjectId() }, numero: 1 }],
       totalQuestaoValidadas: 1,
     };
     const findById = jest.fn().mockResolvedValue(prova);
@@ -87,13 +87,13 @@ describe('ProvaRepository.removeQuestion (single-write questoesNovo)', () => {
       status: Status.Approved,
     } as any);
 
-    expect(prova.questoesNovo).toHaveLength(1);
+    expect(prova.questoes).toHaveLength(1);
     expect(prova.totalQuestaoValidadas).toBe(1);
   });
 });
 
-describe('ProvaRepository.getById (popula questoesNovo.questao)', () => {
-  it('popula questoesNovo.questao no topo e aninhado nos simulados', async () => {
+describe('ProvaRepository.getById (popula questoes.questao)', () => {
+  it('popula questoes.questao no topo e aninhado nos simulados', async () => {
     const populateCalls: any[] = [];
     const query: any = {};
     query.populate = jest.fn((arg: any) => {
@@ -108,15 +108,15 @@ describe('ProvaRepository.getById (popula questoesNovo.questao)', () => {
     await repo.getById('p1');
 
     expect(findById).toHaveBeenCalledWith('p1');
-    // populate top-level de questoesNovo.questao
-    expect(populateCalls).toContain('questoesNovo.questao');
+    // populate top-level de questoes.questao
+    expect(populateCalls).toContain('questoes.questao');
     expect(populateCalls).not.toContain('questoes');
-    // populate aninhado nos simulados inclui questoesNovo.questao
+    // populate aninhado nos simulados inclui questoes.questao
     const nested = populateCalls.find(
       (c) => c && typeof c === 'object' && c.path === 'simulados',
     );
     expect(nested).toBeDefined();
-    expect(nested.populate).toEqual(['categoria', { path: 'questoesNovo.questao' }]);
+    expect(nested.populate).toEqual(['categoria', { path: 'questoes.questao' }]);
   });
 });
 

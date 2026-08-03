@@ -92,7 +92,7 @@ describe('SimuladoService.getToAnswer (gate de disponibilidade)', () => {
       disponivelDe: null,
       disponivelAte: null,
       categoria: { _id: 'c1', duracao: 60 },
-      questoesNovo: [],
+      questoes: [],
     } as any;
     const service = makeService({
       getAvailabilityById: jest.fn().mockResolvedValue({
@@ -106,7 +106,7 @@ describe('SimuladoService.getToAnswer (gate de disponibilidade)', () => {
     expect(result).toMatchObject({ _id: 's1', nome: 'S', duracao: 60 });
   });
 
-  it('monta questoes a partir de questoesNovo (numero do subdoc)', async () => {
+  it('monta questoes a partir de questoes (numero do subdoc)', async () => {
     const simulado = {
       _id: 's1',
       nome: 'S',
@@ -115,7 +115,7 @@ describe('SimuladoService.getToAnswer (gate de disponibilidade)', () => {
       disponivelDe: null,
       disponivelAte: null,
       categoria: { _id: 'c1', duracao: 60 },
-      questoesNovo: [
+      questoes: [
         {
           questao: {
             _id: 'q1',
@@ -220,13 +220,13 @@ describe('SimuladoService.updateDisponibilidade', () => {
   });
 });
 
-describe('SimuladoService.addQuestionSimulados (single-write questoesNovo)', () => {
-  it('empurra em questoesNovo e desbloqueia quando atinge quantidade e todas aprovadas', async () => {
+describe('SimuladoService.addQuestionSimulados (single-write questoes)', () => {
+  it('empurra em questoes e desbloqueia quando atinge quantidade e todas aprovadas', async () => {
     const updateSession = jest.fn().mockResolvedValue(undefined);
     const service = makeService({ updateSession });
     const sml: any = {
       _id: 's1',
-      questoesNovo: [],
+      questoes: [],
       categoria: { quantidadeTotalQuestao: 1 },
       bloqueado: true,
     };
@@ -238,7 +238,7 @@ describe('SimuladoService.addQuestionSimulados (single-write questoesNovo)', () 
 
     await service.addQuestionSimulados([sml], question);
 
-    expect(sml.questoesNovo).toHaveLength(1);
+    expect(sml.questoes).toHaveLength(1);
     expect(sml.bloqueado).toBe(false);
     expect(updateSession).toHaveBeenCalledWith(sml, undefined);
   });
@@ -249,7 +249,7 @@ describe('SimuladoService.addQuestionSimulados (single-write questoesNovo)', () 
     });
     const sml: any = {
       _id: 's1',
-      questoesNovo: [],
+      questoes: [],
       categoria: { quantidadeTotalQuestao: 30 },
       bloqueado: true,
     };
@@ -264,19 +264,19 @@ describe('SimuladoService.addQuestionSimulados (single-write questoesNovo)', () 
   });
 });
 
-describe('SimuladoService.removeQuestionSimulados (single-write questoesNovo)', () => {
-  it('remove de questoesNovo e bloqueia o simulado', async () => {
+describe('SimuladoService.removeQuestionSimulados (single-write questoes)', () => {
+  it('remove de questoes e bloqueia o simulado', async () => {
     const updateSession = jest.fn().mockResolvedValue(undefined);
     const service = makeService({ updateSession });
     const sml: any = {
       _id: 's1',
-      questoesNovo: [{ questao: { _id: 'q1' }, numero: 1 }],
+      questoes: [{ questao: { _id: 'q1' }, numero: 1 }],
       bloqueado: false,
     };
 
     await service.removeQuestionSimulados([sml], { _id: 'q1' } as any);
 
-    expect(sml.questoesNovo).toHaveLength(0);
+    expect(sml.questoes).toHaveLength(0);
     expect(sml.bloqueado).toBe(true);
     expect(updateSession).toHaveBeenCalledWith(sml, undefined);
   });
@@ -286,20 +286,20 @@ describe('SimuladoService.removeQuestionSimulados (single-write questoesNovo)', 
     const service = makeService({ updateSession });
     const sml: any = {
       _id: 's1',
-      questoesNovo: [{ questao: { _id: 'outra' }, numero: 1 }],
+      questoes: [{ questao: { _id: 'outra' }, numero: 1 }],
       bloqueado: false,
     };
 
     await service.removeQuestionSimulados([sml], { _id: 'q1' } as any);
 
-    expect(sml.questoesNovo).toHaveLength(1);
+    expect(sml.questoes).toHaveLength(1);
     expect(sml.bloqueado).toBe(false);
     expect(updateSession).not.toHaveBeenCalled();
   });
 });
 
-describe('SimuladoService.processAnswer (lê questoesNovo)', () => {
-  it('mapeia respostas a partir de questoesNovo e completa o histórico', async () => {
+describe('SimuladoService.processAnswer (lê questoes)', () => {
+  it('mapeia respostas a partir de questoes e completa o histórico', async () => {
     const questao: any = {
       _id: { toString: () => 'q1' },
       alternativa: 'A',
@@ -308,7 +308,7 @@ describe('SimuladoService.processAnswer (lê questoesNovo)', () => {
     };
     const simulado: any = {
       _id: 's1',
-      questoesNovo: [{ questao, numero: 1 }],
+      questoes: [{ questao, numero: 1 }],
     };
 
     const historicoRepository: any = {
@@ -339,9 +339,9 @@ describe('SimuladoService.processAnswer (lê questoesNovo)', () => {
 
     await service.processAnswer('hist1');
 
-    // buscou o ano pela primeira questão de questoesNovo
+    // buscou o ano pela primeira questão de questoes
     expect(questoesRepository.getById).toHaveBeenCalledWith(questao._id);
-    // completou com 1 resposta mapeada de questoesNovo
+    // completou com 1 resposta mapeada de questoes
     const payload = historicoRepository.completeProcessing.mock.calls[0][1];
     expect(payload.ano).toBe(2023);
     expect(payload.respostas).toHaveLength(1);

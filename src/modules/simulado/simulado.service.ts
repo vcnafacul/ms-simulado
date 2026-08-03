@@ -129,17 +129,17 @@ export class SimuladoService {
   ) {
     await Promise.all(
       simulados.map(async (sml) => {
-        // Adiciona a nova questão (single-write em questoesNovo).
+        // Adiciona a nova questão (single-write em questoes).
         addQuestaoToContainer(sml, question);
 
         // Verifica se o simulado atingiu a quantidade total de questões
         // (categoria livre / quantidadeTotalQuestao null sempre "atinge")
         const atingiuQuantidadeTotal = atingiuQuantidade(
           sml.categoria.quantidadeTotalQuestao,
-          sml.questoesNovo.length,
+          sml.questoes.length,
         );
         // Verifica se todas as questões estão aprovadas
-        const todasAprovadas = sml.questoesNovo.every(
+        const todasAprovadas = sml.questoes.every(
           (qc) => qc.questao.status === Status.Approved,
         );
 
@@ -158,9 +158,9 @@ export class SimuladoService {
   ) {
     await Promise.all(
       simulados.map(async (sml) => {
-        const before = sml.questoesNovo.length;
+        const before = sml.questoes.length;
         removeQuestaoFromContainer(sml, question._id);
-        if (sml.questoesNovo.length !== before) {
+        if (sml.questoes.length !== before) {
           sml.bloqueado = true;
           await this.simuladoRepository.updateSession(sml, session);
         }
@@ -208,12 +208,12 @@ export class SimuladoService {
 
       const ano = (
         await this.questoesRepository.getById(
-          simulado.questoesNovo[0].questao._id,
+          simulado.questoes[0].questao._id,
         )
       ).prova.ano;
 
       const respostasAproveitamento: RespostaAproveitamento[] =
-        simulado.questoesNovo.map((qc) => {
+        simulado.questoes.map((qc) => {
           const questao = qc.questao;
           const resposta = historico.rawRespostas!.find(
             (r: any) => r.questao === questao._id.toString(),
@@ -271,7 +271,7 @@ export class SimuladoService {
           nome: simulado.nome,
           descricao: simulado.descricao,
           categoria: simulado.categoria._id,
-          questoes: simulado.questoesNovo.map((qc) => ({
+          questoes: simulado.questoes.map((qc) => ({
             _id: qc.questao._id,
             enemArea: qc.questao.enemArea,
             frente1: qc.questao.frente1,

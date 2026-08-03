@@ -1,8 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { ApiProperty } from '@nestjs/swagger';
-import mongoose, { Types } from 'mongoose';
+import { Types } from 'mongoose';
 import { BaseSchema } from 'src/shared/base/base.schema';
-import { Questao } from '../../questao/questao.schema';
 import { Categoria } from '../../categoria/schemas/categoria.schema';
 import {
   QuestaoNaContainer,
@@ -23,17 +22,9 @@ export class Simulado extends BaseSchema {
   @ApiProperty()
   categoria: Categoria;
 
-  @Prop({
-    type: [{ ref: 'Questao', type: mongoose.Schema.Types.ObjectId }],
-    default: [],
-    required: false,
-  })
-  @ApiProperty({ type: Questao, isArray: true })
-  questoes: Questao[];
-
   @Prop({ type: [QuestaoNaContainerSchema], default: [] })
   @ApiProperty({ type: QuestaoNaContainer, isArray: true, required: false })
-  questoesNovo: QuestaoNaContainer[];
+  questoes: QuestaoNaContainer[];
 
   @Prop({ required: false, default: 0 })
   @ApiProperty()

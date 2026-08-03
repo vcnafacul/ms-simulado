@@ -30,7 +30,7 @@ function makeHistorico(aproveitamento: AproveitamentoHistorico) {
     _id: 'hist-id',
     simulado: {
       nome: 'Simulado',
-      questoesNovo: [{}, {}] as any[],
+      questoes: [{}, {}] as any[],
       aproveitamento: 0,
       vezesRespondido: 0,
     },
@@ -71,15 +71,15 @@ describe('HistoricoService.calcularMediaAproveitamento', () => {
   });
 });
 
-describe('HistoricoService.getById (remap questoesNovo → simulado.questoes)', () => {
-  it('achata questoesNovo.questao em simulado.questoes e remove questoesNovo', async () => {
+describe('HistoricoService.getById (achata simulado.questoes)', () => {
+  it('achata questoes.questao em simulado.questoes (subdoc → questao)', async () => {
     const historico = {
       toObject: () => ({
         _id: 'h1',
         simulado: {
           _id: 's1',
           nome: 'S',
-          questoesNovo: [
+          questoes: [
             { questao: { _id: 'q1', textoQuestao: 'a', numero: 5, prova: 'p1' }, numero: 1 },
             { questao: { _id: 'q2', textoQuestao: 'b', numero: 6, prova: 'p1' }, numero: 2 },
           ],
@@ -95,7 +95,6 @@ describe('HistoricoService.getById (remap questoesNovo → simulado.questoes)', 
       { _id: 'q1', textoQuestao: 'a', numero: 5, prova: 'p1' },
       { _id: 'q2', textoQuestao: 'b', numero: 6, prova: 'p1' },
     ]);
-    expect(result.simulado.questoesNovo).toBeUndefined();
   });
 
   it('retorna null quando não encontra', async () => {

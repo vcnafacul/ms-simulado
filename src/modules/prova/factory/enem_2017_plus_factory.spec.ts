@@ -18,32 +18,32 @@ function makeFactory(getProvaWithQuestion?: jest.Mock) {
 
 describe('Enem2017PlusFactory.getMissingNumbers (Regra A — Dia 1, idiomáticas 1-5)', () => {
   it('marca como faltante a idiomática (1-5) que só tem 1 ocorrência', async () => {
-    const questoesNovo: any[] = [];
-    for (let n = 1; n <= 90; n++) questoesNovo.push({ numero: n, questao: {} });
-    questoesNovo.push({ numero: 1, questao: {} }); // numero 1 agora tem 2
+    const questoes: any[] = [];
+    for (let n = 1; n <= 90; n++) questoes.push({ numero: n, questao: {} });
+    questoes.push({ numero: 1, questao: {} }); // numero 1 agora tem 2
 
     const { factory } = makeFactory();
     const missing = await factory.getMissingNumbers({
       nome: 'Enem Dia 1 2020 PRIMEIRA 1',
       inicialNumero: 1,
-      questoesNovo,
+      questoes,
     } as any);
 
     expect(missing).toEqual([2, 3, 4, 5]);
   });
 
   it('marca numero totalmente ausente como faltante', async () => {
-    const questoesNovo: any[] = [];
+    const questoes: any[] = [];
     for (let n = 1; n <= 90; n++) {
       if (n === 50) continue;
-      questoesNovo.push({ numero: n, questao: {} });
-      if (n < 6) questoesNovo.push({ numero: n, questao: {} }); // 1-5 completas
+      questoes.push({ numero: n, questao: {} });
+      if (n < 6) questoes.push({ numero: n, questao: {} }); // 1-5 completas
     }
     const { factory } = makeFactory();
     const missing = await factory.getMissingNumbers({
       nome: 'Enem Dia 1 2020 PRIMEIRA 1',
       inicialNumero: 1,
-      questoesNovo,
+      questoes,
     } as any);
     expect(missing).toEqual([50]);
   });
@@ -52,7 +52,7 @@ describe('Enem2017PlusFactory.getMissingNumbers (Regra A — Dia 1, idiomáticas
 describe('Enem2017PlusFactory.verifyNumberProva (Regra C)', () => {
   it('numero livre → true', async () => {
     const { factory } = makeFactory(
-      jest.fn().mockResolvedValue({ questoesNovo: [] }),
+      jest.fn().mockResolvedValue({ questoes: [] }),
     );
     expect(await factory.verifyNumberProva('p1', 50)).toBe(true);
   });
@@ -61,7 +61,7 @@ describe('Enem2017PlusFactory.verifyNumberProva (Regra C)', () => {
     const { factory } = makeFactory(
       jest
         .fn()
-        .mockResolvedValue({ questoesNovo: [{ numero: 3, questao: {} }] }),
+        .mockResolvedValue({ questoes: [{ numero: 3, questao: {} }] }),
     );
     expect(await factory.verifyNumberProva('p1', 3)).toBe(true);
   });
@@ -69,7 +69,7 @@ describe('Enem2017PlusFactory.verifyNumberProva (Regra C)', () => {
   it('idiomático (1-5) com 2 ocorrências → false', async () => {
     const { factory } = makeFactory(
       jest.fn().mockResolvedValue({
-        questoesNovo: [
+        questoes: [
           { numero: 3, questao: {} },
           { numero: 3, questao: {} },
         ],
@@ -82,7 +82,7 @@ describe('Enem2017PlusFactory.verifyNumberProva (Regra C)', () => {
     const { factory } = makeFactory(
       jest
         .fn()
-        .mockResolvedValue({ questoesNovo: [{ numero: 10, questao: {} }] }),
+        .mockResolvedValue({ questoes: [{ numero: 10, questao: {} }] }),
     );
     expect(await factory.verifyNumberProva('p1', 10)).toBe(false);
   });
@@ -101,12 +101,12 @@ describe('Enem2017PlusFactory.updateQuestion — numero-sync (mudança pura de n
   it('reconcilia o numero no subdoc da prova e do simulado quando só o número muda', async () => {
     const simulado: any = {
       _id: 's1',
-      questoesNovo: [{ questao: { _id: 'qX' }, numero: 10 }],
+      questoes: [{ questao: { _id: 'qX' }, numero: 10 }],
     };
     const prova: any = {
       _id: 'p1',
       simulados: [simulado],
-      questoesNovo: [{ questao: { _id: 'qX' }, numero: 10 }],
+      questoes: [{ questao: { _id: 'qX' }, numero: 10 }],
     };
 
     const session = makeSession();
@@ -162,9 +162,9 @@ describe('Enem2017PlusFactory.updateQuestion — numero-sync (mudança pura de n
     expect(simuladoService.addQuestionSimulados).not.toHaveBeenCalled();
     expect(simuladoService.removeQuestionSimulados).not.toHaveBeenCalled();
     // numero-sync reconciliou prova + simulado
-    expect(prova.questoesNovo[0].numero).toBe(11);
+    expect(prova.questoes[0].numero).toBe(11);
     expect(provaRepository.update).toHaveBeenCalledWith(prova);
-    expect(simulado.questoesNovo[0].numero).toBe(11);
+    expect(simulado.questoes[0].numero).toBe(11);
     expect(simuladoRepository.update).toHaveBeenCalledWith(simulado);
   });
 });

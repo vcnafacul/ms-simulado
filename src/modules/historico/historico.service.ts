@@ -23,11 +23,10 @@ export class HistoricoService {
     const obj: any = (historico as any).toObject
       ? (historico as any).toObject()
       : historico;
-    if (obj.simulado && Array.isArray(obj.simulado.questoesNovo)) {
-      obj.simulado.questoes = obj.simulado.questoesNovo.map(
+    if (obj.simulado && Array.isArray(obj.simulado.questoes)) {
+      obj.simulado.questoes = obj.simulado.questoes.map(
         (qc: any) => qc.questao,
       );
-      delete obj.simulado.questoesNovo;
     }
     return obj;
   }
@@ -43,7 +42,7 @@ export class HistoricoService {
       performance: historico.aproveitamento,
       timeSpent: historico.tempoRealizado,
       questionsAnswered: historico.questoesRespondidas,
-      totalQuestionsTest: historico.simulado.questoesNovo.length,
+      totalQuestionsTest: historico.simulado.questoes.length,
       testPerformance: historico.simulado.aproveitamento,
       testAttempts: historico.simulado.vezesRespondido,
       createdAt: historico.createdAt,

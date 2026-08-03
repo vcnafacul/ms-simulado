@@ -74,7 +74,6 @@ export class CustomProvaFactory implements IProvaFactory {
       descricao: `${prova.categoria.exame.nome}`,
       categoria: prova.categoria,
       questoes: [],
-      questoesNovo: [],
       criadorId: prova.criadorId,
       cursinhoId: prova.cursinhoId,
     } as any);
@@ -163,7 +162,7 @@ export class CustomProvaFactory implements IProvaFactory {
     numberQuestion: number,
   ): Promise<boolean> {
     const prova = await this.provaRepository.getProvaWithQuestion(id);
-    return !prova.questoesNovo.some((qc) => qc.numero === numberQuestion);
+    return !prova.questoes.some((qc) => qc.numero === numberQuestion);
   }
 
   public async getMissingNumbers(prova: Prova): Promise<number[]> {
@@ -173,7 +172,7 @@ export class CustomProvaFactory implements IProvaFactory {
 
     const missingQuestion: number[] = [];
     for (let i = 1; i <= prova.categoria.quantidadeTotalQuestao; i++) {
-      if (!prova.questoesNovo.find((qc) => qc.numero === i)) {
+      if (!prova.questoes.find((qc) => qc.numero === i)) {
         missingQuestion.push(i);
       }
     }

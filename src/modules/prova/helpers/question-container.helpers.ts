@@ -3,12 +3,12 @@ import { Questao } from '../../questao/questao.schema';
 import { QuestaoNaContainer } from '../schemas/questao-na-container.schema';
 
 interface QuestaoContainer {
-  questoesNovo: QuestaoNaContainer[];
+  questoes: QuestaoNaContainer[];
 }
 
 /**
  * Adiciona a questão ao container (Prova ou Simulado) escrevendo SÓ em
- * `questoesNovo` (cutover, single-write). Guarda o objeto Questao completo —
+ * `questoes` (cutover, single-write). Guarda o objeto Questao completo —
  * o Mongoose casta para `_id` na persistência, e em memória preserva a leitura
  * de `qc.questao.status`/`.numero` usada nas factories/addQuestionSimulados.
  */
@@ -16,7 +16,7 @@ export function addQuestaoToContainer(
   container: QuestaoContainer,
   questao: Questao,
 ): void {
-  container.questoesNovo.push({ questao, numero: questao.numero });
+  container.questoes.push({ questao, numero: questao.numero });
 }
 
 /**
@@ -29,7 +29,7 @@ export function removeQuestaoFromContainer(
   questaoId: Types.ObjectId | string,
 ): void {
   const idStr = questaoId.toString();
-  container.questoesNovo = container.questoesNovo.filter((qc) => {
+  container.questoes = container.questoes.filter((qc) => {
     const cur = (qc.questao as any)?._id ?? qc.questao;
     return cur.toString() !== idStr;
   });
@@ -48,7 +48,7 @@ export function updateNumeroNoContainer(
 ): boolean {
   const idStr = questaoId.toString();
   let changed = false;
-  for (const qc of container.questoesNovo) {
+  for (const qc of container.questoes) {
     const cur = (qc.questao as any)?._id ?? qc.questao;
     if (cur.toString() === idStr && qc.numero !== numero) {
       qc.numero = numero;

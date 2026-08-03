@@ -33,11 +33,11 @@ export class ProvaRepository extends BaseRepository<Prova> {
     return await this.model
       .findById(id)
       .populate('simulados')
-      .populate('questoesNovo.questao')
+      .populate('questoes.questao')
       .populate({ path: 'categoria', populate: 'exame' })
       .populate({
         path: 'simulados',
-        populate: ['categoria', { path: 'questoesNovo.questao' }],
+        populate: ['categoria', { path: 'questoes.questao' }],
       });
   }
 
@@ -52,10 +52,10 @@ export class ProvaRepository extends BaseRepository<Prova> {
 
   public async removeQuestion(id: string, oldQuestao: Questao) {
     const prova = await this.model.findById(id);
-    const before = prova.questoesNovo.length;
+    const before = prova.questoes.length;
     removeQuestaoFromContainer(prova, oldQuestao._id);
     if (
-      prova.questoesNovo.length !== before &&
+      prova.questoes.length !== before &&
       oldQuestao.status === Status.Approved
     ) {
       prova.totalQuestaoValidadas -= 1;

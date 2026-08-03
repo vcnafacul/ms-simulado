@@ -21,12 +21,12 @@ describe('ProvaService.approvedQuestion — regra bloqueado com qtd null', () =>
   it('desbloqueia simulado de categoria livre (null) quando todas aprovadas', async () => {
     const simulado: any = {
       _id: 's1',
-      questoesNovo: [{ questao: { _id: 'q1', status: Status.Pending }, numero: 1 }],
+      questoes: [{ questao: { _id: 'q1', status: Status.Pending }, numero: 1 }],
       categoria: { quantidadeTotalQuestao: null },
       bloqueado: true,
     };
     const prova = {
-      questoesNovo: [{ questao: { _id: 'q1', status: Status.Pending }, numero: 1 }],
+      questoes: [{ questao: { _id: 'q1', status: Status.Pending }, numero: 1 }],
       simulados: [simulado],
     } as any;
     const { service } = makeService({
@@ -42,12 +42,12 @@ describe('ProvaService.approvedQuestion — regra bloqueado com qtd null', () =>
   it('mantém bloqueado quando categoria numérica ainda não atingiu a quantidade', async () => {
     const simulado: any = {
       _id: 's1',
-      questoesNovo: [{ questao: { _id: 'q1', status: Status.Pending }, numero: 1 }],
+      questoes: [{ questao: { _id: 'q1', status: Status.Pending }, numero: 1 }],
       categoria: { quantidadeTotalQuestao: 30 },
       bloqueado: true,
     };
     const prova = {
-      questoesNovo: [{ questao: { _id: 'q1', status: Status.Pending }, numero: 1 }],
+      questoes: [{ questao: { _id: 'q1', status: Status.Pending }, numero: 1 }],
       simulados: [simulado],
     };
     const { service } = makeService({
@@ -74,7 +74,7 @@ describe('ProvaService.getAllByCursinho', () => {
       totalQuestaoValidadas: 0,
       filename: 'f.pdf',
       enemAreas: [] as any[],
-      questoesNovo: [] as any[],
+      questoes: [] as any[],
       createdAt: new Date('2024-01-01T00:00:00.000Z'),
     };
   }
@@ -136,11 +136,11 @@ describe('ProvaService.getAllByCursinho', () => {
   });
 });
 
-describe('ProvaService.refuseQuestion — recompute questoesNovo', () => {
+describe('ProvaService.refuseQuestion — recompute questoes', () => {
   it('exclui a questão recusada da contagem e bloqueia o simulado', async () => {
     const simulado: any = {
       _id: 's1',
-      questoesNovo: [
+      questoes: [
         { questao: { _id: 'q1', status: Status.Approved }, numero: 1 },
         { questao: { _id: 'q2', status: Status.Approved }, numero: 2 },
       ],
@@ -148,7 +148,7 @@ describe('ProvaService.refuseQuestion — recompute questoesNovo', () => {
       bloqueado: false,
     };
     const prova = {
-      questoesNovo: [
+      questoes: [
         { questao: { _id: 'q1', status: Status.Approved }, numero: 1 },
         { questao: { _id: 'q2', status: Status.Approved }, numero: 2 },
       ],
