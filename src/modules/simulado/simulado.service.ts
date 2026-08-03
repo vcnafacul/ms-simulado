@@ -23,6 +23,10 @@ import { Questao } from '../questao/questao.schema';
 import { CategoriaRepository } from '../categoria/categoria.repository';
 import { atingiuQuantidade } from './helpers/bloqueado';
 import {
+  addQuestaoToContainer,
+  removeQuestaoFromContainer,
+} from '../prova/helpers/question-container.helpers';
+import {
   getAvailabilityStatus,
   isSimuladoAvailable,
 } from './helpers/availability';
@@ -125,24 +129,28 @@ export class SimuladoService {
   ) {
     await Promise.all(
       simulados.map(async (sml) => {
-        // Adiciona a nova questão
-        sml.questoes.push(question);
+        // Adiciona a nova questão (single-write em questoesNovo).
+        // `questoesNovo` é opcional no tipo Simulado mas sempre existe em
+        // runtime (default: [] no schema); cast p/ satisfazer o helper.
+        addQuestaoToContainer(
+          sml as Required<Pick<Simulado, 'questoesNovo'>>,
+          question,
+        );
 
-        // Verifica se o simulador atingiu a quantidade total de questões
+        // Verifica se o simulado atingiu a quantidade total de questões
         // (categoria livre / quantidadeTotalQuestao null sempre "atinge")
         const atingiuQuantidadeTotal = atingiuQuantidade(
           sml.categoria.quantidadeTotalQuestao,
-          sml.questoes.length,
+          sml.questoesNovo!.length,
         );
         // Verifica se todas as questões estão aprovadas
-        const todasAprovadas = sml.questoes.every(
-          (q) => q.status === Status.Approved,
+        const todasAprovadas = sml.questoesNovo!.every(
+          (qc) => qc.questao.status === Status.Approved,
         );
 
-        // Define bloqueado como false somente se todas as questões foram adicionadas e estão aprovadas
+        // Bloqueado = false só se todas adicionadas e aprovadas
         sml.bloqueado = !(atingiuQuantidadeTotal && todasAprovadas);
 
-        // Retorna a promessa para o update
         return await this.simuladoRepository.updateSession(sml, session);
       }),
     );
@@ -155,11 +163,12 @@ export class SimuladoService {
   ) {
     await Promise.all(
       simulados.map(async (sml) => {
-        const index = sml.questoes.findIndex(
-          (questao) => questao._id.toString() === question._id.toString(),
+        const before = sml.questoesNovo!.length;
+        removeQuestaoFromContainer(
+          sml as Required<Pick<Simulado, 'questoesNovo'>>,
+          question._id,
         );
-        if (index !== -1) {
-          sml.questoes.splice(index, 1);
+        if (sml.questoesNovo!.length !== before) {
           sml.bloqueado = true;
           await this.simuladoRepository.updateSession(sml, session);
         }

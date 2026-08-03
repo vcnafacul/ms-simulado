@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SimuladoService } from './simulado.service';
+import { Status } from '../questao/enums/status.enum';
 
 function makeService(simuladoRepo: Record<string, jest.Mock>) {
   const service = new SimuladoService(
@@ -165,5 +166,85 @@ describe('SimuladoService.updateDisponibilidade', () => {
     expect(updateDisponibilidade).toHaveBeenCalledWith('x', {
       disponivelDe: null,
     });
+  });
+});
+
+describe('SimuladoService.addQuestionSimulados (single-write questoesNovo)', () => {
+  it('empurra em questoesNovo e desbloqueia quando atinge quantidade e todas aprovadas', async () => {
+    const updateSession = jest.fn().mockResolvedValue(undefined);
+    const service = makeService({ updateSession });
+    const sml: any = {
+      _id: 's1',
+      questoes: [],
+      questoesNovo: [],
+      categoria: { quantidadeTotalQuestao: 1 },
+      bloqueado: true,
+    };
+    const question: any = {
+      _id: 'q1',
+      numero: 1,
+      status: Status.Approved,
+    };
+
+    await service.addQuestionSimulados([sml], question);
+
+    expect(sml.questoesNovo).toHaveLength(1);
+    expect(sml.questoes).toHaveLength(0); // congelado
+    expect(sml.bloqueado).toBe(false);
+    expect(updateSession).toHaveBeenCalledWith(sml, undefined);
+  });
+
+  it('mantém bloqueado quando ainda não atingiu a quantidade', async () => {
+    const service = makeService({
+      updateSession: jest.fn().mockResolvedValue(undefined),
+    });
+    const sml: any = {
+      _id: 's1',
+      questoesNovo: [],
+      categoria: { quantidadeTotalQuestao: 30 },
+      bloqueado: true,
+    };
+
+    await service.addQuestionSimulados([sml], {
+      _id: 'q1',
+      numero: 1,
+      status: Status.Approved,
+    } as any);
+
+    expect(sml.bloqueado).toBe(true);
+  });
+});
+
+describe('SimuladoService.removeQuestionSimulados (single-write questoesNovo)', () => {
+  it('remove de questoesNovo e bloqueia o simulado', async () => {
+    const updateSession = jest.fn().mockResolvedValue(undefined);
+    const service = makeService({ updateSession });
+    const sml: any = {
+      _id: 's1',
+      questoesNovo: [{ questao: { _id: 'q1' }, numero: 1 }],
+      bloqueado: false,
+    };
+
+    await service.removeQuestionSimulados([sml], { _id: 'q1' } as any);
+
+    expect(sml.questoesNovo).toHaveLength(0);
+    expect(sml.bloqueado).toBe(true);
+    expect(updateSession).toHaveBeenCalledWith(sml, undefined);
+  });
+
+  it('não mexe quando a questão não estava no simulado', async () => {
+    const updateSession = jest.fn().mockResolvedValue(undefined);
+    const service = makeService({ updateSession });
+    const sml: any = {
+      _id: 's1',
+      questoesNovo: [{ questao: { _id: 'outra' }, numero: 1 }],
+      bloqueado: false,
+    };
+
+    await service.removeQuestionSimulados([sml], { _id: 'q1' } as any);
+
+    expect(sml.questoesNovo).toHaveLength(1);
+    expect(sml.bloqueado).toBe(false);
+    expect(updateSession).not.toHaveBeenCalled();
   });
 });
