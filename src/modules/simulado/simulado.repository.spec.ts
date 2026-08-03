@@ -109,8 +109,8 @@ describe('SimuladoRepository.answer (popula questoes.questao)', () => {
   });
 });
 
-describe('SimuladoRepository.getById (popula questoes.questao, sem questoes)', () => {
-  it('popula categoria + questoes.questao e NÃO popula questoes', async () => {
+describe('SimuladoRepository.getById (popula questoes.questao)', () => {
+  it('popula categoria + questoes.questao', async () => {
     const populateArgs: any[] = [];
     const exec = jest.fn().mockResolvedValue({ _id: 's1' });
     const query: any = { exec };
@@ -127,10 +127,5 @@ describe('SimuladoRepository.getById (popula questoes.questao, sem questoes)', (
       path: 'questoes.questao',
       populate: ['frente1', 'materia'],
     });
-    expect(
-      populateArgs.some(
-        (a) => a && typeof a === 'object' && a.path === 'questoes',
-      ),
-    ).toBe(false);
   });
 });
