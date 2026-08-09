@@ -187,25 +187,59 @@ describe('QuestaoService.getAll (provasContendo)', () => {
   });
 });
 
-describe('QuestaoService.updateClassificacao (provaChanged via reverse-lookup)', () => {
-  it('detecta mudança de prova via findProvaAtual e dispara updateQuestion', async () => {
-    const questao: any = { _id: 'q1', enemArea: 'Mat', frente1: { _id: { toString: () => 'f1' } }, alternativa: 'A' };
+describe('QuestaoService.updateClassificacao', () => {
+  const questao: any = {
+    _id: 'q1',
+    enemArea: 'Mat',
+    frente1: { _id: { toString: () => 'f1' } },
+    alternativa: 'A',
+  };
+
+  it('numero-only: chama syncNumero e NAO a factory', async () => {
     const repository: any = {
       getByIdToUpdate: jest.fn().mockResolvedValue(questao),
-      findProvaAtual: jest.fn().mockResolvedValue('provaAntiga'),
       updateClassificacao: jest.fn().mockResolvedValue(undefined),
     };
-    const provaRepository: any = { getById: jest.fn().mockResolvedValue({ _id: 'provaNova', categoria: {}, ano: 2020 }) };
-    const provaFactory: any = { getFactory: jest.fn().mockReturnValue({ updateQuestion: jest.fn().mockResolvedValue(undefined) }) };
+    const provaService: any = { syncNumero: jest.fn().mockResolvedValue(undefined) };
+    const provaFactory: any = { getFactory: jest.fn() };
     const { QuestaoService } = require('./questao.service');
     const service = new QuestaoService(
-      repository, {} as any, provaRepository, {} as any, {} as any, {} as any, {} as any, {} as any, provaFactory,
+      repository, provaService, {} as any, {} as any, {} as any,
+      {} as any, {} as any, {} as any, provaFactory,
     );
+
     await service.updateClassificacao('q1', {
-      prova: 'provaNova', enemArea: 'Mat', frente1: 'f1', materia: 'm1', numero: 3,
+      prova: 'p1', enemArea: 'Mat', frente1: 'f1', materia: 'm1', numero: 7,
     } as any);
-    // prova mudou (provaAntiga -> provaNova) → chamou updateQuestion via factory
-    expect(provaFactory.getFactory).toHaveBeenCalled();
+
+    expect(provaService.syncNumero).toHaveBeenCalledWith('p1', 'q1', 7);
+    expect(provaFactory.getFactory).not.toHaveBeenCalled();
+    expect(repository.updateClassificacao).toHaveBeenCalledWith('q1', expect.anything());
+  });
+
+  it('enemArea mudou: dispara factory.updateQuestion e NAO syncNumero', async () => {
+    const repository: any = {
+      getByIdToUpdate: jest.fn().mockResolvedValue(questao),
+      updateClassificacao: jest.fn().mockResolvedValue(undefined),
+    };
+    const provaService: any = { syncNumero: jest.fn() };
+    const provaRepository: any = {
+      getById: jest.fn().mockResolvedValue({ _id: 'p1', categoria: {}, ano: 2020 }),
+    };
+    const factory: any = { updateQuestion: jest.fn().mockResolvedValue(undefined) };
+    const provaFactory: any = { getFactory: jest.fn().mockReturnValue(factory) };
+    const { QuestaoService } = require('./questao.service');
+    const service = new QuestaoService(
+      repository, provaService, provaRepository, {} as any, {} as any,
+      {} as any, {} as any, {} as any, provaFactory,
+    );
+
+    await service.updateClassificacao('q1', {
+      prova: 'p1', enemArea: 'Ling', frente1: 'f1', materia: 'm1', numero: 3,
+    } as any);
+
+    expect(factory.updateQuestion).toHaveBeenCalled();
+    expect(provaService.syncNumero).not.toHaveBeenCalled();
     expect(repository.updateClassificacao).toHaveBeenCalledWith('q1', expect.anything());
   });
 });

@@ -249,14 +249,14 @@ export class QuestaoService {
       throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
     }
 
-    const provaAtual = await this.repository.findProvaAtual(id);
-    const provaChanged = classificacao.prova !== provaAtual;
     const enemAreaChanged = classificacao.enemArea !== questao.enemArea;
     const frente1Changed =
       classificacao.frente1 !== questao.frente1?._id?.toString();
 
     try {
-      if (provaChanged || enemAreaChanged || frente1Changed) {
+      // enemArea/frente1 podem mudar a membership de simulado (idiomáticas ENEM)
+      // → precisa da factory. A factory já sincroniza o numero no fim.
+      if (enemAreaChanged || frente1Changed) {
         const updateDto = new UpdateDTOInput();
         updateDto._id = id;
         updateDto.prova = classificacao.prova;
@@ -268,6 +268,13 @@ export class QuestaoService {
         updateDto.numero = classificacao.numero;
         updateDto.alternativa = questao.alternativa;
         await this.updateQuestion(updateDto);
+      } else if (classificacao.numero != null) {
+        // Só o numero mudou: sync escopado na prova editada + simulados dela.
+        await this.provaService.syncNumero(
+          classificacao.prova,
+          id,
+          classificacao.numero,
+        );
       }
       await this.repository.updateClassificacao(id, classificacao);
     } catch (error: any) {
