@@ -187,6 +187,30 @@ describe('QuestaoService.getAll (provasContendo)', () => {
   });
 });
 
+describe('QuestaoService.getById', () => {
+  it('anexa provasContendo ao detalhe da questao', async () => {
+    const doc: any = { _id: 'q1', toObject: () => ({ _id: 'q1', enemArea: 'Mat' }) };
+    const repository: any = {
+      getById: jest.fn().mockResolvedValue(doc),
+      findProvasContendoMany: jest.fn().mockResolvedValue(
+        new Map([['q1', [{ provaId: 'p1', provaNome: 'Prova 1', numero: 4 }]]]),
+      ),
+    };
+    const { QuestaoService } = require('./questao.service');
+    const service = new QuestaoService(
+      repository, {} as any, {} as any, {} as any, {} as any,
+      {} as any, {} as any, {} as any, {} as any,
+    );
+
+    const res: any = await service.getById('q1');
+
+    expect(repository.findProvasContendoMany).toHaveBeenCalledWith(['q1']);
+    expect(res.provasContendo).toEqual([
+      { provaId: 'p1', provaNome: 'Prova 1', numero: 4 },
+    ]);
+  });
+});
+
 describe('QuestaoService.updateClassificacao', () => {
   const questao: any = {
     _id: 'q1',

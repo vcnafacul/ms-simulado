@@ -57,9 +57,15 @@ export class QuestaoService {
     );
   }
 
-  public async getById(id: string): Promise<Questao> {
+  public async getById(id: string): Promise<any> {
     const questao = await this.repository.getById(id);
-    return questao;
+    if (!questao) return questao;
+    const map = await this.repository.findProvasContendoMany([id]);
+    const obj: any = (questao as any).toObject
+      ? (questao as any).toObject()
+      : questao;
+    obj.provasContendo = map.get(id.toString()) ?? [];
+    return obj;
   }
 
   public async canInsertQuestion(
