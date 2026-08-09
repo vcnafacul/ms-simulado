@@ -107,6 +107,21 @@ recreate_local() {
   echo " ok"
 }
 
+do_restore() {
+  echo "→ Restore no Mongo local..."
+  docker run --rm --network "$CLONE_NETWORK" -v "$DUMP_DIR:/dump" "$CLONE_MONGO_IMAGE" \
+    mongorestore --uri="mongodb://$CLONE_CONTAINER_NAME:27017" \
+    --archive=/dump/archive.gz --gzip --drop
+}
+
+cleanup_dump() {
+  if [ "$KEEP_DUMP" -eq 1 ]; then
+    echo "ℹ dump mantido em: $DUMP_DIR/archive.gz"
+  else
+    rm -rf "$DUMP_DIR"
+  fi
+}
+
 main() {
   local arg
   for arg in "$@"; do
@@ -125,7 +140,12 @@ main() {
   docker network create "$CLONE_NETWORK" >/dev/null 2>&1 || true
   do_dump
   recreate_local
-  echo "TODO: restore/validate (próximas tasks)"
+  do_restore
+  cleanup_dump
+  echo ""
+  echo "✅ Clone pronto."
+  echo "   Aponte o ms-simulado para o clone editando o .env:"
+  echo "     MONGODB=mongodb://localhost:$CLONE_PORT/$SRC_DB"
 }
 
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then main "$@"; fi
