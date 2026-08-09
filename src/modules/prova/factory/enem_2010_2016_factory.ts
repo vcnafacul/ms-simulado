@@ -312,23 +312,25 @@ export class Enem2010_2017Factory implements IProvaFactory {
         );
       }
       await this.questaoRepository.updateQuestion(question);
+      // Numero-sync DENTRO da transação: reconcilia prova + simulados na mesma
+      // session — se falhar, aborta a transação (evita numero dessincronizado
+      // pós-commit).
+      if (question.numero != null) {
+        await syncNumeroNaProvaESimulados(
+          this.provaRepository,
+          this.simuladoRepository,
+          question.prova,
+          question._id,
+          question.numero,
+          session,
+        );
+      }
       await session.commitTransaction();
     } catch (error) {
       await session.abortTransaction();
       throw error;
     } finally {
       session.endSession();
-    }
-
-    // Numero-sync (cutover): numero vive no subdoc; reconcilia prova + simulados.
-    if (question.numero != null) {
-      await syncNumeroNaProvaESimulados(
-        this.provaRepository,
-        this.simuladoRepository,
-        question.prova,
-        question._id,
-        question.numero,
-      );
     }
   }
 

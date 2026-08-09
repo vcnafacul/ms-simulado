@@ -325,9 +325,12 @@ describe('CustomProvaFactory.updateQuestion — numero-sync', () => {
     } as any);
 
     expect(prova.questoes[0].numero).toBe(6);
-    expect(provaRepository.update).toHaveBeenCalledWith(prova);
+    expect(provaRepository.update).toHaveBeenCalledWith(prova, expect.anything());
     expect(simulado.questoes[0].numero).toBe(6);
-    expect(simuladoRepository.update).toHaveBeenCalledWith(simulado);
+    expect(simuladoRepository.update).toHaveBeenCalledWith(
+      simulado,
+      expect.anything(),
+    );
   });
 
   it('NÃO reconcilia quando o input não traz numero', async () => {

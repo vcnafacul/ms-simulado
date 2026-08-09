@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { ClientSession, Types } from 'mongoose';
 import { Questao } from '../../questao/questao.schema';
 import { QuestaoNaContainer } from '../schemas/questao-na-container.schema';
 
@@ -38,10 +38,10 @@ export function removeQuestaoFromContainer(
 
 interface ProvaRepositoryLike {
   getById(id: string): Promise<QuestaoContainer & { simulados: QuestaoContainer[] }>;
-  update(prova: QuestaoContainer): Promise<unknown>;
+  update(prova: QuestaoContainer, session?: ClientSession): Promise<unknown>;
 }
 interface SimuladoRepositoryLike {
-  update(simulado: QuestaoContainer): Promise<unknown>;
+  update(simulado: QuestaoContainer, session?: ClientSession): Promise<unknown>;
 }
 
 /**
@@ -50,6 +50,11 @@ interface SimuladoRepositoryLike {
  * número vive no relacionamento, não propaga a outras provas. Idempotente:
  * `updateNumeroNoContainer` é no-op quando o número já está correto, então só
  * persiste os containers que de fato mudaram.
+ *
+ * `session` opcional: quando chamado dentro de uma transação (factories), os
+ * updates entram na mesma session — assim uma falha aqui aborta a transação em
+ * vez de deixar o `numero` dessincronizado pós-commit. Sem session (ex.:
+ * updateClassificacao) roda solto, como antes.
  */
 export async function syncNumeroNaProvaESimulados(
   provaRepository: ProvaRepositoryLike,
@@ -57,16 +62,17 @@ export async function syncNumeroNaProvaESimulados(
   provaId: string,
   questaoId: Types.ObjectId | string,
   numero: number,
+  session?: ClientSession,
 ): Promise<void> {
   const prova = await provaRepository.getById(provaId);
   if (!prova) return;
   if (updateNumeroNoContainer(prova, questaoId, numero)) {
-    await provaRepository.update(prova);
+    await provaRepository.update(prova, session);
   }
   await Promise.all(
     (prova.simulados ?? []).map(async (sml) => {
       if (updateNumeroNoContainer(sml, questaoId, numero)) {
-        await simuladoRepository.update(sml);
+        await simuladoRepository.update(sml, session);
       }
     }),
   );

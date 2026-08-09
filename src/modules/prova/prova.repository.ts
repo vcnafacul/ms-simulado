@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { ClientSession, Model } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { GetAllWhereInput } from 'src/shared/base/interfaces/get-all.input';
@@ -18,8 +18,8 @@ export class ProvaRepository extends BaseRepository<Prova> {
     super(model);
   }
 
-  async update(prova: Prova) {
-    await this.model.updateOne({ _id: prova._id }, prova);
+  async update(prova: Prova, session?: ClientSession) {
+    await this.model.updateOne({ _id: prova._id }, prova, { session });
   }
 
   async getProvaWithQuestion(id: string): Promise<Prova> {

@@ -69,8 +69,8 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
     };
   }
 
-  async update(simulado: Simulado) {
-    await this.model.updateOne({ _id: simulado._id }, simulado);
+  async update(simulado: Simulado, session?: ClientSession) {
+    await this.model.updateOne({ _id: simulado._id }, simulado, { session });
   }
 
   async updateSession(simulado: Simulado, session?: ClientSession) {

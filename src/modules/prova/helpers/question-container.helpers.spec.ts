@@ -89,8 +89,8 @@ describe('syncNumeroNaProvaESimulados', () => {
 
     expect(prova.questoes[0].numero).toBe(9);
     expect(sml.questoes[0].numero).toBe(9);
-    expect(provaRepository.update).toHaveBeenCalledWith(prova);
-    expect(simuladoRepository.update).toHaveBeenCalledWith(sml);
+    expect(provaRepository.update).toHaveBeenCalledWith(prova, undefined);
+    expect(simuladoRepository.update).toHaveBeenCalledWith(sml, undefined);
   });
 
   it('nao persiste quando numero nao muda', async () => {

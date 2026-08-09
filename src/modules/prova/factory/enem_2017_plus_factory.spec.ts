@@ -164,8 +164,11 @@ describe('Enem2017PlusFactory.updateQuestion — numero-sync (mudança pura de n
     expect(simuladoService.removeQuestionSimulados).not.toHaveBeenCalled();
     // numero-sync reconciliou prova + simulado
     expect(prova.questoes[0].numero).toBe(11);
-    expect(provaRepository.update).toHaveBeenCalledWith(prova);
+    expect(provaRepository.update).toHaveBeenCalledWith(prova, expect.anything());
     expect(simulado.questoes[0].numero).toBe(11);
-    expect(simuladoRepository.update).toHaveBeenCalledWith(simulado);
+    expect(simuladoRepository.update).toHaveBeenCalledWith(
+      simulado,
+      expect.anything(),
+    );
   });
 });
