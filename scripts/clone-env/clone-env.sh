@@ -33,11 +33,12 @@ load_env() {
   [ -f "$env_file" ] || return 0
   local line key val
   while IFS= read -r line || [ -n "$line" ]; do
+    line="${line#"${line%%[![:space:]]*}"}"   # left-trim
     case "$line" in ''|\#*) continue;; esac
     key="${line%%=*}"; val="${line#*=}"
     key="${key#export }"
     key="$(printf '%s' "$key" | tr -d '[:space:]')"
-    [ -z "$key" ] && continue
+    [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
     if [ -z "${!key:-}" ]; then export "$key=$val"; fi
   done < "$env_file"
 }
@@ -65,7 +66,7 @@ parse_source() {
 # Recusa origem local (evita clonar local->local ou confundir origem com destino).
 guard_not_local() {
   case "$SRC_HOST" in
-    localhost*|127.0.0.1*|0.0.0.0*|*:"$CLONE_PORT")
+    localhost*|LOCALHOST*|127.*|0.0.0.0*|::1|\[::1\]*|host.docker.internal*|*:"$CLONE_PORT")
       echo "❌ SOURCE_MONGODB aponta para host local ($SRC_HOST). A origem deve ser remota (homol/prod)." >&2
       exit 1;;
   esac
