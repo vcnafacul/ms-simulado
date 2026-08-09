@@ -81,6 +81,18 @@ confirm() {
   case "$ans" in y|Y|yes|YES|sim|SIM) ;; *) echo "Abortado."; exit 1;; esac
 }
 
+do_dump() {
+  DUMP_DIR="$(mktemp -d)"
+  echo "→ Dump da origem (mongodump, read-only) — db \"$SRC_DB\"..."
+  sleep "$SLEEP_BETWEEN_OPS"
+  # --entrypoint mongodump: evita o gosu do entrypoint da imagem mongo (que dropa
+  # para o usuário "mongodb" e não consegue escrever no bind-mount do Docker Desktop).
+  docker run --rm --network "$CLONE_NETWORK" -v "$DUMP_DIR:/dump" \
+    --entrypoint mongodump "$CLONE_MONGO_IMAGE" \
+    --uri="$SRC_BASE_URI" --db="$SRC_DB" --archive=/dump/archive.gz --gzip
+  echo "  dump em $DUMP_DIR/archive.gz"
+}
+
 main() {
   local arg
   for arg in "$@"; do
@@ -96,7 +108,9 @@ main() {
   parse_source
   guard_not_local
   confirm
-  echo "TODO: dump/restore/validate (próximas tasks)"
+  docker network create "$CLONE_NETWORK" >/dev/null 2>&1 || true
+  do_dump
+  echo "TODO: restore/validate (próximas tasks)"
 }
 
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then main "$@"; fi
