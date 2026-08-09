@@ -78,3 +78,8 @@ export class Prova extends BaseSchema {
 export const ProvaSchema = SchemaFactory.createForClass(Prova);
 
 ProvaSchema.index({ cursinhoId: 1 });
+
+// Índice reverso questao -> provas que a contêm. Sustenta os lookups do banco de
+// questões (findProvasContendo/Many, findProvaAtual, findAnoByQuestao). Declarado
+// no schema (autoIndex cria no boot) pra não depender do indices.sh manual.
+ProvaSchema.index({ 'questoes.questao': 1 });
