@@ -17,10 +17,13 @@ counts() {
     mongosh "$1" --quiet --eval '
       const s = '"$2"';
       const out = {};
-      db.getCollectionNames().sort().forEach(c => {
-        out[c] = db.getCollection(c).countDocuments();
-        if (s > 0) sleep(s);
-      });
+      db.getCollectionInfos({ type: "collection" })
+        .map(i => i.name)
+        .sort()
+        .forEach(c => {
+          out[c] = db.getCollection(c).countDocuments();
+          if (s > 0) sleep(s);
+        });
       print(JSON.stringify(out));
     '
 }
@@ -28,6 +31,14 @@ counts() {
 echo "→ Validando contagens (origem vs local)..."
 src_json="$(counts "$SRC_URI" "$((SLEEP * 1000))")"
 local_json="$(counts "$LOCAL_URI" 0)"
+
+for name in src_json local_json; do
+  val="${!name}"
+  if [ -z "$val" ] || ! printf '%s' "$val" | jq -e . >/dev/null 2>&1; then
+    echo "❌ $name vazio ou não é JSON válido (falha ao contar documentos)" >&2
+    exit 1
+  fi
+done
 
 printf "%-28s %10s %10s   %s\n" "collection" "origem" "local" "ok"
 fail=0
