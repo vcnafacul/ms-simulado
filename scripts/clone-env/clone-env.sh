@@ -93,6 +93,20 @@ do_dump() {
   echo "  dump em $DUMP_DIR/archive.gz"
 }
 
+recreate_local() {
+  echo "→ Recriando Mongo local (wipe & reload)..."
+  docker rm -f "$CLONE_CONTAINER_NAME" >/dev/null 2>&1 || true
+  docker volume rm "${CLONE_CONTAINER_NAME}-data" >/dev/null 2>&1 || true
+  docker run -d --name "$CLONE_CONTAINER_NAME" --network "$CLONE_NETWORK" \
+    -p "$CLONE_PORT:27017" -v "${CLONE_CONTAINER_NAME}-data:/data/db" \
+    "$CLONE_MONGO_IMAGE" >/dev/null
+  printf "  aguardando o Mongo local subir"
+  until docker exec "$CLONE_CONTAINER_NAME" mongosh --quiet --eval 'db.runCommand({ping:1}).ok' 2>/dev/null | grep -q 1; do
+    printf "."; sleep 1
+  done
+  echo " ok"
+}
+
 main() {
   local arg
   for arg in "$@"; do
@@ -110,6 +124,7 @@ main() {
   confirm
   docker network create "$CLONE_NETWORK" >/dev/null 2>&1 || true
   do_dump
+  recreate_local
   echo "TODO: restore/validate (próximas tasks)"
 }
 
