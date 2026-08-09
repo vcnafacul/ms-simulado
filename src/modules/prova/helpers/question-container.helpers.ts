@@ -42,6 +42,42 @@ export function removeQuestaoFromContainer(
  * questão exige reconciliar os containers (prova + simulados). Retorna se
  * alguma entry mudou (pra evitar persistência desnecessária).
  */
+interface ProvaRepositoryLike {
+  getById(id: string): Promise<QuestaoContainer & { simulados: QuestaoContainer[] }>;
+  update(prova: QuestaoContainer): Promise<unknown>;
+}
+interface SimuladoRepositoryLike {
+  update(simulado: QuestaoContainer): Promise<unknown>;
+}
+
+/**
+ * Sincroniza o `numero` de uma questão no container da prova e em cada simulado
+ * dela. Escopo intencional (Etapa 9): só a prova informada + seus simulados —
+ * número vive no relacionamento, não propaga a outras provas. Idempotente:
+ * `updateNumeroNoContainer` é no-op quando o número já está correto, então só
+ * persiste os containers que de fato mudaram.
+ */
+export async function syncNumeroNaProvaESimulados(
+  provaRepository: ProvaRepositoryLike,
+  simuladoRepository: SimuladoRepositoryLike,
+  provaId: string,
+  questaoId: Types.ObjectId | string,
+  numero: number,
+): Promise<void> {
+  const prova = await provaRepository.getById(provaId);
+  if (!prova) return;
+  if (updateNumeroNoContainer(prova, questaoId, numero)) {
+    await provaRepository.update(prova);
+  }
+  await Promise.all(
+    (prova.simulados ?? []).map(async (sml) => {
+      if (updateNumeroNoContainer(sml, questaoId, numero)) {
+        await simuladoRepository.update(sml);
+      }
+    }),
+  );
+}
+
 export function updateNumeroNoContainer(
   container: QuestaoContainer,
   questaoId: Types.ObjectId | string,

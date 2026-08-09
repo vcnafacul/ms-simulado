@@ -64,6 +64,62 @@ describe('question-container.helpers', () => {
   });
 });
 
+import { syncNumeroNaProvaESimulados } from './question-container.helpers';
+
+describe('syncNumeroNaProvaESimulados', () => {
+  it('atualiza numero na prova e nos simulados que contem a questao', async () => {
+    const sml = { questoes: [{ questao: { _id: 'q1' }, numero: 5 }] };
+    const prova = {
+      _id: 'p1',
+      questoes: [{ questao: { _id: 'q1' }, numero: 5 }],
+      simulados: [sml],
+    };
+    const provaRepository = {
+      getById: jest.fn().mockResolvedValue(prova),
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+    const simuladoRepository = { update: jest.fn().mockResolvedValue(undefined) };
+
+    await syncNumeroNaProvaESimulados(
+      provaRepository as any,
+      simuladoRepository as any,
+      'p1',
+      'q1',
+      9,
+    );
+
+    expect(prova.questoes[0].numero).toBe(9);
+    expect(sml.questoes[0].numero).toBe(9);
+    expect(provaRepository.update).toHaveBeenCalledWith(prova);
+    expect(simuladoRepository.update).toHaveBeenCalledWith(sml);
+  });
+
+  it('nao persiste quando numero nao muda', async () => {
+    const sml = { questoes: [{ questao: { _id: 'q1' }, numero: 9 }] };
+    const prova = {
+      _id: 'p1',
+      questoes: [{ questao: { _id: 'q1' }, numero: 9 }],
+      simulados: [sml],
+    };
+    const provaRepository = {
+      getById: jest.fn().mockResolvedValue(prova),
+      update: jest.fn(),
+    };
+    const simuladoRepository = { update: jest.fn() };
+
+    await syncNumeroNaProvaESimulados(
+      provaRepository as any,
+      simuladoRepository as any,
+      'p1',
+      'q1',
+      9,
+    );
+
+    expect(provaRepository.update).not.toHaveBeenCalled();
+    expect(simuladoRepository.update).not.toHaveBeenCalled();
+  });
+});
+
 describe('updateNumeroNoContainer', () => {
   it('atualiza o numero da entry correta e retorna true (questao objeto completo)', () => {
     const alvo = new Types.ObjectId();
