@@ -136,6 +136,37 @@ describe('ProvaService.getAllByCursinho', () => {
   });
 });
 
+describe('ProvaService.syncNumero', () => {
+  it('delega para o helper usando repository e simuladoRepository do service', async () => {
+    const { ProvaService } = require('./prova.service');
+    const sml = { questoes: [{ questao: { _id: 'q1' }, numero: 5 }] };
+    const prova = {
+      _id: 'p1',
+      questoes: [{ questao: { _id: 'q1' }, numero: 5 }],
+      simulados: [sml],
+    };
+    const repository: any = {
+      getById: jest.fn().mockResolvedValue(prova),
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+    const simuladoRepository: any = { update: jest.fn().mockResolvedValue(undefined) };
+    const service = new ProvaService(
+      {} as any,
+      repository,
+      {} as any,
+      simuladoRepository,
+      {} as any,
+    );
+
+    await service.syncNumero('p1', 'q1', 9);
+
+    expect(prova.questoes[0].numero).toBe(9);
+    expect(sml.questoes[0].numero).toBe(9);
+    expect(repository.update).toHaveBeenCalledWith(prova);
+    expect(simuladoRepository.update).toHaveBeenCalledWith(sml);
+  });
+});
+
 describe('ProvaService.refuseQuestion — recompute questoes', () => {
   it('exclui a questão recusada da contagem e bloqueia o simulado', async () => {
     const simulado: any = {

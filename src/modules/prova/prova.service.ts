@@ -13,6 +13,7 @@ import { ProvaRepository } from './prova.repository';
 import { Prova } from './prova.schema';
 import { UpdateProvaFilesDTO } from './dtos/update-files.dto.input';
 import { atingiuQuantidade } from '../simulado/helpers/bloqueado';
+import { syncNumeroNaProvaESimulados } from './helpers/question-container.helpers';
 
 @Injectable()
 export class ProvaService {
@@ -56,6 +57,20 @@ export class ProvaService {
   public async getById(id: string): Promise<Prova> {
     const prova = await this.repository.getById(id);
     return prova;
+  }
+
+  public async syncNumero(
+    provaId: string,
+    questaoId: string,
+    numero: number,
+  ): Promise<void> {
+    await syncNumeroNaProvaESimulados(
+      this.repository,
+      this.simuladoRepository,
+      provaId,
+      questaoId,
+      numero,
+    );
   }
 
   private toProvaDTO(prova: Prova): GetProvaDTOOutout {
