@@ -30,6 +30,13 @@ export class Questao extends QuestaoReview {
   @ApiProperty()
   public materia: Materia;
 
+  // Âncora da prova de origem (renomeada de `prova` na migração 0002). String
+  // (id hex), não populada: serve pra casar com `provasContendo` no dash e obter
+  // prova+número. O número não vive mais na questão — vem do relacionamento.
+  @Prop({ type: String, required: false, default: null })
+  @ApiProperty({ required: false, nullable: true })
+  public provaBase?: string | null;
+
   @Prop({ required: false, default: '' })
   @ApiProperty()
   public textoQuestao: string;

@@ -9,6 +9,9 @@ export class QuestaoAllDTO {
   @ApiProperty()
   public provasContendo: { provaId: string; provaNome: string; numero: number }[];
 
+  @ApiProperty({ required: false, nullable: true })
+  public provaBase?: string | null;
+
   @ApiProperty()
   public enemArea: EnemArea;
 

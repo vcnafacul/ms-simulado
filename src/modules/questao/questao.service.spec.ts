@@ -169,7 +169,7 @@ describe('QuestaoService.getAll (provasContendo)', () => {
   it('monta provasContendo por questão via reverse-lookup', async () => {
     const repository: any = {
       getAll: jest.fn().mockResolvedValue({
-        data: [{ _id: 'q1', enemArea: 'Mat', materia: { nome: 'M' }, status: 1, updatedAt: 'd' }],
+        data: [{ _id: 'q1', provaBase: 'pr1', enemArea: 'Mat', materia: { nome: 'M' }, status: 1, updatedAt: 'd' }],
         page: 1, limit: 10, totalItems: 1,
       }),
       findProvasContendoMany: jest.fn().mockResolvedValue(
@@ -182,6 +182,7 @@ describe('QuestaoService.getAll (provasContendo)', () => {
     );
     const res = await service.getAll({ page: 1, limit: 10 });
     expect(res.data[0].provasContendo).toEqual([{ provaId: 'pr1', provaNome: 'Prova 1', numero: 5 }]);
+    expect(res.data[0].provaBase).toBe('pr1');
     expect((res.data[0] as any).prova).toBeUndefined();
     expect((res.data[0] as any).numero).toBeUndefined();
   });
@@ -189,7 +190,7 @@ describe('QuestaoService.getAll (provasContendo)', () => {
 
 describe('QuestaoService.getById', () => {
   it('anexa provasContendo ao detalhe da questao', async () => {
-    const doc: any = { _id: 'q1', toObject: () => ({ _id: 'q1', enemArea: 'Mat' }) };
+    const doc: any = { _id: 'q1', toObject: () => ({ _id: 'q1', enemArea: 'Mat', provaBase: 'p1' }) };
     const repository: any = {
       getById: jest.fn().mockResolvedValue(doc),
       findProvasContendoMany: jest.fn().mockResolvedValue(
@@ -208,6 +209,7 @@ describe('QuestaoService.getById', () => {
     expect(res.provasContendo).toEqual([
       { provaId: 'p1', provaNome: 'Prova 1', numero: 4 },
     ]);
+    expect(res.provaBase).toBe('p1');
   });
 });
 

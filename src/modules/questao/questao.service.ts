@@ -122,6 +122,7 @@ export class QuestaoService {
     const questoesAll: QuestaoAllDTO[] = questoes.data.map((questao) => ({
       _id: questao._id,
       provasContendo: provasMap.get(questao._id.toString()) ?? [],
+      provaBase: questao.provaBase ? questao.provaBase.toString() : null,
       enemArea: questao.enemArea,
       materia: questao.materia?.nome,
       status: questao.status,
