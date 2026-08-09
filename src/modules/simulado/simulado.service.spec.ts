@@ -353,4 +353,38 @@ describe('SimuladoService.processAnswer (lê questoes)', () => {
     expect(payload.respostas[0].alternativaEstudante).toBe('A');
     expect(payload.respostas[0].alternativaCorreta).toBe('A');
   });
+
+  it('marca Failed sem crashar quando o simulado não tem questões', async () => {
+    const historicoRepository: any = {
+      claimForProcessing: jest.fn().mockResolvedValue(true),
+      getById: jest.fn().mockResolvedValue({
+        simulado: 's1',
+        rawRespostas: [{ questao: 'q1', alternativaEstudante: 'A' }],
+      }),
+      updateStatus: jest.fn().mockResolvedValue(undefined),
+      completeProcessing: jest.fn().mockResolvedValue(undefined),
+    };
+    const simuladoRepository: any = {
+      answer: jest.fn().mockResolvedValue({ _id: 's1', questoes: [] }),
+    };
+    const questoesRepository: any = {
+      findAnoByQuestao: jest.fn(),
+      updateQuestionAnswered: jest.fn(),
+    };
+
+    const service = new SimuladoService(
+      simuladoRepository,
+      questoesRepository,
+      {} as any,
+      historicoRepository,
+      {} as any,
+      {} as any,
+    );
+
+    await expect(service.processAnswer('hist1')).resolves.toBeUndefined();
+
+    expect(questoesRepository.findAnoByQuestao).not.toHaveBeenCalled();
+    expect(historicoRepository.completeProcessing).not.toHaveBeenCalled();
+    expect(historicoRepository.updateStatus).toHaveBeenCalledTimes(1);
+  });
 });

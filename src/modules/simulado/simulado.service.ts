@@ -207,6 +207,16 @@ export class SimuladoService {
         historico.simulado.toString();
       const simulado = await this.simuladoRepository.answer(simuladoId);
 
+      // Guard: simulado sem questões não tem o que processar — evita
+      // TypeError no acesso a questoes[0] abaixo.
+      if (!simulado.questoes.length) {
+        await this.historicoRepository.updateStatus(
+          histId,
+          HistoricoStatus.Failed,
+        );
+        return;
+      }
+
       const ano = await this.questoesRepository.findAnoByQuestao(
         simulado.questoes[0].questao._id,
       );
