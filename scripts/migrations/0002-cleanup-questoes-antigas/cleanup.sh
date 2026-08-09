@@ -4,10 +4,10 @@
 # Espelha o modelo da 0001: NÃO conecta ao Mongo, opera sobre JSON exportado.
 #
 # Renomeia questoesNovo -> questoes (dropando o array antigo de refs) em
-# provas/simulados. Em questoes, renomeia `prova` -> `provaBase` (âncora da prova
-# de origem) e MANTÉM `numero` — assim a questão que veio de uma prova única
-# preserva prova+número. Questão sem prova segue sem provaBase/numero (modelo
-# novo puro; o vínculo passa a viver só em Prova.questoes[]).
+# provas/simulados. Em questoes, renomeia `prova` -> `provaBase` (ponteiro pra
+# prova de origem) e REMOVE `numero` — número vive só no relacionamento
+# (Prova.questoes[].numero). No dash, casa-se `provaBase` com `provasContendo`
+# pra obter prova+número. Questão sem prova fica sem provaBase.
 #
 # A derrubada/criação de índices (que EXIGE conexão ao banco — não dá pra fazer
 # em arquivo) fica no script separado ./indices.sh, rodado por ÚLTIMO, depois de
@@ -56,15 +56,12 @@ jq 'map(.questoes = (.questoesNovo // []) | del(.questoesNovo))' "$SIMULADOS" > 
 ns=$(jq 'length' "$DIR/simulados.out.json")
 echo "[STEP 2] simulados.out.json: $ns docs (questoes := questoesNovo)" >&2
 
-# ---- QUESTOES: renomeia prova -> provaBase (mantém numero). Sem prova → sem
-#      provaBase/numero (modelo novo puro).
-jq 'map(if (.prova != null)
-        then (.provaBase = .prova | del(.prova))
-        else del(.prova, .numero)
-        end)' "$QUESTOES" > "$DIR/questoes.out.json"
+# ---- QUESTOES: renomeia prova -> provaBase (ponteiro) e REMOVE numero.
+#      numero vive só no relacionamento (Prova.questoes[].numero).
+jq 'map((if (.prova != null) then .provaBase = .prova else . end) | del(.prova, .numero))' "$QUESTOES" > "$DIR/questoes.out.json"
 nq=$(jq 'length' "$DIR/questoes.out.json")
 comBase=$(jq '[ .[] | select(.provaBase != null) ] | length' "$DIR/questoes.out.json")
-echo "[STEP 3] questoes.out.json: $nq docs ($comBase com provaBase; prova->provaBase, numero mantido)" >&2
+echo "[STEP 3] questoes.out.json: $nq docs ($comBase com provaBase; prova->provaBase, numero removido)" >&2
 
 echo "[DONE] provas.out.json, simulados.out.json, questoes.out.json gerados." >&2
 echo "cleanup 0002 OK" >&2

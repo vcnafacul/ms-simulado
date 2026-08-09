@@ -2,9 +2,10 @@
 
 Cleanup final da Etapa 9. Dropa o array antigo de refs (`questoes`), renomeia o
 subdoc `questoesNovo` → `questoes` em `Prova`/`Simulado`, e em `Questao` renomeia
-`prova` → `provaBase` **mantendo** `numero` (âncora da prova de origem, pra quem
-veio de uma prova única). Questão sem prova fica sem `provaBase`/`numero` — o
-vínculo passa a viver só em `Prova.questoes[]`.
+`prova` → `provaBase` (ponteiro pra prova de origem) e **remove** `numero` — o
+número passa a viver só no relacionamento (`Prova.questoes[].numero`). No dash,
+casa-se `provaBase` com `provasContendo` pra obter prova+número. Questão sem prova
+fica sem `provaBase`.
 
 Como a **0001**, os scripts de transformação **NÃO conectam ao Mongo**: operam
 sobre JSON exportado localmente e geram `*.out.json` para reimportar.
@@ -17,7 +18,7 @@ Os scripts:
 
 | Script | Conecta ao Mongo? | O que faz |
 |--------|:-:|-----------|
-| `cleanup.sh`  | não | rename `questoesNovo`→`questoes`; `prova`→`provaBase` (mantém `numero`) → `*.out.json` |
+| `cleanup.sh`  | não | rename `questoesNovo`→`questoes`; `prova`→`provaBase` + remove `numero` → `*.out.json` |
 | `validate.sh` | não | valida os `*.out.json` |
 | `indices.sh`  | **sim** | dropa índices legados e cria os índices reversos finais |
 

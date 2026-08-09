@@ -59,12 +59,12 @@ else
   echo "✗ [4] $resid_prova questoes ainda com campo prova" >&2; fail=1
 fi
 
-# [5] numero só existe acompanhado de provaBase (sem provaBase => sem numero)
-num_orfao=$(jq '[ .[] | select((.numero != null) and (.provaBase == null)) ] | length' "$QUESTOES_OUT")
-if [ "$num_orfao" = "0" ]; then
-  echo "✓ [5] Nenhum numero orfao (todo numero tem provaBase)"
+# [5] numero saiu de todas as questoes (vive só no relacionamento)
+resid_num=$(jq '[ .[] | select(has("numero")) ] | length' "$QUESTOES_OUT")
+if [ "$resid_num" = "0" ]; then
+  echo "✓ [5] Nenhuma questao com numero (numero vive no relacionamento)"
 else
-  echo "✗ [5] $num_orfao questoes com numero sem provaBase" >&2; fail=1
+  echo "✗ [5] $resid_num questoes ainda com numero" >&2; fail=1
 fi
 
 # [6] Rename preservou o vínculo: #provaBase(out) == #prova não-nula(in)
