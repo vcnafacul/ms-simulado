@@ -1,24 +1,35 @@
 # Migração 0002 — Cleanup Questões Antigas (Etapa 9, final)
 
-Cleanup final da Etapa 9. Derruba o array antigo de refs (`questoes`), renomeia
-o subdoc `questoesNovo` → `questoes` em `Prova`/`Simulado`, e remove os campos
-legado `prova`/`numero` de `Questao`. Também dropa os índices legados
-(`prova_1`, `numero_1`) e cria os índices reversos finais
-(`questoes.questao`) em `provas` e `simulados`.
+Cleanup final da Etapa 9. Dropa o array antigo de refs (`questoes`), renomeia o
+subdoc `questoesNovo` → `questoes` em `Prova`/`Simulado`, e em `Questao` renomeia
+`prova` → `provaBase` **mantendo** `numero` (âncora da prova de origem, pra quem
+veio de uma prova única). Questão sem prova fica sem `provaBase`/`numero` — o
+vínculo passa a viver só em `Prova.questoes[]`.
 
-Diferente da 0001, esta migração **conecta ao Mongo** e opera in-place
-(`$unset`/`$rename`/`updateMany`).
+Como a **0001**, os scripts de transformação **NÃO conectam ao Mongo**: operam
+sobre JSON exportado localmente e geram `*.out.json` para reimportar.
 
-> **IRREVERSÍVEL sem restaurar backup.** O `$rename`/`$unset` remove os dados
-> antigos; não há como reverter por script. Rodar **somente** após smoke e
-> monitoramento do deploy anterior (Card 05) estarem OK. Ver `rollback.md`.
+A **derrubada/criação de índices** é a única parte que precisa do banco (não sai
+no `mongoexport` nem entra no `mongoimport`) e por isso fica num script final
+separado, `indices.sh`, rodado por último.
+
+Os scripts:
+
+| Script | Conecta ao Mongo? | O que faz |
+|--------|:-:|-----------|
+| `cleanup.sh`  | não | rename `questoesNovo`→`questoes`; `prova`→`provaBase` (mantém `numero`) → `*.out.json` |
+| `validate.sh` | não | valida os `*.out.json` |
+| `indices.sh`  | **sim** | dropa índices legados e cria os índices reversos finais |
 
 ## Pré-requisitos
 
-`mongosh`, `bash`, e o Mongo Database Tools (`mongodump`/`mongorestore`).
-`$MONGODB` = URI do banco alvo.
+`jq` (>=1.6), `bash`, o Mongo Database Tools (`mongodump`, `mongoexport`,
+`mongoimport`) e `mongosh` (só para `indices.sh`). `$MONGODB` = URI do banco alvo.
 
 ## Procedimento (homol primeiro, depois prod)
+
+Rodar **somente** após a 0001 ter sido aplicada (reimportada) e o deploy do
+código anterior (Card 05) estar validado.
 
 ### 1. Backup obrigatório (restore safety)
 
@@ -32,52 +43,53 @@ du -sh ./backup-0002            # confirmar tamanho não-zero
 # subir ./backup-0002 para R2/S3 com retenção >=90 dias; anotar o caminho no PR
 ```
 
-Backup destas 3 collections. É a **única** via de rollback (ver `rollback.md`).
-
-### 2. Rodar o cleanup
+### 2. Exportar as collections (JSON array, Extended JSON relaxado = default)
 
 ```bash
-MONGODB='...' bash cleanup.sh
+mongoexport --uri="$MONGODB" --collection=provas    --jsonArray --out=provas.json
+mongoexport --uri="$MONGODB" --collection=simulados --jsonArray --out=simulados.json
+mongoexport --uri="$MONGODB" --collection=questoes  --jsonArray --out=questoes.json
 ```
 
-Deve terminar imprimindo `cleanup 0002 OK`. O pré-check aborta se houver prova
-com `questoesNovo` vazio mas `questoes` antigo populado (sinal de que a 0001 não
-rodou) — nesse caso, rodar a migração 0001 antes.
-
-### 3. Validar
+### 3. Rodar o cleanup
 
 ```bash
-MONGODB='...' bash validate.sh
+bash cleanup.sh .            # gera provas.out.json, simulados.out.json, questoes.out.json
+bash validate.sh .           # deve terminar com "✅ validate 0002 OK" (exit 0)
 ```
 
-Deve imprimir `validate 0002 OK` (exit 0). Se sair com código 1, NÃO seguir para
-o deploy — investigar os logs (e, se preciso, restaurar do backup do passo 1).
+O pré-check do `cleanup.sh` **aborta** se achar prova/simulado com `questoesNovo`
+vazio mas `questoes` antigo populado (sinal de que a 0001 não rodou, ou de que o
+dump já foi migrado). Se sair com código 1, NÃO reimportar — investigar os logs.
 
-### 4. Deploy do código do Card 07a — imediatamente
+### 4. Reimportar (drop + import — backup já salvo)
 
-O código do Card 07a lê `questoes` no shape novo `[{questao, numero}]` que o
-script acabou de criar. Fazer o deploy logo após o `validate.sh` passar, para
-não deixar o banco no shape novo com código antigo em execução.
+```bash
+mongosh "$MONGODB" --eval 'db.provas.drop(); db.simulados.drop(); db.questoes.drop();'
+mongoimport --uri="$MONGODB" --collection=provas    --jsonArray --file=provas.out.json
+mongoimport --uri="$MONGODB" --collection=simulados --jsonArray --file=simulados.out.json
+mongoimport --uri="$MONGODB" --collection=questoes  --jsonArray --file=questoes.out.json
+```
 
-### 5. Produção
+### 5. Índices (conecta ao banco) — logo após reimportar
 
-Repetir 1→4 em janela de manutenção, sem deploys/writes concorrentes. Backup
+```bash
+MONGODB='...' bash indices.sh    # deve terminar com "indices 0002 OK"
+```
+
+### 6. Deploy do código do Card 07a — imediatamente
+
+O código do Card 07a lê `questoes` no shape novo `[{questao, numero}]`. Fazer o
+deploy logo após reimportar + `indices.sh`, para não deixar o banco no shape novo
+com código antigo em execução.
+
+### 7. Produção
+
+Repetir 1→6 em janela de manutenção, sem deploys/writes concorrentes. Backup
 obrigatório antes. Se algo falhar → `rollback.md`.
 
-## Recuperação em caso de falha no meio
+## Idempotência
 
-- Este script deve rodar **uma única vez**, numa janela de manutenção **sem
-  escritas concorrentes**.
-- Se ele **falhar no meio** (as operações são 5 `updateMany` separados,
-  **não-transacionais**), **NÃO re-execute**. Restaure o backup (ver
-  `rollback.md`) e recomece do zero — um estado parcial pode fazer o pré-check
-  abortar, ou uma re-execução dropar dados já renomeados.
-- O pré-check **aborta** se detectar estado inconsistente (inclusive um banco
-  **já migrado**). Isso é **proteção**, não um erro a "forçar": se ele abortar,
-  investigue o estado do banco, não contorne o script.
-
-## Nota
-
-`$unset` roda **antes** do `$rename` para evitar colisão de campo (o destino
-`questoes` precisa não existir antes de renomear `questoesNovo` sobre ele).
-Rodar em homologação antes de produção.
+`cleanup.sh` reescreve os `*.out.json` sem tocar nos `.json` de entrada — rodar
+2x sobre o mesmo dump dá o mesmo resultado. `indices.sh` também é idempotente
+(`dropIndex` ignora índice inexistente; `createIndex` é no-op se já existe).

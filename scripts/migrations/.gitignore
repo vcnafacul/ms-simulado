@@ -1,0 +1,5 @@
+# Dumps exportados/gerados pelas migrations (dados reais — nunca commitar).
+# Só os scripts (*.sh) e docs (*.md) são versionados.
+*.json
+*.log
+backup-*/
