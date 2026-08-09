@@ -82,7 +82,7 @@ confirm() {
 }
 
 do_dump() {
-  DUMP_DIR="$(mktemp -d)"
+  DUMP_DIR="$(mktemp -d "$REPO_ROOT/.clone-env-dump-XXXXXX")"
   echo "→ Dump da origem (mongodump, read-only) — db \"$SRC_DB\"..."
   sleep "$SLEEP_BETWEEN_OPS"
   # --entrypoint mongodump: evita o gosu do entrypoint da imagem mongo (que dropa
