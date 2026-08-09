@@ -24,9 +24,12 @@ export class HistoricoService {
       ? (historico as any).toObject()
       : historico;
     if (obj.simulado && Array.isArray(obj.simulado.questoes)) {
-      obj.simulado.questoes = obj.simulado.questoes.map(
-        (qc: any) => qc.questao,
-      );
+      // Achata pro shape antigo do client, preservando o numero do relacionamento
+      // (numero vive em QuestaoNaContainer, não mais na Questao).
+      obj.simulado.questoes = obj.simulado.questoes.map((qc: any) => ({
+        ...qc.questao,
+        numero: qc.numero,
+      }));
     }
     return obj;
   }

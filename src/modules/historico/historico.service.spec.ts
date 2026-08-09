@@ -80,8 +80,8 @@ describe('HistoricoService.getById (achata simulado.questoes)', () => {
           _id: 's1',
           nome: 'S',
           questoes: [
-            { questao: { _id: 'q1', textoQuestao: 'a', numero: 5, prova: 'p1' }, numero: 1 },
-            { questao: { _id: 'q2', textoQuestao: 'b', numero: 6, prova: 'p1' }, numero: 2 },
+            { questao: { _id: 'q1', textoQuestao: 'a' }, numero: 1 },
+            { questao: { _id: 'q2', textoQuestao: 'b' }, numero: 2 },
           ],
         },
       }),
@@ -91,9 +91,10 @@ describe('HistoricoService.getById (achata simulado.questoes)', () => {
 
     const result: any = await service.getById('h1');
 
+    // Achata pro shape do client preservando o numero do relacionamento (qc.numero).
     expect(result.simulado.questoes).toEqual([
-      { _id: 'q1', textoQuestao: 'a', numero: 5, prova: 'p1' },
-      { _id: 'q2', textoQuestao: 'b', numero: 6, prova: 'p1' },
+      { _id: 'q1', textoQuestao: 'a', numero: 1 },
+      { _id: 'q2', textoQuestao: 'b', numero: 2 },
     ]);
   });
 
