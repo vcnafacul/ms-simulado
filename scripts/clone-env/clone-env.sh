@@ -27,6 +27,10 @@ ASSUME_YES=0
 KEEP_DUMP=0
 RUN_VALIDATE=1
 
+# Rede de segurança: em qualquer saída, remove o dump temporário (salvo --keep-dump).
+cleanup_on_exit() { [ "$KEEP_DUMP" -eq 1 ] && return 0; [ -n "${DUMP_DIR:-}" ] && rm -rf "$DUMP_DIR"; return 0; }
+trap cleanup_on_exit EXIT
+
 # Carrega KEY=VALUE do .env sem sobrescrever o que já veio do ambiente.
 load_env() {
   local env_file="${ENV_FILE:-$REPO_ROOT/.env}"
@@ -42,8 +46,6 @@ load_env() {
     if [ -z "${!key:-}" ]; then export "$key=$val"; fi
   done < "$env_file"
 }
-
-mask_uri() { printf '%s' "$1" | sed -E 's#(://[^:/@]+):[^@]*@#\1:***@#'; }
 
 # A partir de SOURCE_MONGODB popula: SRC_HOST, SRC_DB, SRC_BASE_URI (URI sem o db).
 parse_source() {
@@ -101,7 +103,14 @@ recreate_local() {
     -p "$CLONE_PORT:27017" -v "${CLONE_CONTAINER_NAME}-data:/data/db" \
     "$CLONE_MONGO_IMAGE" >/dev/null
   printf "  aguardando o Mongo local subir"
+  local tries=0
   until docker exec "$CLONE_CONTAINER_NAME" mongosh --quiet --eval 'db.runCommand({ping:1}).ok' 2>/dev/null | grep -q 1; do
+    tries=$((tries + 1))
+    if [ "$tries" -ge 60 ]; then
+      echo "" >&2
+      echo "❌ Mongo local não ficou pronto após 60s. Veja: docker logs $CLONE_CONTAINER_NAME" >&2
+      exit 1
+    fi
     printf "."; sleep 1
   done
   echo " ok"
@@ -133,6 +142,7 @@ main() {
     esac
   done
   command -v docker >/dev/null || { echo "❌ Docker não encontrado." >&2; exit 1; }
+  command -v jq >/dev/null || { echo "❌ jq não encontrado." >&2; exit 1; }
   load_env
   parse_source
   guard_not_local
