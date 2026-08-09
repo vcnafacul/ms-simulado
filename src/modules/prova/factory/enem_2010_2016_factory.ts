@@ -11,7 +11,7 @@ import { SimuladoRepository } from 'src/modules/simulado/simulado.repository';
 import { SimuladoService } from 'src/modules/simulado/simulado.service';
 import { CategoriaRepository } from 'src/modules/categoria/categoria.repository';
 import { CreateProvaDTOInput } from '../dtos/create.dto.input';
-import { updateNumeroNoContainer } from '../helpers/question-container.helpers';
+import { syncNumeroNaProvaESimulados } from '../helpers/question-container.helpers';
 import { ProvaRepository } from '../prova.repository';
 import { Prova } from '../prova.schema';
 import { EnemService } from '../services/enem_service';
@@ -320,19 +320,14 @@ export class Enem2010_2017Factory implements IProvaFactory {
       session.endSession();
     }
 
-    // Numero-sync (cutover): numero vive no subdoc; se mudou, reconcilia in-place
-    // na prova de destino e seus simulados que referenciam a questão.
+    // Numero-sync (cutover): numero vive no subdoc; reconcilia prova + simulados.
     if (question.numero != null) {
-      const provaAtual = await this.provaRepository.getById(question.prova);
-      if (updateNumeroNoContainer(provaAtual, question._id, question.numero)) {
-        await this.provaRepository.update(provaAtual);
-      }
-      await Promise.all(
-        provaAtual.simulados.map(async (sml) => {
-          if (updateNumeroNoContainer(sml, question._id, question.numero)) {
-            await this.simuladoRepository.update(sml);
-          }
-        }),
+      await syncNumeroNaProvaESimulados(
+        this.provaRepository,
+        this.simuladoRepository,
+        question.prova,
+        question._id,
+        question.numero,
       );
     }
   }

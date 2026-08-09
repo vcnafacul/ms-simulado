@@ -36,12 +36,6 @@ export function removeQuestaoFromContainer(
   });
 }
 
-/**
- * Atualiza in-place o `numero` das entries que referenciam `questaoId`.
- * Usado no cutover: `numero` vive no subdoc, então editar o número de uma
- * questão exige reconciliar os containers (prova + simulados). Retorna se
- * alguma entry mudou (pra evitar persistência desnecessária).
- */
 interface ProvaRepositoryLike {
   getById(id: string): Promise<QuestaoContainer & { simulados: QuestaoContainer[] }>;
   update(prova: QuestaoContainer): Promise<unknown>;
@@ -78,6 +72,12 @@ export async function syncNumeroNaProvaESimulados(
   );
 }
 
+/**
+ * Atualiza in-place o `numero` das entries que referenciam `questaoId`.
+ * Usado no cutover: `numero` vive no subdoc, então editar o número de uma
+ * questão exige reconciliar os containers (prova + simulados). Retorna se
+ * alguma entry mudou (pra evitar persistência desnecessária).
+ */
 export function updateNumeroNoContainer(
   container: QuestaoContainer,
   questaoId: Types.ObjectId | string,

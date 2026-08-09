@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 import {
   addQuestaoToContainer,
   removeQuestaoFromContainer,
+  syncNumeroNaProvaESimulados,
   updateNumeroNoContainer,
 } from './question-container.helpers';
 
@@ -64,8 +65,6 @@ describe('question-container.helpers', () => {
   });
 });
 
-import { syncNumeroNaProvaESimulados } from './question-container.helpers';
-
 describe('syncNumeroNaProvaESimulados', () => {
   it('atualiza numero na prova e nos simulados que contem a questao', async () => {
     const sml = { questoes: [{ questao: { _id: 'q1' }, numero: 5 }] };
@@ -114,6 +113,27 @@ describe('syncNumeroNaProvaESimulados', () => {
       'q1',
       9,
     );
+
+    expect(provaRepository.update).not.toHaveBeenCalled();
+    expect(simuladoRepository.update).not.toHaveBeenCalled();
+  });
+
+  it('retorna sem erro quando prova não existe', async () => {
+    const provaRepository = {
+      getById: jest.fn().mockResolvedValue(null),
+      update: jest.fn(),
+    };
+    const simuladoRepository = { update: jest.fn() };
+
+    await expect(
+      syncNumeroNaProvaESimulados(
+        provaRepository as any,
+        simuladoRepository as any,
+        'p-missing',
+        'q1',
+        9,
+      ),
+    ).resolves.toBeUndefined();
 
     expect(provaRepository.update).not.toHaveBeenCalled();
     expect(simuladoRepository.update).not.toHaveBeenCalled();

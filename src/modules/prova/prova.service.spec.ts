@@ -138,7 +138,6 @@ describe('ProvaService.getAllByCursinho', () => {
 
 describe('ProvaService.syncNumero', () => {
   it('delega para o helper usando repository e simuladoRepository do service', async () => {
-    const { ProvaService } = require('./prova.service');
     const sml = { questoes: [{ questao: { _id: 'q1' }, numero: 5 }] };
     const prova = {
       _id: 'p1',
