@@ -90,6 +90,17 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     return prova?.ano;
   }
 
+  async provaContemQuestao(
+    provaId: string,
+    questaoId: string,
+  ): Promise<boolean> {
+    const found = await this.provaModel.exists({
+      _id: provaId,
+      'questoes.questao': questaoId,
+    });
+    return !!found;
+  }
+
   async getByIdToUpdate(id: string) {
     return await this.model
       .findById(id)

@@ -276,6 +276,19 @@ export class QuestaoService {
         updateDto.alternativa = questao.alternativa;
         await this.updateQuestion(updateDto);
       } else if (classificacao.numero != null) {
+        // Guard: no branch numero-only assumimos que a questão já está na prova
+        // enviada (a UI trava a prova). Falha alto se não estiver, em vez de o
+        // syncNumero virar no-op silencioso na prova errada.
+        const naProva = await this.repository.provaContemQuestao(
+          classificacao.prova,
+          id,
+        );
+        if (!naProva) {
+          throw new HttpException(
+            `A questão ${id} não está na prova ${classificacao.prova}.`,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
         // Só o numero mudou: sync escopado na prova editada + simulados dela.
         await this.provaService.syncNumero(
           classificacao.prova,

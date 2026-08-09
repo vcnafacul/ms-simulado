@@ -225,6 +225,7 @@ describe('QuestaoService.updateClassificacao', () => {
     const repository: any = {
       getByIdToUpdate: jest.fn().mockResolvedValue(questao),
       updateClassificacao: jest.fn().mockResolvedValue(undefined),
+      provaContemQuestao: jest.fn().mockResolvedValue(true),
     };
     const provaService: any = { syncNumero: jest.fn().mockResolvedValue(undefined) };
     const provaFactory: any = { getFactory: jest.fn() };
@@ -238,9 +239,33 @@ describe('QuestaoService.updateClassificacao', () => {
       prova: 'p1', enemArea: 'Mat', frente1: 'f1', materia: 'm1', numero: 7,
     } as any);
 
+    expect(repository.provaContemQuestao).toHaveBeenCalledWith('p1', 'q1');
     expect(provaService.syncNumero).toHaveBeenCalledWith('p1', 'q1', 7);
     expect(provaFactory.getFactory).not.toHaveBeenCalled();
     expect(repository.updateClassificacao).toHaveBeenCalledWith('q1', expect.anything());
+  });
+
+  it('numero-only: falha alto se a prova enviada não contém a questão', async () => {
+    const repository: any = {
+      getByIdToUpdate: jest.fn().mockResolvedValue(questao),
+      updateClassificacao: jest.fn().mockResolvedValue(undefined),
+      provaContemQuestao: jest.fn().mockResolvedValue(false),
+    };
+    const provaService: any = { syncNumero: jest.fn() };
+    const { QuestaoService } = require('./questao.service');
+    const service = new QuestaoService(
+      repository, provaService, {} as any, {} as any, {} as any,
+      {} as any, {} as any, {} as any, {} as any,
+    );
+
+    await expect(
+      service.updateClassificacao('q1', {
+        prova: 'p1', enemArea: 'Mat', frente1: 'f1', materia: 'm1', numero: 7,
+      } as any),
+    ).rejects.toBeTruthy();
+
+    expect(provaService.syncNumero).not.toHaveBeenCalled();
+    expect(repository.updateClassificacao).not.toHaveBeenCalled();
   });
 
   it('enemArea mudou: dispara factory.updateQuestion e NAO syncNumero', async () => {
