@@ -141,6 +141,12 @@ main() {
   do_dump
   recreate_local
   do_restore
+  if [ "$RUN_VALIDATE" -eq 1 ]; then
+    bash "$SCRIPT_DIR/validate.sh" \
+      "$SOURCE_MONGODB" \
+      "mongodb://$CLONE_CONTAINER_NAME:27017/$SRC_DB" \
+      "$SLEEP_BETWEEN_OPS"
+  fi
   cleanup_dump
   echo ""
   echo "✅ Clone pronto."
