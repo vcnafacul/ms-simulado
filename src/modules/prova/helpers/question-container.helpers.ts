@@ -21,19 +21,25 @@ export function addQuestaoToContainer(
 }
 
 /**
- * Remove do container a entry cuja questão bate com `questaoId`. Normaliza o id
- * para funcionar tanto com objeto completo (`qc.questao._id`) quanto com ref
- * crua (`qc.questao` sendo o próprio ObjectId).
+ * Normaliza o id da questão de uma entry, funcionando tanto com objeto completo
+ * (`qc.questao._id`, populado) quanto com ref crua (`qc.questao` = ObjectId).
+ */
+export function resolveQuestaoId(qc: QuestaoNaContainer): string {
+  const q = qc.questao as any;
+  return (q?._id ?? q).toString();
+}
+
+/**
+ * Remove do container a entry cuja questão bate com `questaoId`.
  */
 export function removeQuestaoFromContainer(
   container: QuestaoContainer,
   questaoId: Types.ObjectId | string,
 ): void {
   const idStr = questaoId.toString();
-  container.questoes = container.questoes.filter((qc) => {
-    const cur = (qc.questao as any)?._id ?? qc.questao;
-    return cur.toString() !== idStr;
-  });
+  container.questoes = container.questoes.filter(
+    (qc) => resolveQuestaoId(qc) !== idStr,
+  );
 }
 
 interface ProvaRepositoryLike {
@@ -92,8 +98,7 @@ export function updateNumeroNoContainer(
   const idStr = questaoId.toString();
   let changed = false;
   for (const qc of container.questoes) {
-    const cur = (qc.questao as any)?._id ?? qc.questao;
-    if (cur.toString() === idStr && qc.numero !== numero) {
+    if (resolveQuestaoId(qc) === idStr && qc.numero !== numero) {
       qc.numero = numero;
       changed = true;
     }

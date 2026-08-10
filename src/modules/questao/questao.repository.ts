@@ -5,6 +5,7 @@ import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllWhereInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { Prova } from '../prova/prova.schema';
+import { resolveQuestaoId } from '../prova/helpers/question-container.helpers';
 import { Resposta } from '../historico/types/resposta';
 import { UpdateClassificacaoDTOInput } from './dtos/update-classificacao.dto.input';
 import { UpdateContentDTOInput } from './dtos/update-content.dto.input';
@@ -259,9 +260,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
   async findQuestaoIdsByProva(provaId: string): Promise<string[]> {
     const prova = await this.provaModel.findById(provaId).select('questoes').exec();
     if (!prova) return [];
-    return prova.questoes.map((qc: any) =>
-      ((qc.questao as any)?._id ?? qc.questao).toString(),
-    );
+    return prova.questoes.map((qc) => resolveQuestaoId(qc));
   }
 
   async findProvasContendoMany(
@@ -274,7 +273,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     const map = new Map<string, ProvaContendo[]>();
     for (const prova of provas) {
       for (const qc of (prova as any).questoes) {
-        const qId = ((qc.questao as any)?._id ?? qc.questao).toString();
+        const qId = resolveQuestaoId(qc);
         if (!questaoIds.includes(qId)) continue;
         if (!map.has(qId)) map.set(qId, []);
         map.get(qId)!.push({
