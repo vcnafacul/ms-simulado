@@ -293,6 +293,26 @@ export class QuestaoService {
     });
   }
 
+  public async definirProvaBase(
+    questaoId: string,
+    provaId: string,
+    userId?: string,
+  ): Promise<void> {
+    const naProva = await this.repository.provaContemQuestao(provaId, questaoId);
+    if (!naProva) {
+      throw new BadRequestException(
+        'A prova indicada não contém esta questão.',
+      );
+    }
+    await this.repository.setProvaBase(questaoId, provaId);
+    await this.auditLogService.create({
+      user: userId,
+      entityId: questaoId,
+      entityType: 'Questao',
+      changes: JSON.stringify({ acao: 'definirProvaBase', provaId }),
+    });
+  }
+
   public async adicionarEmProva(
     questaoId: string,
     provaId: string,

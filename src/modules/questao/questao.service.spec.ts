@@ -380,6 +380,47 @@ describe('QuestaoService.removerDeProva', () => {
   });
 });
 
+describe('QuestaoService.definirProvaBase', () => {
+  const { QuestaoService: QS } = require('./questao.service');
+
+  let repository: any;
+  let auditLogService: any;
+  let service: any;
+
+  beforeEach(() => {
+    repository = {
+      provaContemQuestao: jest.fn(),
+      setProvaBase: jest.fn().mockResolvedValue(undefined),
+    };
+    auditLogService = {
+      create: jest.fn().mockResolvedValue(undefined),
+    };
+    service = new QS(
+      repository,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      auditLogService,
+      {} as any,
+      {} as any,
+    );
+  });
+
+  it('rejeita prova fora de provasContendo', async () => {
+    repository.provaContemQuestao.mockResolvedValue(false);
+    await expect(service.definirProvaBase('q1', 'p9')).rejects.toThrow();
+  });
+
+  it('seta provaBase e audita', async () => {
+    repository.provaContemQuestao.mockResolvedValue(true);
+    await service.definirProvaBase('q1', 'p1');
+    expect(repository.setProvaBase).toHaveBeenCalledWith('q1', 'p1');
+    expect(auditLogService.create).toHaveBeenCalled();
+  });
+});
+
 describe('QuestaoService.updateClassificacao', () => {
   const questao: any = {
     _id: 'q1',
