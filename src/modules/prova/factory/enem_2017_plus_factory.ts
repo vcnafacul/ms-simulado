@@ -311,6 +311,62 @@ export class Enem2017PlusFactory implements IProvaFactory {
     }
   }
 
+  public async addQuestaoExistenteAProva(
+    questaoId: string,
+    provaId: string,
+    numero: number,
+  ): Promise<void> {
+    const questao = await this.questaoRepository.getByIdToUpdate(questaoId);
+    const [frenteIngles, frenteEspanhol] = await Promise.all([
+      this.getFrenteByNome('Inglês'),
+      this.getFrenteByNome('Espanhol'),
+    ]);
+
+    // Objeto no formato que validate/selectSimuladosToEnter esperam, montado a
+    // partir da questão já existente (frente1 populada → id string).
+    const questionLike = {
+      numero,
+      enemArea: questao.enemArea,
+      frente1: questao.frente1?._id?.toString(),
+      prova: provaId,
+    } as unknown as UpdateDTOInput;
+
+    await this.enemService.validate(questionLike, frenteIngles, frenteEspanhol, 1, 5);
+
+    const provaToEnter = await this.provaRepository.getById(provaId);
+    const dia1 = [EnemArea.CienciasHumanas, EnemArea.Linguagens].includes(
+      questao.enemArea,
+    );
+    const isIngles = questionLike.frente1 === frenteIngles._id.toString();
+    const isEspanhol =
+      !isIngles && questionLike.frente1 === frenteEspanhol._id.toString();
+    const simuladosToEnter = this.selectSimuladosToEnter(
+      provaToEnter,
+      questionLike,
+      isIngles,
+      isEspanhol,
+      dia1,
+    );
+
+    const session = await this.questaoRepository.startSession();
+    session.startTransaction();
+    try {
+      await this.simuladoService.addQuestionSimulados(
+        simuladosToEnter,
+        questao,
+        numero,
+        session,
+      );
+      await this.provaRepository.addQuestion(provaId, questao, numero, session);
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
   // --- Funções auxiliares ---
 
   private async getFrenteByNome(nome: string): Promise<Frente> {
