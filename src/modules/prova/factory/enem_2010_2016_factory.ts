@@ -334,6 +334,68 @@ export class Enem2010_2017Factory implements IProvaFactory {
     }
   }
 
+  public async addQuestaoExistenteAProva(
+    questaoId: string,
+    provaId: string,
+    numero: number,
+  ): Promise<void> {
+    const questao = await this.questaoRepository.getByIdToUpdate(questaoId);
+
+    const [frenteIngles, frenteEspanhol] = await Promise.all([
+      this.getFrenteByNome('Inglês'),
+      this.getFrenteByNome('Espanhol'),
+    ]);
+
+    const questionLike = {
+      numero,
+      enemArea: questao.enemArea,
+      frente1: questao.frente1?._id?.toString(),
+      prova: provaId,
+    } as unknown as UpdateDTOInput;
+
+    await this.enemService.validate(
+      questionLike,
+      frenteIngles,
+      frenteEspanhol,
+      91,
+      95,
+    );
+
+    const provaToEnter = await this.provaRepository.getById(provaId);
+    const isIngles = questionLike.frente1 === frenteIngles._id.toString();
+    const isEspanhol =
+      !isIngles && questionLike.frente1 === frenteEspanhol._id.toString();
+
+    if (isIngles || isEspanhol) {
+      await this.validateInsertion(provaToEnter._id, numero, questionLike.frente1);
+    }
+
+    const simuladosToEnter = this.selectSimulados(
+      provaToEnter,
+      questionLike,
+      isIngles,
+      isEspanhol,
+    );
+
+    const session = await this.questaoRepository.startSession();
+    session.startTransaction();
+    try {
+      await this.simuladoService.addQuestionSimulados(
+        simuladosToEnter,
+        questao,
+        numero,
+        session,
+      );
+      await this.provaRepository.addQuestion(provaId, questao, numero, session);
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
   // Busca a frente pelo nome (reaproveitada da função createQuestion)
   private async getFrenteByNome(nome: string): Promise<Frente> {
     return this.frenteRepository.getByFilter({ nome });
