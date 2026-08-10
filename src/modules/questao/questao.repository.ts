@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { ClientSession, Model, Types } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllWhereInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
@@ -206,6 +206,14 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       { _id: id },
       { imageId: imageId.imageId || null },
     );
+  }
+
+  async setProvaBase(
+    id: string,
+    provaBase: string | null,
+    session?: ClientSession,
+  ) {
+    await this.model.updateOne({ _id: id }, { provaBase }, { session });
   }
 
   async updateImageAlternativa(
