@@ -26,7 +26,7 @@ import { UpdateImageAlternativaDTOInput } from './dtos/update-image-alternativa.
 import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
-import { QuestaoRepository } from './questao.repository';
+import { ProvaContendo, QuestaoRepository } from './questao.repository';
 import { Questao } from './questao.schema';
 
 @Injectable()
@@ -57,13 +57,15 @@ export class QuestaoService {
     );
   }
 
-  public async getById(id: string): Promise<any> {
+  public async getById(
+    id: string,
+  ): Promise<(Questao & { provasContendo: ProvaContendo[] }) | null> {
     const questao = await this.repository.getById(id);
-    if (!questao) return questao;
+    if (!questao) return null;
     const map = await this.repository.findProvasContendoMany([id]);
-    const obj: any = (questao as any).toObject
+    const obj = ((questao as any).toObject
       ? (questao as any).toObject()
-      : questao;
+      : questao) as Questao & { provasContendo: ProvaContendo[] };
     obj.provasContendo = map.get(id.toString()) ?? [];
     return obj;
   }

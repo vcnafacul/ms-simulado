@@ -14,6 +14,13 @@ import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
 import { Questao } from './questao.schema';
 
+/** Entrada do reverse-lookup: prova que contém a questão + o número nela. */
+export interface ProvaContendo {
+  provaId: string;
+  provaNome: string;
+  numero: number;
+}
+
 @Injectable()
 export class QuestaoRepository extends BaseRepository<Questao> {
   constructor(
@@ -259,12 +266,12 @@ export class QuestaoRepository extends BaseRepository<Questao> {
 
   async findProvasContendoMany(
     questaoIds: string[],
-  ): Promise<Map<string, { provaId: string; provaNome: string; numero: number }[]>> {
+  ): Promise<Map<string, ProvaContendo[]>> {
     const provas = await this.provaModel
       .find({ 'questoes.questao': { $in: questaoIds } })
       .select('nome questoes')
       .exec();
-    const map = new Map<string, { provaId: string; provaNome: string; numero: number }[]>();
+    const map = new Map<string, ProvaContendo[]>();
     for (const prova of provas) {
       for (const qc of (prova as any).questoes) {
         const qId = ((qc.questao as any)?._id ?? qc.questao).toString();

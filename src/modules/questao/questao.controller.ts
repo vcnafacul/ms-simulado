@@ -20,6 +20,7 @@ import { UpdateImageAlternativaDTOInput } from './dtos/update-image-alternativa.
 import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
+import { ProvaContendo } from './questao.repository';
 import { Questao } from './questao.schema';
 import { QuestaoService } from './questao.service';
 
@@ -104,7 +105,9 @@ export class QuestaoController {
     type: Questao,
     isArray: false,
   })
-  public async getById(@Param('id') id: string): Promise<Questao> {
+  public async getById(
+    @Param('id') id: string,
+  ): Promise<(Questao & { provasContendo: ProvaContendo[] }) | null> {
     return await this.service.getById(id);
   }
 
