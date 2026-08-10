@@ -249,6 +249,50 @@ export class QuestaoService {
     }
   }
 
+  public async removerDeProva(
+    questaoId: string,
+    provaId: string,
+    userId?: string,
+  ): Promise<void> {
+    const provas = await this.repository.findProvasContendo(questaoId);
+    if (provas.length <= 1) {
+      throw new BadRequestException(
+        'Não é possível remover o último vínculo. Para retirar de todas as provas, exclua a questão.',
+      );
+    }
+    const alvo = provas.find((p) => p._id.toString() === provaId);
+    if (!alvo) {
+      throw new BadRequestException('A questão não está nesta prova.');
+    }
+    const questao = await this.repository.getByIdToUpdate(questaoId);
+
+    const session = await this.repository.startSession();
+    session.startTransaction();
+    try {
+      await this.simuladoService.removeQuestionSimulados(
+        alvo.simulados,
+        questao,
+        session,
+      );
+      await this.provaRepository.removeQuestion(provaId, questao, session);
+      if (questao.provaBase?.toString() === provaId) {
+        await this.repository.setProvaBase(questaoId, null, session);
+      }
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+    await this.auditLogService.create({
+      user: userId,
+      entityId: questaoId,
+      entityType: 'Questao',
+      changes: JSON.stringify({ acao: 'removerDeProva', provaId }),
+    });
+  }
+
   public async adicionarEmProva(
     questaoId: string,
     provaId: string,

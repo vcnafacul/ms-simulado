@@ -286,6 +286,100 @@ describe('QuestaoService.adicionarEmProva', () => {
   });
 });
 
+describe('QuestaoService.removerDeProva', () => {
+  const { QuestaoService: QS } = require('./questao.service');
+
+  let repository: any;
+  let provaRepository: any;
+  let simuladoService: any;
+  let auditLogService: any;
+  let service: any;
+
+  const sessionMock = {
+    startTransaction: jest.fn(),
+    commitTransaction: jest.fn(),
+    abortTransaction: jest.fn(),
+    endSession: jest.fn(),
+  };
+
+  beforeEach(() => {
+    repository = {
+      findProvasContendo: jest.fn(),
+      getByIdToUpdate: jest.fn(),
+      setProvaBase: jest.fn().mockResolvedValue(undefined),
+      startSession: jest.fn().mockResolvedValue(sessionMock),
+    };
+    provaRepository = {
+      removeQuestion: jest.fn().mockResolvedValue(undefined),
+    };
+    simuladoService = {
+      removeQuestionSimulados: jest.fn().mockResolvedValue(undefined),
+    };
+    auditLogService = {
+      create: jest.fn().mockResolvedValue(undefined),
+    };
+    jest.clearAllMocks();
+    repository.startSession.mockResolvedValue(sessionMock);
+    sessionMock.startTransaction.mockReset();
+    sessionMock.commitTransaction.mockResolvedValue(undefined);
+    sessionMock.abortTransaction.mockResolvedValue(undefined);
+    sessionMock.endSession.mockReset();
+
+    service = new QS(
+      repository,
+      {} as any,
+      provaRepository,
+      {} as any,
+      {} as any,
+      {} as any,
+      auditLogService,
+      simuladoService,
+      {} as any,
+    );
+  });
+
+  it('bloqueia remover o último vínculo', async () => {
+    repository.findProvasContendo.mockResolvedValue([{ _id: 'p1', simulados: [] }] as any);
+    await expect(service.removerDeProva('q1', 'p1')).rejects.toThrow();
+  });
+
+  it('bloqueia quando a prova não contém a questão', async () => {
+    repository.findProvasContendo.mockResolvedValue([
+      { _id: 'p1', simulados: [] },
+      { _id: 'p2', simulados: [] },
+    ] as any);
+    await expect(service.removerDeProva('q1', 'pX')).rejects.toThrow();
+  });
+
+  it('remove de prova+simulados e zera provaBase quando era a base', async () => {
+    const questao = { _id: 'q1', status: 'Approved', provaBase: 'p1' } as any;
+    repository.findProvasContendo.mockResolvedValue([
+      { _id: 'p1', simulados: [{ _id: 's1' }] },
+      { _id: 'p2', simulados: [] },
+    ] as any);
+    repository.getByIdToUpdate.mockResolvedValue(questao);
+
+    await service.removerDeProva('q1', 'p1');
+
+    expect(simuladoService.removeQuestionSimulados).toHaveBeenCalled();
+    expect(provaRepository.removeQuestion).toHaveBeenCalledWith('p1', questao, expect.anything());
+    expect(repository.setProvaBase).toHaveBeenCalledWith('q1', null, expect.anything());
+  });
+
+  it('não mexe em provaBase quando a prova removida não é a base', async () => {
+    const questao = { _id: 'q1', status: 'Pending', provaBase: 'p2' } as any;
+    repository.findProvasContendo.mockResolvedValue([
+      { _id: 'p1', simulados: [] },
+      { _id: 'p2', simulados: [] },
+    ] as any);
+    repository.getByIdToUpdate.mockResolvedValue(questao);
+
+    await service.removerDeProva('q1', 'p1');
+
+    expect(repository.setProvaBase).not.toHaveBeenCalled();
+  });
+});
+
 describe('QuestaoService.updateClassificacao', () => {
   const questao: any = {
     _id: 'q1',
