@@ -54,10 +54,9 @@ export class ProvaRepository extends BaseRepository<Prova> {
     const prova = await this.model.findById(id);
     const before = prova.questoes.length;
     removeQuestaoFromContainer(prova, oldQuestao._id);
-    if (
-      prova.questoes.length !== before &&
-      oldQuestao.status === Status.Approved
-    ) {
+    // Questão não estava na prova: nada mudou → evita write espúrio.
+    if (prova.questoes.length === before) return;
+    if (oldQuestao.status === Status.Approved) {
       prova.totalQuestaoValidadas -= 1;
     }
     await this.model.updateOne({ _id: prova._id }, prova);
