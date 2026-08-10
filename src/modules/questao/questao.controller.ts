@@ -188,9 +188,9 @@ export class QuestaoController {
   public async removerDeProva(
     @Param('id') id: string,
     @Param('provaId') provaId: string,
-    @Body() body: { userId?: string },
+    @Query('userId') userId?: string,
   ): Promise<void> {
-    await this.service.removerDeProva(id, provaId, body?.userId);
+    await this.service.removerDeProva(id, provaId, userId);
   }
 
   @Patch(':id/prova-base')
