@@ -23,7 +23,7 @@ fail=0
 expected=$(jq -n --slurpfile q "$QUESTOES" --slurpfile p "$PROVAS_OUT" '
   ($p[0] | map(._id["$oid"])) as $ids
   | [ $q[0][] | select(.prova != null and (.numero != null))
-      | select((.prova["$oid"]) as $pid | ($ids | index($pid))) ] | length')
+      | select(((.prova | if type == "object" then .["$oid"] else . end)) as $pid | ($ids | index($pid))) ] | length')
 got=$(jq '[.[] | .questoesNovo | length] | add // 0' "$PROVAS_OUT")
 if [ "$expected" = "$got" ]; then
   echo "✓ [1] Total prova entries = $got (esperado $expected)"
@@ -34,7 +34,7 @@ fi
 # [2] Idiomáticas preservadas: nº de grupos (prova,numero) com >=2 igual input vs output
 exp_pairs=$(jq -n --slurpfile q "$QUESTOES" '
   [ $q[0][] | select(.prova != null and (.numero != null))
-    | (.prova["$oid"] + "|" + (.numero | tostring)) ]
+    | ((.prova | if type == "object" then .["$oid"] else . end) + "|" + (.numero | tostring)) ]
   | group_by(.) | map(select(length >= 2)) | length')
 got_pairs=$(jq '
   [ .[] | (.questoesNovo // [])
@@ -63,7 +63,7 @@ fi
 orfas=$(jq -n --slurpfile q "$QUESTOES" --slurpfile p "$PROVAS_OUT" '
   ($p[0] | map(._id["$oid"])) as $ids
   | [ $q[0][] | select(.prova != null and (.numero != null))
-      | select((.prova["$oid"]) as $pid | ($ids | index($pid)) | not) ] | length')
+      | select(((.prova | if type == "object" then .["$oid"] else . end)) as $pid | ($ids | index($pid)) | not) ] | length')
 echo "ℹ [4] Questoes órfãs (prova fora do dump): $orfas (warn)"
 
 if [ "$fail" -eq 0 ]; then

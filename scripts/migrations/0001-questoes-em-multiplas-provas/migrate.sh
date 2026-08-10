@@ -46,7 +46,7 @@ jq -n \
   | ($provas[0]) as $ps
   | ( [ $qs[]
         | select(.prova != null and (.numero != null))
-        | { provaId: .prova["$oid"], questao: {"$oid": ._id["$oid"]}, numero: .numero } ]
+        | { provaId: (.prova | if type == "object" then .["$oid"] else . end), questao: {"$oid": ._id["$oid"]}, numero: .numero } ]
       | to_entries
       | map(.value + { _id: {"$oid": $idpool[.key]} }) ) as $entries
   | ( $entries
@@ -63,7 +63,7 @@ orfas=$(jq -n --slurpfile q "$QUESTOES" --slurpfile p "$PROVAS" '
   ($p[0] | map(._id["$oid"])) as $ids
   | [ $q[0][]
       | select(.prova != null and (.numero != null))
-      | select((.prova["$oid"]) as $pid | ($ids | index($pid)) | not) ] | length')
+      | select(((.prova | if type == "object" then .["$oid"] else . end)) as $pid | ($ids | index($pid)) | not) ] | length')
 echo "[STEP 2b] Questoes órfãs (prova fora do dump): $orfas" >&2
 
 # ============ SIMULADO ============
