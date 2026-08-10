@@ -249,6 +249,39 @@ export class QuestaoService {
     }
   }
 
+  public async adicionarEmProva(
+    questaoId: string,
+    provaId: string,
+    numero: number,
+    userId?: string,
+  ): Promise<void> {
+    const prova = await this.provaRepository.getById(provaId);
+    if (!prova) {
+      throw new NotFoundException(`Prova com ID ${provaId} não encontrada.`);
+    }
+    const jaVinculada = await this.repository.provaContemQuestao(
+      provaId,
+      questaoId,
+    );
+    if (jaVinculada) {
+      throw new BadRequestException('A questão já está nesta prova.');
+    }
+    const factory = this.provaFactory.getFactory(prova.categoria, prova.ano);
+    const numeroLivre = await factory.verifyNumberProva(prova._id, numero);
+    if (!numeroLivre) {
+      throw new BadRequestException(
+        `Número ${numero} indisponível nesta prova.`,
+      );
+    }
+    await factory.addQuestaoExistenteAProva(questaoId, provaId, numero);
+    await this.auditLogService.create({
+      user: userId,
+      entityId: questaoId,
+      entityType: 'Questao',
+      changes: JSON.stringify({ acao: 'adicionarEmProva', provaId, numero }),
+    });
+  }
+
   public async updateClassificacao(
     id: string,
     classificacao: UpdateClassificacaoDTOInput,

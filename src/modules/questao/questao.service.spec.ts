@@ -213,6 +213,79 @@ describe('QuestaoService.getById', () => {
   });
 });
 
+describe('QuestaoService.adicionarEmProva', () => {
+  const { QuestaoService: QS } = require('./questao.service');
+
+  let repository: any;
+  let provaRepository: any;
+  let provaFactory: any;
+  let auditLogService: any;
+  let service: any;
+
+  beforeEach(() => {
+    repository = {
+      provaContemQuestao: jest.fn(),
+    };
+    provaRepository = {
+      getById: jest.fn(),
+    };
+    provaFactory = {
+      getFactory: jest.fn(),
+    };
+    auditLogService = {
+      create: jest.fn().mockResolvedValue(undefined),
+    };
+    service = new QS(
+      repository,
+      {} as any,
+      provaRepository,
+      {} as any,
+      {} as any,
+      {} as any,
+      auditLogService,
+      {} as any,
+      provaFactory,
+    );
+  });
+
+  it('bloqueia vínculo duplicado', async () => {
+    provaRepository.getById.mockResolvedValue({ _id: 'p1', categoria: {}, ano: 2020 });
+    (provaFactory.getFactory as jest.Mock).mockReturnValue({
+      verifyNumberProva: jest.fn().mockResolvedValue(true),
+      addQuestaoExistenteAProva: jest.fn(),
+    });
+    repository.provaContemQuestao.mockResolvedValue(true);
+
+    await expect(service.adicionarEmProva('q1', 'p1', 5)).rejects.toThrow();
+  });
+
+  it('bloqueia número ocupado', async () => {
+    provaRepository.getById.mockResolvedValue({ _id: 'p1', categoria: {}, ano: 2020 });
+    (provaFactory.getFactory as jest.Mock).mockReturnValue({
+      verifyNumberProva: jest.fn().mockResolvedValue(false),
+      addQuestaoExistenteAProva: jest.fn(),
+    });
+    repository.provaContemQuestao.mockResolvedValue(false);
+
+    await expect(service.adicionarEmProva('q1', 'p1', 5)).rejects.toThrow();
+  });
+
+  it('delega à factory e audita no caminho feliz', async () => {
+    const addFn = jest.fn().mockResolvedValue(undefined);
+    provaRepository.getById.mockResolvedValue({ _id: 'p1', categoria: {}, ano: 2020 });
+    (provaFactory.getFactory as jest.Mock).mockReturnValue({
+      verifyNumberProva: jest.fn().mockResolvedValue(true),
+      addQuestaoExistenteAProva: addFn,
+    });
+    repository.provaContemQuestao.mockResolvedValue(false);
+
+    await service.adicionarEmProva('q1', 'p1', 5);
+
+    expect(addFn).toHaveBeenCalledWith('q1', 'p1', 5);
+    expect(auditLogService.create).toHaveBeenCalled();
+  });
+});
+
 describe('QuestaoService.updateClassificacao', () => {
   const questao: any = {
     _id: 'q1',
