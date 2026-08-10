@@ -17,6 +17,7 @@ function makeFactory(overrides?: {
   getById?: jest.Mock;
   getProvaWithQuestion?: jest.Mock;
   getByIdToUpdate?: jest.Mock;
+  findProvaAtual?: jest.Mock;
   session?: ReturnType<typeof makeSession>;
 }) {
   const session = overrides?.session ?? makeSession();
@@ -24,6 +25,8 @@ function makeFactory(overrides?: {
     startSession: jest.fn().mockResolvedValue(session),
     create: jest.fn().mockImplementation(async (q) => ({ ...q, _id: 'q-new' })),
     getByIdToUpdate: overrides?.getByIdToUpdate ?? jest.fn(),
+    findProvaAtual:
+      overrides?.findProvaAtual ?? jest.fn().mockResolvedValue(undefined),
     updateQuestion: jest.fn().mockResolvedValue(undefined),
   };
   const provaRepository = {
@@ -32,6 +35,7 @@ function makeFactory(overrides?: {
     getProvaWithQuestion: overrides?.getProvaWithQuestion ?? jest.fn(),
     addQuestion: jest.fn().mockResolvedValue(undefined),
     removeQuestion: jest.fn().mockResolvedValue(undefined),
+    update: jest.fn().mockResolvedValue(undefined),
   };
   const simuladoService = {
     addQuestionSimulados: jest.fn().mockResolvedValue(undefined),
@@ -39,6 +43,7 @@ function makeFactory(overrides?: {
   };
   const simuladoRepository = {
     create: jest.fn().mockImplementation(async (s) => ({ ...s, _id: 's-new' })),
+    update: jest.fn().mockResolvedValue(undefined),
   };
   const categoria = {
     nome: 'Personalizado 30q 60min',
@@ -167,9 +172,10 @@ describe('CustomProvaFactory.createQuestion', () => {
     expect(simuladoService.addQuestionSimulados).toHaveBeenCalledWith(
       provaToEnter.simulados,
       result,
+      1,
       session,
     );
-    expect(provaRepository.addQuestion).toHaveBeenCalledWith('p1', result);
+    expect(provaRepository.addQuestion).toHaveBeenCalledWith('p1', result, 1);
     expect(session.commitTransaction).toHaveBeenCalledTimes(1);
     expect(session.abortTransaction).not.toHaveBeenCalled();
     expect(session.endSession).toHaveBeenCalledTimes(1);
@@ -198,6 +204,7 @@ describe('CustomProvaFactory.updateQuestion', () => {
       makeFactory({
         getByIdToUpdate: jest.fn().mockResolvedValue(questaoAtual),
         getById: jest.fn().mockResolvedValue({ _id: 'p1', simulados: [] }),
+        findProvaAtual: jest.fn().mockResolvedValue('p1'),
       });
 
     await factory.updateQuestion({ _id: 'q1', prova: 'p1' } as any);
@@ -220,6 +227,7 @@ describe('CustomProvaFactory.updateQuestion', () => {
     const { factory, simuladoService, provaRepository } = makeFactory({
       getByIdToUpdate: jest.fn().mockResolvedValue(questaoAtual),
       getById,
+      findProvaAtual: jest.fn().mockResolvedValue('p-old'),
     });
 
     await factory.updateQuestion({ _id: 'q1', prova: 'p-new' } as any);
@@ -236,11 +244,13 @@ describe('CustomProvaFactory.updateQuestion', () => {
     expect(simuladoService.addQuestionSimulados).toHaveBeenCalledWith(
       newProva.simulados,
       questaoAtual,
+      undefined,
       expect.anything(),
     );
     expect(provaRepository.addQuestion).toHaveBeenCalledWith(
       'p-new',
       questaoAtual,
+      undefined,
     );
   });
 });
@@ -282,5 +292,69 @@ describe('CustomProvaFactory.getMissingNumbers', () => {
       questoes: [{ numero: 2 }, { numero: 4 }],
     } as any;
     expect(await factory.getMissingNumbers(prova)).toEqual([1, 3]);
+  });
+});
+
+describe('CustomProvaFactory.updateQuestion — numero-sync', () => {
+  it('reconcilia o numero no subdoc da prova e do simulado quando o número muda', async () => {
+    const simulado: any = {
+      _id: 's1',
+      questoes: [{ questao: { _id: 'qX' }, numero: 5 }],
+    };
+    const prova: any = {
+      _id: 'p1',
+      simulados: [simulado],
+      questoes: [{ questao: { _id: 'qX' }, numero: 5 }],
+    };
+    const getById = jest.fn().mockResolvedValue(prova);
+    const getByIdToUpdate = jest.fn().mockResolvedValue({
+      _id: 'qX',
+      numero: 5,
+      prova: { _id: 'p1' },
+    });
+    const { factory, provaRepository, simuladoRepository } = makeFactory({
+      getById,
+      getByIdToUpdate,
+      findProvaAtual: jest.fn().mockResolvedValue('p1'),
+    });
+
+    await factory.updateQuestion({
+      _id: 'qX',
+      numero: 6,
+      prova: 'p1',
+    } as any);
+
+    expect(prova.questoes[0].numero).toBe(6);
+    expect(provaRepository.update).toHaveBeenCalledWith(prova, expect.anything());
+    expect(simulado.questoes[0].numero).toBe(6);
+    expect(simuladoRepository.update).toHaveBeenCalledWith(
+      simulado,
+      expect.anything(),
+    );
+  });
+
+  it('NÃO reconcilia quando o input não traz numero', async () => {
+    const prova: any = {
+      _id: 'p1',
+      simulados: [],
+      questoes: [{ questao: { _id: 'qX' }, numero: 5 }],
+    };
+    const getById = jest.fn().mockResolvedValue(prova);
+    const getByIdToUpdate = jest.fn().mockResolvedValue({
+      _id: 'qX',
+      prova: { _id: 'p1' },
+    });
+    const { factory, provaRepository } = makeFactory({
+      getById,
+      getByIdToUpdate,
+      findProvaAtual: jest.fn().mockResolvedValue('p1'),
+    });
+
+    await factory.updateQuestion({
+      _id: 'qX',
+      prova: 'p1',
+    } as any);
+
+    expect(provaRepository.update).not.toHaveBeenCalled();
   });
 });

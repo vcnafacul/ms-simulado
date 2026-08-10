@@ -13,7 +13,6 @@ function makeService(overrides?: { getById?: jest.Mock }) {
     {} as any, // categoriaRepository
     simuladoRepository as any,
     {} as any, // questaoRepository
-    {} as any, // frenteRepository
   );
   return { service, repository, simuladoRepository };
 }
@@ -22,14 +21,14 @@ describe('ProvaService.approvedQuestion — regra bloqueado com qtd null', () =>
   it('desbloqueia simulado de categoria livre (null) quando todas aprovadas', async () => {
     const simulado: any = {
       _id: 's1',
-      questoes: [{ _id: 'q1', status: Status.Pending, numero: 1 }],
+      questoes: [{ questao: { _id: 'q1', status: Status.Pending }, numero: 1 }],
       categoria: { quantidadeTotalQuestao: null },
       bloqueado: true,
     };
     const prova = {
-      questoes: [{ _id: 'q1', status: Status.Pending }],
+      questoes: [{ questao: { _id: 'q1', status: Status.Pending }, numero: 1 }],
       simulados: [simulado],
-    };
+    } as any;
     const { service } = makeService({
       getById: jest.fn().mockResolvedValue(prova),
     });
@@ -37,17 +36,18 @@ describe('ProvaService.approvedQuestion — regra bloqueado com qtd null', () =>
     await service.approvedQuestion('p1', 'q1');
 
     expect(simulado.bloqueado).toBe(false);
+    expect(prova.totalQuestaoValidadas).toBe(1);
   });
 
   it('mantém bloqueado quando categoria numérica ainda não atingiu a quantidade', async () => {
     const simulado: any = {
       _id: 's1',
-      questoes: [{ _id: 'q1', status: Status.Pending, numero: 1 }],
+      questoes: [{ questao: { _id: 'q1', status: Status.Pending }, numero: 1 }],
       categoria: { quantidadeTotalQuestao: 30 },
       bloqueado: true,
     };
     const prova = {
-      questoes: [{ _id: 'q1', status: Status.Pending }],
+      questoes: [{ questao: { _id: 'q1', status: Status.Pending }, numero: 1 }],
       simulados: [simulado],
     };
     const { service } = makeService({
@@ -57,52 +57,6 @@ describe('ProvaService.approvedQuestion — regra bloqueado com qtd null', () =>
     await service.approvedQuestion('p1', 'q1');
 
     expect(simulado.bloqueado).toBe(true);
-  });
-});
-
-describe('ProvaService.selectQuestionsForSimulado — branch custom', () => {
-  it('prova custom: retorna TODAS as questões da prova (sem string matching)', () => {
-    const { service } = makeService();
-    const questoes = [
-      { _id: 'q1', numero: 1 },
-      { _id: 'q2', numero: 2 },
-    ];
-    const simulado: any = { nome: 'Nome livre qualquer' } as any;
-    const prova = { categoria: { custom: true }, ano: 2024 } as any;
-
-    const result = (service as any).selectQuestionsForSimulado(
-      simulado,
-      questoes,
-      prova,
-      undefined,
-      undefined,
-    );
-
-    expect(result).toHaveLength(2);
-    expect(result).toEqual(questoes);
-  });
-
-  it('prova oficial: simulado padrão recebe todas as questões (string matching preservado)', () => {
-    const { service } = makeService();
-    const questoes = [
-      { _id: 'q1', numero: 1, enemArea: 'Matemática' },
-      { _id: 'q2', numero: 2, enemArea: 'Matemática' },
-    ];
-    const prova = {
-      categoria: { custom: false, nome: 'Enem Dia 2' },
-      ano: 2023,
-    } as any;
-    const simulado: any = { nome: 'Enem Dia 2 2023' } as any; // === `${nome} ${ano}`
-
-    const result = (service as any).selectQuestionsForSimulado(
-      simulado,
-      questoes,
-      prova,
-      { _id: 'fi' },
-      { _id: 'fe' },
-    );
-
-    expect(result).toHaveLength(2);
   });
 });
 
@@ -133,7 +87,6 @@ describe('ProvaService.getAllByCursinho', () => {
       {} as any, // categoriaRepository
       {} as any, // simuladoRepository
       {} as any, // questaoRepository
-      {} as any, // frenteRepository
     );
     return { service, repository };
   }
@@ -180,5 +133,68 @@ describe('ProvaService.getAllByCursinho', () => {
 
     expect(result.data).toEqual([]);
     expect(result.totalItems).toBe(0);
+  });
+});
+
+describe('ProvaService.syncNumero', () => {
+  it('delega para o helper usando repository e simuladoRepository do service', async () => {
+    const sml = { questoes: [{ questao: { _id: 'q1' }, numero: 5 }] };
+    const prova = {
+      _id: 'p1',
+      questoes: [{ questao: { _id: 'q1' }, numero: 5 }],
+      simulados: [sml],
+    };
+    const repository: any = {
+      getById: jest.fn().mockResolvedValue(prova),
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+    const simuladoRepository: any = { update: jest.fn().mockResolvedValue(undefined) };
+    const service = new ProvaService(
+      {} as any,
+      repository,
+      {} as any,
+      simuladoRepository,
+      {} as any,
+    );
+
+    await service.syncNumero('p1', 'q1', 9);
+
+    expect(prova.questoes[0].numero).toBe(9);
+    expect(sml.questoes[0].numero).toBe(9);
+    expect(repository.update).toHaveBeenCalledWith(prova, undefined);
+    expect(simuladoRepository.update).toHaveBeenCalledWith(sml, undefined);
+  });
+});
+
+describe('ProvaService.refuseQuestion — recompute questoes', () => {
+  it('exclui a questão recusada da contagem e bloqueia o simulado', async () => {
+    const simulado: any = {
+      _id: 's1',
+      questoes: [
+        { questao: { _id: 'q1', status: Status.Approved }, numero: 1 },
+        { questao: { _id: 'q2', status: Status.Approved }, numero: 2 },
+      ],
+      categoria: { quantidadeTotalQuestao: 2 },
+      bloqueado: false,
+    };
+    const prova = {
+      questoes: [
+        { questao: { _id: 'q1', status: Status.Approved }, numero: 1 },
+        { questao: { _id: 'q2', status: Status.Approved }, numero: 2 },
+      ],
+      simulados: [simulado],
+    } as any;
+    const { service, simuladoRepository, repository } = makeService({
+      getById: jest.fn().mockResolvedValue(prova),
+    });
+
+    await service.refuseQuestion('p1', 'q1');
+
+    // q1 recusada não conta; sobra q2 aprovada
+    expect(prova.totalQuestaoValidadas).toBe(1);
+    // simulado tinha q1 → recalcula bloqueado (q1 excluída => nem todas aprovadas)
+    expect(simulado.bloqueado).toBe(true);
+    expect(simuladoRepository.update).toHaveBeenCalledWith(simulado);
+    expect(repository.update).toHaveBeenCalledWith(prova);
   });
 });

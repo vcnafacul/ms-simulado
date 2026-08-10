@@ -24,7 +24,7 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
       .findById(id)
       .populate('categoria')
       .populate({
-        path: 'questoes',
+        path: 'questoes.questao',
         populate: ['frente1', 'materia'],
       })
       .exec();
@@ -44,7 +44,7 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
     return await this.model
       .findById(id)
       .populate({
-        path: 'questoes',
+        path: 'questoes.questao',
         populate: ['frente1', 'materia'],
         select: 'alternativa',
       })
@@ -69,8 +69,8 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
     };
   }
 
-  async update(simulado: Simulado) {
-    await this.model.updateOne({ _id: simulado._id }, simulado);
+  async update(simulado: Simulado, session?: ClientSession) {
+    await this.model.updateOne({ _id: simulado._id }, simulado, { session });
   }
 
   async updateSession(simulado: Simulado, session?: ClientSession) {

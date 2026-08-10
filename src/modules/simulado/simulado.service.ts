@@ -23,6 +23,10 @@ import { Questao } from '../questao/questao.schema';
 import { CategoriaRepository } from '../categoria/categoria.repository';
 import { atingiuQuantidade } from './helpers/bloqueado';
 import {
+  addQuestaoToContainer,
+  removeQuestaoFromContainer,
+} from '../prova/helpers/question-container.helpers';
+import {
   getAvailabilityStatus,
   isSimuladoAvailable,
 } from './helpers/availability';
@@ -121,14 +125,15 @@ export class SimuladoService {
   public async addQuestionSimulados(
     simulados: Simulado[],
     question: Questao,
+    numero: number,
     session?: ClientSession,
   ) {
     await Promise.all(
       simulados.map(async (sml) => {
-        // Adiciona a nova questão
-        sml.questoes.push(question);
+        // Adiciona a nova questão (single-write em questoes).
+        addQuestaoToContainer(sml, question, numero);
 
-        // Verifica se o simulador atingiu a quantidade total de questões
+        // Verifica se o simulado atingiu a quantidade total de questões
         // (categoria livre / quantidadeTotalQuestao null sempre "atinge")
         const atingiuQuantidadeTotal = atingiuQuantidade(
           sml.categoria.quantidadeTotalQuestao,
@@ -136,13 +141,12 @@ export class SimuladoService {
         );
         // Verifica se todas as questões estão aprovadas
         const todasAprovadas = sml.questoes.every(
-          (q) => q.status === Status.Approved,
+          (qc) => qc.questao.status === Status.Approved,
         );
 
-        // Define bloqueado como false somente se todas as questões foram adicionadas e estão aprovadas
+        // Bloqueado = false só se todas adicionadas e aprovadas
         sml.bloqueado = !(atingiuQuantidadeTotal && todasAprovadas);
 
-        // Retorna a promessa para o update
         return await this.simuladoRepository.updateSession(sml, session);
       }),
     );
@@ -155,11 +159,9 @@ export class SimuladoService {
   ) {
     await Promise.all(
       simulados.map(async (sml) => {
-        const index = sml.questoes.findIndex(
-          (questao) => questao._id.toString() === question._id.toString(),
-        );
-        if (index !== -1) {
-          sml.questoes.splice(index, 1);
+        const before = sml.questoes.length;
+        removeQuestaoFromContainer(sml, question._id);
+        if (sml.questoes.length !== before) {
           sml.bloqueado = true;
           await this.simuladoRepository.updateSession(sml, session);
         }
@@ -205,12 +207,23 @@ export class SimuladoService {
         historico.simulado.toString();
       const simulado = await this.simuladoRepository.answer(simuladoId);
 
-      const ano = (
-        await this.questoesRepository.getById(simulado.questoes[0]._id)
-      ).prova.ano;
+      // Guard: simulado sem questões não tem o que processar — evita
+      // TypeError no acesso a questoes[0] abaixo.
+      if (!simulado.questoes.length) {
+        await this.historicoRepository.updateStatus(
+          histId,
+          HistoricoStatus.Failed,
+        );
+        return;
+      }
+
+      const ano = await this.questoesRepository.findAnoByQuestao(
+        simulado.questoes[0].questao._id,
+      );
 
       const respostasAproveitamento: RespostaAproveitamento[] =
-        simulado.questoes.map((questao) => {
+        simulado.questoes.map((qc) => {
+          const questao = qc.questao;
           const resposta = historico.rawRespostas!.find(
             (r: any) => r.questao === questao._id.toString(),
           );
@@ -267,16 +280,15 @@ export class SimuladoService {
           nome: simulado.nome,
           descricao: simulado.descricao,
           categoria: simulado.categoria._id,
-          questoes: simulado.questoes.map((q) => ({
-            _id: q._id,
-            enemArea: q.enemArea,
-            frente1: q.frente1,
-            frente2: q.frente2,
-            frente3: q.frente3,
-            materia: q.materia,
-            numero: q.numero,
-            imageId: q.imageId,
-            prova: q.prova,
+          questoes: simulado.questoes.map((qc) => ({
+            _id: qc.questao._id,
+            enemArea: qc.questao.enemArea,
+            frente1: qc.questao.frente1,
+            frente2: qc.questao.frente2,
+            frente3: qc.questao.frente3,
+            materia: qc.questao.materia,
+            numero: qc.numero,
+            imageId: qc.questao.imageId,
           })),
           inicio: inicio,
           duracao: simulado.categoria.duracao,

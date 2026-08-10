@@ -50,7 +50,6 @@ import { QuestaoService } from './questao.service';
     SimuladoRepository,
     ProvaFactory,
     EnemService,
-    SimuladoService,
   ],
   controllers: [QuestaoController],
   exports: [QuestaoService, QuestaoRepository],

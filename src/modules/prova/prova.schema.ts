@@ -1,11 +1,14 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { Types } from 'mongoose';
 import { BaseSchema } from 'src/shared/base/base.schema';
-import { Questao } from '../questao/questao.schema';
 import { Simulado } from '../simulado/schemas/simulado.schema';
 import { Categoria } from '../categoria/schemas/categoria.schema';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
 import { Edicao } from './enums/edicao.enum';
+import {
+  QuestaoNaContainer,
+  QuestaoNaContainerSchema,
+} from './schemas/questao-na-container.schema';
 
 @Schema({ timestamps: true, versionKey: false })
 export class Prova extends BaseSchema {
@@ -41,11 +44,8 @@ export class Prova extends BaseSchema {
   })
   public simulados: Simulado[];
 
-  @Prop({
-    type: [{ ref: 'Questao', type: mongoose.Schema.Types.ObjectId }],
-    default: [],
-  })
-  questoes: Questao[];
+  @Prop({ type: [QuestaoNaContainerSchema], default: [] })
+  public questoes: QuestaoNaContainer[];
 
   @Prop()
   public nome: string;
@@ -78,3 +78,8 @@ export class Prova extends BaseSchema {
 export const ProvaSchema = SchemaFactory.createForClass(Prova);
 
 ProvaSchema.index({ cursinhoId: 1 });
+
+// Índice reverso questao -> provas que a contêm. Sustenta os lookups do banco de
+// questões (findProvasContendo/Many, findProvaAtual, findAnoByQuestao). Declarado
+// no schema (autoIndex cria no boot) pra não depender do indices.sh manual.
+ProvaSchema.index({ 'questoes.questao': 1 });

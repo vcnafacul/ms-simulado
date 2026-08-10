@@ -18,7 +18,20 @@ export class HistoricoService {
   }
 
   async getById(id: string) {
-    return await this.repository.getById(id);
+    const historico = await this.repository.getById(id);
+    if (!historico) return historico;
+    const obj: any = (historico as any).toObject
+      ? (historico as any).toObject()
+      : historico;
+    if (obj.simulado && Array.isArray(obj.simulado.questoes)) {
+      // Achata pro shape antigo do client, preservando o numero do relacionamento
+      // (numero vive em QuestaoNaContainer, não mais na Questao).
+      obj.simulado.questoes = obj.simulado.questoes.map((qc: any) => ({
+        ...qc.questao,
+        numero: qc.numero,
+      }));
+    }
+    return obj;
   }
 
   async getPerformance(userId: string): Promise<GetPerformanceHistories> {

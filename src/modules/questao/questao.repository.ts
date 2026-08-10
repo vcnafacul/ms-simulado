@@ -4,6 +4,8 @@ import { Model, Types } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllWhereInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
+import { Prova } from '../prova/prova.schema';
+import { resolveQuestaoId } from '../prova/helpers/question-container.helpers';
 import { Resposta } from '../historico/types/resposta';
 import { UpdateClassificacaoDTOInput } from './dtos/update-classificacao.dto.input';
 import { UpdateContentDTOInput } from './dtos/update-content.dto.input';
@@ -13,9 +15,19 @@ import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
 import { Questao } from './questao.schema';
 
+/** Entrada do reverse-lookup: prova que contém a questão + o número nela. */
+export interface ProvaContendo {
+  provaId: string;
+  provaNome: string;
+  numero: number;
+}
+
 @Injectable()
 export class QuestaoRepository extends BaseRepository<Questao> {
-  constructor(@InjectModel(Questao.name) model: Model<Questao>) {
+  constructor(
+    @InjectModel(Questao.name) model: Model<Questao>,
+    @InjectModel(Prova.name) private readonly provaModel: Model<Prova>,
+  ) {
     super(model);
   }
 
@@ -24,12 +36,12 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     limit,
     where,
     or,
-    sortColumn = 'numero',
+    sortColumn = 'updatedAt',
     sortOrder = 'asc',
   }: GetAllWhereInput): Promise<GetAllOutput<Questao>> {
     const sortDirection: 1 | -1 = sortOrder === 'desc' ? -1 : 1;
     const sort: Record<string, 1 | -1> = {
-      [sortColumn ?? 'numero']: sortDirection,
+      [sortColumn ?? 'updatedAt']: sortDirection,
     };
 
     const query = this.model
@@ -37,7 +49,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       .sort(sort)
       .skip((page - 1) * limit)
       .limit(limit ?? Infinity)
-      .populate(['materia', 'prova'])
+      .populate(['materia'])
       .select('+alternativa');
 
     const queryCount = this.model.where({ ...where });
@@ -70,22 +82,45 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     return await this.model.findById(id).select('+alternativa');
   }
 
+  async findProvaAtual(questaoId: string): Promise<string | undefined> {
+    const prova = await this.provaModel
+      .findOne({ 'questoes.questao': questaoId })
+      .select('_id')
+      .exec();
+    return prova?._id?.toString();
+  }
+
+  async findAnoByQuestao(questaoId: string): Promise<number | undefined> {
+    const prova = await this.provaModel
+      .findOne({ 'questoes.questao': questaoId })
+      .select('ano')
+      .exec();
+    return prova?.ano;
+  }
+
+  async provaContemQuestao(
+    provaId: string,
+    questaoId: string,
+  ): Promise<boolean> {
+    const found = await this.provaModel.exists({
+      _id: provaId,
+      'questoes.questao': questaoId,
+    });
+    return !!found;
+  }
+
   async getByIdToUpdate(id: string) {
     return await this.model
       .findById(id)
       .select('+alternativa')
-      .populate(['frente1', 'materia', 'prova']);
+      .populate(['frente1', 'materia']);
   }
 
   async getByIdToDelete(id: string) {
     return await this.model
       .findById(id)
       .select('+alternativa')
-      .populate(['frente1', 'materia', 'prova'])
-      .populate({
-        path: 'prova',
-        populate: 'simulados',
-      });
+      .populate(['frente1', 'materia']);
   }
 
   async getQuestaoByFiltro(filtro: object, quant: number): Promise<Questao[]> {
@@ -124,8 +159,6 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     classificacao: UpdateClassificacaoDTOInput,
   ) {
     const updateData: any = {
-      prova: classificacao.prova,
-      numero: classificacao.numero,
       enemArea: classificacao.enemArea,
       materia: classificacao.materia,
       frente1: classificacao.frente1,
@@ -217,25 +250,58 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     await this.model.deleteOne({ _id });
   }
 
+  async findProvasContendo(questaoId: string): Promise<Prova[]> {
+    return await this.provaModel
+      .find({ 'questoes.questao': questaoId })
+      .populate('simulados')
+      .exec();
+  }
+
+  async findQuestaoIdsByProva(provaId: string): Promise<string[]> {
+    const prova = await this.provaModel.findById(provaId).select('questoes').exec();
+    if (!prova) return [];
+    return prova.questoes.map((qc) => resolveQuestaoId(qc));
+  }
+
+  async findProvasContendoMany(
+    questaoIds: string[],
+  ): Promise<Map<string, ProvaContendo[]>> {
+    const provas = await this.provaModel
+      .find({ 'questoes.questao': { $in: questaoIds } })
+      .select('nome questoes')
+      .exec();
+    const map = new Map<string, ProvaContendo[]>();
+    for (const prova of provas) {
+      for (const qc of (prova as any).questoes) {
+        const qId = resolveQuestaoId(qc);
+        if (!questaoIds.includes(qId)) continue;
+        if (!map.has(qId)) map.set(qId, []);
+        map.get(qId)!.push({
+          provaId: (prova as any)._id.toString(),
+          provaNome: (prova as any).nome,
+          numero: qc.numero,
+        });
+      }
+    }
+    return map;
+  }
+
   async canInsertQuestion(
     provaId: string,
     numero: number,
     frente1: string,
   ): Promise<boolean> {
-    const questaoExistente = await this.model.findOne({
-      prova: provaId,
-      numero,
-      frente1,
-    });
-
-    return !questaoExistente; // se já existe, não pode cadastrar → false
-  }
-
-  async getAllByProvaIds(provaIds: string[]): Promise<Questao[]> {
-    return await this.model
-      .find({ prova: { $in: provaIds }, deletedAt: null })
-      .populate(['frente1'])
+    const prova = await this.provaModel
+      .findById(provaId)
+      .populate('questoes.questao')
       .exec();
+    if (!prova) return true;
+    const jaExiste = prova.questoes.some(
+      (qc: any) =>
+        qc.numero === numero &&
+        (qc.questao as any)?.frente1?.toString() === frente1,
+    );
+    return !jaExiste;
   }
 
   async getTotalEntity() {

@@ -11,6 +11,7 @@ import { SimuladoRepository } from 'src/modules/simulado/simulado.repository';
 import { SimuladoService } from 'src/modules/simulado/simulado.service';
 import { CategoriaRepository } from 'src/modules/categoria/categoria.repository';
 import { CreateProvaDTOInput } from '../dtos/create.dto.input';
+import { syncNumeroNaProvaESimulados } from '../helpers/question-container.helpers';
 import { ProvaRepository } from '../prova.repository';
 import { Prova } from '../prova.schema';
 import { EnemService } from '../services/enem_service';
@@ -90,13 +91,12 @@ export class Enem2010_2017Factory implements IProvaFactory {
     const missingQuestion = [];
     if (day2) {
       for (let index = prova.inicialNumero; index <= 180; index++) {
-        if (!prova.questoes.find((quest) => quest.numero === index)) {
+        if (!prova.questoes.find((qc) => qc.numero === index)) {
           missingQuestion.push(index);
         } else {
           if (index > 90 && index < 96) {
             const hasAllQuestion =
-              prova.questoes.filter((quest) => quest.numero === index).length <
-              2;
+              prova.questoes.filter((qc) => qc.numero === index).length < 2;
             if (hasAllQuestion) {
               missingQuestion.push(index);
             }
@@ -105,7 +105,7 @@ export class Enem2010_2017Factory implements IProvaFactory {
       }
     } else {
       for (let index = prova.inicialNumero; index <= 90; index++) {
-        if (!prova.questoes.find((quest) => quest.numero === index)) {
+        if (!prova.questoes.find((qc) => qc.numero === index)) {
           missingQuestion.push(index);
         }
       }
@@ -118,10 +118,10 @@ export class Enem2010_2017Factory implements IProvaFactory {
     numberQuestion: number,
   ): Promise<boolean> {
     const prova = await this.provaRepository.getProvaWithQuestion(id);
-    if (prova.questoes.some((quest) => quest.numero === numberQuestion)) {
+    if (prova.questoes.some((qc) => qc.numero === numberQuestion)) {
       if (numberQuestion > 90 && numberQuestion < 96) {
         return (
-          prova.questoes.filter((quest) => quest.numero === numberQuestion)
+          prova.questoes.filter((qc) => qc.numero === numberQuestion)
             .length < 2
         );
       }
@@ -180,9 +180,14 @@ export class Enem2010_2017Factory implements IProvaFactory {
       await this.simuladoService.addQuestionSimulados(
         simuladosToEnter,
         result,
+        question.numero,
         session,
       );
-      await this.provaRepository.addQuestion(question.prova, result);
+      await this.provaRepository.addQuestion(
+        question.prova,
+        result,
+        question.numero,
+      );
       await session.commitTransaction();
       return result;
     } catch (error) {
@@ -230,7 +235,9 @@ export class Enem2010_2017Factory implements IProvaFactory {
     );
 
     // Determina se houve mudança de prova ou de simulados
-    const provaToLeaveId = questao.prova?._id.toString();
+    const provaToLeaveId = await this.questaoRepository.findProvaAtual(
+      question._id,
+    );
     const provaToEnter = await this.provaRepository.getById(question.prova);
     const changeProva = provaToLeaveId !== provaToEnter._id.toString();
     const changeSimulados =
@@ -295,11 +302,29 @@ export class Enem2010_2017Factory implements IProvaFactory {
         await this.simuladoService.addQuestionSimulados(
           simuladosActuallyEnter,
           questao,
+          question.numero,
           session,
         );
-        await this.provaRepository.addQuestion(question.prova, questao);
+        await this.provaRepository.addQuestion(
+          question.prova,
+          questao,
+          question.numero,
+        );
       }
       await this.questaoRepository.updateQuestion(question);
+      // Numero-sync DENTRO da transação: reconcilia prova + simulados na mesma
+      // session — se falhar, aborta a transação (evita numero dessincronizado
+      // pós-commit).
+      if (question.numero != null) {
+        await syncNumeroNaProvaESimulados(
+          this.provaRepository,
+          this.simuladoRepository,
+          question.prova,
+          question._id,
+          question.numero,
+          session,
+        );
+      }
       await session.commitTransaction();
     } catch (error) {
       await session.abortTransaction();

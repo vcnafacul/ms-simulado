@@ -26,7 +26,7 @@ import { UpdateImageAlternativaDTOInput } from './dtos/update-image-alternativa.
 import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
-import { QuestaoRepository } from './questao.repository';
+import { ProvaContendo, QuestaoRepository } from './questao.repository';
 import { Questao } from './questao.schema';
 
 @Injectable()
@@ -57,9 +57,17 @@ export class QuestaoService {
     );
   }
 
-  public async getById(id: string): Promise<Questao> {
+  public async getById(
+    id: string,
+  ): Promise<(Questao & { provasContendo: ProvaContendo[] }) | null> {
     const questao = await this.repository.getById(id);
-    return questao;
+    if (!questao) return null;
+    const map = await this.repository.findProvasContendoMany([id]);
+    const obj = ((questao as any).toObject
+      ? (questao as any).toObject()
+      : questao) as Questao & { provasContendo: ProvaContendo[] };
+    obj.provasContendo = map.get(id.toString()) ?? [];
+    return obj;
   }
 
   public async canInsertQuestion(
@@ -79,8 +87,8 @@ export class QuestaoService {
     frente,
     prova,
     enemArea,
-    sortColumn = 'numero',
-    sortOrder = 'asc',
+    sortColumn = 'updatedAt',
+    sortOrder = 'desc',
   }: QuestaoDTOInput): Promise<GetAllOutput<QuestaoAllDTO>> {
     const textConditions: any[] = text
       ? this.generateTextCombinations(text)
@@ -94,10 +102,12 @@ export class QuestaoService {
       combineConditions.push(frenteorConditions);
     if (textConditions.length > 0) combineConditions.push(textConditions);
 
-    const where: Record<string, string | number> = {};
+    const where: Record<string, string | number | { $in: string[] }> = {};
     if (status !== undefined) where['status'] = status;
     if (materia) where['materia'] = materia;
-    if (prova) where['prova'] = prova;
+    if (prova) {
+      where['_id'] = { $in: await this.repository.findQuestaoIdsByProva(prova) };
+    }
     if (enemArea) where['enemArea'] = enemArea;
 
     const questoes = await this.repository.getAll({
@@ -109,12 +119,14 @@ export class QuestaoService {
       sortOrder,
     });
 
+    const ids = questoes.data.map((q) => q._id.toString());
+    const provasMap = await this.repository.findProvasContendoMany(ids);
     const questoesAll: QuestaoAllDTO[] = questoes.data.map((questao) => ({
       _id: questao._id,
-      prova: questao.prova.nome,
+      provasContendo: provasMap.get(questao._id.toString()) ?? [],
+      provaBase: questao.provaBase ? questao.provaBase.toString() : null,
       enemArea: questao.enemArea,
       materia: questao.materia?.nome,
-      numero: questao.numero,
       status: questao.status,
       updatedAt: questao.updatedAt,
     }));
@@ -140,13 +152,14 @@ export class QuestaoService {
     const session = await this.repository.startSession();
     session.startTransaction();
     try {
-      if (question.prova) {
+      const provas = await this.repository.findProvasContendo(id);
+      for (const prova of provas) {
         await this.simuladoService.removeQuestionSimulados(
-          question.prova.simulados,
+          prova.simulados,
           question,
           session,
         );
-        await this.provaRepository.removeQuestion(question.prova._id, question);
+        await this.provaRepository.removeQuestion(prova._id, question);
       }
       await this.repository.delete(id);
       await session.commitTransaction();
@@ -189,16 +202,21 @@ export class QuestaoService {
           HttpStatus.NOT_MODIFIED,
         );
       }
-      if (!question.prova) {
+      const provas = await this.repository.findProvasContendo(id);
+      if (provas.length === 0) {
         throw new HttpException(
-          'Para aprovar ou rejeitar, a prova não pode ser nula',
+          'Para aprovar ou rejeitar, a questão precisa estar em ao menos uma prova',
           HttpStatus.BAD_REQUEST,
         );
       }
       if (status === Status.Approved) {
-        await this.provaService.approvedQuestion(question.prova._id, id);
+        for (const prova of provas) {
+          await this.provaService.approvedQuestion(prova._id, id);
+        }
       } else if (question.status === Status.Approved) {
-        await this.provaService.refuseQuestion(question.prova._id, id);
+        for (const prova of provas) {
+          await this.provaService.refuseQuestion(prova._id, id);
+        }
       }
       await this.repository.UpdateStatus(id, status);
       await this.auditLogService.create({
@@ -240,14 +258,14 @@ export class QuestaoService {
       throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
     }
 
-    const provaChanged =
-      classificacao.prova !== questao.prova?._id?.toString();
     const enemAreaChanged = classificacao.enemArea !== questao.enemArea;
     const frente1Changed =
       classificacao.frente1 !== questao.frente1?._id?.toString();
 
     try {
-      if (provaChanged || enemAreaChanged || frente1Changed) {
+      // enemArea/frente1 podem mudar a membership de simulado (idiomáticas ENEM)
+      // → precisa da factory. A factory já sincroniza o numero no fim.
+      if (enemAreaChanged || frente1Changed) {
         const updateDto = new UpdateDTOInput();
         updateDto._id = id;
         updateDto.prova = classificacao.prova;
@@ -259,6 +277,26 @@ export class QuestaoService {
         updateDto.numero = classificacao.numero;
         updateDto.alternativa = questao.alternativa;
         await this.updateQuestion(updateDto);
+      } else if (classificacao.numero != null) {
+        // Guard: no branch numero-only assumimos que a questão já está na prova
+        // enviada (a UI trava a prova). Falha alto se não estiver, em vez de o
+        // syncNumero virar no-op silencioso na prova errada.
+        const naProva = await this.repository.provaContemQuestao(
+          classificacao.prova,
+          id,
+        );
+        if (!naProva) {
+          throw new HttpException(
+            `A questão ${id} não está na prova ${classificacao.prova}.`,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        // Só o numero mudou: sync escopado na prova editada + simulados dela.
+        await this.provaService.syncNumero(
+          classificacao.prova,
+          id,
+          classificacao.numero,
+        );
       }
       await this.repository.updateClassificacao(id, classificacao);
     } catch (error: any) {
@@ -394,11 +432,6 @@ export class QuestaoService {
     combinations.push({
       textoAlternativaE: { $regex: text, $options: 'i' },
     });
-
-    const num = Number.parseInt(text);
-    if (!isNaN(num)) {
-      combinations.push({ numero: num });
-    }
 
     return combinations;
   }

@@ -3,7 +3,6 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { Frente } from '../frente/frente.schema';
 import { Materia } from '../materia/materia.schema';
-import { Prova } from '../prova/prova.schema';
 import { Alternativa } from './enums/alternativa.enum';
 import { EnemArea } from './enums/enem-area.enum';
 import { Status } from './enums/status.enum';
@@ -31,9 +30,12 @@ export class Questao extends QuestaoReview {
   @ApiProperty()
   public materia: Materia;
 
-  @Prop({ required: false, default: null })
+  // Âncora da prova de origem (renomeada de `prova` na migração 0002). String
+  // (id hex), não populada: serve pra casar com `provasContendo` no dash e obter
+  // prova+número. O número não vive mais na questão — vem do relacionamento.
+  @Prop({ type: String, required: false, default: null })
   @ApiProperty({ required: false, nullable: true })
-  public numero: number | null;
+  public provaBase?: string | null;
 
   @Prop({ required: false, default: '' })
   @ApiProperty()
@@ -105,10 +107,6 @@ export class Questao extends QuestaoReview {
   @Prop({ required: false, default: Status.Pending, enum: Status })
   @ApiProperty()
   public status: Status;
-
-  @Prop({ ref: Prova.name, type: Types.ObjectId, required: false })
-  @ApiProperty()
-  public prova?: Prova;
 
   @Prop({ required: false, default: [], type: [String] })
   @ApiProperty()

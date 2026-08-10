@@ -7,16 +7,16 @@ export class QuestaoAllDTO {
   public _id?: string;
 
   @ApiProperty()
-  public prova: string;
+  public provasContendo: { provaId: string; provaNome: string; numero: number }[];
+
+  @ApiProperty({ required: false, nullable: true })
+  public provaBase?: string | null;
 
   @ApiProperty()
   public enemArea: EnemArea;
 
   @ApiProperty()
   public materia: string;
-
-  @ApiProperty()
-  public numero: number;
 
   @ApiProperty()
   public status: Status;

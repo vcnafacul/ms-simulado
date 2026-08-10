@@ -2,7 +2,6 @@ import { EnemArea } from '../enums/enem-area.enum';
 import { Frente } from '../../frente/frente.schema';
 import { Materia } from '../..//materia/materia.schema';
 import { ApiProperty } from '@nestjs/swagger';
-import { Prova } from 'src/modules/prova/prova.schema';
 
 export class QuestaoAnswerDTOOutput {
   @ApiProperty()
@@ -25,7 +24,4 @@ export class QuestaoAnswerDTOOutput {
 
   @ApiProperty()
   public imageId: string;
-
-  @ApiProperty()
-  public prova: Prova;
 }

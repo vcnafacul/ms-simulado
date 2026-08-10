@@ -2,8 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  HttpCode,
-  HttpStatus,
   Param,
   Patch,
   Post,
@@ -66,29 +64,6 @@ export class ProvaController {
   @Get('summary')
   async getSummary() {
     return await this.service.getSummary();
-  }
-
-  @Post('sync')
-  @HttpCode(HttpStatus.ACCEPTED)
-  @ApiResponse({
-    status: 202,
-    description: 'Inicia sincronizacao em background',
-  })
-  @ApiResponse({
-    status: 409,
-    description: 'Sincronizacao ja em andamento',
-  })
-  public startSync() {
-    return this.service.startSync();
-  }
-
-  @Get('sync/report')
-  @ApiResponse({
-    status: 200,
-    description: 'Retorna o relatorio da ultima sincronizacao',
-  })
-  public getSyncReport() {
-    return this.service.getSyncReport();
   }
 
   @Get(':id')

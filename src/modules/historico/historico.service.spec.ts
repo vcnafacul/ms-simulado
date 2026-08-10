@@ -30,7 +30,7 @@ function makeHistorico(aproveitamento: AproveitamentoHistorico) {
     _id: 'hist-id',
     simulado: {
       nome: 'Simulado',
-      questoes: [] as any[],
+      questoes: [{}, {}] as any[],
       aproveitamento: 0,
       vezesRespondido: 0,
     },
@@ -67,5 +67,40 @@ describe('HistoricoService.calcularMediaAproveitamento', () => {
     const expected = (0.5 + 0.8 + 1.0) / 3; // ≈ 0.7667
     expect(result.performanceMateriaFrente.materias[0].aproveitamento).toBeCloseTo(expected, 5);
     expect(result.performanceMateriaFrente.frentes[0].aproveitamento).toBeCloseTo(expected, 5);
+    expect(result.historicos[0].totalQuestionsTest).toBe(2);
+  });
+});
+
+describe('HistoricoService.getById (achata simulado.questoes)', () => {
+  it('achata questoes.questao em simulado.questoes (subdoc → questao)', async () => {
+    const historico = {
+      toObject: () => ({
+        _id: 'h1',
+        simulado: {
+          _id: 's1',
+          nome: 'S',
+          questoes: [
+            { questao: { _id: 'q1', textoQuestao: 'a' }, numero: 1 },
+            { questao: { _id: 'q2', textoQuestao: 'b' }, numero: 2 },
+          ],
+        },
+      }),
+    };
+    const repository: any = { getById: jest.fn().mockResolvedValue(historico) };
+    const service = new HistoricoService(repository);
+
+    const result: any = await service.getById('h1');
+
+    // Achata pro shape do client preservando o numero do relacionamento (qc.numero).
+    expect(result.simulado.questoes).toEqual([
+      { _id: 'q1', textoQuestao: 'a', numero: 1 },
+      { _id: 'q2', textoQuestao: 'b', numero: 2 },
+    ]);
+  });
+
+  it('retorna null quando não encontra', async () => {
+    const repository: any = { getById: jest.fn().mockResolvedValue(null) };
+    const service = new HistoricoService(repository);
+    expect(await service.getById('x')).toBeNull();
   });
 });

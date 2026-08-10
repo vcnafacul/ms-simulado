@@ -90,3 +90,42 @@ describe('SimuladoRepository.getAvailabilityById', () => {
     });
   });
 });
+
+describe('SimuladoRepository.answer (popula questoes.questao)', () => {
+  it('popula questoes.questao com frente1/materia e alternativa', async () => {
+    const exec = jest.fn().mockResolvedValue({ _id: 's1', questoes: [] });
+    const populate = jest.fn().mockReturnValue({ exec });
+    const findById = jest.fn().mockReturnValue({ populate });
+    const repo = new SimuladoRepository({ findById } as any);
+
+    await repo.answer('s1');
+
+    expect(findById).toHaveBeenCalledWith('s1');
+    expect(populate).toHaveBeenCalledWith({
+      path: 'questoes.questao',
+      populate: ['frente1', 'materia'],
+      select: 'alternativa',
+    });
+  });
+});
+
+describe('SimuladoRepository.getById (popula questoes.questao)', () => {
+  it('popula categoria + questoes.questao', async () => {
+    const populateArgs: any[] = [];
+    const exec = jest.fn().mockResolvedValue({ _id: 's1' });
+    const query: any = { exec };
+    query.populate = jest.fn((arg: any) => {
+      populateArgs.push(arg);
+      return query;
+    });
+    const findById = jest.fn().mockReturnValue(query);
+    const repo = new SimuladoRepository({ findById } as any);
+
+    await repo.getById('s1');
+
+    expect(populateArgs).toContainEqual({
+      path: 'questoes.questao',
+      populate: ['frente1', 'materia'],
+    });
+  });
+});

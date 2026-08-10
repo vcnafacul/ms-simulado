@@ -7,6 +7,7 @@ import { SimuladoRepository } from 'src/modules/simulado/simulado.repository';
 import { SimuladoService } from 'src/modules/simulado/simulado.service';
 import { Categoria } from 'src/modules/categoria/schemas/categoria.schema';
 import { CreateProvaDTOInput } from '../dtos/create.dto.input';
+import { syncNumeroNaProvaESimulados } from '../helpers/question-container.helpers';
 import { ProvaRepository } from '../prova.repository';
 import { Prova } from '../prova.schema';
 import { IProvaFactory } from './types';
@@ -93,9 +94,14 @@ export class CustomProvaFactory implements IProvaFactory {
       await this.simuladoService.addQuestionSimulados(
         provaToEnter.simulados,
         result,
+        question.numero,
         session,
       );
-      await this.provaRepository.addQuestion(question.prova, result);
+      await this.provaRepository.addQuestion(
+        question.prova,
+        result,
+        question.numero,
+      );
       await session.commitTransaction();
       return result;
     } catch (error) {
@@ -108,7 +114,9 @@ export class CustomProvaFactory implements IProvaFactory {
 
   public async updateQuestion(question: UpdateDTOInput): Promise<void> {
     const questao = await this.questaoRepository.getByIdToUpdate(question._id);
-    const provaToLeaveId = questao.prova?._id.toString();
+    const provaToLeaveId = await this.questaoRepository.findProvaAtual(
+      question._id,
+    );
     const provaToEnter = await this.provaRepository.getById(question.prova);
     const changeProva = provaToLeaveId !== provaToEnter._id.toString();
 
@@ -126,11 +134,29 @@ export class CustomProvaFactory implements IProvaFactory {
         await this.simuladoService.addQuestionSimulados(
           provaToEnter.simulados,
           questao,
+          question.numero,
           session,
         );
-        await this.provaRepository.addQuestion(question.prova, questao);
+        await this.provaRepository.addQuestion(
+          question.prova,
+          questao,
+          question.numero,
+        );
       }
       await this.questaoRepository.updateQuestion(question);
+      // Numero-sync DENTRO da transação: reconcilia prova + simulados na mesma
+      // session — se falhar, aborta a transação (evita numero dessincronizado
+      // pós-commit).
+      if (question.numero != null) {
+        await syncNumeroNaProvaESimulados(
+          this.provaRepository,
+          this.simuladoRepository,
+          question.prova,
+          question._id,
+          question.numero,
+          session,
+        );
+      }
       await session.commitTransaction();
     } catch (error) {
       await session.abortTransaction();
@@ -145,7 +171,7 @@ export class CustomProvaFactory implements IProvaFactory {
     numberQuestion: number,
   ): Promise<boolean> {
     const prova = await this.provaRepository.getProvaWithQuestion(id);
-    return !prova.questoes.some((quest) => quest.numero === numberQuestion);
+    return !prova.questoes.some((qc) => qc.numero === numberQuestion);
   }
 
   public async getMissingNumbers(prova: Prova): Promise<number[]> {
@@ -155,7 +181,7 @@ export class CustomProvaFactory implements IProvaFactory {
 
     const missingQuestion: number[] = [];
     for (let i = 1; i <= prova.categoria.quantidadeTotalQuestao; i++) {
-      if (!prova.questoes.find((quest) => quest.numero === i)) {
+      if (!prova.questoes.find((qc) => qc.numero === i)) {
         missingQuestion.push(i);
       }
     }
