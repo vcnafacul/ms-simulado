@@ -1,5 +1,28 @@
 import { QuestaoRepository } from './questao.repository';
 
+describe('QuestaoRepository.setProvaBase (atualiza campo provaBase com session)', () => {
+  function makeRepoWithUpdateOne() {
+    const updateOne = jest.fn().mockResolvedValue({ acknowledged: true });
+    const questaoModel: any = { updateOne };
+    const provaModel: any = {};
+    return { repo: new QuestaoRepository(questaoModel, provaModel), updateOne };
+  }
+
+  it('chama model.updateOne com filtro _id, payload provaBase e session quando session é passada', async () => {
+    const { repo, updateOne } = makeRepoWithUpdateOne();
+    const session = {} as any;
+    await repo.setProvaBase('q1', 'p1', session);
+    expect(updateOne).toHaveBeenCalledWith({ _id: 'q1' }, { provaBase: 'p1' }, { session });
+  });
+
+  it('aceita null como provaBase e passa null no payload para model.updateOne', async () => {
+    const { repo, updateOne } = makeRepoWithUpdateOne();
+    const session = {} as any;
+    await repo.setProvaBase('q1', null, session);
+    expect(updateOne).toHaveBeenCalledWith({ _id: 'q1' }, { provaBase: null }, { session });
+  });
+});
+
 describe('QuestaoRepository.canInsertQuestion (reverse-lookup em Prova.questoes)', () => {
   function makeRepo(prova: any) {
     const exec = jest.fn().mockResolvedValue(prova);

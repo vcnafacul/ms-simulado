@@ -295,6 +295,35 @@ describe('CustomProvaFactory.getMissingNumbers', () => {
   });
 });
 
+describe('CustomProvaFactory.addQuestaoExistenteAProva', () => {
+  it('adiciona questão existente à prova custom em transação (todos os simulados)', async () => {
+    const questao = { _id: 'q1', status: 'Approved', enemArea: '', frente1: null } as any;
+    const prova = { _id: 'p1', simulados: [{ _id: 's1' }] } as any;
+    const { factory, questaoRepository, provaRepository, simuladoService, session } = makeFactory({
+      getByIdToUpdate: jest.fn().mockResolvedValue(questao),
+      getById: jest.fn().mockResolvedValue(prova),
+    });
+
+    await factory.addQuestaoExistenteAProva('q1', 'p1', 7);
+
+    expect(simuladoService.addQuestionSimulados).toHaveBeenCalledWith(
+      prova.simulados,
+      questao,
+      7,
+      expect.anything(),
+    );
+    expect(provaRepository.addQuestion).toHaveBeenCalledWith(
+      'p1',
+      questao,
+      7,
+      expect.anything(),
+    );
+    expect(session.commitTransaction).toHaveBeenCalledTimes(1);
+    expect(session.abortTransaction).not.toHaveBeenCalled();
+    expect(session.endSession).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('CustomProvaFactory.updateQuestion — numero-sync', () => {
   it('reconcilia o numero no subdoc da prova e do simulado quando o número muda', async () => {
     const simulado: any = {

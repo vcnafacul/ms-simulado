@@ -41,17 +41,26 @@ export class ProvaRepository extends BaseRepository<Prova> {
       });
   }
 
-  public async addQuestion(id: string, question: Questao, numero: number) {
-    const prova = await this.model.findById(id);
+  public async addQuestion(
+    id: string,
+    question: Questao,
+    numero: number,
+    session?: ClientSession,
+  ) {
+    const prova = await this.model.findById(id, null, { session });
     addQuestaoToContainer(prova, question, numero);
     if (question.status === Status.Approved) {
       prova.totalQuestaoValidadas += 1;
     }
-    await this.model.updateOne({ _id: prova._id }, prova);
+    await this.model.updateOne({ _id: prova._id }, prova, { session });
   }
 
-  public async removeQuestion(id: string, oldQuestao: Questao) {
-    const prova = await this.model.findById(id);
+  public async removeQuestion(
+    id: string,
+    oldQuestao: Questao,
+    session?: ClientSession,
+  ) {
+    const prova = await this.model.findById(id, null, { session });
     const before = prova.questoes.length;
     removeQuestaoFromContainer(prova, oldQuestao._id);
     // Questão não estava na prova: nada mudou → evita write espúrio.
@@ -59,7 +68,7 @@ export class ProvaRepository extends BaseRepository<Prova> {
     if (oldQuestao.status === Status.Approved) {
       prova.totalQuestaoValidadas -= 1;
     }
-    await this.model.updateOne({ _id: prova._id }, prova);
+    await this.model.updateOne({ _id: prova._id }, prova, { session });
   }
 
   async getAll({

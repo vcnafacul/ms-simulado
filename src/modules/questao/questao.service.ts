@@ -249,6 +249,103 @@ export class QuestaoService {
     }
   }
 
+  public async removerDeProva(
+    questaoId: string,
+    provaId: string,
+    userId?: string,
+  ): Promise<void> {
+    const provas = await this.repository.findProvasContendo(questaoId);
+    if (provas.length <= 1) {
+      throw new BadRequestException(
+        'Não é possível remover o último vínculo. Para retirar de todas as provas, exclua a questão.',
+      );
+    }
+    const alvo = provas.find((p) => p._id.toString() === provaId);
+    if (!alvo) {
+      throw new BadRequestException('A questão não está nesta prova.');
+    }
+    const questao = await this.repository.getByIdToUpdate(questaoId);
+
+    const session = await this.repository.startSession();
+    session.startTransaction();
+    try {
+      await this.simuladoService.removeQuestionSimulados(
+        alvo.simulados,
+        questao,
+        session,
+      );
+      await this.provaRepository.removeQuestion(provaId, questao, session);
+      if (questao.provaBase?.toString() === provaId) {
+        await this.repository.setProvaBase(questaoId, null, session);
+      }
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+    await this.auditLogService.create({
+      user: userId,
+      entityId: questaoId,
+      entityType: 'Questao',
+      changes: JSON.stringify({ acao: 'removerDeProva', provaId }),
+    });
+  }
+
+  public async definirProvaBase(
+    questaoId: string,
+    provaId: string,
+    userId?: string,
+  ): Promise<void> {
+    const naProva = await this.repository.provaContemQuestao(provaId, questaoId);
+    if (!naProva) {
+      throw new BadRequestException(
+        'A prova indicada não contém esta questão.',
+      );
+    }
+    await this.repository.setProvaBase(questaoId, provaId);
+    await this.auditLogService.create({
+      user: userId,
+      entityId: questaoId,
+      entityType: 'Questao',
+      changes: JSON.stringify({ acao: 'definirProvaBase', provaId }),
+    });
+  }
+
+  public async adicionarEmProva(
+    questaoId: string,
+    provaId: string,
+    numero: number,
+    userId?: string,
+  ): Promise<void> {
+    const prova = await this.provaRepository.getById(provaId);
+    if (!prova) {
+      throw new NotFoundException(`Prova com ID ${provaId} não encontrada.`);
+    }
+    const jaVinculada = await this.repository.provaContemQuestao(
+      provaId,
+      questaoId,
+    );
+    if (jaVinculada) {
+      throw new BadRequestException('A questão já está nesta prova.');
+    }
+    const factory = this.provaFactory.getFactory(prova.categoria, prova.ano);
+    const numeroLivre = await factory.verifyNumberProva(prova._id, numero);
+    if (!numeroLivre) {
+      throw new BadRequestException(
+        `Número ${numero} indisponível nesta prova.`,
+      );
+    }
+    await factory.addQuestaoExistenteAProva(questaoId, provaId, numero);
+    await this.auditLogService.create({
+      user: userId,
+      entityId: questaoId,
+      entityType: 'Questao',
+      changes: JSON.stringify({ acao: 'adicionarEmProva', provaId, numero }),
+    });
+  }
+
   public async updateClassificacao(
     id: string,
     classificacao: UpdateClassificacaoDTOInput,

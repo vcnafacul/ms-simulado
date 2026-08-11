@@ -18,6 +18,8 @@ import { UpdateClassificacaoDTOInput } from './dtos/update-classificacao.dto.inp
 import { UpdateContentDTOInput } from './dtos/update-content.dto.input';
 import { UpdateImageAlternativaDTOInput } from './dtos/update-image-alternativa.dto.input';
 import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
+import { AdicionarEmProvaDTOInput } from './dtos/adicionar-em-prova.dto.input';
+import { DefinirProvaBaseDTOInput } from './dtos/definir-prova-base.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
 import { ProvaContendo } from './questao.repository';
@@ -170,6 +172,34 @@ export class QuestaoController {
     @Body() imageAlternativa: UpdateImageAlternativaDTOInput,
   ) {
     await this.service.updateImageAlternativa(id, imageAlternativa);
+  }
+
+  @Post(':id/provas')
+  @ApiResponse({ status: 200, description: 'adiciona a questão a uma prova' })
+  public async adicionarEmProva(
+    @Param('id') id: string,
+    @Body() body: AdicionarEmProvaDTOInput,
+  ): Promise<void> {
+    await this.service.adicionarEmProva(id, body.provaId, body.numero, body.userId);
+  }
+
+  @Delete(':id/provas/:provaId')
+  @ApiResponse({ status: 200, description: 'remove a questão de uma prova' })
+  public async removerDeProva(
+    @Param('id') id: string,
+    @Param('provaId') provaId: string,
+    @Query('userId') userId?: string,
+  ): Promise<void> {
+    await this.service.removerDeProva(id, provaId, userId);
+  }
+
+  @Patch(':id/prova-base')
+  @ApiResponse({ status: 200, description: 'define a provaBase da questão' })
+  public async definirProvaBase(
+    @Param('id') id: string,
+    @Body() body: DefinirProvaBaseDTOInput,
+  ): Promise<void> {
+    await this.service.definirProvaBase(id, body.provaId, body.userId);
   }
 
   @Patch(':id/:status')

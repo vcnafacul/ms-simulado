@@ -213,6 +213,214 @@ describe('QuestaoService.getById', () => {
   });
 });
 
+describe('QuestaoService.adicionarEmProva', () => {
+  const { QuestaoService: QS } = require('./questao.service');
+
+  let repository: any;
+  let provaRepository: any;
+  let provaFactory: any;
+  let auditLogService: any;
+  let service: any;
+
+  beforeEach(() => {
+    repository = {
+      provaContemQuestao: jest.fn(),
+    };
+    provaRepository = {
+      getById: jest.fn(),
+    };
+    provaFactory = {
+      getFactory: jest.fn(),
+    };
+    auditLogService = {
+      create: jest.fn().mockResolvedValue(undefined),
+    };
+    service = new QS(
+      repository,
+      {} as any,
+      provaRepository,
+      {} as any,
+      {} as any,
+      {} as any,
+      auditLogService,
+      {} as any,
+      provaFactory,
+    );
+  });
+
+  it('bloqueia vínculo duplicado', async () => {
+    provaRepository.getById.mockResolvedValue({ _id: 'p1', categoria: {}, ano: 2020 });
+    (provaFactory.getFactory as jest.Mock).mockReturnValue({
+      verifyNumberProva: jest.fn().mockResolvedValue(true),
+      addQuestaoExistenteAProva: jest.fn(),
+    });
+    repository.provaContemQuestao.mockResolvedValue(true);
+
+    await expect(service.adicionarEmProva('q1', 'p1', 5)).rejects.toThrow();
+  });
+
+  it('bloqueia número ocupado', async () => {
+    provaRepository.getById.mockResolvedValue({ _id: 'p1', categoria: {}, ano: 2020 });
+    (provaFactory.getFactory as jest.Mock).mockReturnValue({
+      verifyNumberProva: jest.fn().mockResolvedValue(false),
+      addQuestaoExistenteAProva: jest.fn(),
+    });
+    repository.provaContemQuestao.mockResolvedValue(false);
+
+    await expect(service.adicionarEmProva('q1', 'p1', 5)).rejects.toThrow();
+  });
+
+  it('delega à factory e audita no caminho feliz', async () => {
+    const addFn = jest.fn().mockResolvedValue(undefined);
+    provaRepository.getById.mockResolvedValue({ _id: 'p1', categoria: {}, ano: 2020 });
+    (provaFactory.getFactory as jest.Mock).mockReturnValue({
+      verifyNumberProva: jest.fn().mockResolvedValue(true),
+      addQuestaoExistenteAProva: addFn,
+    });
+    repository.provaContemQuestao.mockResolvedValue(false);
+
+    await service.adicionarEmProva('q1', 'p1', 5);
+
+    expect(addFn).toHaveBeenCalledWith('q1', 'p1', 5);
+    expect(auditLogService.create).toHaveBeenCalled();
+  });
+});
+
+describe('QuestaoService.removerDeProva', () => {
+  const { QuestaoService: QS } = require('./questao.service');
+
+  let repository: any;
+  let provaRepository: any;
+  let simuladoService: any;
+  let auditLogService: any;
+  let service: any;
+
+  const sessionMock = {
+    startTransaction: jest.fn(),
+    commitTransaction: jest.fn(),
+    abortTransaction: jest.fn(),
+    endSession: jest.fn(),
+  };
+
+  beforeEach(() => {
+    repository = {
+      findProvasContendo: jest.fn(),
+      getByIdToUpdate: jest.fn(),
+      setProvaBase: jest.fn().mockResolvedValue(undefined),
+      startSession: jest.fn().mockResolvedValue(sessionMock),
+    };
+    provaRepository = {
+      removeQuestion: jest.fn().mockResolvedValue(undefined),
+    };
+    simuladoService = {
+      removeQuestionSimulados: jest.fn().mockResolvedValue(undefined),
+    };
+    auditLogService = {
+      create: jest.fn().mockResolvedValue(undefined),
+    };
+    jest.clearAllMocks();
+    repository.startSession.mockResolvedValue(sessionMock);
+    sessionMock.startTransaction.mockReset();
+    sessionMock.commitTransaction.mockResolvedValue(undefined);
+    sessionMock.abortTransaction.mockResolvedValue(undefined);
+    sessionMock.endSession.mockReset();
+
+    service = new QS(
+      repository,
+      {} as any,
+      provaRepository,
+      {} as any,
+      {} as any,
+      {} as any,
+      auditLogService,
+      simuladoService,
+      {} as any,
+    );
+  });
+
+  it('bloqueia remover o último vínculo', async () => {
+    repository.findProvasContendo.mockResolvedValue([{ _id: 'p1', simulados: [] }] as any);
+    await expect(service.removerDeProva('q1', 'p1')).rejects.toThrow();
+  });
+
+  it('bloqueia quando a prova não contém a questão', async () => {
+    repository.findProvasContendo.mockResolvedValue([
+      { _id: 'p1', simulados: [] },
+      { _id: 'p2', simulados: [] },
+    ] as any);
+    await expect(service.removerDeProva('q1', 'pX')).rejects.toThrow();
+  });
+
+  it('remove de prova+simulados e zera provaBase quando era a base', async () => {
+    const questao = { _id: 'q1', status: 'Approved', provaBase: 'p1' } as any;
+    repository.findProvasContendo.mockResolvedValue([
+      { _id: 'p1', simulados: [{ _id: 's1' }] },
+      { _id: 'p2', simulados: [] },
+    ] as any);
+    repository.getByIdToUpdate.mockResolvedValue(questao);
+
+    await service.removerDeProva('q1', 'p1');
+
+    expect(simuladoService.removeQuestionSimulados).toHaveBeenCalled();
+    expect(provaRepository.removeQuestion).toHaveBeenCalledWith('p1', questao, expect.anything());
+    expect(repository.setProvaBase).toHaveBeenCalledWith('q1', null, expect.anything());
+  });
+
+  it('não mexe em provaBase quando a prova removida não é a base', async () => {
+    const questao = { _id: 'q1', status: 'Pending', provaBase: 'p2' } as any;
+    repository.findProvasContendo.mockResolvedValue([
+      { _id: 'p1', simulados: [] },
+      { _id: 'p2', simulados: [] },
+    ] as any);
+    repository.getByIdToUpdate.mockResolvedValue(questao);
+
+    await service.removerDeProva('q1', 'p1');
+
+    expect(repository.setProvaBase).not.toHaveBeenCalled();
+  });
+});
+
+describe('QuestaoService.definirProvaBase', () => {
+  const { QuestaoService: QS } = require('./questao.service');
+
+  let repository: any;
+  let auditLogService: any;
+  let service: any;
+
+  beforeEach(() => {
+    repository = {
+      provaContemQuestao: jest.fn(),
+      setProvaBase: jest.fn().mockResolvedValue(undefined),
+    };
+    auditLogService = {
+      create: jest.fn().mockResolvedValue(undefined),
+    };
+    service = new QS(
+      repository,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      auditLogService,
+      {} as any,
+      {} as any,
+    );
+  });
+
+  it('rejeita prova fora de provasContendo', async () => {
+    repository.provaContemQuestao.mockResolvedValue(false);
+    await expect(service.definirProvaBase('q1', 'p9')).rejects.toThrow();
+  });
+
+  it('seta provaBase e audita', async () => {
+    repository.provaContemQuestao.mockResolvedValue(true);
+    await service.definirProvaBase('q1', 'p1');
+    expect(repository.setProvaBase).toHaveBeenCalledWith('q1', 'p1');
+    expect(auditLogService.create).toHaveBeenCalled();
+  });
+});
+
 describe('QuestaoService.updateClassificacao', () => {
   const questao: any = {
     _id: 'q1',
