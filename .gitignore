@@ -40,4 +40,4 @@ lerna-debug.log*
 .env
 
 # clone-env dump temp dirs
-.clone-env-dump-*
+.clone-env-dump-*tmp/
