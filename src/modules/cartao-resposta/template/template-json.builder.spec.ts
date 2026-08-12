@@ -23,7 +23,8 @@ describe('buildTemplateJson', () => {
     ]);
     const mat = templateJson.fieldBlocks.matricula;
     const layoutMat = layout.fieldBlocks.find((b) => b.key === 'matricula')!;
-    expect(mat.origin).toEqual(layoutMat.origin);
+    // origin do template = centro da 1ª bolha − bubbleDim/2 (canto sup-esq p/ o OMRChecker)
+    expect(mat.origin).toEqual([layoutMat.origin[0] - 30, layoutMat.origin[1] - 30]);
     expect(mat.labelsGap).toBe(layoutMat.labelsGap);
     expect(mat.bubblesGap).toBe(layoutMat.bubblesGap);
   });
@@ -33,28 +34,34 @@ describe('buildTemplateJson', () => {
     expect(configJson.outputs.show_image_level).toBe(0);
   });
 
-  it('consistência: expansão OMRChecker ≡ LayoutModel.bubbleCenter', () => {
+  // O centro de amostragem do OMRChecker (origin_topleft + índices·gaps + bubbleDim/2)
+  // tem que coincidir com o centro visual que o PDF desenha (LayoutModel.bubbleCenter).
+  it('consistência: centro de amostragem OMRChecker ≡ LayoutModel.bubbleCenter', () => {
     const layout = buildLayout(90);
     const { templateJson } = buildTemplateJson(layout);
+    const [halfW, halfH] = [
+      layout.page.bubbleWidthPx / 2,
+      layout.page.bubbleHeightPx / 2,
+    ];
 
     const mat = templateJson.fieldBlocks.matricula;
     for (let i = 0; i < 8; i++) {
       for (let j = 0; j < 10; j++) {
-        const expanded = {
-          x: mat.origin[0] + i * mat.labelsGap,
-          y: mat.origin[1] + j * mat.bubblesGap,
+        const sampleCenter = {
+          x: mat.origin[0] + i * mat.labelsGap + halfW,
+          y: mat.origin[1] + j * mat.bubblesGap + halfH,
         };
-        expect(layout.bubbleCenter('matricula', i, j)).toEqual(expanded);
+        expect(layout.bubbleCenter('matricula', i, j)).toEqual(sampleCenter);
       }
     }
     const c1 = templateJson.fieldBlocks.respostas_c1;
     for (let i = 0; i < 30; i++) {
       for (let j = 0; j < 5; j++) {
-        const expanded = {
-          x: c1.origin[0] + j * c1.bubblesGap,
-          y: c1.origin[1] + i * c1.labelsGap,
+        const sampleCenter = {
+          x: c1.origin[0] + j * c1.bubblesGap + halfW,
+          y: c1.origin[1] + i * c1.labelsGap + halfH,
         };
-        expect(layout.bubbleCenter('respostas_c1', i, j)).toEqual(expanded);
+        expect(layout.bubbleCenter('respostas_c1', i, j)).toEqual(sampleCenter);
       }
     }
   });

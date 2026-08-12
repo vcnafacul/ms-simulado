@@ -23,11 +23,18 @@ export function buildTemplateJson(layout: LayoutModel): {
   templateJson: OmrTemplateJson;
   configJson: OmrConfigJson;
 } {
+  // O LayoutModel guarda `origin` como o CENTRO da primeira bolha (o que o PDF desenha).
+  // O OMRChecker, porém, trata `origin` como o CANTO SUPERIOR-ESQUERDO da caixa de amostra
+  // (core.py: rect = [y, y+box_h, x, x+box_w]). Logo emitimos origin = centro − bubbleDim/2,
+  // pra o centro de amostragem do OMRChecker (origin + índices·gaps + bubbleDim/2) coincidir
+  // com o centro visual desenhado pelo PDF.
+  const halfW = layout.page.bubbleWidthPx / 2;
+  const halfH = layout.page.bubbleHeightPx / 2;
   const fieldBlocks: Record<string, OmrFieldBlock> = {};
   for (const b of layout.fieldBlocks) {
     fieldBlocks[b.key] = {
       fieldType: b.fieldType,
-      origin: b.origin,
+      origin: [b.origin[0] - halfW, b.origin[1] - halfH],
       fieldLabels: b.fieldLabels,
       labelsGap: b.labelsGap,
       bubblesGap: b.bubblesGap,
