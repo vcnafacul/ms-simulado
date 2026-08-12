@@ -23,18 +23,29 @@ export function buildTemplateJson(layout: LayoutModel): {
   templateJson: OmrTemplateJson;
   configJson: OmrConfigJson;
 } {
-  // O LayoutModel guarda `origin` como o CENTRO da primeira bolha (o que o PDF desenha).
-  // O OMRChecker, porém, trata `origin` como o CANTO SUPERIOR-ESQUERDO da caixa de amostra
-  // (core.py: rect = [y, y+box_h, x, x+box_w]). Logo emitimos origin = centro − bubbleDim/2,
-  // pra o centro de amostragem do OMRChecker (origin + índices·gaps + bubbleDim/2) coincidir
-  // com o centro visual desenhado pelo PDF.
+  // Duas correções de convenção do OMRChecker, ambas necessárias pra leitura bater:
+  //
+  // 1) CropOnMarkers (CropOnMarkers.py:153,161) faz four_point_transform usando os CENTROS
+  //    dos 4 markers → a imagem lida vive no "espaço da caixa dos centros de marker", não no
+  //    A4 inteiro. Então pageDimensions = caixa dos centros e as coordenadas dos fieldBlocks
+  //    são relativas ao centro do marker superior-esquerdo (`near`).
+  // 2) O OMRChecker trata `origin`/cada bolha como CANTO SUPERIOR-ESQUERDO da caixa de amostra
+  //    (core.py: rect = [y, y+box_h, x, x+box_w]); o centro de amostragem = origin + índices·gaps
+  //    + bubbleDim/2. Logo emitimos origin = centroVisual − centroMarkerTL − bubbleDim/2.
+  //
+  // O PDF e o LayoutModel continuam em espaço A4 (centro visual real); só o template.json
+  // é reexpresso no espaço normalizado pelos markers.
   const halfW = layout.page.bubbleWidthPx / 2;
   const halfH = layout.page.bubbleHeightPx / 2;
+  const near = layout.page.markerInsetPx + layout.page.markerSizePx / 2;
+  const markerBoxW = layout.page.pageWidthPx - 2 * near;
+  const markerBoxH = layout.page.pageHeightPx - 2 * near;
+
   const fieldBlocks: Record<string, OmrFieldBlock> = {};
   for (const b of layout.fieldBlocks) {
     fieldBlocks[b.key] = {
       fieldType: b.fieldType,
-      origin: [b.origin[0] - halfW, b.origin[1] - halfH],
+      origin: [b.origin[0] - near - halfW, b.origin[1] - near - halfH],
       fieldLabels: b.fieldLabels,
       labelsGap: b.labelsGap,
       bubblesGap: b.bubblesGap,
@@ -42,7 +53,7 @@ export function buildTemplateJson(layout: LayoutModel): {
   }
 
   const templateJson: OmrTemplateJson = {
-    pageDimensions: [layout.page.pageWidthPx, layout.page.pageHeightPx],
+    pageDimensions: [markerBoxW, markerBoxH],
     bubbleDimensions: [layout.page.bubbleWidthPx, layout.page.bubbleHeightPx],
     preProcessors: [
       {
