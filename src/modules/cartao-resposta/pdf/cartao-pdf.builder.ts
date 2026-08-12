@@ -1,0 +1,188 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import * as QRCode from 'qrcode';
+// pdfmake 0.3.x exports a singleton instance (module.exports = new pdfmake()).
+// The API is: pdfMake.setFonts(), pdfMake.setLocalAccessPolicy(), pdfMake.createPdf() → OutputDocumentServer → .getBuffer()
+// `import pdfMake = require('pdfmake')` gives the singleton with proper typing from @types/pdfmake.
+import pdfMake = require('pdfmake');
+import { LayoutModel } from '../layout/cartao-layout';
+
+export interface QrPayload {
+  simuladoId: string;
+  cursinhoId: string;
+  templateVersion: string;
+}
+export interface HeaderData {
+  nomeSimulado: string;
+  nomeProva: string;
+  nomeCursinho: string;
+  qrPayload: QrPayload;
+}
+
+const K = 72 / 300; // px(300dpi) → pt
+const pt = (px: number) => px * K;
+
+const FONTS_DIR = path.join(__dirname, '../assets/fonts');
+const fonts = {
+  Roboto: {
+    normal: path.join(FONTS_DIR, 'Roboto-Regular.ttf'),
+    bold: path.join(FONTS_DIR, 'Roboto-Bold.ttf'),
+    italics: path.join(FONTS_DIR, 'Roboto-Italic.ttf'),
+    bolditalics: path.join(FONTS_DIR, 'Roboto-BoldItalic.ttf'),
+  },
+};
+
+// pdfmake 0.3.x requires images to be base64 data URLs when supplied as file paths
+// via absolutePosition — loading them up front avoids the local-access-policy warnings.
+const MARKER_PATH = path.join(__dirname, '../assets/omr_marker.png');
+const markerDataUrl =
+  'data:image/png;base64,' + fs.readFileSync(MARKER_PATH).toString('base64');
+
+function parseRange(label: string): [number, number] {
+  const m = label.match(/[a-z]+(\d+)\.\.(\d+)/i);
+  if (!m) throw new Error(`range inválido: ${label}`);
+  return [parseInt(m[1], 10), parseInt(m[2], 10)];
+}
+
+function collectBubbleEllipses(layout: LayoutModel): unknown[] {
+  const r = pt(layout.page.bubbleWidthPx / 2);
+  const out: unknown[] = [];
+
+  const draw = (fieldKey: string, nLabels: number, nValues: number) => {
+    for (let i = 0; i < nLabels; i++) {
+      for (let j = 0; j < nValues; j++) {
+        const c = layout.bubbleCenter(fieldKey, i, j);
+        out.push({
+          type: 'ellipse',
+          x: pt(c.x),
+          y: pt(c.y),
+          r1: r,
+          r2: r,
+          lineWidth: 1,
+          lineColor: '#000000',
+        });
+      }
+    }
+  };
+
+  // Matrícula: 8 dígitos × 10 valores (0-9)
+  draw('matricula', 8, 10);
+
+  // Respostas: colunas de questões × 5 opções (A-E)
+  layout.fieldBlocks
+    .filter((b) => b.key.startsWith('respostas_c'))
+    .forEach((b) => {
+      const [first, last] = parseRange(b.fieldLabels[0]);
+      draw(b.key, last - first + 1, 5);
+    });
+
+  return out;
+}
+
+function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
+  const items: unknown[] = [];
+
+  // Header text
+  items.push({
+    text: `${header.nomeSimulado} — ${header.nomeProva}\n${header.nomeCursinho}\nPreencha completamente o círculo. Nome do aluno: ____________________`,
+    absolutePosition: {
+      x: pt(layout.page.headerBox.x),
+      y: pt(layout.page.headerBox.y),
+    },
+    fontSize: 10,
+    width: pt(layout.page.headerBox.width),
+  });
+
+  // Matrícula digit labels (0-9 on the side)
+  const mat = layout.fieldBlocks.find((b) => b.key === 'matricula')!;
+  for (let j = 0; j < 10; j++) {
+    const c = layout.bubbleCenter('matricula', 0, j);
+    items.push({
+      text: String(j),
+      absolutePosition: { x: pt(mat.origin[0] - 55), y: pt(c.y - 12) },
+      fontSize: 8,
+    });
+  }
+
+  // Respostas: option letters (A-E) on top, question numbers on the side
+  layout.fieldBlocks
+    .filter((b) => b.key.startsWith('respostas_c'))
+    .forEach((b) => {
+      const [first, last] = parseRange(b.fieldLabels[0]);
+      ['A', 'B', 'C', 'D', 'E'].forEach((opt, o) => {
+        const c = layout.bubbleCenter(b.key, 0, o);
+        items.push({
+          text: opt,
+          absolutePosition: { x: pt(c.x - 6), y: pt(b.origin[1] - 40) },
+          fontSize: 8,
+        });
+      });
+      for (let q = first; q <= last; q++) {
+        const c = layout.bubbleCenter(b.key, q - first, 0);
+        items.push({
+          text: String(q),
+          absolutePosition: { x: pt(b.origin[0] - 70), y: pt(c.y - 12) },
+          fontSize: 8,
+        });
+      }
+    });
+
+  return items;
+}
+
+export async function buildCartaoPdf(
+  layout: LayoutModel,
+  header: HeaderData,
+): Promise<Buffer> {
+  const qrDataUrl = await QRCode.toDataURL(JSON.stringify(header.qrPayload), {
+    margin: 0,
+  });
+
+  // Marker images: converted to base64 data URLs so pdfmake 0.3.x can embed them
+  // without requiring a localAccessPolicy for filesystem access.
+  const markerImages = layout.markers.map((m) => ({
+    image: markerDataUrl,
+    width: pt(layout.page.markerSizePx),
+    height: pt(layout.page.markerSizePx),
+    absolutePosition: {
+      x: pt(m.x - layout.page.markerSizePx / 2),
+      y: pt(m.y - layout.page.markerSizePx / 2),
+    },
+  }));
+
+  const docDefinition = {
+    pageSize: 'A4',
+    pageMargins: [0, 0, 0, 0] as [number, number, number, number],
+    content: [
+      {
+        canvas: collectBubbleEllipses(layout),
+        absolutePosition: { x: 0, y: 0 },
+      },
+      {
+        image: qrDataUrl,
+        width: pt(layout.page.qrBox.size),
+        absolutePosition: {
+          x: pt(layout.page.qrBox.x),
+          y: pt(layout.page.qrBox.y),
+        },
+      },
+      ...markerImages,
+      ...collectLabels(layout, header),
+    ],
+    defaultStyle: { font: 'Roboto' },
+  };
+
+  // pdfmake 0.3.x: singleton instance, configure then call createPdf()
+  // setFonts must be called before createPdf (it replaces the current font set)
+  pdfMake.setFonts(fonts);
+  // Allow local filesystem access for font files and block all external URLs
+  // (we use data URLs for images, so no URLs are needed)
+  pdfMake.setLocalAccessPolicy(() => true);
+  pdfMake.setUrlAccessPolicy(() => false);
+
+  const pdfDoc = pdfMake.createPdf(
+    docDefinition as Parameters<typeof pdfMake.createPdf>[0],
+  );
+  // OutputDocumentServer.getBuffer() returns a Promise<Buffer> (typed in TCreatedPdf)
+  return pdfDoc.getBuffer();
+}
