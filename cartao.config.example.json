@@ -1,0 +1,25 @@
+{
+  "n": 90,
+  "header": {
+    "nomeSimulado": "Simulado de Amostra",
+    "nomeProva": "Spike Etapa 7",
+    "nomeCursinho": "Cursinho Amostra",
+    "qrPayload": {
+      "simuladoId": "spike",
+      "cursinhoId": "spike",
+      "templateVersion": "v1"
+    }
+  },
+  "layout": {
+    "bubbleWidthPx": 60,
+    "bubbleHeightPx": 60,
+    "matriculaOrigin": [340, 900],
+    "matriculaLabelsGap": 95,
+    "matriculaBubblesGap": 78,
+    "respostasOrigin": [230, 1720],
+    "respostasColumnWidthPx": 760,
+    "respostasLabelsGap": 50,
+    "respostasBubblesGap": 92,
+    "questionsPerColumn": 30
+  }
+}
