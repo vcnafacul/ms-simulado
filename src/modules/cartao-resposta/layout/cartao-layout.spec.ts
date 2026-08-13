@@ -43,7 +43,7 @@ describe('buildLayout', () => {
     expect(cols[0].fieldLabels).toEqual(['q1..20']);
   });
 
-  it('respostasEvenColumns: margem esq = vãos entre containers = margem dir', () => {
+  it('respostasEvenColumns: margem esq = vãos entre containers = margem dir (na caixa dos markers)', () => {
     const cfg = {
       ...DEFAULT_CONFIG,
       respostasEvenColumns: true,
@@ -55,8 +55,11 @@ describe('buildLayout', () => {
     const cols = m.fieldBlocks.filter((b) => b.key.startsWith('respostas_c'));
     expect(cols).toHaveLength(5);
 
-    // Bordas do CONTAINER (padding + número + retângulos + padding), medidas da BORDA DA
-    // PÁGINA (x=0 … pageWidthPx) — é o container que é distribuído igualmente.
+    // Os containers são distribuídos DENTRO da caixa dos markers (de `near` a pageWidth−near),
+    // então as margens são medidas a partir do marker, não da borda da página.
+    const near = cfg.markerInsetPx + cfg.markerSizePx / 2;
+    const boxLeft = near;
+    const boxRight = cfg.pageWidthPx - near;
     const leftEdge = (b: (typeof cols)[number]) =>
       b.origin[0] -
       cfg.bubbleWidthPx / 2 -
@@ -68,14 +71,18 @@ describe('buildLayout', () => {
       cfg.bubbleWidthPx / 2 +
       cfg.respostasBoxPadPx;
 
-    const marginLeft = leftEdge(cols[0]) - 0;
-    const marginRight = cfg.pageWidthPx - rightEdge(cols[cols.length - 1]);
+    const marginLeft = leftEdge(cols[0]) - boxLeft;
+    const marginRight = boxRight - rightEdge(cols[cols.length - 1]);
     const gutters = cols
       .slice(1)
       .map((b, i) => leftEdge(b) - rightEdge(cols[i]));
 
-    gutters.forEach((g) => expect(g).toBeCloseTo(marginLeft, 5));
-    expect(marginRight).toBeCloseTo(marginLeft, 5);
+    // tolerância de 1px (arredondamento das origens pra inteiro)
+    gutters.forEach((g) => expect(Math.abs(g - marginLeft)).toBeLessThanOrEqual(1));
+    expect(Math.abs(marginRight - marginLeft)).toBeLessThanOrEqual(1);
+    // e tudo cabe dentro da caixa dos markers
+    expect(leftEdge(cols[0])).toBeGreaterThanOrEqual(boxLeft);
+    expect(rightEdge(cols[cols.length - 1])).toBeLessThanOrEqual(boxRight);
   });
 
   it('4 markers nos cantos', () => {

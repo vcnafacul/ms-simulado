@@ -121,15 +121,18 @@ export function buildLayout(
   const numColumns = Math.max(1, Math.ceil(N / cfg.maxQuestionsPerColumn));
 
   // Distribuição even das respostas: distribui os CONTAINERS (padding + número + retângulos +
-  // padding) igualmente sobre a LARGURA DA PÁGINA INTEIRA (margem esq = vão = margem dir).
-  // O gutter também é usado pra alinhar o container da matrícula (matriculaAlignRespostas).
+  // padding) igualmente DENTRO DA CAIXA DOS MARKERS (de `near` a pageWidth−near), não pela
+  // página inteira. Isso garante que NADA ultrapasse os markers (senão o OMRChecker corta a
+  // leitura) e o vão entre colunas se ajusta sozinho. Margem-esq (do marker) = vão = margem-dir.
   const respostasBlockWidth = 4 * cfg.respostasBubblesGap + cfg.bubbleWidthPx;
   const respostasContainerWidth =
     2 * cfg.respostasBoxPadPx +
     cfg.respostasNumberWidthPx +
     respostasBlockWidth;
+  const markerBoxLeft = near;
+  const markerBoxWidth = cfg.pageWidthPx - 2 * near;
   const respostasGutter =
-    (cfg.pageWidthPx - numColumns * respostasContainerWidth) / (numColumns + 1);
+    (markerBoxWidth - numColumns * respostasContainerWidth) / (numColumns + 1);
 
   // X (centro da 1ª bolha "A") de cada coluna. Dois modos: even (distribuído) ou fixo.
   // Arredondado pra INTEIRO: o OMRChecker exige coordenadas inteiras no template.json, e a
@@ -139,7 +142,8 @@ export function buildLayout(
   if (cfg.respostasEvenColumns) {
     columnOriginX = (c) =>
       Math.round(
-        respostasGutter +
+        markerBoxLeft +
+          respostasGutter +
           c * (respostasContainerWidth + respostasGutter) +
           cfg.respostasBoxPadPx +
           cfg.respostasNumberWidthPx +
@@ -151,11 +155,12 @@ export function buildLayout(
   }
 
   // Matrícula: origin.x alinhado à borda esq. do 1º container de respostas, se pedido.
-  // Container esq. da matrícula = matriculaX - bw/2 - sideLabel - pad; igualamos ao gutter.
+  // Container esq. da matrícula = matriculaX - bw/2 - sideLabel - pad; igualamos ao 1º container.
   let matriculaX = cfg.matriculaOrigin[0];
   if (cfg.respostasEvenColumns && cfg.matriculaAlignRespostas) {
     matriculaX = Math.round(
-      respostasGutter +
+      markerBoxLeft +
+        respostasGutter +
         cfg.matriculaSideLabelPx +
         cfg.respostasBoxPadPx +
         cfg.bubbleWidthPx / 2,
