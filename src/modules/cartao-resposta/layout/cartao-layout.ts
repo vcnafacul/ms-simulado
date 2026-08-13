@@ -34,6 +34,10 @@ export interface PageConfig {
   respostasNumberWidthPx: number;
   // Padding lateral interno do container (px), igual dos dois lados (esquerda = direita).
   respostasBoxPadPx: number;
+  // Quando true, a matrícula ganha o mesmo tratamento: container com borda, zebra por linha
+  // de dígito (0-9) e uma fileira de quadros em cima pro aluno ESCREVER os dígitos à mão
+  // (facilita a leitura do monitor). Puramente visual — não entra no template.json.
+  matriculaBox: boolean;
   qrBox: { x: number; y: number; size: number };
   headerBox: { x: number; y: number; width: number; height: number };
 }
@@ -59,6 +63,7 @@ export const DEFAULT_CONFIG: PageConfig = {
   respostasColumnBox: false,
   respostasNumberWidthPx: 68,
   respostasBoxPadPx: 20,
+  matriculaBox: false,
   qrBox: { x: 2000, y: 150, size: 320 },
   headerBox: { x: 150, y: 150, width: 1750, height: 560 },
 };

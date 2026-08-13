@@ -98,6 +98,74 @@ function collectColumnBoxes(layout: LayoutModel): unknown[] {
   return out;
 }
 
+// Matrícula com o mesmo tratamento: container + borda, zebra por linha de dígito (0-9), e uma
+// fileira de quadros em cima pro aluno ESCREVER os 8 dígitos à mão. Atrás das bolhas (brancas).
+function collectMatriculaDecorations(layout: LayoutModel): unknown[] {
+  if (!layout.page.matriculaBox) return [];
+  const cfg = layout.page;
+  const mat = layout.fieldBlocks.find((b) => b.key === 'matricula');
+  if (!mat) return [];
+  const bw = cfg.bubbleWidthPx;
+  const bh = cfg.bubbleHeightPx;
+  const nCols = 8;
+  const nDigits = 10;
+  const ox = mat.origin[0];
+  const oy = mat.origin[1];
+  const pad = cfg.respostasBoxPadPx;
+  const labelSpace = 42; // espaço pros rótulos 0-9 à esquerda
+  const hwH = 78; // altura dos quadros de escrita
+  const hwGap = 24; // folga entre os quadros e o grid de bolhas
+  const titleSpace = 62; // espaço acima dos quadros pro título "Matrícula"
+
+  const gridLeft = ox - bw / 2;
+  const gridRight = ox + (nCols - 1) * mat.labelsGap + bw / 2;
+  const hwTop = oy - bh / 2 - hwGap - hwH;
+  const boxLeft = gridLeft - labelSpace - pad;
+  const boxRight = gridRight + pad;
+  const boxTop = hwTop - titleSpace - pad;
+  const boxBottom = oy + (nDigits - 1) * mat.bubblesGap + bh / 2 + pad;
+
+  const out: unknown[] = [];
+  // zebra por linha de dígito (1,3,5,7,9 cinza), cobrindo a largura toda do container
+  for (let j = 1; j < nDigits; j += 2) {
+    const rowCy = oy + j * mat.bubblesGap;
+    out.push({
+      type: 'rect',
+      x: pt(boxLeft),
+      y: pt(rowCy - mat.bubblesGap / 2),
+      w: pt(boxRight - boxLeft),
+      h: pt(mat.bubblesGap),
+      color: '#ededed',
+    });
+  }
+  // quadros de escrita à mão (um por coluna, interior branco por cima da zebra)
+  const hwW = Math.min(bw * 1.4, mat.labelsGap - 22);
+  for (let i = 0; i < nCols; i++) {
+    const cx = ox + i * mat.labelsGap;
+    out.push({
+      type: 'rect',
+      x: pt(cx - hwW / 2),
+      y: pt(hwTop),
+      w: pt(hwW),
+      h: pt(hwH),
+      lineColor: '#000000',
+      lineWidth: 1,
+      color: 'white',
+    });
+  }
+  // borda do container
+  out.push({
+    type: 'rect',
+    x: pt(boxLeft),
+    y: pt(boxTop),
+    w: pt(boxRight - boxLeft),
+    h: pt(boxBottom - boxTop),
+    lineColor: '#bdbdbd',
+    lineWidth: 1,
+  });
+  return out;
+}
+
 function collectBubbleShapes(layout: LayoutModel): unknown[] {
   const shape = layout.page.bubbleShape;
   const w = pt(layout.page.bubbleWidthPx);
@@ -177,6 +245,20 @@ function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
       fontSize: 8,
     });
   }
+  // Título da matrícula acima dos quadros de escrita (quando o container está ligado)
+  if (layout.page.matriculaBox) {
+    const bh = layout.page.bubbleHeightPx;
+    const hwTop = mat.origin[1] - bh / 2 - 24 - 78; // = oy - bh/2 - hwGap - hwH
+    items.push({
+      text: 'MATRÍCULA — escreva e preencha',
+      absolutePosition: {
+        x: pt(mat.origin[0] - layout.page.bubbleWidthPx / 2 - 42),
+        y: pt(hwTop - 52),
+      },
+      fontSize: 9,
+      bold: true,
+    });
+  }
 
   // Respostas: option letters (A-E) on top, question numbers on the side
   const OPT_FONT = 8;
@@ -247,8 +329,12 @@ export async function buildCartaoPdf(
     pageMargins: [0, 0, 0, 0] as [number, number, number, number],
     content: [
       {
-        // fundos/bordas das colunas primeiro (atrás), depois as bolhas (interior branco).
-        canvas: [...collectColumnBoxes(layout), ...collectBubbleShapes(layout)],
+        // fundos/bordas (respostas + matrícula) primeiro (atrás), depois as bolhas (interior branco).
+        canvas: [
+          ...collectColumnBoxes(layout),
+          ...collectMatriculaDecorations(layout),
+          ...collectBubbleShapes(layout),
+        ],
         absolutePosition: { x: 0, y: 0 },
       },
       {
