@@ -20,6 +20,6 @@
     "respostasColumnWidthPx": 760,
     "respostasLabelsGap": 50,
     "respostasBubblesGap": 92,
-    "questionsPerColumn": 30
+    "maxQuestionsPerColumn": 30
   }
 }

@@ -9,7 +9,7 @@ describe('buildLayout', () => {
     expect(mat!.fieldLabels).toEqual(['m1..8']);
   });
 
-  it('respostas: split em colunas de 30 (N=90 → 3 blocos)', () => {
+  it('respostas: N=90 → 3 colunas de 30 (q1..30, q31..60, q61..90)', () => {
     const m = buildLayout(90);
     const cols = m.fieldBlocks.filter((b) => b.key.startsWith('respostas_c'));
     expect(cols).toHaveLength(3);
@@ -19,11 +19,28 @@ describe('buildLayout', () => {
     cols.forEach((c) => expect(c.fieldType).toBe('QTYPE_MCQ5'));
   });
 
-  it('N não múltiplo da coluna: último bloco parcial (N=75 → 30/30/15)', () => {
+  it('auto-fit balanceado: N=45 → 2 colunas 23+22 (não 30+15)', () => {
+    const m = buildLayout(45);
+    const cols = m.fieldBlocks.filter((b) => b.key.startsWith('respostas_c'));
+    expect(cols).toHaveLength(2);
+    expect(cols[0].fieldLabels).toEqual(['q1..23']);
+    expect(cols[1].fieldLabels).toEqual(['q24..45']);
+  });
+
+  it('auto-fit balanceado: N=75 → 3 colunas 25/25/25', () => {
     const m = buildLayout(75);
     const cols = m.fieldBlocks.filter((b) => b.key.startsWith('respostas_c'));
     expect(cols).toHaveLength(3);
-    expect(cols[2].fieldLabels).toEqual(['q61..75']);
+    expect(cols[0].fieldLabels).toEqual(['q1..25']);
+    expect(cols[1].fieldLabels).toEqual(['q26..50']);
+    expect(cols[2].fieldLabels).toEqual(['q51..75']);
+  });
+
+  it('N pequeno: 1 coluna só (N=20 → q1..20)', () => {
+    const m = buildLayout(20);
+    const cols = m.fieldBlocks.filter((b) => b.key.startsWith('respostas_c'));
+    expect(cols).toHaveLength(1);
+    expect(cols[0].fieldLabels).toEqual(['q1..20']);
   });
 
   it('4 markers nos cantos', () => {

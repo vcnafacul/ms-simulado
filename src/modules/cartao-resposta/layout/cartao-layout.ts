@@ -13,7 +13,7 @@ export interface PageConfig {
   respostasColumnWidthPx: number;
   respostasLabelsGap: number;
   respostasBubblesGap: number;
-  questionsPerColumn: number;
+  maxQuestionsPerColumn: number;
   qrBox: { x: number; y: number; size: number };
   headerBox: { x: number; y: number; width: number; height: number };
 }
@@ -33,7 +33,7 @@ export const DEFAULT_CONFIG: PageConfig = {
   respostasColumnWidthPx: 760,
   respostasLabelsGap: 50,
   respostasBubblesGap: 92,
-  questionsPerColumn: 30,
+  maxQuestionsPerColumn: 30,
   qrBox: { x: 2000, y: 150, size: 320 },
   headerBox: { x: 150, y: 150, width: 1750, height: 560 },
 };
@@ -86,10 +86,17 @@ export function buildLayout(
     },
   ];
 
-  const numColumns = Math.ceil(N / cfg.questionsPerColumn);
+  // Quantas colunas cabem N questões, dado o teto por coluna; distribui BALANCEADO
+  // (ex.: N=45 → 23+22, não 30+15). O nº de colunas vem só de N — "auto-fit".
+  const numColumns = Math.max(1, Math.ceil(N / cfg.maxQuestionsPerColumn));
+  const base = Math.floor(N / numColumns);
+  const remainder = N % numColumns;
+  let nextQuestion = 1;
   for (let c = 0; c < numColumns; c++) {
-    const first = c * cfg.questionsPerColumn + 1;
-    const last = Math.min((c + 1) * cfg.questionsPerColumn, N);
+    const countThisColumn = base + (c < remainder ? 1 : 0);
+    const first = nextQuestion;
+    const last = nextQuestion + countThisColumn - 1;
+    nextQuestion = last + 1;
     fieldBlocks.push({
       key: `respostas_c${c + 1}`,
       fieldType: 'QTYPE_MCQ5',

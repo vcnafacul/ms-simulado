@@ -60,6 +60,51 @@ function loadConfig(configPath: string): CartaoConfigFile {
   return raw;
 }
 
+/**
+ * Avisa se algum fieldBlock passa da caixa útil (pageDimensions) — ex.: N grande demais
+ * (o suportado é até 90). Não impede a geração; só alerta que o cartão vai ficar cortado.
+ */
+function warnIfOverflow(templateJson: {
+  pageDimensions: [number, number];
+  bubbleDimensions: [number, number];
+  fieldBlocks: Record<
+    string,
+    {
+      fieldType: string;
+      origin: [number, number];
+      fieldLabels: string[];
+      labelsGap: number;
+      bubblesGap: number;
+    }
+  >;
+}): void {
+  const [pw, ph] = templateJson.pageDimensions;
+  const [bw, bh] = templateJson.bubbleDimensions;
+  for (const [key, b] of Object.entries(templateJson.fieldBlocks)) {
+    const nValues = b.fieldType === 'QTYPE_INT' ? 10 : 5;
+    const m = b.fieldLabels[0].match(/[a-z]+(\d+)\.\.(\d+)/i);
+    const nLabels = m ? parseInt(m[2], 10) - parseInt(m[1], 10) + 1 : 1;
+    // QTYPE_INT: valores descem (bubblesGap), labels atravessam (labelsGap); MCQ5 é o inverso.
+    const vertical = b.fieldType === 'QTYPE_INT';
+    const right =
+      b.origin[0] +
+      (vertical ? nLabels - 1 : nValues - 1) *
+        (vertical ? b.labelsGap : b.bubblesGap) +
+      bw;
+    const bottom =
+      b.origin[1] +
+      (vertical ? nValues - 1 : nLabels - 1) *
+        (vertical ? b.bubblesGap : b.labelsGap) +
+      bh;
+    if (right > pw || bottom > ph) {
+      console.warn(
+        `⚠️  bloco '${key}' passa da área útil (direita=${right}/${pw}, baixo=${bottom}/${ph}). ` +
+          `O cartão suporta até 90 questões; reduza N ou ajuste o layout no config.`,
+      );
+    }
+  }
+}
+
 async function main() {
   const configPath = path.resolve(process.argv[2] ?? 'cartao.config.json');
   const outDir = path.resolve(
@@ -74,6 +119,7 @@ async function main() {
 
   const service = new CartaoRespostaService();
   const art = await service.gerar(N, header, layout);
+  warnIfOverflow(art.templateJson);
 
   fs.writeFileSync(
     path.join(outDir, 'template.json'),
