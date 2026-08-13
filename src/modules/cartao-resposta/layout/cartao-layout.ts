@@ -132,14 +132,19 @@ export function buildLayout(
     (cfg.pageWidthPx - numColumns * respostasContainerWidth) / (numColumns + 1);
 
   // X (centro da 1ª bolha "A") de cada coluna. Dois modos: even (distribuído) ou fixo.
+  // Arredondado pra INTEIRO: o OMRChecker exige coordenadas inteiras no template.json, e a
+  // distribuição even (gutter fracionário) geraria origens quebradas. Arredondar aqui mantém
+  // PDF e template consistentes (ambos leem do LayoutModel).
   let columnOriginX: (c: number) => number;
   if (cfg.respostasEvenColumns) {
     columnOriginX = (c) =>
-      respostasGutter +
-      c * (respostasContainerWidth + respostasGutter) +
-      cfg.respostasBoxPadPx +
-      cfg.respostasNumberWidthPx +
-      cfg.bubbleWidthPx / 2;
+      Math.round(
+        respostasGutter +
+          c * (respostasContainerWidth + respostasGutter) +
+          cfg.respostasBoxPadPx +
+          cfg.respostasNumberWidthPx +
+          cfg.bubbleWidthPx / 2,
+      );
   } else {
     columnOriginX = (c) =>
       cfg.respostasOrigin[0] + c * cfg.respostasColumnWidthPx;
@@ -149,11 +154,12 @@ export function buildLayout(
   // Container esq. da matrícula = matriculaX - bw/2 - sideLabel - pad; igualamos ao gutter.
   let matriculaX = cfg.matriculaOrigin[0];
   if (cfg.respostasEvenColumns && cfg.matriculaAlignRespostas) {
-    matriculaX =
+    matriculaX = Math.round(
       respostasGutter +
-      cfg.matriculaSideLabelPx +
-      cfg.respostasBoxPadPx +
-      cfg.bubbleWidthPx / 2;
+        cfg.matriculaSideLabelPx +
+        cfg.respostasBoxPadPx +
+        cfg.bubbleWidthPx / 2,
+    );
   }
 
   const fieldBlocks: FieldBlockLayout[] = [

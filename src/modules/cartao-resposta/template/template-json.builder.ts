@@ -41,20 +41,28 @@ export function buildTemplateJson(layout: LayoutModel): {
   const markerBoxW = layout.page.pageWidthPx - 2 * near;
   const markerBoxH = layout.page.pageHeightPx - 2 * near;
 
+  // O OMRChecker exige TODAS as coordenadas do template como inteiros (jsonschema). Arredondamos
+  // aqui (o desvio sub-pixel vs. o PDF é irrelevante — a caixa de amostragem tem dezenas de px).
   const fieldBlocks: Record<string, OmrFieldBlock> = {};
   for (const b of layout.fieldBlocks) {
     fieldBlocks[b.key] = {
       fieldType: b.fieldType,
-      origin: [b.origin[0] - near - halfW, b.origin[1] - near - halfH],
+      origin: [
+        Math.round(b.origin[0] - near - halfW),
+        Math.round(b.origin[1] - near - halfH),
+      ],
       fieldLabels: b.fieldLabels,
-      labelsGap: b.labelsGap,
-      bubblesGap: b.bubblesGap,
+      labelsGap: Math.round(b.labelsGap),
+      bubblesGap: Math.round(b.bubblesGap),
     };
   }
 
   const templateJson: OmrTemplateJson = {
-    pageDimensions: [markerBoxW, markerBoxH],
-    bubbleDimensions: [layout.page.bubbleWidthPx, layout.page.bubbleHeightPx],
+    pageDimensions: [Math.round(markerBoxW), Math.round(markerBoxH)],
+    bubbleDimensions: [
+      Math.round(layout.page.bubbleWidthPx),
+      Math.round(layout.page.bubbleHeightPx),
+    ],
     preProcessors: [
       {
         name: 'CropOnMarkers',
