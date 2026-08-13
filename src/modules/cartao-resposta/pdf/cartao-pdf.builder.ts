@@ -122,16 +122,23 @@ function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
   }
 
   // Respostas: option letters (A-E) on top, question numbers on the side
+  const OPT_FONT = 8;
+  const OPT_LABEL_GAP_PT = 4; // respiro entre o rótulo e o topo do 1º retângulo
   layout.fieldBlocks
     .filter((b) => b.key.startsWith('respostas_c'))
     .forEach((b) => {
       const [first, last] = parseRange(b.fieldLabels[0]);
+      // Ancorado ACIMA do topo da primeira marca (não a partir do centro), pra o rótulo
+      // não encostar na marca seja qual for a altura (círculo alto ou retângulo baixo).
+      // absolutePosition.y é o topo do texto, que cresce pra baixo → subtrai a altura do texto.
+      const firstRowTopPt = pt(b.origin[1] - layout.page.bubbleHeightPx / 2);
+      const optLabelYPt = firstRowTopPt - OPT_LABEL_GAP_PT - OPT_FONT * 1.2;
       ['A', 'B', 'C', 'D', 'E'].forEach((opt, o) => {
         const c = layout.bubbleCenter(b.key, 0, o);
         items.push({
           text: opt,
-          absolutePosition: { x: pt(c.x - 6), y: pt(b.origin[1] - 40) },
-          fontSize: 8,
+          absolutePosition: { x: pt(c.x - 6), y: optLabelYPt },
+          fontSize: OPT_FONT,
         });
       });
       for (let q = first; q <= last; q++) {
