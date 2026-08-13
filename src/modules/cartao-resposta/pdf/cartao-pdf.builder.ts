@@ -22,6 +22,10 @@ export interface HeaderData {
 const K = 72 / 300; // px(300dpi) → pt
 const pt = (px: number) => px * K;
 
+// y (em pt) pra centralizar VERTICALMENTE um texto de fontSize `f` (pt) num centro `cyPx` (px).
+// absolutePosition.y é o topo do texto; o fator ~0.55·f alinha o miolo do glifo ao centro.
+const centerTextY = (cyPx: number, f: number) => pt(cyPx) - f * 0.55;
+
 const FONTS_DIR = path.join(__dirname, '../assets/fonts');
 const fonts = {
   Roboto: {
@@ -357,7 +361,7 @@ function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
     const c = layout.bubbleCenter('matricula', 0, j);
     items.push({
       text: String(j),
-      absolutePosition: { x: pt(mat.origin[0] - 55), y: pt(c.y - 12) },
+      absolutePosition: { x: pt(mat.origin[0] - 55), y: centerTextY(c.y, 8) },
       fontSize: 8,
     });
   }
@@ -375,7 +379,7 @@ function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
       const c = layout.bubbleCenter('matricula', 7, j);
       items.push({
         text: String(j),
-        absolutePosition: { x: pt(c.x + matBw / 2 + 12), y: pt(c.y - 12) },
+        absolutePosition: { x: pt(c.x + matBw / 2 + 12), y: centerTextY(c.y, 8) },
         fontSize: 8,
       });
     }
@@ -494,7 +498,7 @@ function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
           text: label,
           absolutePosition: {
             x: numRightPt - label.length * NUM_CHAR_PT,
-            y: pt(c.y - 12),
+            y: centerTextY(c.y, OPT_FONT),
           },
           fontSize: OPT_FONT,
         });
