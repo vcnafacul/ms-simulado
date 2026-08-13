@@ -53,16 +53,15 @@ describe('buildLayout', () => {
     const cols = m.fieldBlocks.filter((b) => b.key.startsWith('respostas_c'));
     expect(cols).toHaveLength(5);
 
-    // Bordas do BLOCO de retângulos (A left … E right), sem o número.
-    const near = cfg.markerInsetPx + cfg.markerSizePx / 2;
-    const usableRight = cfg.pageWidthPx - near;
+    // Bordas do BLOCO de retângulos (A left … E right), sem o número. As margens são
+    // medidas da BORDA DA PÁGINA (x=0 … pageWidthPx), que é o que o olho vê.
     const leftEdge = (b: (typeof cols)[number]) =>
       b.origin[0] - cfg.bubbleWidthPx / 2;
     const rightEdge = (b: (typeof cols)[number]) =>
       b.origin[0] + 4 * cfg.respostasBubblesGap + cfg.bubbleWidthPx / 2;
 
-    const marginLeft = leftEdge(cols[0]) - near;
-    const marginRight = usableRight - rightEdge(cols[cols.length - 1]);
+    const marginLeft = leftEdge(cols[0]) - 0;
+    const marginRight = cfg.pageWidthPx - rightEdge(cols[cols.length - 1]);
     const gutters = cols
       .slice(1)
       .map((b, i) => leftEdge(b) - rightEdge(cols[i]));

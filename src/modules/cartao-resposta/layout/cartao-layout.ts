@@ -108,14 +108,16 @@ export function buildLayout(
   // - even: distribui na largura útil (caixa dos markers) com margem esq. = vão = margem dir.
   let columnOriginX: (c: number) => number;
   if (cfg.respostasEvenColumns) {
-    // Distribui os BLOCOS de retângulos (A-E) igualmente na largura útil:
-    // margem esquerda = vão entre blocos = margem direita. O número da questão flutua
-    // no vão à esquerda de cada bloco (como no ENEM), sem entrar na conta do espaçamento.
-    const usableWidth = cfg.pageWidthPx - 2 * near;
+    // Distribui os BLOCOS de retângulos (A-E) igualmente sobre a LARGURA DA PÁGINA INTEIRA:
+    // margem-esquerda (borda da página → 1º bloco) = vão entre blocos = margem-direita.
+    // O número da questão flutua no vão à esquerda de cada bloco (como no ENEM).
+    // Atenção: os retângulos precisam cair dentro da caixa dos markers (senão o OMR corta);
+    // se os markers forem afastados demais pro vão calculado, o script avisa (warnIfOverflow).
     const blockWidth = 4 * cfg.respostasBubblesGap + cfg.bubbleWidthPx;
-    const gutter = (usableWidth - numColumns * blockWidth) / (numColumns + 1);
+    const gutter =
+      (cfg.pageWidthPx - numColumns * blockWidth) / (numColumns + 1);
     columnOriginX = (c) =>
-      near + gutter + c * (blockWidth + gutter) + cfg.bubbleWidthPx / 2;
+      gutter + c * (blockWidth + gutter) + cfg.bubbleWidthPx / 2;
   } else {
     columnOriginX = (c) =>
       cfg.respostasOrigin[0] + c * cfg.respostasColumnWidthPx;

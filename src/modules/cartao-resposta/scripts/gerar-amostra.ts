@@ -102,6 +102,14 @@ function warnIfOverflow(templateJson: {
           `O cartão suporta até 90 questões; reduza N ou ajuste o layout no config.`,
       );
     }
+    // origem negativa = bloco à esquerda/acima da caixa dos markers → o OMR corta a leitura.
+    // Comum no modo respostasEvenColumns quando os markers estão afastados demais.
+    if (b.origin[0] < 0 || b.origin[1] < 0) {
+      console.warn(
+        `⚠️  bloco '${key}' começa fora da caixa dos markers (origin=${b.origin[0]},${b.origin[1]}). ` +
+          `Aproxime os markers da borda (markerInsetPx menor) ou estreite as colunas.`,
+      );
+    }
   }
 }
 
