@@ -50,7 +50,7 @@ const LOGO_H = Math.round((LOGO_W * 62) / 296); // mantém a proporção da logo
 // (fontes em pt são grandes em px: 15pt≈62px, 11pt≈46px — os gaps abaixo já contam com isso)
 const HEADER_TITLE_DY = LOGO_H + 30; // nome do simulado, abaixo da logo
 const HEADER_NAME_DY = HEADER_TITLE_DY + 70; // rótulo "Nome do Estudante" (abaixo do título)
-const HEADER_LINE_DY = HEADER_NAME_DY + 60; // linha de preenchimento (abaixo do rótulo)
+const HEADER_LINE_DY = HEADER_NAME_DY + 95; // linha de preenchimento (espaço pro aluno escrever)
 const HEADER_LINE_W = 1250; // comprimento da linha de preenchimento
 
 function parseRange(label: string): [number, number] {
@@ -269,7 +269,7 @@ function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
   items.push({
     text: 'Nome do Estudante',
     absolutePosition: { x: pt(hb.x), y: pt(hb.y + HEADER_NAME_DY) },
-    fontSize: 11,
+    fontSize: 9,
   });
 
   // Matrícula digit labels (0-9 à esquerda; e também à direita quando o container está ligado)
