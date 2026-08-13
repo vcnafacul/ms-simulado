@@ -38,6 +38,11 @@ export interface PageConfig {
   // de dígito (0-9) e uma fileira de quadros em cima pro aluno ESCREVER os dígitos à mão
   // (facilita a leitura do monitor). Puramente visual — não entra no template.json.
   matriculaBox: boolean;
+  // Espaço reservado (px) pros rótulos 0-9 de CADA lado do container da matrícula.
+  matriculaSideLabelPx: number;
+  // Quando true (+ respostasEvenColumns), a borda esquerda do container da matrícula é
+  // alinhada com a borda esquerda do 1º container de respostas. Ignora matriculaOrigin.x.
+  matriculaAlignRespostas: boolean;
   qrBox: { x: number; y: number; size: number };
   headerBox: { x: number; y: number; width: number; height: number };
 }
@@ -64,6 +69,8 @@ export const DEFAULT_CONFIG: PageConfig = {
   respostasNumberWidthPx: 68,
   respostasBoxPadPx: 20,
   matriculaBox: false,
+  matriculaSideLabelPx: 40,
+  matriculaAlignRespostas: false,
   qrBox: { x: 2000, y: 150, size: 320 },
   headerBox: { x: 150, y: 150, width: 1750, height: 560 },
 };
@@ -105,39 +112,27 @@ export function buildLayout(
     { x: cfg.pageWidthPx - near, y: cfg.pageHeightPx - near },
   ];
 
-  const fieldBlocks: FieldBlockLayout[] = [
-    {
-      key: 'matricula',
-      fieldType: 'QTYPE_INT',
-      origin: [...cfg.matriculaOrigin] as [number, number],
-      fieldLabels: ['m1..8'],
-      labelsGap: cfg.matriculaLabelsGap,
-      bubblesGap: cfg.matriculaBubblesGap,
-    },
-  ];
-
   // Quantas colunas cabem N questões, dado o teto por coluna; distribui BALANCEADO
   // (ex.: N=45 → 23+22, não 30+15). O nº de colunas vem só de N — "auto-fit".
   const numColumns = Math.max(1, Math.ceil(N / cfg.maxQuestionsPerColumn));
 
-  // X (centro da 1ª bolha "A") de cada coluna. Dois modos:
-  // - fixo: respostasOrigin.x + c·respostasColumnWidthPx (padrão);
-  // - even: distribui na largura útil (caixa dos markers) com margem esq. = vão = margem dir.
+  // Distribuição even das respostas: distribui os CONTAINERS (padding + número + retângulos +
+  // padding) igualmente sobre a LARGURA DA PÁGINA INTEIRA (margem esq = vão = margem dir).
+  // O gutter também é usado pra alinhar o container da matrícula (matriculaAlignRespostas).
+  const respostasBlockWidth = 4 * cfg.respostasBubblesGap + cfg.bubbleWidthPx;
+  const respostasContainerWidth =
+    2 * cfg.respostasBoxPadPx +
+    cfg.respostasNumberWidthPx +
+    respostasBlockWidth;
+  const respostasGutter =
+    (cfg.pageWidthPx - numColumns * respostasContainerWidth) / (numColumns + 1);
+
+  // X (centro da 1ª bolha "A") de cada coluna. Dois modos: even (distribuído) ou fixo.
   let columnOriginX: (c: number) => number;
   if (cfg.respostasEvenColumns) {
-    // Distribui os CONTAINERS (padding + número + retângulos + padding) igualmente sobre a
-    // LARGURA DA PÁGINA INTEIRA: margem-esquerda (borda → 1º container) = vão entre containers
-    // = margem-direita. O número fica DENTRO do container, à esquerda dos retângulos.
-    // Atenção: os retângulos precisam cair dentro da caixa dos markers (senão o OMR corta);
-    // se os markers forem afastados demais, o script avisa (warnIfOverflow).
-    const blockWidth = 4 * cfg.respostasBubblesGap + cfg.bubbleWidthPx;
-    const containerWidth =
-      2 * cfg.respostasBoxPadPx + cfg.respostasNumberWidthPx + blockWidth;
-    const gutter =
-      (cfg.pageWidthPx - numColumns * containerWidth) / (numColumns + 1);
     columnOriginX = (c) =>
-      gutter +
-      c * (containerWidth + gutter) +
+      respostasGutter +
+      c * (respostasContainerWidth + respostasGutter) +
       cfg.respostasBoxPadPx +
       cfg.respostasNumberWidthPx +
       cfg.bubbleWidthPx / 2;
@@ -145,6 +140,28 @@ export function buildLayout(
     columnOriginX = (c) =>
       cfg.respostasOrigin[0] + c * cfg.respostasColumnWidthPx;
   }
+
+  // Matrícula: origin.x alinhado à borda esq. do 1º container de respostas, se pedido.
+  // Container esq. da matrícula = matriculaX - bw/2 - sideLabel - pad; igualamos ao gutter.
+  let matriculaX = cfg.matriculaOrigin[0];
+  if (cfg.respostasEvenColumns && cfg.matriculaAlignRespostas) {
+    matriculaX =
+      respostasGutter +
+      cfg.matriculaSideLabelPx +
+      cfg.respostasBoxPadPx +
+      cfg.bubbleWidthPx / 2;
+  }
+
+  const fieldBlocks: FieldBlockLayout[] = [
+    {
+      key: 'matricula',
+      fieldType: 'QTYPE_INT',
+      origin: [matriculaX, cfg.matriculaOrigin[1]],
+      fieldLabels: ['m1..8'],
+      labelsGap: cfg.matriculaLabelsGap,
+      bubblesGap: cfg.matriculaBubblesGap,
+    },
+  ];
 
   const base = Math.floor(N / numColumns);
   const remainder = N % numColumns;

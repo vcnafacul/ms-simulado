@@ -112,7 +112,7 @@ function collectMatriculaDecorations(layout: LayoutModel): unknown[] {
   const ox = mat.origin[0];
   const oy = mat.origin[1];
   const pad = cfg.respostasBoxPadPx;
-  const labelSpace = 40; // espaço pros rótulos 0-9 — RESERVADO NOS DOIS LADOS (simetria)
+  const labelSpace = cfg.matriculaSideLabelPx; // rótulos 0-9 — RESERVADO NOS DOIS LADOS (simetria)
   const hwH = 78; // altura dos quadros de escrita
   const hwGap = 24; // folga entre os quadros e o grid de bolhas
   const titleSpace = 62; // espaço acima dos quadros pro título "Matrícula"
@@ -249,7 +249,7 @@ function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
   }
   if (layout.page.matriculaBox) {
     const bh = layout.page.bubbleHeightPx;
-    const labelSpace = 40;
+    const labelSpace = layout.page.matriculaSideLabelPx;
     const pad = layout.page.respostasBoxPadPx;
     const hwTop = mat.origin[1] - bh / 2 - 24 - 78; // = oy - bh/2 - hwGap - hwH
     const gridLeft = mat.origin[0] - matBw / 2;
