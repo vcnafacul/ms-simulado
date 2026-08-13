@@ -43,7 +43,7 @@ describe('buildLayout', () => {
     expect(cols[0].fieldLabels).toEqual(['q1..20']);
   });
 
-  it('respostasEvenColumns: margem esq = vãos entre colunas = margem dir', () => {
+  it('respostasEvenColumns: margem esq = vãos entre blocos = margem dir', () => {
     const cfg = {
       ...DEFAULT_CONFIG,
       respostasEvenColumns: true,
@@ -53,10 +53,11 @@ describe('buildLayout', () => {
     const cols = m.fieldBlocks.filter((b) => b.key.startsWith('respostas_c'));
     expect(cols).toHaveLength(5);
 
+    // Bordas do BLOCO de retângulos (A left … E right), sem o número.
     const near = cfg.markerInsetPx + cfg.markerSizePx / 2;
     const usableRight = cfg.pageWidthPx - near;
     const leftEdge = (b: (typeof cols)[number]) =>
-      b.origin[0] - cfg.bubbleWidthPx / 2 - cfg.respostasNumberWidthPx;
+      b.origin[0] - cfg.bubbleWidthPx / 2;
     const rightEdge = (b: (typeof cols)[number]) =>
       b.origin[0] + 4 * cfg.respostasBubblesGap + cfg.bubbleWidthPx / 2;
 

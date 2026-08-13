@@ -21,13 +21,10 @@ export interface PageConfig {
   respostasLabelsGap: number;
   respostasBubblesGap: number;
   maxQuestionsPerColumn: number;
-  // Quando true, as colunas de respostas são distribuídas automaticamente na largura útil
-  // (caixa dos markers), com margem-esquerda = vão-entre-colunas = margem-direita. Nesse modo
-  // respostasOrigin.x e respostasColumnWidthPx são IGNORADOS (só respostasOrigin.y é usado).
+  // Quando true, os blocos de retângulos (A-E) são distribuídos automaticamente na largura
+  // útil (caixa dos markers), com margem-esquerda = vão-entre-colunas = margem-direita. Nesse
+  // modo respostasOrigin.x e respostasColumnWidthPx são IGNORADOS (só respostasOrigin.y é usado).
   respostasEvenColumns: boolean;
-  // Espaço reservado à esquerda de cada coluna pro número da questão (px). Usado só no modo
-  // respostasEvenColumns, pra o número caber no vão da coluna sem invadir a coluna anterior.
-  respostasNumberWidthPx: number;
   qrBox: { x: number; y: number; size: number };
   headerBox: { x: number; y: number; width: number; height: number };
 }
@@ -50,7 +47,6 @@ export const DEFAULT_CONFIG: PageConfig = {
   respostasBubblesGap: 92,
   maxQuestionsPerColumn: 30,
   respostasEvenColumns: false,
-  respostasNumberWidthPx: 70,
   qrBox: { x: 2000, y: 150, size: 320 },
   headerBox: { x: 150, y: 150, width: 1750, height: 560 },
 };
@@ -112,17 +108,14 @@ export function buildLayout(
   // - even: distribui na largura útil (caixa dos markers) com margem esq. = vão = margem dir.
   let columnOriginX: (c: number) => number;
   if (cfg.respostasEvenColumns) {
+    // Distribui os BLOCOS de retângulos (A-E) igualmente na largura útil:
+    // margem esquerda = vão entre blocos = margem direita. O número da questão flutua
+    // no vão à esquerda de cada bloco (como no ENEM), sem entrar na conta do espaçamento.
     const usableWidth = cfg.pageWidthPx - 2 * near;
-    const rectBlockWidth = 4 * cfg.respostasBubblesGap + cfg.bubbleWidthPx;
-    const colContentWidth = cfg.respostasNumberWidthPx + rectBlockWidth;
-    const gutter =
-      (usableWidth - numColumns * colContentWidth) / (numColumns + 1);
+    const blockWidth = 4 * cfg.respostasBubblesGap + cfg.bubbleWidthPx;
+    const gutter = (usableWidth - numColumns * blockWidth) / (numColumns + 1);
     columnOriginX = (c) =>
-      near +
-      gutter +
-      c * (colContentWidth + gutter) +
-      cfg.respostasNumberWidthPx +
-      cfg.bubbleWidthPx / 2;
+      near + gutter + c * (blockWidth + gutter) + cfg.bubbleWidthPx / 2;
   } else {
     columnOriginX = (c) =>
       cfg.respostasOrigin[0] + c * cfg.respostasColumnWidthPx;
