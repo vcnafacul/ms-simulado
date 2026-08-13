@@ -59,6 +59,24 @@ function parseRange(label: string): [number, number] {
   return [parseInt(m[1], 10), parseInt(m[2], 10)];
 }
 
+// Quebra um texto em linhas de até `maxChars` caracteres (o pdfmake não respeita `width`
+// junto com absolutePosition, então quebramos na mão e posicionamos cada linha).
+function wrapText(text: string, maxChars: number): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let cur = '';
+  for (const w of words) {
+    if (cur && (cur + ' ' + w).length > maxChars) {
+      lines.push(cur);
+      cur = w;
+    } else {
+      cur = cur ? cur + ' ' + w : w;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
 // Container de cada coluna: zebra POR LINHA (faixa cinza nas linhas pares, cobrindo a largura
 // toda: número + retângulos) + borda. Desenhado ATRÁS das bolhas (interior branco), então é só
 // decorativo — não afeta a leitura do OMR (validado). Número fica DENTRO do container.
@@ -113,33 +131,50 @@ function collectColumnBoxes(layout: LayoutModel): unknown[] {
   return out;
 }
 
+// Geometria dos quadros de escrita da matrícula (px).
+const MAT_HW_H = 78; // altura dos quadros de escrita
+const MAT_HW_GAP = 24; // folga entre os quadros e o grid de bolhas
+const MAT_TITLE_SPACE = 62; // espaço acima dos quadros pro título "Matrícula"
+
+// Limites do container da matrícula — usado pelas decorações e pra alinhar as instruções.
+function matriculaBounds(layout: LayoutModel) {
+  const cfg = layout.page;
+  const mat = layout.fieldBlocks.find((b) => b.key === 'matricula')!;
+  const bw = cfg.bubbleWidthPx;
+  const bh = cfg.bubbleHeightPx;
+  const pad = cfg.respostasBoxPadPx;
+  const labelSpace = cfg.matriculaSideLabelPx;
+  const ox = mat.origin[0];
+  const oy = mat.origin[1];
+  const gridLeft = ox - bw / 2;
+  const gridRight = ox + 7 * mat.labelsGap + bw / 2;
+  const hwTop = oy - bh / 2 - MAT_HW_GAP - MAT_HW_H;
+  return {
+    mat,
+    bw,
+    bh,
+    pad,
+    labelSpace,
+    ox,
+    oy,
+    hwTop,
+    boxLeft: gridLeft - labelSpace - pad,
+    boxRight: gridRight + labelSpace + pad,
+    boxTop: hwTop - MAT_TITLE_SPACE - pad,
+    boxBottom: oy + 9 * mat.bubblesGap + bh / 2 + pad,
+  };
+}
+
 // Matrícula com o mesmo tratamento: container + borda, zebra por linha de dígito (0-9), e uma
 // fileira de quadros em cima pro aluno ESCREVER os 8 dígitos à mão. Atrás das bolhas (brancas).
 function collectMatriculaDecorations(layout: LayoutModel): unknown[] {
   if (!layout.page.matriculaBox) return [];
-  const cfg = layout.page;
-  const mat = layout.fieldBlocks.find((b) => b.key === 'matricula');
-  if (!mat) return [];
-  const bw = cfg.bubbleWidthPx;
-  const bh = cfg.bubbleHeightPx;
+  const b = matriculaBounds(layout);
+  const { mat, bw, bh, ox, oy, hwTop, boxLeft, boxRight, boxTop, boxBottom } =
+    b;
   const nCols = 8;
   const nDigits = 10;
-  const ox = mat.origin[0];
-  const oy = mat.origin[1];
-  const pad = cfg.respostasBoxPadPx;
-  const labelSpace = cfg.matriculaSideLabelPx; // rótulos 0-9 — RESERVADO NOS DOIS LADOS (simetria)
-  const hwH = 78; // altura dos quadros de escrita
-  const hwGap = 24; // folga entre os quadros e o grid de bolhas
-  const titleSpace = 62; // espaço acima dos quadros pro título "Matrícula"
-
-  const gridLeft = ox - bw / 2;
-  const gridRight = ox + (nCols - 1) * mat.labelsGap + bw / 2;
-  const hwTop = oy - bh / 2 - hwGap - hwH;
-  // padding igual dos dois lados: gridpad = labelSpace + pad à esquerda E à direita.
-  const boxLeft = gridLeft - labelSpace - pad;
-  const boxRight = gridRight + labelSpace + pad;
-  const boxTop = hwTop - titleSpace - pad;
-  const boxBottom = oy + (nDigits - 1) * mat.bubblesGap + bh / 2 + pad;
+  const hwH = MAT_HW_H;
 
   const out: unknown[] = [];
   // zebra por linha de dígito (1,3,5,7,9 cinza), cobrindo a largura toda do container
@@ -180,6 +215,28 @@ function collectMatriculaDecorations(layout: LayoutModel): unknown[] {
     lineWidth: 1,
   });
   return out;
+}
+
+const INSTR_GAP = 60; // vão entre a matrícula, as instruções e o QR
+
+// Borda do container de instruções, à direita da matrícula (topo/base alinhados), antes do QR.
+function collectInstructionsBox(layout: LayoutModel): unknown[] {
+  if (!layout.page.instructionsBox || !layout.page.matriculaBox) return [];
+  const b = matriculaBounds(layout);
+  const left = b.boxRight + INSTR_GAP;
+  const right = layout.page.qrBox.x - INSTR_GAP;
+  if (right - left < 200) return []; // não cabe entre a matrícula e o QR
+  return [
+    {
+      type: 'rect',
+      x: pt(left),
+      y: pt(b.boxTop),
+      w: pt(right - left),
+      h: pt(b.boxBottom - b.boxTop),
+      lineColor: '#bdbdbd',
+      lineWidth: 1,
+    },
+  ];
 }
 
 function collectBubbleShapes(layout: LayoutModel): unknown[] {
@@ -318,6 +375,54 @@ function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
     });
   }
 
+  // Instruções: título + lista numerada (quebra de linha na mão), dentro do container à
+  // direita da matrícula.
+  if (layout.page.instructionsBox && layout.page.matriculaBox) {
+    const mb = matriculaBounds(layout);
+    const left = mb.boxRight + INSTR_GAP;
+    const right = layout.page.qrBox.x - INSTR_GAP;
+    if (right - left >= 200) {
+      const innerPad = 26;
+      const font = 10;
+      const lineH = (font * 1.4) / K; // altura de linha (px)
+      const numIndent = 48; // recuo do texto após o "N." (px)
+      const textX = left + innerPad + numIndent;
+      const innerW = right - left - 2 * innerPad - numIndent;
+      const maxChars = Math.floor((innerW * K) / (font * 0.48)); // estimativa
+      const instrs = [
+        'Busque escrever o nome com letra legível, de preferência de forma.',
+        'Preencha as bolhas completamente, com caneta esferográfica preta. Não use lápis nem caneta de outra cor.',
+        'O cartão-resposta é o único documento usado para a correção do simulado. Não amasse, não dobre nem rasure.',
+      ];
+      items.push({
+        text: 'Instruções',
+        absolutePosition: {
+          x: pt(left + innerPad),
+          y: pt(mb.boxTop + innerPad),
+        },
+        fontSize: 12,
+        bold: true,
+      });
+      let y = mb.boxTop + innerPad + 52;
+      instrs.forEach((txt, idx) => {
+        const lines = wrapText(txt, maxChars);
+        items.push({
+          text: `${idx + 1}.`,
+          absolutePosition: { x: pt(left + innerPad), y: pt(y) },
+          fontSize: font,
+        });
+        lines.forEach((ln, li) => {
+          items.push({
+            text: ln,
+            absolutePosition: { x: pt(textX), y: pt(y + li * lineH) },
+            fontSize: font,
+          });
+        });
+        y += lines.length * lineH + lineH * 0.55; // respiro entre itens
+      });
+    }
+  }
+
   // Respostas: option letters (A-E) on top, question numbers on the side
   const OPT_FONT = 8;
   const OPT_LABEL_GAP_PT = 4; // respiro entre o rótulo A-E e o topo do 1º retângulo
@@ -391,6 +496,7 @@ export async function buildCartaoPdf(
         canvas: [
           ...collectColumnBoxes(layout),
           ...collectMatriculaDecorations(layout),
+          ...collectInstructionsBox(layout),
           ...collectHeaderShapes(layout),
           ...collectBubbleShapes(layout),
         ],

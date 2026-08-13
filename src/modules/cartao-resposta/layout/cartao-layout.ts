@@ -43,6 +43,9 @@ export interface PageConfig {
   // Quando true (+ respostasEvenColumns), a borda esquerda do container da matrícula é
   // alinhada com a borda esquerda do 1º container de respostas. Ignora matriculaOrigin.x.
   matriculaAlignRespostas: boolean;
+  // Quando true (+ matriculaBox), desenha um container de instruções à direita da matrícula
+  // (alinhado no topo/base), entre a matrícula e o QR. Puramente visual.
+  instructionsBox: boolean;
   qrBox: { x: number; y: number; size: number };
   headerBox: { x: number; y: number; width: number; height: number };
 }
@@ -71,6 +74,7 @@ export const DEFAULT_CONFIG: PageConfig = {
   matriculaBox: false,
   matriculaSideLabelPx: 40,
   matriculaAlignRespostas: false,
+  instructionsBox: false,
   qrBox: { x: 2000, y: 150, size: 320 },
   headerBox: { x: 150, y: 150, width: 1750, height: 560 },
 };
