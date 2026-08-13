@@ -1,4 +1,4 @@
-import { buildLayout } from './cartao-layout';
+import { buildLayout, DEFAULT_CONFIG } from './cartao-layout';
 
 describe('buildLayout', () => {
   it('matrícula: 1 fieldBlock QTYPE_INT com 8 labels m1..m8', () => {
@@ -41,6 +41,33 @@ describe('buildLayout', () => {
     const cols = m.fieldBlocks.filter((b) => b.key.startsWith('respostas_c'));
     expect(cols).toHaveLength(1);
     expect(cols[0].fieldLabels).toEqual(['q1..20']);
+  });
+
+  it('respostasEvenColumns: margem esq = vãos entre colunas = margem dir', () => {
+    const cfg = {
+      ...DEFAULT_CONFIG,
+      respostasEvenColumns: true,
+      maxQuestionsPerColumn: 18,
+    };
+    const m = buildLayout(90, cfg);
+    const cols = m.fieldBlocks.filter((b) => b.key.startsWith('respostas_c'));
+    expect(cols).toHaveLength(5);
+
+    const near = cfg.markerInsetPx + cfg.markerSizePx / 2;
+    const usableRight = cfg.pageWidthPx - near;
+    const leftEdge = (b: (typeof cols)[number]) =>
+      b.origin[0] - cfg.bubbleWidthPx / 2 - cfg.respostasNumberWidthPx;
+    const rightEdge = (b: (typeof cols)[number]) =>
+      b.origin[0] + 4 * cfg.respostasBubblesGap + cfg.bubbleWidthPx / 2;
+
+    const marginLeft = leftEdge(cols[0]) - near;
+    const marginRight = usableRight - rightEdge(cols[cols.length - 1]);
+    const gutters = cols
+      .slice(1)
+      .map((b, i) => leftEdge(b) - rightEdge(cols[i]));
+
+    gutters.forEach((g) => expect(g).toBeCloseTo(marginLeft, 5));
+    expect(marginRight).toBeCloseTo(marginLeft, 5);
   });
 
   it('4 markers nos cantos', () => {
