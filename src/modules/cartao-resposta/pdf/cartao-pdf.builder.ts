@@ -123,7 +123,9 @@ function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
 
   // Respostas: option letters (A-E) on top, question numbers on the side
   const OPT_FONT = 8;
-  const OPT_LABEL_GAP_PT = 4; // respiro entre o rótulo e o topo do 1º retângulo
+  const OPT_LABEL_GAP_PT = 4; // respiro entre o rótulo A-E e o topo do 1º retângulo
+  const NUM_GAP_PT = 6; // respiro entre o número da questão e a borda esq. da 1ª marca
+  const NUM_CHAR_PT = OPT_FONT * 0.58; // largura aprox. de um dígito em pt (fonte 8)
   layout.fieldBlocks
     .filter((b) => b.key.startsWith('respostas_c'))
     .forEach((b) => {
@@ -141,12 +143,21 @@ function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
           fontSize: OPT_FONT,
         });
       });
+      // "Alinha à direita" na mão: a borda esq. da 1ª marca menos o respiro é onde o número
+      // termina; recuo o x pela largura estimada do texto, pra 1 ou 2 dígitos ficarem à
+      // mesma distância do retângulo. (alignment/width não valem com absolutePosition.)
+      const numRightPt =
+        pt(b.origin[0] - layout.page.bubbleWidthPx / 2) - NUM_GAP_PT;
       for (let q = first; q <= last; q++) {
         const c = layout.bubbleCenter(b.key, q - first, 0);
+        const label = String(q);
         items.push({
-          text: String(q),
-          absolutePosition: { x: pt(b.origin[0] - 70), y: pt(c.y - 12) },
-          fontSize: 8,
+          text: label,
+          absolutePosition: {
+            x: numRightPt - label.length * NUM_CHAR_PT,
+            y: pt(c.y - 12),
+          },
+          fontSize: OPT_FONT,
         });
       }
     });
