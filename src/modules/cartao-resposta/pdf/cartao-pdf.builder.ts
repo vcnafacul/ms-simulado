@@ -112,7 +112,7 @@ function collectMatriculaDecorations(layout: LayoutModel): unknown[] {
   const ox = mat.origin[0];
   const oy = mat.origin[1];
   const pad = cfg.respostasBoxPadPx;
-  const labelSpace = 42; // espaço pros rótulos 0-9 à esquerda
+  const labelSpace = 40; // espaço pros rótulos 0-9 — RESERVADO NOS DOIS LADOS (simetria)
   const hwH = 78; // altura dos quadros de escrita
   const hwGap = 24; // folga entre os quadros e o grid de bolhas
   const titleSpace = 62; // espaço acima dos quadros pro título "Matrícula"
@@ -120,8 +120,9 @@ function collectMatriculaDecorations(layout: LayoutModel): unknown[] {
   const gridLeft = ox - bw / 2;
   const gridRight = ox + (nCols - 1) * mat.labelsGap + bw / 2;
   const hwTop = oy - bh / 2 - hwGap - hwH;
+  // padding igual dos dois lados: gridpad = labelSpace + pad à esquerda E à direita.
   const boxLeft = gridLeft - labelSpace - pad;
-  const boxRight = gridRight + pad;
+  const boxRight = gridRight + labelSpace + pad;
   const boxTop = hwTop - titleSpace - pad;
   const boxBottom = oy + (nDigits - 1) * mat.bubblesGap + bh / 2 + pad;
 
@@ -235,8 +236,9 @@ function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
     width: pt(layout.page.headerBox.width),
   });
 
-  // Matrícula digit labels (0-9 on the side)
+  // Matrícula digit labels (0-9 à esquerda; e também à direita quando o container está ligado)
   const mat = layout.fieldBlocks.find((b) => b.key === 'matricula')!;
+  const matBw = layout.page.bubbleWidthPx;
   for (let j = 0; j < 10; j++) {
     const c = layout.bubbleCenter('matricula', 0, j);
     items.push({
@@ -245,17 +247,37 @@ function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
       fontSize: 8,
     });
   }
-  // Título da matrícula acima dos quadros de escrita (quando o container está ligado)
   if (layout.page.matriculaBox) {
     const bh = layout.page.bubbleHeightPx;
+    const labelSpace = 40;
+    const pad = layout.page.respostasBoxPadPx;
     const hwTop = mat.origin[1] - bh / 2 - 24 - 78; // = oy - bh/2 - hwGap - hwH
+    const gridLeft = mat.origin[0] - matBw / 2;
+    const gridRight = mat.origin[0] + 7 * mat.labelsGap + matBw / 2;
+    const boxLeft = gridLeft - labelSpace - pad;
+    const boxRight = gridRight + labelSpace + pad;
+    // rótulos 0-9 espelhados à direita
+    for (let j = 0; j < 10; j++) {
+      const c = layout.bubbleCenter('matricula', 7, j);
+      items.push({
+        text: String(j),
+        absolutePosition: { x: pt(c.x + matBw / 2 + 12), y: pt(c.y - 12) },
+        fontSize: 8,
+      });
+    }
+    // título centralizado sobre o container — centralizado NA MÃO (largura/alignment não
+    // funcionam com absolutePosition no pdfmake), estimando a largura do texto.
+    const titleText = 'Código de Matrícula';
+    const titleFont = 9;
+    const titleWidthPx = (titleText.length * titleFont * 0.52) / K; // estimativa (bold)
+    const boxCenterPx = (boxLeft + boxRight) / 2;
     items.push({
-      text: 'MATRÍCULA — escreva e preencha',
+      text: titleText,
       absolutePosition: {
-        x: pt(mat.origin[0] - layout.page.bubbleWidthPx / 2 - 42),
+        x: pt(boxCenterPx - titleWidthPx / 2),
         y: pt(hwTop - 52),
       },
-      fontSize: 9,
+      fontSize: titleFont,
       bold: true,
     });
   }
