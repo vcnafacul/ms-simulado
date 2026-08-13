@@ -44,6 +44,47 @@ function parseRange(label: string): [number, number] {
   return [parseInt(m[1], 10), parseInt(m[2], 10)];
 }
 
+// Fundo cinza (zebra) + borda em volta de cada coluna de respostas. Desenhado ATRÁS das
+// bolhas (que têm interior branco), então é só decorativo — não afeta a leitura do OMR.
+function collectColumnBoxes(layout: LayoutModel): unknown[] {
+  if (!layout.page.respostasColumnBox) return [];
+  const bw = layout.page.bubbleWidthPx;
+  const bh = layout.page.bubbleHeightPx;
+  const padX = 12; // folga lateral da caixa (px)
+  const padTop = 78; // folga acima da 1ª linha (px) — cobre o cabeçalho A-E
+  const padBottom = 14; // folga abaixo da última linha (px)
+  const out: unknown[] = [];
+  const cols = layout.fieldBlocks.filter((b) =>
+    b.key.startsWith('respostas_c'),
+  );
+  cols.forEach((b, idx) => {
+    const [first, last] = parseRange(b.fieldLabels[0]);
+    const nRows = last - first + 1;
+    const left = b.origin[0] - bw / 2 - padX;
+    const right = b.origin[0] + 4 * b.bubblesGap + bw / 2 + padX;
+    const top = b.origin[1] - bh / 2 - padTop;
+    const bottom = b.origin[1] + (nRows - 1) * b.labelsGap + bh / 2 + padBottom;
+    const box = {
+      x: pt(left),
+      y: pt(top),
+      w: pt(right - left),
+      h: pt(bottom - top),
+    };
+    // fundo cinza claro nas colunas alternadas (2ª, 4ª…)
+    if (idx % 2 === 1) {
+      out.push({ type: 'rect', ...box, color: '#ededed' });
+    }
+    // borda em todas as colunas
+    out.push({
+      type: 'rect',
+      ...box,
+      lineColor: '#bdbdbd',
+      lineWidth: 1,
+    });
+  });
+  return out;
+}
+
 function collectBubbleShapes(layout: LayoutModel): unknown[] {
   const shape = layout.page.bubbleShape;
   const w = pt(layout.page.bubbleWidthPx);
@@ -52,6 +93,7 @@ function collectBubbleShapes(layout: LayoutModel): unknown[] {
 
   // A marca (círculo ou retângulo) ocupa exatamente a caixa bubbleWidth × bubbleHeight,
   // centrada no ponto que o OMR amostra — desenho e leitura sempre casados.
+  // Interior BRANCO (color: 'white') pra o OMR ler branco-vs-preto mesmo com fundo cinza atrás.
   const drawShape = (cx: number, cy: number) =>
     shape === 'rect'
       ? {
@@ -62,6 +104,7 @@ function collectBubbleShapes(layout: LayoutModel): unknown[] {
           h,
           lineWidth: 1,
           lineColor: '#000000',
+          color: 'white',
         }
       : {
           type: 'ellipse',
@@ -71,6 +114,7 @@ function collectBubbleShapes(layout: LayoutModel): unknown[] {
           r2: h / 2,
           lineWidth: 1,
           lineColor: '#000000',
+          color: 'white',
         };
 
   const draw = (fieldKey: string, nLabels: number, nValues: number) => {
@@ -190,7 +234,8 @@ export async function buildCartaoPdf(
     pageMargins: [0, 0, 0, 0] as [number, number, number, number],
     content: [
       {
-        canvas: collectBubbleShapes(layout),
+        // fundos/bordas das colunas primeiro (atrás), depois as bolhas (interior branco).
+        canvas: [...collectColumnBoxes(layout), ...collectBubbleShapes(layout)],
         absolutePosition: { x: 0, y: 0 },
       },
       {

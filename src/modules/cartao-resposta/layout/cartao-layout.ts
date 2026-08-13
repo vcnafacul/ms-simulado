@@ -25,6 +25,10 @@ export interface PageConfig {
   // útil (caixa dos markers), com margem-esquerda = vão-entre-colunas = margem-direita. Nesse
   // modo respostasOrigin.x e respostasColumnWidthPx são IGNORADOS (só respostasOrigin.y é usado).
   respostasEvenColumns: boolean;
+  // Quando true, desenha uma borda em volta de cada coluna de respostas e um fundo cinza
+  // claro nas colunas alternadas (zebra). É puramente visual (PDF) — não entra no template.json.
+  // O interior de cada retângulo continua branco, então o OMR lê branco-vs-preto sem interferência.
+  respostasColumnBox: boolean;
   qrBox: { x: number; y: number; size: number };
   headerBox: { x: number; y: number; width: number; height: number };
 }
@@ -47,6 +51,7 @@ export const DEFAULT_CONFIG: PageConfig = {
   respostasBubblesGap: 92,
   maxQuestionsPerColumn: 30,
   respostasEvenColumns: false,
+  respostasColumnBox: false,
   qrBox: { x: 2000, y: 150, size: 320 },
   headerBox: { x: 150, y: 150, width: 1750, height: 560 },
 };
