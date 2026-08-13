@@ -52,10 +52,32 @@ o código do OMRChecker vendorizado, não por tentativa e erro:
 - Foto reta (sem perspectiva acentuada) ou scanner a **≥ 200 dpi**.
 - Preencher a bolha **completamente** (o círculo inteiro), caneta escura.
 
-## Taxa de acerto real (preencher após impressão/foto manual)
+## Taxa de acerto real (impressão + foto manual)
 
-| Amostra | Captura | Matrícula OK? | Respostas OK? | Observações |
+Primeiro teste real — cartão impresso (5 colunas × 18, bolhas redondas), preenchido à mão
+com caneta preta e **fotografado com celular** (com perspectiva/inclinação):
+
+| Amostra | Captura | Matrícula | Respostas | Observações |
 |---|---|---|---|---|
-| _(a preencher)_ | scan / foto | | | |
+| 2026-08-13 | foto celular | `20260001` ✓ | ~100% ✓ | perspectiva corrigida pelos markers; dupla marcação (q39 A+E) detectada corretamente; coluna toda-C lida certa |
+
+**Conclusão:** pipeline ponta-a-ponta validado (gerador → impressão → preenchimento → foto → `run_omr`).
+Foto de celular com perspectiva foi corrigida pelos 4 markers. Matrícula e respostas visíveis batem
+com a leitura.
+
+## ⚠️ Bug de layout achado no teste: coluna 5 encosta no limite dos markers
+
+A distribuição `respostasEvenColumns` espalha as colunas pela **largura da página inteira**, mas os
+markers ficam a `near = markerInset + markerSize/2` da borda. Com `respostasBubblesGap` largo, a caixa
+de amostragem da alternativa E da **coluna 5** ultrapassa a caixa dos markers (`pageDimensions`), e o
+OMRChecker **recusa o template** (`Overflowing field block 'respostas_c5'`).
+
+- **Workaround no teste:** reduzir `bubbleDimensions` no template.json (40→24) — cabe sem mexer nas
+  posições. Só pra destravar a leitura deste cartão já impresso.
+- **Correção pro config (reimpressão):** reduzir `respostasBubblesGap` (ex.: **75 → 64**) → dá ~22px de
+  folga e o gerador para de avisar. (Reduzir markerSize quase não ajuda; bubble menor idem — o que
+  puxa a coluna 5 pra dentro é o gap A–E menor.)
+- **Correção arquitetural (futuro):** distribuir as colunas dentro da **caixa dos markers**, não da
+  página inteira, garantindo que nada caia no/além do marker. Trade-off com "margem da página = vão".
 
 > Calibração fina por categoria (N real, ajuste de bolha/gaps contra prints reais) = Ticket A.
