@@ -217,22 +217,43 @@ function collectMatriculaDecorations(layout: LayoutModel): unknown[] {
   return out;
 }
 
-const INSTR_GAP = 60; // vão entre a matrícula, as instruções e o QR
+const INSTR_GAP = 60; // vão entre a matrícula e as instruções
 
-// Borda do container de instruções, à direita da matrícula (topo/base alinhados), antes do QR.
+// Limites do container de instruções: à direita da matrícula, topo/base alinhados com ela,
+// e a borda DIREITA alinhada com a borda direita do último container de respostas.
+function instructionsBounds(layout: LayoutModel) {
+  const cfg = layout.page;
+  const mb = matriculaBounds(layout);
+  const respCols = layout.fieldBlocks.filter((b) =>
+    b.key.startsWith('respostas_c'),
+  );
+  const last = respCols[respCols.length - 1];
+  const right = last
+    ? last.origin[0] +
+      4 * last.bubblesGap +
+      cfg.bubbleWidthPx / 2 +
+      cfg.respostasBoxPadPx
+    : cfg.qrBox.x - INSTR_GAP;
+  return {
+    left: mb.boxRight + INSTR_GAP,
+    right,
+    top: mb.boxTop,
+    bottom: mb.boxBottom,
+  };
+}
+
+// Borda do container de instruções, à direita da matrícula.
 function collectInstructionsBox(layout: LayoutModel): unknown[] {
   if (!layout.page.instructionsBox || !layout.page.matriculaBox) return [];
-  const b = matriculaBounds(layout);
-  const left = b.boxRight + INSTR_GAP;
-  const right = layout.page.qrBox.x - INSTR_GAP;
-  if (right - left < 200) return []; // não cabe entre a matrícula e o QR
+  const b = instructionsBounds(layout);
+  if (b.right - b.left < 200) return [];
   return [
     {
       type: 'rect',
-      x: pt(left),
-      y: pt(b.boxTop),
-      w: pt(right - left),
-      h: pt(b.boxBottom - b.boxTop),
+      x: pt(b.left),
+      y: pt(b.top),
+      w: pt(b.right - b.left),
+      h: pt(b.bottom - b.top),
       lineColor: '#bdbdbd',
       lineWidth: 1,
     },
@@ -378,47 +399,63 @@ function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
   // Instruções: título + lista numerada (quebra de linha na mão), dentro do container à
   // direita da matrícula.
   if (layout.page.instructionsBox && layout.page.matriculaBox) {
-    const mb = matriculaBounds(layout);
-    const left = mb.boxRight + INSTR_GAP;
-    const right = layout.page.qrBox.x - INSTR_GAP;
-    if (right - left >= 200) {
-      const innerPad = 26;
+    const ib = instructionsBounds(layout);
+    if (ib.right - ib.left >= 200) {
+      const padL = 30; // padding interno esquerdo
+      const padR = 55; // padding interno direito (espaço entre texto e a borda do container)
+      const numIndent = 48; // recuo do texto após o "N." (px)
       const font = 10;
       const lineH = (font * 1.4) / K; // altura de linha (px)
-      const numIndent = 48; // recuo do texto após o "N." (px)
-      const textX = left + innerPad + numIndent;
-      const innerW = right - left - 2 * innerPad - numIndent;
+      const textX = ib.left + padL + numIndent;
+      const innerW = ib.right - ib.left - padL - numIndent - padR;
       const maxChars = Math.floor((innerW * K) / (font * 0.48)); // estimativa
-      const instrs = [
-        'Busque escrever o nome com letra legível, de preferência de forma.',
-        'Preencha as bolhas completamente, com caneta esferográfica preta. Não use lápis nem caneta de outra cor.',
-        'O cartão-resposta é o único documento usado para a correção do simulado. Não amasse, não dobre nem rasure.',
+      const instrs: { text: string; bold?: string }[] = [
+        {
+          text: 'Busque escrever o nome com letra legível, de preferência de forma.',
+        },
+        {
+          text: 'Preencha as bolhas completamente, com caneta esferográfica preta. Não use lápis nem caneta de outra cor.',
+        },
+        {
+          text: 'O cartão-resposta é o único documento usado para a correção do simulado. Não amasse, não dobre nem rasure.',
+          bold: 'cartão-resposta',
+        },
       ];
       items.push({
         text: 'Instruções',
         absolutePosition: {
-          x: pt(left + innerPad),
-          y: pt(mb.boxTop + innerPad),
+          x: pt(ib.left + padL),
+          y: pt(ib.top + padL),
         },
-        fontSize: 12,
+        fontSize: 13,
         bold: true,
       });
-      let y = mb.boxTop + innerPad + 52;
-      instrs.forEach((txt, idx) => {
-        const lines = wrapText(txt, maxChars);
+      let y = ib.top + padL + 76; // mais espaço entre o título e os itens
+      instrs.forEach((instr, idx) => {
+        const lines = wrapText(instr.text, maxChars);
         items.push({
           text: `${idx + 1}.`,
-          absolutePosition: { x: pt(left + innerPad), y: pt(y) },
+          absolutePosition: { x: pt(ib.left + padL), y: pt(y) },
           fontSize: font,
         });
         lines.forEach((ln, li) => {
+          // negrito na palavra pedida (fica inteira numa linha, sem espaço interno)
+          let content: unknown = ln;
+          if (instr.bold && ln.includes(instr.bold)) {
+            const i = ln.indexOf(instr.bold);
+            content = [
+              { text: ln.slice(0, i) },
+              { text: instr.bold, bold: true },
+              { text: ln.slice(i + instr.bold.length) },
+            ];
+          }
           items.push({
-            text: ln,
+            text: content,
             absolutePosition: { x: pt(textX), y: pt(y + li * lineH) },
             fontSize: font,
           });
         });
-        y += lines.length * lineH + lineH * 0.55; // respiro entre itens
+        y += lines.length * lineH + lineH * 0.75; // mais respiro entre itens
       });
     }
   }
