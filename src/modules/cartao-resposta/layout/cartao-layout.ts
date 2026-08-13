@@ -26,9 +26,14 @@ export interface PageConfig {
   // modo respostasOrigin.x e respostasColumnWidthPx são IGNORADOS (só respostasOrigin.y é usado).
   respostasEvenColumns: boolean;
   // Quando true, desenha uma borda em volta de cada coluna de respostas e um fundo cinza
-  // claro nas colunas alternadas (zebra). É puramente visual (PDF) — não entra no template.json.
-  // O interior de cada retângulo continua branco, então o OMR lê branco-vs-preto sem interferência.
+  // claro ALTERNANDO POR LINHA (zebra: 2ª, 4ª, 6ª linha…). É puramente visual (PDF) — não
+  // entra no template.json. O interior de cada retângulo continua branco, então o OMR lê
+  // branco-vs-preto sem interferência.
   respostasColumnBox: boolean;
+  // Largura reservada (px) pro número da questão DENTRO do container, à esquerda dos retângulos.
+  respostasNumberWidthPx: number;
+  // Padding lateral interno do container (px), igual dos dois lados (esquerda = direita).
+  respostasBoxPadPx: number;
   qrBox: { x: number; y: number; size: number };
   headerBox: { x: number; y: number; width: number; height: number };
 }
@@ -52,6 +57,8 @@ export const DEFAULT_CONFIG: PageConfig = {
   maxQuestionsPerColumn: 30,
   respostasEvenColumns: false,
   respostasColumnBox: false,
+  respostasNumberWidthPx: 68,
+  respostasBoxPadPx: 20,
   qrBox: { x: 2000, y: 150, size: 320 },
   headerBox: { x: 150, y: 150, width: 1750, height: 560 },
 };
@@ -113,16 +120,22 @@ export function buildLayout(
   // - even: distribui na largura útil (caixa dos markers) com margem esq. = vão = margem dir.
   let columnOriginX: (c: number) => number;
   if (cfg.respostasEvenColumns) {
-    // Distribui os BLOCOS de retângulos (A-E) igualmente sobre a LARGURA DA PÁGINA INTEIRA:
-    // margem-esquerda (borda da página → 1º bloco) = vão entre blocos = margem-direita.
-    // O número da questão flutua no vão à esquerda de cada bloco (como no ENEM).
+    // Distribui os CONTAINERS (padding + número + retângulos + padding) igualmente sobre a
+    // LARGURA DA PÁGINA INTEIRA: margem-esquerda (borda → 1º container) = vão entre containers
+    // = margem-direita. O número fica DENTRO do container, à esquerda dos retângulos.
     // Atenção: os retângulos precisam cair dentro da caixa dos markers (senão o OMR corta);
-    // se os markers forem afastados demais pro vão calculado, o script avisa (warnIfOverflow).
+    // se os markers forem afastados demais, o script avisa (warnIfOverflow).
     const blockWidth = 4 * cfg.respostasBubblesGap + cfg.bubbleWidthPx;
+    const containerWidth =
+      2 * cfg.respostasBoxPadPx + cfg.respostasNumberWidthPx + blockWidth;
     const gutter =
-      (cfg.pageWidthPx - numColumns * blockWidth) / (numColumns + 1);
+      (cfg.pageWidthPx - numColumns * containerWidth) / (numColumns + 1);
     columnOriginX = (c) =>
-      gutter + c * (blockWidth + gutter) + cfg.bubbleWidthPx / 2;
+      gutter +
+      c * (containerWidth + gutter) +
+      cfg.respostasBoxPadPx +
+      cfg.respostasNumberWidthPx +
+      cfg.bubbleWidthPx / 2;
   } else {
     columnOriginX = (c) =>
       cfg.respostasOrigin[0] + c * cfg.respostasColumnWidthPx;

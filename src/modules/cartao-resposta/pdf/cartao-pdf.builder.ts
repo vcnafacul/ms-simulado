@@ -44,40 +44,53 @@ function parseRange(label: string): [number, number] {
   return [parseInt(m[1], 10), parseInt(m[2], 10)];
 }
 
-// Fundo cinza (zebra) + borda em volta de cada coluna de respostas. Desenhado ATRÁS das
-// bolhas (que têm interior branco), então é só decorativo — não afeta a leitura do OMR.
+// Container de cada coluna: zebra POR LINHA (faixa cinza nas linhas pares, cobrindo a largura
+// toda: número + retângulos) + borda. Desenhado ATRÁS das bolhas (interior branco), então é só
+// decorativo — não afeta a leitura do OMR (validado). Número fica DENTRO do container.
 function collectColumnBoxes(layout: LayoutModel): unknown[] {
   if (!layout.page.respostasColumnBox) return [];
-  const bw = layout.page.bubbleWidthPx;
-  const bh = layout.page.bubbleHeightPx;
-  const padX = 12; // folga lateral da caixa (px)
+  const cfg = layout.page;
+  const bw = cfg.bubbleWidthPx;
+  const bh = cfg.bubbleHeightPx;
   const padTop = 78; // folga acima da 1ª linha (px) — cobre o cabeçalho A-E
   const padBottom = 14; // folga abaixo da última linha (px)
   const out: unknown[] = [];
   const cols = layout.fieldBlocks.filter((b) =>
     b.key.startsWith('respostas_c'),
   );
-  cols.forEach((b, idx) => {
+  cols.forEach((b) => {
     const [first, last] = parseRange(b.fieldLabels[0]);
     const nRows = last - first + 1;
-    const left = b.origin[0] - bw / 2 - padX;
-    const right = b.origin[0] + 4 * b.bubblesGap + bw / 2 + padX;
+    // container: [padding][número][retângulos][padding] — padding igual dos dois lados.
+    const left =
+      b.origin[0] - bw / 2 - cfg.respostasNumberWidthPx - cfg.respostasBoxPadPx;
+    const right =
+      b.origin[0] + 4 * b.bubblesGap + bw / 2 + cfg.respostasBoxPadPx;
     const top = b.origin[1] - bh / 2 - padTop;
     const bottom = b.origin[1] + (nRows - 1) * b.labelsGap + bh / 2 + padBottom;
-    const box = {
+
+    // zebra por linha: faixa cinza nas linhas pares (2ª, 4ª… = índice ímpar), largura toda,
+    // limitada ao interior do container.
+    for (let i = 1; i < nRows; i += 2) {
+      const rowCy = b.origin[1] + i * b.labelsGap;
+      const stripeTop = Math.max(top, rowCy - b.labelsGap / 2);
+      const stripeBottom = Math.min(bottom, rowCy + b.labelsGap / 2);
+      out.push({
+        type: 'rect',
+        x: pt(left),
+        y: pt(stripeTop),
+        w: pt(right - left),
+        h: pt(stripeBottom - stripeTop),
+        color: '#ededed',
+      });
+    }
+    // borda do container por cima das faixas
+    out.push({
+      type: 'rect',
       x: pt(left),
       y: pt(top),
       w: pt(right - left),
       h: pt(bottom - top),
-    };
-    // fundo cinza claro nas colunas alternadas (2ª, 4ª…)
-    if (idx % 2 === 1) {
-      out.push({ type: 'rect', ...box, color: '#ededed' });
-    }
-    // borda em todas as colunas
-    out.push({
-      type: 'rect',
-      ...box,
       lineColor: '#bdbdbd',
       lineWidth: 1,
     });

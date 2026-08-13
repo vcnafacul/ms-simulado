@@ -43,22 +43,30 @@ describe('buildLayout', () => {
     expect(cols[0].fieldLabels).toEqual(['q1..20']);
   });
 
-  it('respostasEvenColumns: margem esq = vãos entre blocos = margem dir', () => {
+  it('respostasEvenColumns: margem esq = vãos entre containers = margem dir', () => {
     const cfg = {
       ...DEFAULT_CONFIG,
       respostasEvenColumns: true,
       maxQuestionsPerColumn: 18,
+      bubbleWidthPx: 46,
+      respostasBubblesGap: 66,
     };
     const m = buildLayout(90, cfg);
     const cols = m.fieldBlocks.filter((b) => b.key.startsWith('respostas_c'));
     expect(cols).toHaveLength(5);
 
-    // Bordas do BLOCO de retângulos (A left … E right), sem o número. As margens são
-    // medidas da BORDA DA PÁGINA (x=0 … pageWidthPx), que é o que o olho vê.
+    // Bordas do CONTAINER (padding + número + retângulos + padding), medidas da BORDA DA
+    // PÁGINA (x=0 … pageWidthPx) — é o container que é distribuído igualmente.
     const leftEdge = (b: (typeof cols)[number]) =>
-      b.origin[0] - cfg.bubbleWidthPx / 2;
+      b.origin[0] -
+      cfg.bubbleWidthPx / 2 -
+      cfg.respostasNumberWidthPx -
+      cfg.respostasBoxPadPx;
     const rightEdge = (b: (typeof cols)[number]) =>
-      b.origin[0] + 4 * cfg.respostasBubblesGap + cfg.bubbleWidthPx / 2;
+      b.origin[0] +
+      4 * cfg.respostasBubblesGap +
+      cfg.bubbleWidthPx / 2 +
+      cfg.respostasBoxPadPx;
 
     const marginLeft = leftEdge(cols[0]) - 0;
     const marginRight = cfg.pageWidthPx - rightEdge(cols[cols.length - 1]);
