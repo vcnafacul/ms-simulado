@@ -11,8 +11,9 @@
     }
   },
   "layout": {
-    "bubbleWidthPx": 60,
-    "bubbleHeightPx": 60,
+    "bubbleShape": "rect",
+    "bubbleWidthPx": 66,
+    "bubbleHeightPx": 22,
     "matriculaOrigin": [340, 900],
     "matriculaLabelsGap": 95,
     "matriculaBubblesGap": 78,

@@ -44,23 +44,40 @@ function parseRange(label: string): [number, number] {
   return [parseInt(m[1], 10), parseInt(m[2], 10)];
 }
 
-function collectBubbleEllipses(layout: LayoutModel): unknown[] {
-  const r = pt(layout.page.bubbleWidthPx / 2);
+function collectBubbleShapes(layout: LayoutModel): unknown[] {
+  const shape = layout.page.bubbleShape;
+  const w = pt(layout.page.bubbleWidthPx);
+  const h = pt(layout.page.bubbleHeightPx);
   const out: unknown[] = [];
+
+  // A marca (círculo ou retângulo) ocupa exatamente a caixa bubbleWidth × bubbleHeight,
+  // centrada no ponto que o OMR amostra — desenho e leitura sempre casados.
+  const drawShape = (cx: number, cy: number) =>
+    shape === 'rect'
+      ? {
+          type: 'rect',
+          x: cx - w / 2,
+          y: cy - h / 2,
+          w,
+          h,
+          lineWidth: 1,
+          lineColor: '#000000',
+        }
+      : {
+          type: 'ellipse',
+          x: cx,
+          y: cy,
+          r1: w / 2,
+          r2: h / 2,
+          lineWidth: 1,
+          lineColor: '#000000',
+        };
 
   const draw = (fieldKey: string, nLabels: number, nValues: number) => {
     for (let i = 0; i < nLabels; i++) {
       for (let j = 0; j < nValues; j++) {
         const c = layout.bubbleCenter(fieldKey, i, j);
-        out.push({
-          type: 'ellipse',
-          x: pt(c.x),
-          y: pt(c.y),
-          r1: r,
-          r2: r,
-          lineWidth: 1,
-          lineColor: '#000000',
-        });
+        out.push(drawShape(pt(c.x), pt(c.y)));
       }
     }
   };
@@ -84,7 +101,7 @@ function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
 
   // Header text
   items.push({
-    text: `${header.nomeSimulado} — ${header.nomeProva}\n${header.nomeCursinho}\nPreencha completamente o círculo. Nome do aluno: ____________________`,
+    text: `${header.nomeSimulado} — ${header.nomeProva}\n${header.nomeCursinho}\nPreencha completamente a alternativa. Nome do aluno: ____________________`,
     absolutePosition: {
       x: pt(layout.page.headerBox.x),
       y: pt(layout.page.headerBox.y),
@@ -155,7 +172,7 @@ export async function buildCartaoPdf(
     pageMargins: [0, 0, 0, 0] as [number, number, number, number],
     content: [
       {
-        canvas: collectBubbleEllipses(layout),
+        canvas: collectBubbleShapes(layout),
         absolutePosition: { x: 0, y: 0 },
       },
       {

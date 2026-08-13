@@ -1,9 +1,16 @@
+export type BubbleShape = 'circle' | 'rect';
+
 export interface PageConfig {
   dpi: number;
   pageWidthPx: number;
   pageHeightPx: number;
   markerSizePx: number;
   markerInsetPx: number;
+  // Forma da marca. 'circle' = bolha redonda; 'rect' = retângulo estilo ENEM.
+  // A CAIXA que o OMR amostra é sempre bubbleWidthPx × bubbleHeightPx — o desenho (círculo
+  // ou retângulo) preenche essa mesma caixa, então leitura e visual ficam sempre casados.
+  // Pra um retângulo "1/3 da linha", deixe bubbleHeightPx bem menor que o passo da linha.
+  bubbleShape: BubbleShape;
   bubbleWidthPx: number;
   bubbleHeightPx: number;
   matriculaOrigin: [number, number];
@@ -24,6 +31,7 @@ export const DEFAULT_CONFIG: PageConfig = {
   pageHeightPx: 3508,
   markerSizePx: 120,
   markerInsetPx: 100,
+  bubbleShape: 'circle',
   bubbleWidthPx: 60,
   bubbleHeightPx: 60,
   matriculaOrigin: [340, 900],
