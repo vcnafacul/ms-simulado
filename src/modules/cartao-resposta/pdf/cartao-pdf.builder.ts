@@ -86,7 +86,7 @@ function collectColumnBoxes(layout: LayoutModel): unknown[] {
   const bw = cfg.bubbleWidthPx;
   const bh = cfg.bubbleHeightPx;
   const padTop = 78; // folga acima da 1ª linha (px) — cobre o cabeçalho A-E
-  const padBottom = 14; // folga abaixo da última linha (px)
+  const padBottom = 28; // folga abaixo da última linha (px) — pra não colar na borda
   const out: unknown[] = [];
   const cols = layout.fieldBlocks.filter((b) =>
     b.key.startsWith('respostas_c'),
