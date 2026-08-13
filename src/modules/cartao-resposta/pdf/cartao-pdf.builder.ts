@@ -38,6 +38,21 @@ const MARKER_PATH = path.join(__dirname, '../assets/omr_marker.png');
 const markerDataUrl =
   'data:image/png;base64,' + fs.readFileSync(MARKER_PATH).toString('base64');
 
+// Logo do projeto (Você na Facul) — 296×62 nativo. Data URL pro pdfmake 0.3.x.
+const LOGO_PATH = path.join(__dirname, '../assets/logo.png');
+const logoDataUrl =
+  'data:image/png;base64,' + fs.readFileSync(LOGO_PATH).toString('base64');
+
+// Layout do cabeçalho (px, relativos ao headerBox): logo → nome do simulado → "Nome do
+// Estudante" → linha de preenchimento.
+const LOGO_W = 440;
+const LOGO_H = Math.round((LOGO_W * 62) / 296); // mantém a proporção da logo
+// (fontes em pt são grandes em px: 15pt≈62px, 11pt≈46px — os gaps abaixo já contam com isso)
+const HEADER_TITLE_DY = LOGO_H + 30; // nome do simulado, abaixo da logo
+const HEADER_NAME_DY = HEADER_TITLE_DY + 70; // rótulo "Nome do Estudante" (abaixo do título)
+const HEADER_LINE_DY = HEADER_NAME_DY + 60; // linha de preenchimento (abaixo do rótulo)
+const HEADER_LINE_W = 1250; // comprimento da linha de preenchimento
+
 function parseRange(label: string): [number, number] {
   const m = label.match(/[a-z]+(\d+)\.\.(\d+)/i);
   if (!m) throw new Error(`range inválido: ${label}`);
@@ -222,18 +237,39 @@ function collectBubbleShapes(layout: LayoutModel): unknown[] {
   return out;
 }
 
+// Linha de preenchimento do nome do estudante (desenhada no canvas).
+function collectHeaderShapes(layout: LayoutModel): unknown[] {
+  const hb = layout.page.headerBox;
+  const y = hb.y + HEADER_LINE_DY;
+  return [
+    {
+      type: 'line',
+      x1: pt(hb.x),
+      y1: pt(y),
+      x2: pt(hb.x + HEADER_LINE_W),
+      y2: pt(y),
+      lineWidth: 1,
+      lineColor: '#000000',
+    },
+  ];
+}
+
 function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
   const items: unknown[] = [];
 
-  // Header text
+  // Cabeçalho: nome do simulado (grande) + "Nome do Estudante" (a logo é imagem, a linha é
+  // desenhada no canvas — ver buildCartaoPdf e collectHeaderShapes).
+  const hb = layout.page.headerBox;
   items.push({
-    text: `${header.nomeSimulado} — ${header.nomeProva}\n${header.nomeCursinho}\nPreencha completamente a alternativa. Nome do aluno: ____________________`,
-    absolutePosition: {
-      x: pt(layout.page.headerBox.x),
-      y: pt(layout.page.headerBox.y),
-    },
-    fontSize: 10,
-    width: pt(layout.page.headerBox.width),
+    text: header.nomeSimulado,
+    absolutePosition: { x: pt(hb.x), y: pt(hb.y + HEADER_TITLE_DY) },
+    fontSize: 15,
+    bold: true,
+  });
+  items.push({
+    text: 'Nome do Estudante',
+    absolutePosition: { x: pt(hb.x), y: pt(hb.y + HEADER_NAME_DY) },
+    fontSize: 11,
   });
 
   // Matrícula digit labels (0-9 à esquerda; e também à direita quando o container está ligado)
@@ -351,13 +387,22 @@ export async function buildCartaoPdf(
     pageMargins: [0, 0, 0, 0] as [number, number, number, number],
     content: [
       {
-        // fundos/bordas (respostas + matrícula) primeiro (atrás), depois as bolhas (interior branco).
+        // fundos/bordas (respostas + matrícula) + linha do cabeçalho; depois as bolhas (interior branco).
         canvas: [
           ...collectColumnBoxes(layout),
           ...collectMatriculaDecorations(layout),
+          ...collectHeaderShapes(layout),
           ...collectBubbleShapes(layout),
         ],
         absolutePosition: { x: 0, y: 0 },
+      },
+      {
+        image: logoDataUrl,
+        width: pt(LOGO_W),
+        absolutePosition: {
+          x: pt(layout.page.headerBox.x),
+          y: pt(layout.page.headerBox.y),
+        },
       },
       {
         image: qrDataUrl,
