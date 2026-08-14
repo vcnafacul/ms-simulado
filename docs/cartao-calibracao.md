@@ -59,7 +59,13 @@ com caneta preta e **fotografado com celular** (com perspectiva/inclinação):
 
 | Amostra | Captura | Matrícula | Respostas | Observações |
 |---|---|---|---|---|
-| 2026-08-13 | foto celular | `20260001` ✓ | ~100% ✓ | perspectiva corrigida pelos markers; dupla marcação (q39 A+E) detectada corretamente; coluna toda-C lida certa |
+| 2026-08-13 #1 | foto celular | `20260001` ✓ | ~100% ✓ | layout ANTIGO + template com hack (bubbleDim 24). Dupla marcação (q39 A+E) detectada; perspectiva corrigida |
+| 2026-08-13 #3 | foto celular (plana) | `57262531` ✓ | **90/90 ✓, 0 nulas, 0 múltiplas** | layout NOVO (colunas na caixa dos markers, gap 75, sem hack). Leitura limpa de produção |
+
+**Lição de captura (foto #2 falhou):** foto com perspectiva forte + base cortada → markers de baixo mal
+detectados (Quarter3/4 com score ~0.7) → dewarp torto → 20/90 e várias múltiplas. **Refazer plana, com os
+4 markers completos e folga**, resolveu (foto #3 → 90/90). O `CheckedOMRs/*.jpeg` que o OMRChecker gera é
+o melhor diagnóstico (mostra o cartão dewarpado).
 
 **Conclusão:** pipeline ponta-a-ponta validado (gerador → impressão → preenchimento → foto → `run_omr`).
 Foto de celular com perspectiva foi corrigida pelos 4 markers. Matrícula e respostas visíveis batem
