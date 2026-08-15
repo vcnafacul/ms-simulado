@@ -48,6 +48,19 @@ export class Historico extends BaseSchema {
 
   @Prop({ type: [Object], default: null })
   public rawRespostas: any[] | null;
+
+  @Prop({ required: false })
+  @ApiProperty({ required: false })
+  public imageKey?: string;
+
+  @Prop({ required: false })
+  @ApiProperty({ required: false })
+  public cartaoCode?: string;
 }
 
 export const HistoricoSchema = SchemaFactory.createForClass(Historico);
+
+HistoricoSchema.index(
+  { imageKey: 1 },
+  { unique: true, partialFilterExpression: { imageKey: { $type: 'string' } } },
+);
