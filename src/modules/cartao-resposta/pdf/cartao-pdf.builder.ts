@@ -10,6 +10,7 @@ import { LayoutModel } from '../layout/cartao-layout';
 export interface QrPayload {
   simuladoId: string;
   cursinhoId: string;
+  cartaoCode: string;
   templateVersion: string;
 }
 export interface HeaderData {
@@ -348,9 +349,9 @@ function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
     fontSize: 15,
     bold: true,
   });
-  // Identificador único do simulado (self-contained): fonte do template no ms-omr.
+  // Identificador do cartão (sequencial por simulado): impresso + embutido no QR.
   items.push({
-    text: `ID: ${header.simuladoId}`,
+    text: `Cartão #${header.qrPayload.cartaoCode.padStart(3, '0')}`,
     absolutePosition: { x: pt(hb.x), y: pt(hb.y + HEADER_TITLE_DY + 40) },
     fontSize: 8,
   });

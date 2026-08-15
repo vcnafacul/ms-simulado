@@ -11,6 +11,7 @@ describe('buildCartaoPdf', () => {
       qrPayload: {
         simuladoId: 'spike',
         cursinhoId: 'spike',
+        cartaoCode: '7',
         templateVersion: 'v1',
       },
     });
@@ -26,6 +27,7 @@ describe('buildCartaoPdf', () => {
       qrPayload: {
         simuladoId: '665f0c1a2b3c4d5e6f000001',
         cursinhoId: '',
+        cartaoCode: '7',
         templateVersion: 'v1',
       },
     });

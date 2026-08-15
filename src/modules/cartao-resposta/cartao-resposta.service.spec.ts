@@ -9,7 +9,12 @@ describe('CartaoRespostaService', () => {
       simuladoId: 'x',
       nomeProva: 'P',
       nomeCursinho: 'C',
-      qrPayload: { simuladoId: 'x', cursinhoId: 'y', templateVersion: 'v1' },
+      qrPayload: {
+        simuladoId: 'x',
+        cursinhoId: 'y',
+        cartaoCode: '1',
+        templateVersion: 'v1',
+      },
     });
     expect(Object.keys(art.templateJson.fieldBlocks)).toContain('matricula');
     expect(art.configJson.outputs.show_image_level).toBe(0);
