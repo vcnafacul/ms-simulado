@@ -29,6 +29,7 @@ interface CartaoConfigFile {
 
 const DEFAULT_HEADER: HeaderData = {
   nomeSimulado: 'Simulado de Amostra',
+  simuladoId: 'spike',
   nomeProva: 'Spike Etapa 7',
   nomeCursinho: 'Cursinho Amostra',
   qrPayload: {

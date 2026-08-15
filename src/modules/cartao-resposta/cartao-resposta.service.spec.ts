@@ -6,6 +6,7 @@ describe('CartaoRespostaService', () => {
     const service = new CartaoRespostaService();
     const art = await service.gerar(90, {
       nomeSimulado: 'S',
+      simuladoId: 'x',
       nomeProva: 'P',
       nomeCursinho: 'C',
       qrPayload: { simuladoId: 'x', cursinhoId: 'y', templateVersion: 'v1' },
