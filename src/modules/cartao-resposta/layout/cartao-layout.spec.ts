@@ -78,7 +78,9 @@ describe('buildLayout', () => {
       .map((b, i) => leftEdge(b) - rightEdge(cols[i]));
 
     // tolerância de 1px (arredondamento das origens pra inteiro)
-    gutters.forEach((g) => expect(Math.abs(g - marginLeft)).toBeLessThanOrEqual(1));
+    gutters.forEach((g) =>
+      expect(Math.abs(g - marginLeft)).toBeLessThanOrEqual(1),
+    );
     expect(Math.abs(marginRight - marginLeft)).toBeLessThanOrEqual(1);
     // e tudo cabe dentro da caixa dos markers
     expect(leftEdge(cols[0])).toBeGreaterThanOrEqual(boxLeft);
