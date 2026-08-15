@@ -14,8 +14,9 @@ export interface QrPayload {
 }
 export interface HeaderData {
   nomeSimulado: string;
-  nomeProva: string;
-  nomeCursinho: string;
+  simuladoId: string;
+  nomeProva?: string;
+  nomeCursinho?: string;
   qrPayload: QrPayload;
 }
 
@@ -174,8 +175,7 @@ function matriculaBounds(layout: LayoutModel) {
 function collectMatriculaDecorations(layout: LayoutModel): unknown[] {
   if (!layout.page.matriculaBox) return [];
   const b = matriculaBounds(layout);
-  const { mat, bw, bh, ox, oy, hwTop, boxLeft, boxRight, boxTop, boxBottom } =
-    b;
+  const { mat, bw, ox, oy, hwTop, boxLeft, boxRight, boxTop, boxBottom } = b;
   const nCols = 8;
   const nDigits = 10;
   const hwH = MAT_HW_H;
@@ -348,6 +348,12 @@ function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
     fontSize: 15,
     bold: true,
   });
+  // Identificador único do simulado (self-contained): fonte do template no ms-omr.
+  items.push({
+    text: `ID: ${header.simuladoId}`,
+    absolutePosition: { x: pt(hb.x), y: pt(hb.y + HEADER_TITLE_DY + 40) },
+    fontSize: 8,
+  });
   items.push({
     text: 'Nome do Estudante',
     absolutePosition: { x: pt(hb.x), y: pt(hb.y + HEADER_NAME_DY) },
@@ -379,7 +385,10 @@ function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
       const c = layout.bubbleCenter('matricula', 7, j);
       items.push({
         text: String(j),
-        absolutePosition: { x: pt(c.x + matBw / 2 + 12), y: centerTextY(c.y, 8) },
+        absolutePosition: {
+          x: pt(c.x + matBw / 2 + 12),
+          y: centerTextY(c.y, 8),
+        },
         fontSize: 8,
       });
     }
