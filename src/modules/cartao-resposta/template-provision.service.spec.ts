@@ -3,7 +3,6 @@ import {
   TemplateProvisionService,
   keyTemplate,
   keyConfig,
-  keyPdf,
 } from './template-provision.service';
 
 const ID = '665f0c1a2b3c4d5e6f000001';
@@ -15,7 +14,10 @@ function setup(over: Partial<any> = {}) {
     cursinhoId: null,
     categoria: { quantidadeTotalQuestao: 90 },
   };
-  const simuladoService = { getById: jest.fn().mockResolvedValue(simulado) };
+  const simuladoService = {
+    getById: jest.fn().mockResolvedValue(simulado),
+    incrementarCartaoSeq: jest.fn().mockResolvedValue(7),
+  };
   const cartaoService = {
     gerar: jest.fn().mockResolvedValue({
       templateJson: { a: 1 },
@@ -38,10 +40,12 @@ function setup(over: Partial<any> = {}) {
 }
 
 describe('TemplateProvisionService', () => {
-  it('miss: gera, grava 3 artefatos e devolve o pdf', async () => {
-    const { svc, cartaoService, storage } = setup();
+  it('json ausente: incrementa contador, gera on-the-fly com cartaoCode, grava só os JSONs e devolve o pdf', async () => {
+    const { svc, simuladoService, cartaoService, storage } = setup();
     const pdf = await svc.obterPdf(ID);
+
     expect(pdf.toString()).toBe('PDF');
+    expect(simuladoService.incrementarCartaoSeq).toHaveBeenCalledWith(ID);
     expect(cartaoService.gerar).toHaveBeenCalledWith(
       90,
       expect.objectContaining({
@@ -49,6 +53,7 @@ describe('TemplateProvisionService', () => {
         simuladoId: ID,
         qrPayload: expect.objectContaining({
           simuladoId: ID,
+          cartaoCode: '7',
           templateVersion: 'v1',
         }),
       }),
@@ -63,21 +68,23 @@ describe('TemplateProvisionService', () => {
       JSON.stringify({ b: 2 }),
       'application/json',
     );
-    expect(storage.putObject).toHaveBeenCalledWith(
-      keyPdf(ID),
-      Buffer.from('PDF'),
-      'application/pdf',
+    // nunca grava o PDF no R2
+    const pdfPuts = storage.putObject.mock.calls.filter(
+      (c: any[]) => c[2] === 'application/pdf',
     );
+    expect(pdfPuts).toHaveLength(0);
   });
 
-  it('hit: não regera, devolve o pdf do R2', async () => {
-    const { svc, cartaoService, storage } = setup({
+  it('json já existe: ainda incrementa + gera + devolve o pdf, mas não grava nada', async () => {
+    const { svc, simuladoService, cartaoService, storage } = setup({
       storage: { exists: jest.fn().mockResolvedValue(true) },
     });
     const pdf = await svc.obterPdf(ID);
-    expect(pdf.toString()).toBe('CACHED');
-    expect(cartaoService.gerar).not.toHaveBeenCalled();
-    expect(storage.get).toHaveBeenCalledWith(keyPdf(ID));
+
+    expect(pdf.toString()).toBe('PDF');
+    expect(simuladoService.incrementarCartaoSeq).toHaveBeenCalledWith(ID);
+    expect(cartaoService.gerar).toHaveBeenCalled();
+    expect(storage.putObject).not.toHaveBeenCalled();
   });
 
   it('simulado inexistente → NotFound', async () => {

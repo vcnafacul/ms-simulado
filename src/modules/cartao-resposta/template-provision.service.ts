@@ -10,7 +10,6 @@ import { StorageService } from '../../shared/storage/storage.service';
 const base = (id: string) => `templates/${id}`;
 export const keyTemplate = (id: string) => `${base(id)}/template.json`;
 export const keyConfig = (id: string) => `${base(id)}/config.json`;
-export const keyPdf = (id: string) => `${base(id)}/cartao.pdf`;
 
 @Injectable()
 export class TemplateProvisionService {
@@ -21,16 +20,14 @@ export class TemplateProvisionService {
   ) {}
 
   async obterPdf(simuladoId: string): Promise<Buffer> {
-    if (await this.storage.exists(keyPdf(simuladoId))) {
-      return this.storage.get(keyPdf(simuladoId));
-    }
-
     const simulado = await this.simuladoService.getById(simuladoId);
     if (!simulado) throw new NotFoundException('simulado não encontrado');
 
     const N = simulado.categoria?.quantidadeTotalQuestao;
     if (N == null)
       throw new BadRequestException('categoria sem total de questões');
+
+    const seq = await this.simuladoService.incrementarCartaoSeq(simuladoId);
 
     const { templateJson, configJson, pdfBuffer } =
       await this.cartaoService.gerar(N, {
@@ -39,25 +36,23 @@ export class TemplateProvisionService {
         qrPayload: {
           simuladoId,
           cursinhoId: simulado.cursinhoId ?? '',
+          cartaoCode: String(seq),
           templateVersion: 'v1',
         },
       });
 
-    await this.storage.putObject(
-      keyTemplate(simuladoId),
-      JSON.stringify(templateJson),
-      'application/json',
-    );
-    await this.storage.putObject(
-      keyConfig(simuladoId),
-      JSON.stringify(configJson),
-      'application/json',
-    );
-    await this.storage.putObject(
-      keyPdf(simuladoId),
-      pdfBuffer,
-      'application/pdf',
-    );
+    if (!(await this.storage.exists(keyTemplate(simuladoId)))) {
+      await this.storage.putObject(
+        keyTemplate(simuladoId),
+        JSON.stringify(templateJson),
+        'application/json',
+      );
+      await this.storage.putObject(
+        keyConfig(simuladoId),
+        JSON.stringify(configJson),
+        'application/json',
+      );
+    }
 
     return pdfBuffer;
   }
