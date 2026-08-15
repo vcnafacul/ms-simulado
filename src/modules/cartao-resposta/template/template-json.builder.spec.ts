@@ -4,15 +4,15 @@ import { buildTemplateJson } from './template-json.builder';
 describe('buildTemplateJson', () => {
   it('emite pageDimensions, bubbleDimensions e CropOnMarkers', () => {
     const { templateJson } = buildTemplateJson(buildLayout(90));
-    expect(templateJson.pageDimensions).toEqual([2160, 3188]); // caixa dos centros de marker
-    expect(templateJson.bubbleDimensions).toEqual([60, 60]);
+    expect(templateJson.pageDimensions).toEqual([2330, 3358]); // caixa dos centros de marker
+    expect(templateJson.bubbleDimensions).toEqual([40, 40]);
     expect(templateJson.preProcessors[0].name).toBe('CropOnMarkers');
     expect(templateJson.preProcessors[0].options.relativePath).toBe(
       'omr_marker.png',
     );
   });
 
-  it('fieldBlocks: matricula + respostas_c1..c3 com origin/gaps do layout', () => {
+  it('fieldBlocks: matricula + respostas_c1..c5 com origin/gaps do layout', () => {
     const layout = buildLayout(90);
     const { templateJson } = buildTemplateJson(layout);
     expect(Object.keys(templateJson.fieldBlocks).sort()).toEqual([
@@ -20,13 +20,15 @@ describe('buildTemplateJson', () => {
       'respostas_c1',
       'respostas_c2',
       'respostas_c3',
+      'respostas_c4',
+      'respostas_c5',
     ]);
     const mat = templateJson.fieldBlocks.matricula;
     const layoutMat = layout.fieldBlocks.find((b) => b.key === 'matricula')!;
-    // origin do template = centro − centroMarkerTL(near=160) − bubbleDim/2(30)
+    // origin do template = centro − centroMarkerTL(near=75) − bubbleDim/2(20)
     expect(mat.origin).toEqual([
-      layoutMat.origin[0] - 160 - 30,
-      layoutMat.origin[1] - 160 - 30,
+      layoutMat.origin[0] - 75 - 20,
+      layoutMat.origin[1] - 75 - 20,
     ]);
     expect(mat.labelsGap).toBe(layoutMat.labelsGap);
     expect(mat.bubblesGap).toBe(layoutMat.bubblesGap);
@@ -34,7 +36,7 @@ describe('buildTemplateJson', () => {
 
   it('pageDimensions = caixa dos centros de marker (A4 − 2·near)', () => {
     const { templateJson } = buildTemplateJson(buildLayout(90));
-    expect(templateJson.pageDimensions).toEqual([2480 - 320, 3508 - 320]);
+    expect(templateJson.pageDimensions).toEqual([2480 - 150, 3508 - 150]);
   });
 
   it('config.json força show_image_level 0 (headless)', () => {
@@ -63,7 +65,7 @@ describe('buildTemplateJson', () => {
       }
     }
     const c1 = templateJson.fieldBlocks.respostas_c1;
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 18; i++) {
       for (let j = 0; j < 5; j++) {
         const sampleCenter = {
           x: c1.origin[0] + j * c1.bubblesGap + halfW + near,
