@@ -46,6 +46,16 @@ export class CartaoCallbackService {
       (historico.simulado as any)?._id?.toString() ??
       historico.simulado.toString();
     const simulado = await this.simuladoRepository.answer(simuladoId);
+    if (!simulado) {
+      this.logger.warn(
+        `callback: simulado ${simuladoId} não encontrado (histórico ${histId}) → Failed`,
+      );
+      await this.historicoRepository.updateStatus(
+        histId,
+        HistoricoStatus.Failed,
+      );
+      return;
+    }
 
     const numeroToId = new Map<number, string>();
     for (const qc of simulado.questoes) {

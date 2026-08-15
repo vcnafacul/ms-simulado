@@ -82,4 +82,22 @@ describe('CartaoCallbackService', () => {
       { histId: 'h1' },
     );
   });
+
+  it('simulado nulo (deletado): marca Failed e ack, sem publish', async () => {
+    const { svc, historicoRepository, queueProducer } = setup({
+      simuladoRepository: { answer: jest.fn().mockResolvedValue(null) },
+    });
+    await svc.processar({
+      imageKey: 'k',
+      respostas: [{ questao: '1', alternativaEstudante: 'A' }],
+    });
+    expect(historicoRepository.updateStatus).toHaveBeenCalledWith(
+      'h1',
+      HistoricoStatus.Failed,
+    );
+    expect(
+      historicoRepository.prepararParaProcessamento,
+    ).not.toHaveBeenCalled();
+    expect(queueProducer.publish).not.toHaveBeenCalled();
+  });
 });
