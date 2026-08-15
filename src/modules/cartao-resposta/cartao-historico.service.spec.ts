@@ -21,7 +21,7 @@ function setup(over: any = {}) {
 }
 const DTO = {
   usuario: 'u1',
-  imageKey: 'cartoes/665abc/i.jpg',
+  imageKey: 'cartoes/665f0c1a2b3c4d5e6f00abc1/i.jpg',
   cartaoCode: '7',
 };
 
@@ -30,7 +30,7 @@ it('happy: cria e chama o omr', async () => {
   const r = await svc.criar(DTO);
   expect(r).toEqual({ historicoId: 'h1' });
   expect(repo.createAwaitingOmr).toHaveBeenCalledWith(
-    expect.objectContaining({ simuladoId: '665abc' }),
+    expect.objectContaining({ simuladoId: '665f0c1a2b3c4d5e6f00abc1' }),
   );
   expect(omr.enviarProcessamento).toHaveBeenCalledWith(DTO.imageKey);
 });
