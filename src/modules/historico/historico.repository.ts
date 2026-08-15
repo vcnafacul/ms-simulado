@@ -214,6 +214,35 @@ export class HistoricoRepository extends BaseRepository<Historico> {
     });
   }
 
+  async existsCartaoAtivo(
+    usuario: string,
+    simuladoId: string,
+    cartaoCode: string,
+  ): Promise<boolean> {
+    const found = await this.model.exists({
+      usuario,
+      simulado: new Types.ObjectId(simuladoId),
+      cartaoCode,
+      status: { $ne: HistoricoStatus.Failed },
+    });
+    return found !== null;
+  }
+
+  async createAwaitingOmr(data: {
+    usuario: string;
+    simuladoId: string;
+    imageKey: string;
+    cartaoCode: string;
+  }): Promise<Historico> {
+    return this.model.create({
+      usuario: data.usuario,
+      simulado: new Types.ObjectId(data.simuladoId),
+      imageKey: data.imageKey,
+      cartaoCode: data.cartaoCode,
+      status: HistoricoStatus.AwaitingOmr,
+    });
+  }
+
   async findByStatuses(statuses: HistoricoStatus[]): Promise<Historico[]> {
     return this.model.find({ status: { $in: statuses } }).exec();
   }
