@@ -53,6 +53,10 @@ export class Simulado extends BaseSchema {
   @Prop({ required: false, default: null })
   @ApiProperty({ required: false, nullable: true })
   disponivelAte?: Date | null;
+
+  @Prop({ required: false, default: 0 })
+  @ApiProperty({ required: false })
+  public cartaoSeq?: number;
 }
 
 export const SimuladoSchema = SchemaFactory.createForClass(Simulado);

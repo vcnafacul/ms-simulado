@@ -109,6 +109,31 @@ describe('SimuladoRepository.answer (popula questoes.questao)', () => {
   });
 });
 
+describe('SimuladoRepository.incrementarCartaoSeq', () => {
+  it('faz $inc atômico e devolve o novo valor', async () => {
+    const findByIdAndUpdate = jest.fn().mockResolvedValue({ cartaoSeq: 8 });
+    const repo = new SimuladoRepository({ findByIdAndUpdate } as any);
+
+    const seq = await repo.incrementarCartaoSeq('665abc');
+
+    expect(seq).toBe(8);
+    expect(findByIdAndUpdate).toHaveBeenCalledWith(
+      '665abc',
+      { $inc: { cartaoSeq: 1 } },
+      { new: true },
+    );
+  });
+
+  it('devolve 0 quando o simulado não existe', async () => {
+    const findByIdAndUpdate = jest.fn().mockResolvedValue(null);
+    const repo = new SimuladoRepository({ findByIdAndUpdate } as any);
+
+    const seq = await repo.incrementarCartaoSeq('inexistente');
+
+    expect(seq).toBe(0);
+  });
+});
+
 describe('SimuladoRepository.getById (popula questoes.questao)', () => {
   it('popula categoria + questoes.questao', async () => {
     const populateArgs: any[] = [];

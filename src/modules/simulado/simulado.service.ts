@@ -57,6 +57,10 @@ export class SimuladoService {
     return await this.simuladoRepository.getAll(param);
   }
 
+  async incrementarCartaoSeq(id: string): Promise<number> {
+    return this.simuladoRepository.incrementarCartaoSeq(id);
+  }
+
   public async delete(id: string) {
     await this.simuladoRepository.delete(id);
   }
