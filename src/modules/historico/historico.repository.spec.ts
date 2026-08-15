@@ -52,4 +52,32 @@ describe('HistoricoRepository.getById (popula simulado.questoes.questao)', () =>
       }),
     );
   });
+
+  it('findByImageKey consulta por imageKey', async () => {
+    const findOne = jest.fn().mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: 'h1' }),
+    });
+    const repo = new HistoricoRepository({ findOne } as any);
+    const r = await repo.findByImageKey(
+      'cartoes/665f0c1a2b3c4d5e6f00abc1/i.jpg',
+    );
+    expect((r as any)._id).toBe('h1');
+    expect(findOne).toHaveBeenCalledWith({
+      imageKey: 'cartoes/665f0c1a2b3c4d5e6f00abc1/i.jpg',
+    });
+  });
+
+  it('prepararParaProcessamento grava rawRespostas + status Pending', async () => {
+    const findByIdAndUpdate = jest.fn().mockReturnValue({
+      exec: jest.fn().mockResolvedValue(undefined),
+    });
+    const repo = new HistoricoRepository({ findByIdAndUpdate } as any);
+    await repo.prepararParaProcessamento('h1', [
+      { questao: 'q1', alternativaEstudante: 'A' },
+    ]);
+    expect(findByIdAndUpdate).toHaveBeenCalledWith('h1', {
+      rawRespostas: [{ questao: 'q1', alternativaEstudante: 'A' }],
+      status: 'pending',
+    });
+  });
 });

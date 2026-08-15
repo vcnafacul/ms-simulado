@@ -251,6 +251,19 @@ export class HistoricoRepository extends BaseRepository<Historico> {
     await this.model.findByIdAndUpdate(id, { status }).exec();
   }
 
+  async findByImageKey(imageKey: string): Promise<Historico | null> {
+    return this.model.findOne({ imageKey }).exec();
+  }
+
+  async prepararParaProcessamento(
+    id: string,
+    rawRespostas: unknown[],
+  ): Promise<void> {
+    await this.model
+      .findByIdAndUpdate(id, { rawRespostas, status: HistoricoStatus.Pending })
+      .exec();
+  }
+
   async claimForProcessing(id: string): Promise<boolean> {
     const result = await this.model.findOneAndUpdate(
       { _id: id, status: { $in: [HistoricoStatus.Pending, HistoricoStatus.Processing] } },
