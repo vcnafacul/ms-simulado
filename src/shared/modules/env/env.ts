@@ -18,6 +18,9 @@ export const envSchema = z.object({
   AWS_ACCESS_KEY_ID: z.string().default(''),
   AWS_SECRET_ACCESS_KEY: z.string().default(''),
   CARTAO_BUCKET: z.string().default('vcnafacul-cartoes'),
+
+  // ms-omr (Etapa 12 · A3)
+  OMR_URL: z.string().url().default('http://localhost:8000'),
 });
 
 export type Env = z.infer<typeof envSchema>;
