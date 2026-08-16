@@ -1,7 +1,7 @@
 import { HistoricoRepository } from './historico.repository';
 
 describe('HistoricoRepository.getById (popula simulado.questoes.questao)', () => {
-  it('popula simulado com tipo + questoes.questao (sem questoes)', async () => {
+  it('popula simulado com questoes.questao (sem questoes)', async () => {
     const exec = jest.fn().mockResolvedValue({ _id: 'h1' });
     const populate = jest.fn().mockReturnValue({ exec });
     const findById = jest.fn().mockReturnValue({ populate });
@@ -12,7 +12,7 @@ describe('HistoricoRepository.getById (popula simulado.questoes.questao)', () =>
     expect(findById).toHaveBeenCalledWith('h1');
     expect(populate).toHaveBeenCalledWith({
       path: 'simulado',
-      populate: ['tipo', { path: 'questoes.questao' }],
+      populate: [{ path: 'questoes.questao' }],
     });
   });
 
