@@ -1,12 +1,17 @@
 import { buildLayout, DEFAULT_CONFIG } from './cartao-layout';
 
 describe('buildLayout', () => {
-  it('matrícula: 1 fieldBlock QTYPE_INT com 8 labels m1..m8', () => {
-    const m = buildLayout(90);
+  it('matrícula: 1 fieldBlock QTYPE_INT com 8 labels m1..m8 (quando incluirMatricula)', () => {
+    const m = buildLayout(90, { ...DEFAULT_CONFIG, incluirMatricula: true });
     const mat = m.fieldBlocks.find((b) => b.key === 'matricula');
     expect(mat).toBeDefined();
     expect(mat!.fieldType).toBe('QTYPE_INT');
     expect(mat!.fieldLabels).toEqual(['m1..8']);
+  });
+
+  it('matrícula: DEFAULT_CONFIG NÃO inclui o fieldBlock de matrícula', () => {
+    const m = buildLayout(90);
+    expect(m.fieldBlocks.find((b) => b.key === 'matricula')).toBeUndefined();
   });
 
   it('respostas: N=90 → 5 colunas de 18 (q1..18 … q73..90)', () => {
@@ -28,6 +33,15 @@ describe('buildLayout', () => {
     expect(cols[0].fieldLabels).toEqual(['q1..15']);
     expect(cols[1].fieldLabels).toEqual(['q16..30']);
     expect(cols[2].fieldLabels).toEqual(['q31..45']);
+  });
+
+  it('startNumero desloca os rótulos (bloco 46..90): N=45, start=46 → q46..60, q61..75, q76..90', () => {
+    const m = buildLayout(45, DEFAULT_CONFIG, 46);
+    const cols = m.fieldBlocks.filter((b) => b.key.startsWith('respostas_c'));
+    expect(cols).toHaveLength(3);
+    expect(cols[0].fieldLabels).toEqual(['q46..60']);
+    expect(cols[1].fieldLabels).toEqual(['q61..75']);
+    expect(cols[2].fieldLabels).toEqual(['q76..90']);
   });
 
   it('auto-fit balanceado: N=75 → 5 colunas 15/15/15/15/15', () => {
@@ -99,7 +113,7 @@ describe('buildLayout', () => {
   });
 
   it('bubbleCenter matrícula: origin + (i·labelsGap, j·bubblesGap)', () => {
-    const m = buildLayout(90);
+    const m = buildLayout(90, { ...DEFAULT_CONFIG, incluirMatricula: true });
     const mat = m.fieldBlocks.find((b) => b.key === 'matricula')!;
     const c = m.bubbleCenter('matricula', 2, 3);
     expect(c.x).toBe(mat.origin[0] + 2 * mat.labelsGap);

@@ -10,9 +10,7 @@ describe('buildCartaoPdf', () => {
       nomeCursinho: 'Cursinho Y',
       qrPayload: {
         simuladoId: 'spike',
-        cursinhoId: 'spike',
         cartaoCode: '7',
-        templateVersion: 'v1',
       },
     });
     expect(buf.length).toBeGreaterThan(1000);
@@ -26,9 +24,7 @@ describe('buildCartaoPdf', () => {
       simuladoId: '665f0c1a2b3c4d5e6f000001',
       qrPayload: {
         simuladoId: '665f0c1a2b3c4d5e6f000001',
-        cursinhoId: '',
         cartaoCode: '7',
-        templateVersion: 'v1',
       },
     });
     expect(Buffer.isBuffer(buf)).toBe(true);

@@ -1,4 +1,4 @@
-import { buildLayout } from '../layout/cartao-layout';
+import { buildLayout, DEFAULT_CONFIG } from '../layout/cartao-layout';
 import { buildTemplateJson } from './template-json.builder';
 
 describe('buildTemplateJson', () => {
@@ -12,8 +12,11 @@ describe('buildTemplateJson', () => {
     );
   });
 
-  it('fieldBlocks: matricula + respostas_c1..c5 com origin/gaps do layout', () => {
-    const layout = buildLayout(90);
+  it('fieldBlocks: matricula + respostas_c1..c5 com origin/gaps do layout (incluirMatricula)', () => {
+    const layout = buildLayout(90, {
+      ...DEFAULT_CONFIG,
+      incluirMatricula: true,
+    });
     const { templateJson } = buildTemplateJson(layout);
     expect(Object.keys(templateJson.fieldBlocks).sort()).toEqual([
       'matricula',
@@ -34,6 +37,18 @@ describe('buildTemplateJson', () => {
     expect(mat.bubblesGap).toBe(layoutMat.bubblesGap);
   });
 
+  it('fieldBlocks: DEFAULT (sem matrícula) só tem respostas_c1..c5', () => {
+    const { templateJson } = buildTemplateJson(buildLayout(90));
+    expect(Object.keys(templateJson.fieldBlocks).sort()).toEqual([
+      'respostas_c1',
+      'respostas_c2',
+      'respostas_c3',
+      'respostas_c4',
+      'respostas_c5',
+    ]);
+    expect(templateJson.fieldBlocks.matricula).toBeUndefined();
+  });
+
   it('pageDimensions = caixa dos centros de marker (A4 − 2·near)', () => {
     const { templateJson } = buildTemplateJson(buildLayout(90));
     expect(templateJson.pageDimensions).toEqual([2480 - 150, 3508 - 150]);
@@ -48,7 +63,10 @@ describe('buildTemplateJson', () => {
   // (origin_topleft + índices·gaps + bubbleDim/2) + centroMarkerTL(near) tem que coincidir
   // com o centro visual A4 que o PDF desenha (LayoutModel.bubbleCenter).
   it('consistência: centro de amostragem OMRChecker (+near) ≡ LayoutModel.bubbleCenter', () => {
-    const layout = buildLayout(90);
+    const layout = buildLayout(90, {
+      ...DEFAULT_CONFIG,
+      incluirMatricula: true,
+    });
     const { templateJson } = buildTemplateJson(layout);
     const halfW = layout.page.bubbleWidthPx / 2;
     const halfH = layout.page.bubbleHeightPx / 2;

@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import {
   TemplateProvisionService,
   keyTemplate,
@@ -12,7 +12,9 @@ function setup(over: Partial<any> = {}) {
     _id: ID,
     nome: 'Simulado ENEM',
     cursinhoId: null,
+    bloqueado: false,
     categoria: { quantidadeTotalQuestao: 90 },
+    questoes: Array.from({ length: 90 }, (_, i) => ({ numero: i + 1 })),
   };
   const simuladoService = {
     getById: jest.fn().mockResolvedValue(simulado),
@@ -54,9 +56,10 @@ describe('TemplateProvisionService', () => {
         qrPayload: expect.objectContaining({
           simuladoId: ID,
           cartaoCode: '7',
-          templateVersion: 'v1',
         }),
       }),
+      undefined,
+      1,
     );
     expect(storage.putObject).toHaveBeenCalledWith(
       keyTemplate(ID),
@@ -93,15 +96,35 @@ describe('TemplateProvisionService', () => {
     await expect(svc.obterPdf(ID)).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('categoria sem quantidadeTotalQuestao → BadRequest', async () => {
-    const { svc } = setup({
+  it('simulado bloqueado (não pronto) → Conflict, sem gerar nem incrementar', async () => {
+    const { svc, simuladoService, cartaoService } = setup({
       simulado: {
         _id: ID,
         nome: 'x',
-        cursinhoId: null,
-        categoria: { quantidadeTotalQuestao: null },
+        bloqueado: true,
+        questoes: [{ numero: 1 }],
       },
     });
-    await expect(svc.obterPdf(ID)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(svc.obterPdf(ID)).rejects.toBeInstanceOf(ConflictException);
+    expect(simuladoService.incrementarCartaoSeq).not.toHaveBeenCalled();
+    expect(cartaoService.gerar).not.toHaveBeenCalled();
+  });
+
+  it('usa o menor numero das questões como startNumero (bloco 46..90 → N=45, start=46)', async () => {
+    const { svc, cartaoService } = setup({
+      simulado: {
+        _id: ID,
+        nome: 'CH Dia 1',
+        bloqueado: false,
+        questoes: Array.from({ length: 45 }, (_, i) => ({ numero: 46 + i })),
+      },
+    });
+    await svc.obterPdf(ID);
+    expect(cartaoService.gerar).toHaveBeenCalledWith(
+      45,
+      expect.anything(),
+      undefined,
+      46,
+    );
   });
 });

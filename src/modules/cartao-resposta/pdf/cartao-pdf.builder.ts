@@ -7,11 +7,11 @@ import * as QRCode from 'qrcode';
 import pdfMake = require('pdfmake');
 import { LayoutModel } from '../layout/cartao-layout';
 
+// Payload mínimo do QR (só o que o api precisa) — quanto menor, menos denso e mais fácil de
+// ler numa foto. O api valida apenas simuladoId + cartaoCode.
 export interface QrPayload {
   simuladoId: string;
-  cursinhoId: string;
   cartaoCode: string;
-  templateVersion: string;
 }
 export interface HeaderData {
   nomeSimulado: string;
@@ -49,15 +49,44 @@ const LOGO_PATH = path.join(__dirname, '../assets/logo.png');
 const logoDataUrl =
   'data:image/png;base64,' + fs.readFileSync(LOGO_PATH).toString('base64');
 
-// Layout do cabeçalho (px, relativos ao headerBox): logo → nome do simulado → "Nome do
-// Estudante" → linha de preenchimento.
+// Layout do cabeçalho (px, relativos ao headerBox). Hierarquia visual:
+// logo → título do simulado → dados do aluno (nome + matrícula). Badge do cartão no canto
+// superior direito, à esquerda do QR. Nome/matrícula são manuscritos (não lidos pelo OMR).
 const LOGO_W = 440;
 const LOGO_H = Math.round((LOGO_W * 62) / 296); // mantém a proporção da logo
-// (fontes em pt são grandes em px: 15pt≈62px, 11pt≈46px — os gaps abaixo já contam com isso)
-const HEADER_TITLE_DY = LOGO_H + 30; // nome do simulado, abaixo da logo
-const HEADER_NAME_DY = HEADER_TITLE_DY + 70; // rótulo "Nome do Estudante" (abaixo do título)
-const HEADER_LINE_DY = HEADER_NAME_DY + 95; // linha de preenchimento (espaço pro aluno escrever)
-const HEADER_LINE_W = 1250; // comprimento da linha de preenchimento
+
+// Título do simulado (destaque principal), abaixo da logo
+const HEADER_TITLE_DY = LOGO_H + 48;
+const HEADER_TITLE_FONT = 21;
+
+// Campo "Nome do Estudante": rótulo + linha de preenchimento
+const NOME_LABEL_DY = HEADER_TITLE_DY + 120;
+const NOME_LINE_DY = NOME_LABEL_DY + 72;
+const NOME_LINE_W = 1250;
+
+// Campo "Matrícula (8 dígitos)": rótulo + 8 quadros separados (escrita à mão)
+const MAT_LABEL_DY = NOME_LINE_DY + 96;
+const MAT_BOXES_DY = MAT_LABEL_DY + 50; // topo dos quadros
+const MAT_BOX_W = 70;
+const MAT_BOX_H = 88;
+const MAT_BOX_GAP = 22;
+const MAT_BOX_COUNT = 8;
+
+// Badge do cartão (canto sup. direito, independente do QR): "CARTÃO" pequeno + "#NNN" grande
+const BADGE_W = 360;
+const BADGE_H = 245;
+const BADGE_PAGE_MARGIN = 150; // vão entre o badge e a borda DIREITA da página
+
+// Área de instruções (abaixo dos campos do aluno, à esquerda). O QR fica à direita, na mesma
+// faixa vertical — ver DEFAULT_CONFIG.qrBox. Lista com marcadores, compacta.
+const INSTR_TITLE_DY = MAT_BOXES_DY + MAT_BOX_H + 120; // abaixo dos quadros da matrícula
+const INSTR_TITLE_FONT = 13;
+const INSTR_LIST_DY = INSTR_TITLE_DY + 66;
+const INSTR_LINE_H = 54; // altura de linha da lista (px)
+const INSTR_FONT = 10.5;
+const INSTR_ITEM_GAP = 16; // respiro entre itens (px)
+const INSTR_BULLET_INDENT = 34; // recuo do texto após o "•" (px)
+const INSTR_MAX_CHARS = 58; // quebra de linha (mantém as instruções à esquerda do QR)
 
 function parseRange(label: string): [number, number] {
   const m = label.match(/[a-z]+(\d+)\.\.(\d+)/i);
@@ -174,6 +203,7 @@ function matriculaBounds(layout: LayoutModel) {
 // Matrícula com o mesmo tratamento: container + borda, zebra por linha de dígito (0-9), e uma
 // fileira de quadros em cima pro aluno ESCREVER os 8 dígitos à mão. Atrás das bolhas (brancas).
 function collectMatriculaDecorations(layout: LayoutModel): unknown[] {
+  if (!layout.page.incluirMatricula) return [];
   if (!layout.page.matriculaBox) return [];
   const b = matriculaBounds(layout);
   const { mat, bw, ox, oy, hwTop, boxLeft, boxRight, boxTop, boxBottom } = b;
@@ -222,49 +252,6 @@ function collectMatriculaDecorations(layout: LayoutModel): unknown[] {
   return out;
 }
 
-const INSTR_GAP = 60; // vão entre a matrícula e as instruções
-
-// Limites do container de instruções: à direita da matrícula, topo/base alinhados com ela,
-// e a borda DIREITA alinhada com a borda direita do último container de respostas.
-function instructionsBounds(layout: LayoutModel) {
-  const cfg = layout.page;
-  const mb = matriculaBounds(layout);
-  const respCols = layout.fieldBlocks.filter((b) =>
-    b.key.startsWith('respostas_c'),
-  );
-  const last = respCols[respCols.length - 1];
-  const right = last
-    ? last.origin[0] +
-      4 * last.bubblesGap +
-      cfg.bubbleWidthPx / 2 +
-      cfg.respostasBoxPadPx
-    : cfg.qrBox.x - INSTR_GAP;
-  return {
-    left: mb.boxRight + INSTR_GAP,
-    right,
-    top: mb.boxTop,
-    bottom: mb.boxBottom,
-  };
-}
-
-// Borda do container de instruções, à direita da matrícula.
-function collectInstructionsBox(layout: LayoutModel): unknown[] {
-  if (!layout.page.instructionsBox || !layout.page.matriculaBox) return [];
-  const b = instructionsBounds(layout);
-  if (b.right - b.left < 200) return [];
-  return [
-    {
-      type: 'rect',
-      x: pt(b.left),
-      y: pt(b.top),
-      w: pt(b.right - b.left),
-      h: pt(b.bottom - b.top),
-      lineColor: '#bdbdbd',
-      lineWidth: 1,
-    },
-  ];
-}
-
 function collectBubbleShapes(layout: LayoutModel): unknown[] {
   const shape = layout.page.bubbleShape;
   const w = pt(layout.page.bubbleWidthPx);
@@ -306,8 +293,10 @@ function collectBubbleShapes(layout: LayoutModel): unknown[] {
     }
   };
 
-  // Matrícula: 8 dígitos × 10 valores (0-9)
-  draw('matricula', 8, 10);
+  // Matrícula: 8 dígitos × 10 valores (0-9) — só quando o cartão inclui matrícula
+  if (layout.page.incluirMatricula) {
+    draw('matricula', 8, 10);
+  }
 
   // Respostas: colunas de questões × 5 opções (A-E)
   layout.fieldBlocks
@@ -320,159 +309,222 @@ function collectBubbleShapes(layout: LayoutModel): unknown[] {
   return out;
 }
 
-// Linha de preenchimento do nome do estudante (desenhada no canvas).
+// Formas do cabeçalho no canvas: linha do nome, 8 quadros da matrícula e o badge do cartão.
 function collectHeaderShapes(layout: LayoutModel): unknown[] {
   const hb = layout.page.headerBox;
-  const y = hb.y + HEADER_LINE_DY;
-  return [
-    {
-      type: 'line',
-      x1: pt(hb.x),
-      y1: pt(y),
-      x2: pt(hb.x + HEADER_LINE_W),
-      y2: pt(y),
-      lineWidth: 1,
-      lineColor: '#000000',
-    },
-  ];
+  const out: unknown[] = [];
+
+  // Linha de preenchimento do NOME
+  const nomeLineY = hb.y + NOME_LINE_DY;
+  out.push({
+    type: 'line',
+    x1: pt(hb.x),
+    y1: pt(nomeLineY),
+    x2: pt(hb.x + NOME_LINE_W),
+    y2: pt(nomeLineY),
+    lineWidth: 1,
+    lineColor: '#000000',
+  });
+
+  // 8 quadros da MATRÍCULA (separados, escrita à mão — não lidos pelo OMR)
+  const boxesY = hb.y + MAT_BOXES_DY;
+  for (let i = 0; i < MAT_BOX_COUNT; i++) {
+    const x = hb.x + i * (MAT_BOX_W + MAT_BOX_GAP);
+    out.push({
+      type: 'rect',
+      x: pt(x),
+      y: pt(boxesY),
+      w: pt(MAT_BOX_W),
+      h: pt(MAT_BOX_H),
+      r: pt(6),
+      lineWidth: 1.2,
+      lineColor: '#444444',
+    });
+  }
+
+  // Badge do cartão (canto sup. direito, à esquerda do QR)
+  const badgeLeft = layout.page.pageWidthPx - BADGE_PAGE_MARGIN - BADGE_W;
+  out.push({
+    type: 'rect',
+    x: pt(badgeLeft),
+    y: pt(hb.y),
+    w: pt(BADGE_W),
+    h: pt(BADGE_H),
+    r: pt(14),
+    lineWidth: 2,
+    lineColor: '#222222',
+  });
+
+  return out;
 }
 
 function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
   const items: unknown[] = [];
 
-  // Cabeçalho: nome do simulado (grande) + "Nome do Estudante" (a logo é imagem, a linha é
-  // desenhada no canvas — ver buildCartaoPdf e collectHeaderShapes).
+  // Cabeçalho (a logo é imagem; badge/quadros/linha são canvas — ver collectHeaderShapes).
   const hb = layout.page.headerBox;
+
+  // Título do simulado — destaque principal
   items.push({
     text: header.nomeSimulado,
     absolutePosition: { x: pt(hb.x), y: pt(hb.y + HEADER_TITLE_DY) },
-    fontSize: 15,
+    fontSize: HEADER_TITLE_FONT,
     bold: true,
   });
-  // Identificador do cartão (sequencial por simulado): impresso + embutido no QR.
+
+  // Rótulo do campo NOME
   items.push({
-    text: `Cartão #${header.qrPayload.cartaoCode.padStart(3, '0')}`,
-    absolutePosition: { x: pt(hb.x), y: pt(hb.y + HEADER_TITLE_DY + 40) },
-    fontSize: 8,
+    text: 'NOME DO ESTUDANTE:',
+    absolutePosition: { x: pt(hb.x), y: pt(hb.y + NOME_LABEL_DY) },
+    fontSize: 11,
+    bold: true,
   });
+
+  // Rótulo do campo MATRÍCULA
   items.push({
-    text: 'Nome do Estudante',
-    absolutePosition: { x: pt(hb.x), y: pt(hb.y + HEADER_NAME_DY) },
-    fontSize: 9,
+    text: 'MATRÍCULA (8 DÍGITOS):',
+    absolutePosition: { x: pt(hb.x), y: pt(hb.y + MAT_LABEL_DY) },
+    fontSize: 11,
+    bold: true,
+  });
+
+  // Badge do cartão: "CARTÃO" pequeno em cima, "#NNN" grande embaixo, centralizados na caixa.
+  // Número dinâmico (padStart garante só o mínimo de 3 dígitos) — centralização estimada na mão.
+  const badgeLeft = layout.page.pageWidthPx - BADGE_PAGE_MARGIN - BADGE_W;
+  const badgeCenterX = badgeLeft + BADGE_W / 2;
+  const cartaoFont = 11;
+  const cartaoW = 'CARTÃO'.length * cartaoFont * 0.62; // pt, estimativa (bold)
+  items.push({
+    text: 'CARTÃO',
+    absolutePosition: {
+      x: pt(badgeCenterX) - cartaoW / 2,
+      y: pt(hb.y + 44),
+    },
+    fontSize: cartaoFont,
+    bold: true,
+  });
+  const numeroText = `#${header.qrPayload.cartaoCode.padStart(3, '0')}`;
+  const numeroFont = 28;
+  const numeroW = numeroText.length * numeroFont * 0.6; // pt, estimativa (bold)
+  items.push({
+    text: numeroText,
+    absolutePosition: {
+      x: pt(badgeCenterX) - numeroW / 2,
+      y: pt(hb.y + 108),
+    },
+    fontSize: numeroFont,
+    bold: true,
   });
 
   // Matrícula digit labels (0-9 à esquerda; e também à direita quando o container está ligado)
-  const mat = layout.fieldBlocks.find((b) => b.key === 'matricula')!;
-  const matBw = layout.page.bubbleWidthPx;
-  for (let j = 0; j < 10; j++) {
-    const c = layout.bubbleCenter('matricula', 0, j);
-    items.push({
-      text: String(j),
-      absolutePosition: { x: pt(mat.origin[0] - 55), y: centerTextY(c.y, 8) },
-      fontSize: 8,
-    });
-  }
-  if (layout.page.matriculaBox) {
-    const bh = layout.page.bubbleHeightPx;
-    const labelSpace = layout.page.matriculaSideLabelPx;
-    const pad = layout.page.respostasBoxPadPx;
-    const hwTop = mat.origin[1] - bh / 2 - 24 - 78; // = oy - bh/2 - hwGap - hwH
-    const gridLeft = mat.origin[0] - matBw / 2;
-    const gridRight = mat.origin[0] + 7 * mat.labelsGap + matBw / 2;
-    const boxLeft = gridLeft - labelSpace - pad;
-    const boxRight = gridRight + labelSpace + pad;
-    // rótulos 0-9 espelhados à direita
+  // — só quando o cartão inclui matrícula.
+  if (layout.page.incluirMatricula) {
+    const mat = layout.fieldBlocks.find((b) => b.key === 'matricula')!;
+    const matBw = layout.page.bubbleWidthPx;
     for (let j = 0; j < 10; j++) {
-      const c = layout.bubbleCenter('matricula', 7, j);
+      const c = layout.bubbleCenter('matricula', 0, j);
       items.push({
         text: String(j),
-        absolutePosition: {
-          x: pt(c.x + matBw / 2 + 12),
-          y: centerTextY(c.y, 8),
-        },
+        absolutePosition: { x: pt(mat.origin[0] - 55), y: centerTextY(c.y, 8) },
         fontSize: 8,
       });
     }
-    // título centralizado sobre o container — centralizado NA MÃO (largura/alignment não
-    // funcionam com absolutePosition no pdfmake), estimando a largura do texto.
-    const titleText = 'Código de Matrícula';
-    const titleFont = 9;
-    const titleWidthPx = (titleText.length * titleFont * 0.52) / K; // estimativa (bold)
-    const boxCenterPx = (boxLeft + boxRight) / 2;
-    items.push({
-      text: titleText,
-      absolutePosition: {
-        x: pt(boxCenterPx - titleWidthPx / 2),
-        y: pt(hwTop - 52),
-      },
-      fontSize: titleFont,
-      bold: true,
-    });
-  }
-
-  // Instruções: título + lista numerada (quebra de linha na mão), dentro do container à
-  // direita da matrícula.
-  if (layout.page.instructionsBox && layout.page.matriculaBox) {
-    const ib = instructionsBounds(layout);
-    if (ib.right - ib.left >= 200) {
-      const padL = 30; // padding interno esquerdo
-      const padR = 55; // padding interno direito (espaço entre texto e a borda do container)
-      const numIndent = 48; // recuo do texto após o "N." (px)
-      const font = 10;
-      const lineH = (font * 1.4) / K; // altura de linha (px)
-      const textX = ib.left + padL + numIndent;
-      const innerW = ib.right - ib.left - padL - numIndent - padR;
-      const maxChars = Math.floor((innerW * K) / (font * 0.48)); // estimativa
-      const instrs: { text: string; bold?: string }[] = [
-        {
-          text: 'Busque escrever o nome com letra legível, de preferência de forma.',
-        },
-        {
-          text: 'Preencha as bolhas completamente, com caneta esferográfica preta. Não use lápis nem caneta de outra cor.',
-        },
-        {
-          text: 'O cartão-resposta é o único documento usado para a correção do simulado. Não amasse, não dobre nem rasure.',
-          bold: 'cartão-resposta',
-        },
-      ];
-      items.push({
-        text: 'Instruções',
-        absolutePosition: {
-          x: pt(ib.left + padL),
-          y: pt(ib.top + padL),
-        },
-        fontSize: 13,
-        bold: true,
-      });
-      let y = ib.top + padL + 76; // mais espaço entre o título e os itens
-      instrs.forEach((instr, idx) => {
-        const lines = wrapText(instr.text, maxChars);
+    if (layout.page.matriculaBox) {
+      const bh = layout.page.bubbleHeightPx;
+      const labelSpace = layout.page.matriculaSideLabelPx;
+      const pad = layout.page.respostasBoxPadPx;
+      const hwTop = mat.origin[1] - bh / 2 - 24 - 78; // = oy - bh/2 - hwGap - hwH
+      const gridLeft = mat.origin[0] - matBw / 2;
+      const gridRight = mat.origin[0] + 7 * mat.labelsGap + matBw / 2;
+      const boxLeft = gridLeft - labelSpace - pad;
+      const boxRight = gridRight + labelSpace + pad;
+      // rótulos 0-9 espelhados à direita
+      for (let j = 0; j < 10; j++) {
+        const c = layout.bubbleCenter('matricula', 7, j);
         items.push({
-          text: `${idx + 1}.`,
-          absolutePosition: { x: pt(ib.left + padL), y: pt(y) },
-          fontSize: font,
+          text: String(j),
+          absolutePosition: {
+            x: pt(c.x + matBw / 2 + 12),
+            y: centerTextY(c.y, 8),
+          },
+          fontSize: 8,
         });
-        lines.forEach((ln, li) => {
-          // negrito na palavra pedida (fica inteira numa linha, sem espaço interno)
-          let content: unknown = ln;
-          if (instr.bold && ln.includes(instr.bold)) {
-            const i = ln.indexOf(instr.bold);
-            content = [
-              { text: ln.slice(0, i) },
-              { text: instr.bold, bold: true },
-              { text: ln.slice(i + instr.bold.length) },
-            ];
-          }
-          items.push({
-            text: content,
-            absolutePosition: { x: pt(textX), y: pt(y + li * lineH) },
-            fontSize: font,
-          });
-        });
-        y += lines.length * lineH + lineH * 0.75; // mais respiro entre itens
+      }
+      // título centralizado sobre o container — centralizado NA MÃO (largura/alignment não
+      // funcionam com absolutePosition no pdfmake), estimando a largura do texto.
+      const titleText = 'Código de Matrícula';
+      const titleFont = 9;
+      const titleWidthPx = (titleText.length * titleFont * 0.52) / K; // estimativa (bold)
+      const boxCenterPx = (boxLeft + boxRight) / 2;
+      items.push({
+        text: titleText,
+        absolutePosition: {
+          x: pt(boxCenterPx - titleWidthPx / 2),
+          y: pt(hwTop - 52),
+        },
+        fontSize: titleFont,
+        bold: true,
       });
     }
   }
+
+  // Instruções (abaixo dos campos do aluno, à esquerda). Título + lista com marcadores.
+  if (layout.page.instructionsBox) {
+    const x0 = hb.x;
+    items.push({
+      text: 'INSTRUÇÕES',
+      absolutePosition: { x: pt(x0), y: pt(hb.y + INSTR_TITLE_DY) },
+      fontSize: INSTR_TITLE_FONT,
+      bold: true,
+    });
+    const instrucoes = [
+      'Preencha completamente o círculo referente à alternativa escolhida.',
+      'Use caneta esferográfica de tinta preta ou azul-escura.',
+      'Marque apenas uma alternativa por questão.',
+      'Não faça marcas fora dos círculos.',
+      'Evite rasuras e não dobre este cartão.',
+    ];
+    let y = hb.y + INSTR_LIST_DY;
+    for (const item of instrucoes) {
+      const lines = wrapText(item, INSTR_MAX_CHARS);
+      items.push({
+        text: '•',
+        absolutePosition: { x: pt(x0), y: pt(y) },
+        fontSize: INSTR_FONT,
+      });
+      lines.forEach((ln, li) => {
+        items.push({
+          text: ln,
+          absolutePosition: {
+            x: pt(x0 + INSTR_BULLET_INDENT),
+            y: pt(y + li * INSTR_LINE_H),
+          },
+          fontSize: INSTR_FONT,
+        });
+      });
+      y += lines.length * INSTR_LINE_H + INSTR_ITEM_GAP;
+    }
+  }
+
+  // Legenda do QR (abaixo dele, centralizada na largura do QR, em 2 linhas).
+  const qr = layout.page.qrBox;
+  const qrCenterX = qr.x + qr.size / 2;
+  const capFont = 9;
+  const capLines = wrapText(
+    'Este QR Code identifica este cartão resposta.',
+    24,
+  );
+  capLines.forEach((ln, li) => {
+    const w = ln.length * capFont * 0.5; // pt, estimativa
+    items.push({
+      text: ln,
+      absolutePosition: {
+        x: pt(qrCenterX) - w / 2,
+        y: pt(qr.y + qr.size + 12 + li * 34),
+      },
+      fontSize: capFont,
+    });
+  });
 
   // Respostas: option letters (A-E) on top, question numbers on the side
   const OPT_FONT = 8;
@@ -522,8 +574,11 @@ export async function buildCartaoPdf(
   layout: LayoutModel,
   header: HeaderData,
 ): Promise<Buffer> {
+  // margin = quiet zone (módulos brancos ao redor) — essencial pra leitura por câmera.
+  // errorCorrectionLevel 'H' = 30% de recuperação (robusto a foto/inclinação/manchas).
   const qrDataUrl = await QRCode.toDataURL(JSON.stringify(header.qrPayload), {
-    margin: 0,
+    margin: 4,
+    errorCorrectionLevel: 'H',
   });
 
   // Marker images: converted to base64 data URLs so pdfmake 0.3.x can embed them
@@ -547,7 +602,6 @@ export async function buildCartaoPdf(
         canvas: [
           ...collectColumnBoxes(layout),
           ...collectMatriculaDecorations(layout),
-          ...collectInstructionsBox(layout),
           ...collectHeaderShapes(layout),
           ...collectBubbleShapes(layout),
         ],

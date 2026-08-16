@@ -46,6 +46,10 @@ export interface PageConfig {
   // Quando true (+ matriculaBox), desenha um container de instruções à direita da matrícula
   // (alinhado no topo/base), entre a matrícula e o QR. Puramente visual.
   instructionsBox: boolean;
+  // Quando true, o cartão inclui a seção de matrícula (bolhas, container, quadros de escrita,
+  // rótulos 0-9, título e o container de instruções posicionado em relação a ela). Quando false,
+  // NADA da matrícula é gerado (nem no PDF nem no template.json) — só as respostas.
+  incluirMatricula: boolean;
   qrBox: { x: number; y: number; size: number };
   headerBox: { x: number; y: number; width: number; height: number };
 }
@@ -75,7 +79,8 @@ export const DEFAULT_CONFIG: PageConfig = {
   matriculaSideLabelPx: 40,
   matriculaAlignRespostas: true,
   instructionsBox: true,
-  qrBox: { x: 2000, y: 150, size: 320 },
+  incluirMatricula: false,
+  qrBox: { x: 1605, y: 437, size: 700 },
   headerBox: { x: 150, y: 150, width: 1750, height: 560 },
 };
 
@@ -106,6 +111,7 @@ export interface LayoutModel {
 export function buildLayout(
   N: number,
   cfg: PageConfig = DEFAULT_CONFIG,
+  startNumero = 1,
 ): LayoutModel {
   const markerHalf = cfg.markerSizePx / 2;
   const near = cfg.markerInsetPx + markerHalf;
@@ -167,20 +173,23 @@ export function buildLayout(
     );
   }
 
-  const fieldBlocks: FieldBlockLayout[] = [
-    {
+  const fieldBlocks: FieldBlockLayout[] = [];
+  if (cfg.incluirMatricula) {
+    fieldBlocks.push({
       key: 'matricula',
       fieldType: 'QTYPE_INT',
       origin: [matriculaX, cfg.matriculaOrigin[1]],
       fieldLabels: ['m1..8'],
       labelsGap: cfg.matriculaLabelsGap,
       bubblesGap: cfg.matriculaBubblesGap,
-    },
-  ];
+    });
+  }
 
   const base = Math.floor(N / numColumns);
   const remainder = N % numColumns;
-  let nextQuestion = 1;
+  // Rótulos começam no numero REAL da 1ª questão do simulado (ex.: 46), não em 1 — o cartão/OMR
+  // reportam esse numero e o callback casa por numero. A distribuição continua por contagem (N).
+  let nextQuestion = startNumero;
   for (let c = 0; c < numColumns; c++) {
     const countThisColumn = base + (c < remainder ? 1 : 0);
     const first = nextQuestion;

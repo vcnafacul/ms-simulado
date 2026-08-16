@@ -34,9 +34,7 @@ const DEFAULT_HEADER: HeaderData = {
   nomeCursinho: 'Cursinho Amostra',
   qrPayload: {
     simuladoId: 'spike',
-    cursinhoId: 'spike',
     cartaoCode: '1',
-    templateVersion: 'v1',
   },
 };
 
