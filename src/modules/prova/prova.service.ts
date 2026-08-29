@@ -62,7 +62,7 @@ export class ProvaService {
   public async syncNumero(
     provaId: string,
     questaoId: string,
-    numero: number,
+    numero: number | null,
   ): Promise<void> {
     await syncNumeroNaProvaESimulados(
       this.repository,
