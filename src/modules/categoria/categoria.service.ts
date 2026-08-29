@@ -9,6 +9,7 @@ import {
 import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { SimuladoRepository } from '../simulado/simulado.repository';
+import { ProvaRepository } from '../prova/prova.repository';
 import { CreateCategoriaDTOInput } from './dtos/create.dto.input';
 import { Categoria } from './schemas/categoria.schema';
 import { CategoriaRepository } from './categoria.repository';
@@ -19,6 +20,8 @@ export class CategoriaService {
     private readonly repository: CategoriaRepository,
     @Inject(forwardRef(() => SimuladoRepository))
     private readonly simuladoRepository: SimuladoRepository,
+    @Inject(forwardRef(() => ProvaRepository))
+    private readonly provaRepository: ProvaRepository,
   ) {}
 
   public async add(dto: CreateCategoriaDTOInput): Promise<Categoria> {
@@ -75,11 +78,15 @@ export class CategoriaService {
       throw new NotFoundException(`Categoria ${id} não encontrada`);
     }
 
-    const simuladosUsando = await this.simuladoRepository.countByCategoria(id);
-    if (simuladosUsando > 0) {
+    const [simuladosUsando, provasUsando] = await Promise.all([
+      this.simuladoRepository.countByCategoria(id),
+      this.provaRepository.countByCategoria(id),
+    ]);
+    if (simuladosUsando > 0 || provasUsando > 0) {
       throw new ConflictException({
         message: 'Categoria em uso e não pode ser excluída',
         simuladosUsando,
+        provasUsando,
       });
     }
 
