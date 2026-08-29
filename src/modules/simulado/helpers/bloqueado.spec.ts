@@ -18,9 +18,9 @@ describe('atingiuQuantidade', () => {
 
 describe('todasNumeradas', () => {
   it('retorna true quando todas as entries tem numero', () => {
-    expect(
-      todasNumeradas([{ numero: 1 }, { numero: 2 }, { numero: 3 }]),
-    ).toBe(true);
+    expect(todasNumeradas([{ numero: 1 }, { numero: 2 }, { numero: 3 }])).toBe(
+      true,
+    );
   });
 
   it('retorna false quando alguma entry tem numero null', () => {
