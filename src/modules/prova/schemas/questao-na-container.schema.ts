@@ -7,8 +7,8 @@ export class QuestaoNaContainer {
   @Prop({ type: SchemaTypes.ObjectId, ref: 'Questao', required: true })
   questao: Questao;
 
-  @Prop({ required: true })
-  numero: number;
+  @Prop({ required: false, type: Number, default: null })
+  numero: number | null;
 }
 
 export const QuestaoNaContainerSchema =

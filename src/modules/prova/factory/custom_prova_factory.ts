@@ -112,6 +112,34 @@ export class CustomProvaFactory implements IProvaFactory {
     }
   }
 
+  public async addQuestaoExistenteAProva(
+    questaoId: string,
+    provaId: string,
+    numero: number,
+  ): Promise<void> {
+    const questao = await this.questaoRepository.getByIdToUpdate(questaoId);
+    const provaToEnter = await this.provaRepository.getById(provaId);
+
+    const session = await this.questaoRepository.startSession();
+    session.startTransaction();
+    try {
+      // Prova custom: 1 simulado, sem áreas/idiomáticas → entra em todos.
+      await this.simuladoService.addQuestionSimulados(
+        provaToEnter.simulados,
+        questao,
+        numero,
+        session,
+      );
+      await this.provaRepository.addQuestion(provaId, questao, numero, session);
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
   public async updateQuestion(question: UpdateDTOInput): Promise<void> {
     const questao = await this.questaoRepository.getByIdToUpdate(question._id);
     const provaToLeaveId = await this.questaoRepository.findProvaAtual(

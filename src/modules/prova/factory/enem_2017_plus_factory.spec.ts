@@ -1,4 +1,5 @@
 import { Enem2017PlusFactory } from './enem_2017_plus_factory';
+import { EnemArea } from 'src/modules/questao/enums/enem-area.enum';
 
 function makeFactory(getProvaWithQuestion?: jest.Mock) {
   const provaRepository = {
@@ -168,6 +169,69 @@ describe('Enem2017PlusFactory.updateQuestion — numero-sync (mudança pura de n
     expect(simulado.questoes[0].numero).toBe(11);
     expect(simuladoRepository.update).toHaveBeenCalledWith(
       simulado,
+      expect.anything(),
+    );
+  });
+});
+
+describe('Enem2017PlusFactory.addQuestaoExistenteAProva', () => {
+  function makeSession() {
+    return {
+      startTransaction: jest.fn(),
+      commitTransaction: jest.fn().mockResolvedValue(undefined),
+      abortTransaction: jest.fn().mockResolvedValue(undefined),
+      endSession: jest.fn(),
+    };
+  }
+
+  it('valida ENEM e adiciona nos simulados selecionados, em transação', async () => {
+    const questao = {
+      _id: 'q1',
+      status: 'Approved',
+      enemArea: EnemArea.CienciasHumanas,
+      frente1: { _id: { toString: () => 'f-hist' } },
+    } as any;
+    const prova = { _id: 'p1', simulados: [] } as any;
+
+    const session = makeSession();
+    const questaoRepository: any = {
+      startSession: jest.fn().mockResolvedValue(session),
+      getByIdToUpdate: jest.fn().mockResolvedValue(questao),
+    };
+    const provaRepository: any = {
+      getById: jest.fn().mockResolvedValue(prova),
+      addQuestion: jest.fn().mockResolvedValue(undefined),
+    };
+    const frenteRepository: any = {
+      getByFilter: jest.fn().mockImplementation(({ nome }: { nome: string }) => {
+        if (nome === 'Inglês') return Promise.resolve({ _id: { toString: () => 'f-ingles' } });
+        if (nome === 'Espanhol') return Promise.resolve({ _id: { toString: () => 'f-espanhol' } });
+        return Promise.resolve(null);
+      }),
+    };
+    const simuladoService: any = {
+      addQuestionSimulados: jest.fn().mockResolvedValue(undefined),
+    };
+    const enemService: any = {
+      validate: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const factory = new Enem2017PlusFactory(
+      {} as any, // categoriaRepository
+      questaoRepository,
+      provaRepository,
+      frenteRepository,
+      simuladoService,
+      {} as any, // simuladoRepository
+      enemService,
+    );
+
+    await factory.addQuestaoExistenteAProva('q1', 'p1', 42);
+
+    expect(provaRepository.addQuestion).toHaveBeenCalledWith(
+      'p1',
+      questao,
+      42,
       expect.anything(),
     );
   });

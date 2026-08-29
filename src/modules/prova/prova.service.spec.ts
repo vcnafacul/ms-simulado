@@ -58,6 +58,30 @@ describe('ProvaService.approvedQuestion — regra bloqueado com qtd null', () =>
 
     expect(simulado.bloqueado).toBe(true);
   });
+
+  it('mantém bloqueado quando alguma questão do simulado não tem número', async () => {
+    const simulado: any = {
+      _id: 's1',
+      questoes: [
+        { questao: { _id: 'q1', status: Status.Pending }, numero: null },
+      ],
+      categoria: { quantidadeTotalQuestao: null },
+      bloqueado: true,
+    };
+    const prova = {
+      questoes: [
+        { questao: { _id: 'q1', status: Status.Pending }, numero: null },
+      ],
+      simulados: [simulado],
+    } as any;
+    const { service } = makeService({
+      getById: jest.fn().mockResolvedValue(prova),
+    });
+
+    await service.approvedQuestion('p1', 'q1');
+
+    expect(simulado.bloqueado).toBe(true);
+  });
 });
 
 describe('ProvaService.getAllByCursinho', () => {
@@ -148,7 +172,9 @@ describe('ProvaService.syncNumero', () => {
       getById: jest.fn().mockResolvedValue(prova),
       update: jest.fn().mockResolvedValue(undefined),
     };
-    const simuladoRepository: any = { update: jest.fn().mockResolvedValue(undefined) };
+    const simuladoRepository: any = {
+      update: jest.fn().mockResolvedValue(undefined),
+    };
     const service = new ProvaService(
       {} as any,
       repository,

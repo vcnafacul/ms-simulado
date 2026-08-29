@@ -11,6 +11,11 @@ export interface IProvaFactory {
   verifyNumberProva: (id: string, numberQuestion: number) => Promise<boolean>;
   createQuestion: (question: CreateQuestaoDTOInput) => Promise<Questao>;
   updateQuestion: (question: UpdateDTOInput) => void;
+  addQuestaoExistenteAProva: (
+    questaoId: string,
+    provaId: string,
+    numero: number,
+  ) => Promise<void>;
 }
 
 export enum ExameName {

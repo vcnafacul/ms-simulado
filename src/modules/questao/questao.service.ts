@@ -48,7 +48,10 @@ export class QuestaoService {
   public async create(item: CreateQuestaoDTOInput): Promise<Questao> {
     const prova = await this.provaRepository.getById(item.prova);
     const factory = this.provaFactory.getFactory(prova.categoria, prova.ano);
-    if (item.numero == null || await factory.verifyNumberProva(prova._id, item.numero)) {
+    if (
+      item.numero == null ||
+      (await factory.verifyNumberProva(prova._id, item.numero))
+    ) {
       return await factory.createQuestion(item);
     }
     throw new HttpException(
@@ -63,9 +66,9 @@ export class QuestaoService {
     const questao = await this.repository.getById(id);
     if (!questao) return null;
     const map = await this.repository.findProvasContendoMany([id]);
-    const obj = ((questao as any).toObject
-      ? (questao as any).toObject()
-      : questao) as Questao & { provasContendo: ProvaContendo[] };
+    const obj = (
+      (questao as any).toObject ? (questao as any).toObject() : questao
+    ) as Questao & { provasContendo: ProvaContendo[] };
     obj.provasContendo = map.get(id.toString()) ?? [];
     return obj;
   }
@@ -106,7 +109,9 @@ export class QuestaoService {
     if (status !== undefined) where['status'] = status;
     if (materia) where['materia'] = materia;
     if (prova) {
-      where['_id'] = { $in: await this.repository.findQuestaoIdsByProva(prova) };
+      where['_id'] = {
+        $in: await this.repository.findQuestaoIdsByProva(prova),
+      };
     }
     if (enemArea) where['enemArea'] = enemArea;
 
@@ -249,6 +254,106 @@ export class QuestaoService {
     }
   }
 
+  public async removerDeProva(
+    questaoId: string,
+    provaId: string,
+    userId?: string,
+  ): Promise<void> {
+    const provas = await this.repository.findProvasContendo(questaoId);
+    if (provas.length <= 1) {
+      throw new BadRequestException(
+        'Não é possível remover o último vínculo. Para retirar de todas as provas, exclua a questão.',
+      );
+    }
+    const alvo = provas.find((p) => p._id.toString() === provaId);
+    if (!alvo) {
+      throw new BadRequestException('A questão não está nesta prova.');
+    }
+    const questao = await this.repository.getByIdToUpdate(questaoId);
+
+    const session = await this.repository.startSession();
+    session.startTransaction();
+    try {
+      await this.simuladoService.removeQuestionSimulados(
+        alvo.simulados,
+        questao,
+        session,
+      );
+      await this.provaRepository.removeQuestion(provaId, questao, session);
+      if (questao.provaBase?.toString() === provaId) {
+        await this.repository.setProvaBase(questaoId, null, session);
+      }
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+    await this.auditLogService.create({
+      user: userId,
+      entityId: questaoId,
+      entityType: 'Questao',
+      changes: JSON.stringify({ acao: 'removerDeProva', provaId }),
+    });
+  }
+
+  public async definirProvaBase(
+    questaoId: string,
+    provaId: string,
+    userId?: string,
+  ): Promise<void> {
+    const naProva = await this.repository.provaContemQuestao(
+      provaId,
+      questaoId,
+    );
+    if (!naProva) {
+      throw new BadRequestException(
+        'A prova indicada não contém esta questão.',
+      );
+    }
+    await this.repository.setProvaBase(questaoId, provaId);
+    await this.auditLogService.create({
+      user: userId,
+      entityId: questaoId,
+      entityType: 'Questao',
+      changes: JSON.stringify({ acao: 'definirProvaBase', provaId }),
+    });
+  }
+
+  public async adicionarEmProva(
+    questaoId: string,
+    provaId: string,
+    numero: number,
+    userId?: string,
+  ): Promise<void> {
+    const prova = await this.provaRepository.getById(provaId);
+    if (!prova) {
+      throw new NotFoundException(`Prova com ID ${provaId} não encontrada.`);
+    }
+    const jaVinculada = await this.repository.provaContemQuestao(
+      provaId,
+      questaoId,
+    );
+    if (jaVinculada) {
+      throw new BadRequestException('A questão já está nesta prova.');
+    }
+    const factory = this.provaFactory.getFactory(prova.categoria, prova.ano);
+    const numeroLivre = await factory.verifyNumberProva(prova._id, numero);
+    if (!numeroLivre) {
+      throw new BadRequestException(
+        `Número ${numero} indisponível nesta prova.`,
+      );
+    }
+    await factory.addQuestaoExistenteAProva(questaoId, provaId, numero);
+    await this.auditLogService.create({
+      user: userId,
+      entityId: questaoId,
+      entityType: 'Questao',
+      changes: JSON.stringify({ acao: 'adicionarEmProva', provaId, numero }),
+    });
+  }
+
   public async updateClassificacao(
     id: string,
     classificacao: UpdateClassificacaoDTOInput,
@@ -277,10 +382,13 @@ export class QuestaoService {
         updateDto.numero = classificacao.numero;
         updateDto.alternativa = questao.alternativa;
         await this.updateQuestion(updateDto);
-      } else if (classificacao.numero != null) {
-        // Guard: no branch numero-only assumimos que a questão já está na prova
-        // enviada (a UI trava a prova). Falha alto se não estiver, em vez de o
-        // syncNumero virar no-op silencioso na prova errada.
+      } else {
+        // Guard: numero pode ser um valor real ou null (limpar número) — em
+        // ambos os casos assumimos que a questão já está na prova enviada (a
+        // UI trava a prova). Falha alto se não estiver, em vez de o syncNumero
+        // virar no-op silencioso na prova errada. Este endpoint sempre recebe
+        // `numero` no payload (nunca omitido) — o client manda o valor atual
+        // do vínculo, mudado ou não.
         const naProva = await this.repository.provaContemQuestao(
           classificacao.prova,
           id,
@@ -291,11 +399,16 @@ export class QuestaoService {
             HttpStatus.BAD_REQUEST,
           );
         }
-        // Só o numero mudou: sync escopado na prova editada + simulados dela.
+        // Só o numero mudou (ou ficou igual): sync escopado na prova editada
+        // + simulados dela. syncNumero é idempotente (no-op se já correto).
+        // `?? null`: o DTO declara `numero?: number | null` (campo opcional
+        // pra Swagger), mas sem o `!= null` que existia antes, o TypeScript
+        // não estreita mais pra `number` — normaliza `undefined` pra `null`
+        // porque syncNumero espera exatamente `number | null`.
         await this.provaService.syncNumero(
           classificacao.prova,
           id,
-          classificacao.numero,
+          classificacao.numero ?? null,
         );
       }
       await this.repository.updateClassificacao(id, classificacao);

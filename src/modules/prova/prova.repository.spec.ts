@@ -23,7 +23,7 @@ describe('ProvaRepository.addQuestion (single-write questoes)', () => {
     expect(prova.questoes).toHaveLength(1);
     expect(prova.questoes[0].numero).toBe(3);
     expect(prova.totalQuestaoValidadas).toBe(1);
-    expect(updateOne).toHaveBeenCalledWith({ _id: 'p1' }, prova);
+    expect(updateOne).toHaveBeenCalledWith({ _id: 'p1' }, prova, { session: undefined });
   });
 
   it('não incrementa totalQuestaoValidadas quando a questão não está aprovada', async () => {
@@ -71,7 +71,7 @@ describe('ProvaRepository.removeQuestion (single-write questoes)', () => {
 
     expect(prova.questoes).toHaveLength(0);
     expect(prova.totalQuestaoValidadas).toBe(0);
-    expect(updateOne).toHaveBeenCalledWith({ _id: 'p1' }, prova);
+    expect(updateOne).toHaveBeenCalledWith({ _id: 'p1' }, prova, { session: undefined });
   });
 
   it('não decrementa quando a questão não estava no container', async () => {
@@ -120,6 +120,58 @@ describe('ProvaRepository.getById (popula questoes.questao)', () => {
     );
     expect(nested).toBeDefined();
     expect(nested.populate).toEqual(['categoria', { path: 'questoes.questao' }]);
+  });
+});
+
+describe('ProvaRepository.addQuestion (com session)', () => {
+  it('repassa session para findById e updateOne quando session é fornecida', async () => {
+    const prova: any = {
+      _id: 'p1',
+      questoes: [],
+      totalQuestaoValidadas: 0,
+    };
+    const updateOne = jest.fn().mockResolvedValue({ acknowledged: true });
+    const findById = jest.fn().mockResolvedValue(prova);
+    const repo = new ProvaRepository({ findById, updateOne } as any);
+    const session = {} as any;
+
+    const questao: any = {
+      _id: new Types.ObjectId(),
+      numero: 1,
+      status: Status.Approved,
+    };
+    await repo.addQuestion('p1', questao, 1, session);
+
+    expect(findById).toHaveBeenCalledWith('p1', null, { session });
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: 'p1' },
+      prova,
+      { session },
+    );
+  });
+});
+
+describe('ProvaRepository.removeQuestion (com session)', () => {
+  it('repassa session para findById e updateOne quando questão está presente na prova', async () => {
+    const alvo = new Types.ObjectId();
+    const prova: any = {
+      _id: 'p1',
+      questoes: [{ questao: { _id: alvo }, numero: 2 }],
+      totalQuestaoValidadas: 1,
+    };
+    const updateOne = jest.fn().mockResolvedValue({ acknowledged: true });
+    const findById = jest.fn().mockResolvedValue(prova);
+    const repo = new ProvaRepository({ findById, updateOne } as any);
+    const session = {} as any;
+
+    await repo.removeQuestion('p1', { _id: alvo, status: Status.Approved } as any, session);
+
+    expect(findById).toHaveBeenCalledWith('p1', null, { session });
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: 'p1' },
+      prova,
+      { session },
+    );
   });
 });
 

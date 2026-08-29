@@ -21,7 +21,7 @@ import { Status } from '../questao/enums/status.enum';
 import { QuestaoRepository } from '../questao/questao.repository';
 import { Questao } from '../questao/questao.schema';
 import { CategoriaRepository } from '../categoria/categoria.repository';
-import { atingiuQuantidade } from './helpers/bloqueado';
+import { atingiuQuantidade, todasNumeradas } from './helpers/bloqueado';
 import {
   addQuestaoToContainer,
   removeQuestaoFromContainer,
@@ -148,8 +148,12 @@ export class SimuladoService {
           (qc) => qc.questao.status === Status.Approved,
         );
 
-        // Bloqueado = false só se todas adicionadas e aprovadas
-        sml.bloqueado = !(atingiuQuantidadeTotal && todasAprovadas);
+        // Bloqueado = false só se todas adicionadas, aprovadas e numeradas
+        sml.bloqueado = !(
+          atingiuQuantidadeTotal &&
+          todasAprovadas &&
+          todasNumeradas(sml.questoes)
+        );
 
         return await this.simuladoRepository.updateSession(sml, session);
       }),

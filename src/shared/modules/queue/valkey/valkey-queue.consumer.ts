@@ -2,8 +2,8 @@ import {
   Inject,
   Injectable,
   Logger,
+  OnApplicationBootstrap,
   OnModuleDestroy,
-  OnModuleInit,
 } from '@nestjs/common';
 import Redis from 'ioredis';
 import { QueueConsumer } from '../queue.consumer';
@@ -19,7 +19,7 @@ type Registration = {
 @Injectable()
 export class ValkeyQueueConsumer
   extends QueueConsumer
-  implements OnModuleInit, OnModuleDestroy
+  implements OnApplicationBootstrap, OnModuleDestroy
 {
   private readonly logger = new Logger(ValkeyQueueConsumer.name);
   private running = false;
@@ -38,7 +38,10 @@ export class ValkeyQueueConsumer
     this.registrations.push({ stream, group, consumer, handler });
   }
 
-  async onModuleInit() {
+  // onApplicationBootstrap (not onModuleInit) runs only after every module's
+  // onModuleInit has finished, guaranteeing register() has already been
+  // called by consumers like AnswerProcessorService before we start polling.
+  async onApplicationBootstrap() {
     for (const { stream, group } of this.registrations) {
       await this.ensureGroup(stream, group);
     }
@@ -62,6 +65,12 @@ export class ValkeyQueueConsumer
 
   private async poll() {
     while (this.running) {
+      if (this.registrations.length === 0) {
+        // Never spin the loop without an await: with no registrations this
+        // would pin the event loop at 100% CPU and freeze the whole app.
+        await new Promise((r) => setTimeout(r, 200));
+        continue;
+      }
       for (const reg of this.registrations) {
         await this.readAndProcess(reg);
         await this.reclaimStale(reg);

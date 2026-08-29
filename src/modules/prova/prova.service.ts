@@ -12,7 +12,10 @@ import { ProvaFactory } from './factory/prova_factory';
 import { ProvaRepository } from './prova.repository';
 import { Prova } from './prova.schema';
 import { UpdateProvaFilesDTO } from './dtos/update-files.dto.input';
-import { atingiuQuantidade } from '../simulado/helpers/bloqueado';
+import {
+  atingiuQuantidade,
+  todasNumeradas,
+} from '../simulado/helpers/bloqueado';
 import { syncNumeroNaProvaESimulados } from './helpers/question-container.helpers';
 
 @Injectable()
@@ -62,7 +65,7 @@ export class ProvaService {
   public async syncNumero(
     provaId: string,
     questaoId: string,
-    numero: number,
+    numero: number | null,
   ): Promise<void> {
     await syncNumeroNaProvaESimulados(
       this.repository,
@@ -142,7 +145,11 @@ export class ProvaService {
             qc.questao._id.toString() === questionId,
         );
 
-        simulado.bloqueado = !(hasRequiredCount && allApproved);
+        simulado.bloqueado = !(
+          hasRequiredCount &&
+          allApproved &&
+          todasNumeradas(simulado.questoes)
+        );
         if (!simulado.bloqueado) {
           simulado.questoes = simulado.questoes.sort(
             (a, b) => a.numero - b.numero,
