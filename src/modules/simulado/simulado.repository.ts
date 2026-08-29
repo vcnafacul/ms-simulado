@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { ClientSession, Model } from 'mongoose';
+import { ClientSession, Model, Types } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
@@ -17,6 +17,24 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
       categoria: categoriaId,
       deleted: { $ne: true },
     });
+  }
+
+  async countsByCategoria(
+    categoriaIds: string[],
+  ): Promise<Record<string, number>> {
+    const rows = await this.model.aggregate([
+      {
+        $match: {
+          categoria: { $in: categoriaIds.map((id) => new Types.ObjectId(id)) },
+          deleted: { $ne: true },
+        },
+      },
+      { $group: { _id: '$categoria', total: { $sum: 1 } } },
+    ]);
+    return rows.reduce<Record<string, number>>((acc, row) => {
+      acc[row._id.toString()] = row.total;
+      return acc;
+    }, {});
   }
 
   async getById(id: string): Promise<Simulado | null> {
