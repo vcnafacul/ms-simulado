@@ -23,7 +23,9 @@ describe('ProvaRepository.addQuestion (single-write questoes)', () => {
     expect(prova.questoes).toHaveLength(1);
     expect(prova.questoes[0].numero).toBe(3);
     expect(prova.totalQuestaoValidadas).toBe(1);
-    expect(updateOne).toHaveBeenCalledWith({ _id: 'p1' }, prova, { session: undefined });
+    expect(updateOne).toHaveBeenCalledWith({ _id: 'p1' }, prova, {
+      session: undefined,
+    });
   });
 
   it('não incrementa totalQuestaoValidadas quando a questão não está aprovada', async () => {
@@ -71,7 +73,9 @@ describe('ProvaRepository.removeQuestion (single-write questoes)', () => {
 
     expect(prova.questoes).toHaveLength(0);
     expect(prova.totalQuestaoValidadas).toBe(0);
-    expect(updateOne).toHaveBeenCalledWith({ _id: 'p1' }, prova, { session: undefined });
+    expect(updateOne).toHaveBeenCalledWith({ _id: 'p1' }, prova, {
+      session: undefined,
+    });
   });
 
   it('não decrementa quando a questão não estava no container', async () => {
@@ -119,7 +123,10 @@ describe('ProvaRepository.getById (popula questoes.questao)', () => {
       (c) => c && typeof c === 'object' && c.path === 'simulados',
     );
     expect(nested).toBeDefined();
-    expect(nested.populate).toEqual(['categoria', { path: 'questoes.questao' }]);
+    expect(nested.populate).toEqual([
+      'categoria',
+      { path: 'questoes.questao' },
+    ]);
   });
 });
 
@@ -143,11 +150,7 @@ describe('ProvaRepository.addQuestion (com session)', () => {
     await repo.addQuestion('p1', questao, 1, session);
 
     expect(findById).toHaveBeenCalledWith('p1', null, { session });
-    expect(updateOne).toHaveBeenCalledWith(
-      { _id: 'p1' },
-      prova,
-      { session },
-    );
+    expect(updateOne).toHaveBeenCalledWith({ _id: 'p1' }, prova, { session });
   });
 });
 
@@ -164,14 +167,14 @@ describe('ProvaRepository.removeQuestion (com session)', () => {
     const repo = new ProvaRepository({ findById, updateOne } as any);
     const session = {} as any;
 
-    await repo.removeQuestion('p1', { _id: alvo, status: Status.Approved } as any, session);
+    await repo.removeQuestion(
+      'p1',
+      { _id: alvo, status: Status.Approved } as any,
+      session,
+    );
 
     expect(findById).toHaveBeenCalledWith('p1', null, { session });
-    expect(updateOne).toHaveBeenCalledWith(
-      { _id: 'p1' },
-      prova,
-      { session },
-    );
+    expect(updateOne).toHaveBeenCalledWith({ _id: 'p1' }, prova, { session });
   });
 });
 

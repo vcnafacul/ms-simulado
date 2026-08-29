@@ -22,9 +22,15 @@ export class ProvaRepository extends BaseRepository<Prova> {
     return this.model.countDocuments({ categoria: categoriaId });
   }
 
-  async countsByCategoria(categoriaIds: string[]): Promise<Record<string, number>> {
+  async countsByCategoria(
+    categoriaIds: string[],
+  ): Promise<Record<string, number>> {
     const rows = await this.model.aggregate([
-      { $match: { categoria: { $in: categoriaIds.map((id) => new Types.ObjectId(id)) } } },
+      {
+        $match: {
+          categoria: { $in: categoriaIds.map((id) => new Types.ObjectId(id)) },
+        },
+      },
       { $group: { _id: '$categoria', total: { $sum: 1 } } },
     ]);
     return rows.reduce<Record<string, number>>((acc, row) => {
