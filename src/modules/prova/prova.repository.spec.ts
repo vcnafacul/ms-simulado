@@ -198,3 +198,15 @@ describe('ProvaRepository.getProvaWithQuestion (sem populate de questoes)', () =
     ).toBe(true);
   });
 });
+
+describe('ProvaRepository.countByCategoria', () => {
+  it('conta provas que referenciam a categoria', async () => {
+    const countDocuments = jest.fn().mockResolvedValue(4);
+    const repo = new ProvaRepository({ countDocuments } as any);
+
+    const total = await repo.countByCategoria('cat-123');
+
+    expect(total).toBe(4);
+    expect(countDocuments).toHaveBeenCalledWith({ categoria: 'cat-123' });
+  });
+});

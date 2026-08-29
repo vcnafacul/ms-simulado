@@ -18,6 +18,10 @@ export class ProvaRepository extends BaseRepository<Prova> {
     super(model);
   }
 
+  async countByCategoria(categoriaId: string): Promise<number> {
+    return this.model.countDocuments({ categoria: categoriaId });
+  }
+
   async update(prova: Prova, session?: ClientSession) {
     await this.model.updateOne({ _id: prova._id }, prova, { session });
   }
