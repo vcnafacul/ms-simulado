@@ -15,7 +15,7 @@ interface QuestaoContainer {
 export function addQuestaoToContainer(
   container: QuestaoContainer,
   questao: Questao,
-  numero: number,
+  numero: number | null,
 ): void {
   container.questoes.push({ questao, numero });
 }
@@ -67,7 +67,7 @@ export async function syncNumeroNaProvaESimulados(
   simuladoRepository: SimuladoRepositoryLike,
   provaId: string,
   questaoId: Types.ObjectId | string,
-  numero: number,
+  numero: number | null,
   session?: ClientSession,
 ): Promise<void> {
   const prova = await provaRepository.getById(provaId);
@@ -93,7 +93,7 @@ export async function syncNumeroNaProvaESimulados(
 export function updateNumeroNoContainer(
   container: QuestaoContainer,
   questaoId: Types.ObjectId | string,
-  numero: number,
+  numero: number | null,
 ): boolean {
   const idStr = questaoId.toString();
   let changed = false;

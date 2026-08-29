@@ -265,6 +265,26 @@ describe('SimuladoService.addQuestionSimulados (single-write questoes)', () => {
 
     expect(sml.bloqueado).toBe(true);
   });
+
+  it('mantém bloqueado quando a questão sendo adicionada não tem número', async () => {
+    const service = makeService({
+      updateSession: jest.fn().mockResolvedValue(undefined),
+    });
+    const sml: any = {
+      _id: 's1',
+      questoes: [],
+      categoria: { quantidadeTotalQuestao: 1 },
+      bloqueado: true,
+    };
+
+    await service.addQuestionSimulados(
+      [sml],
+      { _id: 'q1', numero: null, status: Status.Approved } as any,
+      null as any,
+    );
+
+    expect(sml.bloqueado).toBe(true);
+  });
 });
 
 describe('SimuladoService.removeQuestionSimulados (single-write questoes)', () => {

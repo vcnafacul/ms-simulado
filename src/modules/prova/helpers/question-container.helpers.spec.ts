@@ -138,6 +138,33 @@ describe('syncNumeroNaProvaESimulados', () => {
     expect(provaRepository.update).not.toHaveBeenCalled();
     expect(simuladoRepository.update).not.toHaveBeenCalled();
   });
+
+  it('propaga numero null (limpar numero) na prova e nos simulados', async () => {
+    const sml = { questoes: [{ questao: { _id: 'q1' }, numero: 5 }] };
+    const prova = {
+      _id: 'p1',
+      questoes: [{ questao: { _id: 'q1' }, numero: 5 }],
+      simulados: [sml],
+    };
+    const provaRepository = {
+      getById: jest.fn().mockResolvedValue(prova),
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+    const simuladoRepository = { update: jest.fn().mockResolvedValue(undefined) };
+
+    await syncNumeroNaProvaESimulados(
+      provaRepository as any,
+      simuladoRepository as any,
+      'p1',
+      'q1',
+      null,
+    );
+
+    expect(prova.questoes[0].numero).toBeNull();
+    expect(sml.questoes[0].numero).toBeNull();
+    expect(provaRepository.update).toHaveBeenCalledWith(prova, undefined);
+    expect(simuladoRepository.update).toHaveBeenCalledWith(sml, undefined);
+  });
 });
 
 describe('updateNumeroNoContainer', () => {
