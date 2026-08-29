@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { ClientSession, Model } from 'mongoose';
+import { ClientSession, Model, Types } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { GetAllWhereInput } from 'src/shared/base/interfaces/get-all.input';
@@ -20,6 +20,17 @@ export class ProvaRepository extends BaseRepository<Prova> {
 
   async countByCategoria(categoriaId: string): Promise<number> {
     return this.model.countDocuments({ categoria: categoriaId });
+  }
+
+  async countsByCategoria(categoriaIds: string[]): Promise<Record<string, number>> {
+    const rows = await this.model.aggregate([
+      { $match: { categoria: { $in: categoriaIds.map((id) => new Types.ObjectId(id)) } } },
+      { $group: { _id: '$categoria', total: { $sum: 1 } } },
+    ]);
+    return rows.reduce<Record<string, number>>((acc, row) => {
+      acc[row._id.toString()] = row.total;
+      return acc;
+    }, {});
   }
 
   async update(prova: Prova, session?: ClientSession) {

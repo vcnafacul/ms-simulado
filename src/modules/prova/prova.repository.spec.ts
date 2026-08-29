@@ -210,3 +210,38 @@ describe('ProvaRepository.countByCategoria', () => {
     expect(countDocuments).toHaveBeenCalledWith({ categoria: 'cat-123' });
   });
 });
+
+describe('ProvaRepository.countsByCategoria', () => {
+  it('agrupa a contagem de provas por categoria em um único aggregate', async () => {
+    const catA = new Types.ObjectId();
+    const catB = new Types.ObjectId();
+    const aggregate = jest.fn().mockResolvedValue([
+      { _id: catA, total: 2 },
+      { _id: catB, total: 5 },
+    ]);
+    const repo = new ProvaRepository({ aggregate } as any);
+
+    const counts = await repo.countsByCategoria([
+      catA.toString(),
+      catB.toString(),
+    ]);
+
+    expect(counts).toEqual({
+      [catA.toString()]: 2,
+      [catB.toString()]: 5,
+    });
+    expect(aggregate).toHaveBeenCalledWith([
+      { $match: { categoria: { $in: [catA, catB] } } },
+      { $group: { _id: '$categoria', total: { $sum: 1 } } },
+    ]);
+  });
+
+  it('retorna objeto vazio quando não há ids', async () => {
+    const aggregate = jest.fn().mockResolvedValue([]);
+    const repo = new ProvaRepository({ aggregate } as any);
+
+    const counts = await repo.countsByCategoria([]);
+
+    expect(counts).toEqual({});
+  });
+});
