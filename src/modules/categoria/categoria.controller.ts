@@ -53,7 +53,9 @@ export class CategoriaController {
     type: CategoriaOutputDTO,
     isArray: false,
   })
-  public async getById(@Param('id') id: string): Promise<CategoriaOutputDTO | null> {
+  public async getById(
+    @Param('id') id: string,
+  ): Promise<CategoriaOutputDTO | null> {
     return await this.service.getById(id);
   }
 
