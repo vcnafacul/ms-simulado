@@ -220,3 +220,134 @@ describe('CategoriaService.add', () => {
     expect(saved.selecionavel).toBe(true);
   });
 });
+
+describe('CategoriaService.getAll (anexa contagem de uso)', () => {
+  it('anexa simuladosCount e provasCount a cada categoria retornada', async () => {
+    const repository = {
+      getAll: jest.fn().mockResolvedValue({
+        data: [
+          { _id: 'cat-1', nome: 'A' },
+          { _id: 'cat-2', nome: 'B' },
+        ],
+        page: 1,
+        limit: 10,
+        totalItems: 2,
+      }),
+    };
+    const simuladoRepository = {
+      countByCategoria: jest.fn(),
+      countsByCategoria: jest.fn().mockResolvedValue({ 'cat-1': 3 }),
+    };
+    const provaRepository = {
+      countByCategoria: jest.fn(),
+      countsByCategoria: jest.fn().mockResolvedValue({ 'cat-2': 5 }),
+    };
+    const service = new CategoriaService(
+      repository as any,
+      simuladoRepository as any,
+      provaRepository as any,
+    );
+
+    const result = await service.getAll({ page: 1, limit: 10 });
+
+    expect(result.data).toEqual([
+      { _id: 'cat-1', nome: 'A', simuladosCount: 3, provasCount: 0 },
+      { _id: 'cat-2', nome: 'B', simuladosCount: 0, provasCount: 5 },
+    ]);
+    expect(simuladoRepository.countsByCategoria).toHaveBeenCalledWith([
+      'cat-1',
+      'cat-2',
+    ]);
+    expect(provaRepository.countsByCategoria).toHaveBeenCalledWith([
+      'cat-1',
+      'cat-2',
+    ]);
+  });
+
+  it('converte documento Mongoose (com toObject) antes de anexar as contagens', async () => {
+    const doc = {
+      _id: 'cat-1',
+      toObject: jest.fn().mockReturnValue({ _id: 'cat-1', nome: 'A' }),
+    };
+    const repository = {
+      getAll: jest.fn().mockResolvedValue({
+        data: [doc],
+        page: 1,
+        limit: 10,
+        totalItems: 1,
+      }),
+    };
+    const simuladoRepository = {
+      countByCategoria: jest.fn(),
+      countsByCategoria: jest.fn().mockResolvedValue({}),
+    };
+    const provaRepository = {
+      countByCategoria: jest.fn(),
+      countsByCategoria: jest.fn().mockResolvedValue({}),
+    };
+    const service = new CategoriaService(
+      repository as any,
+      simuladoRepository as any,
+      provaRepository as any,
+    );
+
+    const result = await service.getAll({ page: 1, limit: 10 });
+
+    expect(doc.toObject).toHaveBeenCalled();
+    expect(result.data).toEqual([
+      { _id: 'cat-1', nome: 'A', simuladosCount: 0, provasCount: 0 },
+    ]);
+  });
+});
+
+describe('CategoriaService.getById (anexa contagem de uso)', () => {
+  it('retorna a categoria com simuladosCount/provasCount', async () => {
+    const repository = {
+      getById: jest.fn().mockResolvedValue({ _id: 'cat-1', nome: 'A' }),
+    };
+    const simuladoRepository = {
+      countByCategoria: jest.fn(),
+      countsByCategoria: jest.fn().mockResolvedValue({ 'cat-1': 4 }),
+    };
+    const provaRepository = {
+      countByCategoria: jest.fn(),
+      countsByCategoria: jest.fn().mockResolvedValue({ 'cat-1': 2 }),
+    };
+    const service = new CategoriaService(
+      repository as any,
+      simuladoRepository as any,
+      provaRepository as any,
+    );
+
+    const result = await service.getById('cat-1');
+
+    expect(result).toEqual({
+      _id: 'cat-1',
+      nome: 'A',
+      simuladosCount: 4,
+      provasCount: 2,
+    });
+  });
+
+  it('retorna null quando a categoria não existe', async () => {
+    const repository = { getById: jest.fn().mockResolvedValue(null) };
+    const simuladoRepository = {
+      countByCategoria: jest.fn(),
+      countsByCategoria: jest.fn(),
+    };
+    const provaRepository = {
+      countByCategoria: jest.fn(),
+      countsByCategoria: jest.fn(),
+    };
+    const service = new CategoriaService(
+      repository as any,
+      simuladoRepository as any,
+      provaRepository as any,
+    );
+
+    const result = await service.getById('cat-x');
+
+    expect(result).toBeNull();
+    expect(simuladoRepository.countsByCategoria).not.toHaveBeenCalled();
+  });
+});

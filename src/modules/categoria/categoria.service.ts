@@ -11,6 +11,7 @@ import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { SimuladoRepository } from '../simulado/simulado.repository';
 import { ProvaRepository } from '../prova/prova.repository';
 import { CreateCategoriaDTOInput } from './dtos/create.dto.input';
+import { CategoriaOutputDTO } from './dtos/categoria-output.dto';
 import { Categoria } from './schemas/categoria.schema';
 import { CategoriaRepository } from './categoria.repository';
 
@@ -64,12 +65,23 @@ export class CategoriaService {
     }
   }
 
-  public async getById(id: string): Promise<Categoria> {
-    return await this.repository.getById(id);
+  public async getById(id: string): Promise<CategoriaOutputDTO | null> {
+    const categoria = await this.repository.getById(id);
+    if (!categoria) {
+      return null;
+    }
+    const [comUso] = await this.attachUsageCounts([categoria]);
+    return comUso;
   }
 
-  public async getAll(param: GetAllInput): Promise<GetAllOutput<Categoria>> {
-    return await this.repository.getAll(param);
+  public async getAll(
+    param: GetAllInput,
+  ): Promise<GetAllOutput<CategoriaOutputDTO>> {
+    const result = await this.repository.getAll(param);
+    return {
+      ...result,
+      data: await this.attachUsageCounts(result.data),
+    };
   }
 
   public async delete(id: string): Promise<void> {
@@ -91,5 +103,27 @@ export class CategoriaService {
     }
 
     await this.repository.delete(id);
+  }
+
+  private async attachUsageCounts(
+    categorias: Categoria[],
+  ): Promise<CategoriaOutputDTO[]> {
+    const ids = categorias.map((c) => c._id.toString());
+    const [simuladoCounts, provaCounts] = await Promise.all([
+      this.simuladoRepository.countsByCategoria(ids),
+      this.provaRepository.countsByCategoria(ids),
+    ]);
+    return categorias.map((categoria) => {
+      const plain =
+        typeof (categoria as any).toObject === 'function'
+          ? (categoria as any).toObject()
+          : categoria;
+      const id = plain._id.toString();
+      return {
+        ...plain,
+        simuladosCount: simuladoCounts[id] ?? 0,
+        provasCount: provaCounts[id] ?? 0,
+      } as CategoriaOutputDTO;
+    });
   }
 }
