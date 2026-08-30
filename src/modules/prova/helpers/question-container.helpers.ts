@@ -1,4 +1,5 @@
 import { ClientSession, Types } from 'mongoose';
+import { revalidarBloqueado } from '../../simulado/helpers/bloqueado';
 import { Questao } from '../../questao/questao.schema';
 import { QuestaoNaContainer } from '../schemas/questao-na-container.schema';
 
@@ -42,10 +43,16 @@ export function removeQuestaoFromContainer(
   );
 }
 
+/** Container que carrega estado de bloqueio (só Simulado, não Prova). */
+interface SimuladoContainer extends QuestaoContainer {
+  categoria: { quantidadeTotalQuestao?: number | null };
+  bloqueado?: boolean;
+}
+
 interface ProvaRepositoryLike {
   getById(
     id: string,
-  ): Promise<QuestaoContainer & { simulados: QuestaoContainer[] }>;
+  ): Promise<QuestaoContainer & { simulados: SimuladoContainer[] }>;
   update(prova: QuestaoContainer, session?: ClientSession): Promise<unknown>;
 }
 interface SimuladoRepositoryLike {
@@ -63,6 +70,11 @@ interface SimuladoRepositoryLike {
  * updates entram na mesma session — assim uma falha aqui aborta a transação em
  * vez de deixar o `numero` dessincronizado pós-commit. Sem session (ex.:
  * updateClassificacao) roda solto, como antes.
+ *
+ * Cada simulado que muda é revalidado: `numero` entra na regra de bloqueio, e
+ * sem isso remover um número deixaria um simulado liberado com questão sem
+ * posição, e preencher o número que faltava não liberaria o simulado travado
+ * só por causa dele.
  */
 export async function syncNumeroNaProvaESimulados(
   provaRepository: ProvaRepositoryLike,
@@ -80,6 +92,7 @@ export async function syncNumeroNaProvaESimulados(
   await Promise.all(
     (prova.simulados ?? []).map(async (sml) => {
       if (updateNumeroNoContainer(sml, questaoId, numero)) {
+        revalidarBloqueado(sml);
         await simuladoRepository.update(sml, session);
       }
     }),
