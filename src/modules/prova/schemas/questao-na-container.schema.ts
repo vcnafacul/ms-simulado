@@ -7,8 +7,11 @@ export class QuestaoNaContainer {
   @Prop({ type: SchemaTypes.ObjectId, ref: 'Questao', required: true })
   questao: Questao;
 
-  @Prop({ required: true })
-  numero: number;
+  // Nullable: uma questão pode estar vinculada à prova sem posição definida
+  // ainda (o admin remove o número na aba Classificação). Simulado com questão
+  // sem número nunca é liberado — ver `todasComNumero` em simulado/helpers.
+  @Prop({ required: false, default: null })
+  numero: number | null;
 }
 
 export const QuestaoNaContainerSchema =

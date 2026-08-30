@@ -12,7 +12,10 @@ import { ProvaFactory } from './factory/prova_factory';
 import { ProvaRepository } from './prova.repository';
 import { Prova } from './prova.schema';
 import { UpdateProvaFilesDTO } from './dtos/update-files.dto.input';
-import { atingiuQuantidade } from '../simulado/helpers/bloqueado';
+import {
+  atingiuQuantidade,
+  todasComNumero,
+} from '../simulado/helpers/bloqueado';
 import { syncNumeroNaProvaESimulados } from './helpers/question-container.helpers';
 
 @Injectable()
@@ -62,7 +65,7 @@ export class ProvaService {
   public async syncNumero(
     provaId: string,
     questaoId: string,
-    numero: number,
+    numero: number | null,
   ): Promise<void> {
     await syncNumeroNaProvaESimulados(
       this.repository,
@@ -141,9 +144,11 @@ export class ProvaService {
             qc.questao.status === Status.Approved ||
             qc.questao._id.toString() === questionId,
         );
+        const allNumbered = todasComNumero(simulado.questoes);
 
-        simulado.bloqueado = !(hasRequiredCount && allApproved);
+        simulado.bloqueado = !(hasRequiredCount && allApproved && allNumbered);
         if (!simulado.bloqueado) {
+          // Seguro ordenar por subtração: só chega aqui com todos numerados.
           simulado.questoes = simulado.questoes.sort(
             (a, b) => a.numero - b.numero,
           );
@@ -177,6 +182,7 @@ export class ProvaService {
         );
         const allApproved =
           hasRequiredCount &&
+          todasComNumero(simulado.questoes) &&
           simulado.questoes.every((qc) => {
             if (qc.questao._id.toString() === questionId) return false;
             return qc.questao.status === Status.Approved;

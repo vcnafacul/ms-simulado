@@ -24,8 +24,8 @@ export class QuestaoDTO {
   @ApiProperty()
   public materia: Materia;
 
-  @ApiProperty()
-  public numero: number;
+  @ApiProperty({ nullable: true })
+  public numero: number | null;
 
   @ApiProperty()
   public textoQuestao?: string;

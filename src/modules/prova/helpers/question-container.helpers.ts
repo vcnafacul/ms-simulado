@@ -43,7 +43,9 @@ export function removeQuestaoFromContainer(
 }
 
 interface ProvaRepositoryLike {
-  getById(id: string): Promise<QuestaoContainer & { simulados: QuestaoContainer[] }>;
+  getById(
+    id: string,
+  ): Promise<QuestaoContainer & { simulados: QuestaoContainer[] }>;
   update(prova: QuestaoContainer, session?: ClientSession): Promise<unknown>;
 }
 interface SimuladoRepositoryLike {
@@ -67,7 +69,7 @@ export async function syncNumeroNaProvaESimulados(
   simuladoRepository: SimuladoRepositoryLike,
   provaId: string,
   questaoId: Types.ObjectId | string,
-  numero: number,
+  numero: number | null,
   session?: ClientSession,
 ): Promise<void> {
   const prova = await provaRepository.getById(provaId);
@@ -93,7 +95,7 @@ export async function syncNumeroNaProvaESimulados(
 export function updateNumeroNoContainer(
   container: QuestaoContainer,
   questaoId: Types.ObjectId | string,
-  numero: number,
+  numero: number | null,
 ): boolean {
   const idStr = questaoId.toString();
   let changed = false;

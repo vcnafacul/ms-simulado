@@ -48,7 +48,10 @@ export class QuestaoService {
   public async create(item: CreateQuestaoDTOInput): Promise<Questao> {
     const prova = await this.provaRepository.getById(item.prova);
     const factory = this.provaFactory.getFactory(prova.categoria, prova.ano);
-    if (item.numero == null || await factory.verifyNumberProva(prova._id, item.numero)) {
+    if (
+      item.numero == null ||
+      (await factory.verifyNumberProva(prova._id, item.numero))
+    ) {
       return await factory.createQuestion(item);
     }
     throw new HttpException(
@@ -63,9 +66,9 @@ export class QuestaoService {
     const questao = await this.repository.getById(id);
     if (!questao) return null;
     const map = await this.repository.findProvasContendoMany([id]);
-    const obj = ((questao as any).toObject
-      ? (questao as any).toObject()
-      : questao) as Questao & { provasContendo: ProvaContendo[] };
+    const obj = (
+      (questao as any).toObject ? (questao as any).toObject() : questao
+    ) as Questao & { provasContendo: ProvaContendo[] };
     obj.provasContendo = map.get(id.toString()) ?? [];
     return obj;
   }
@@ -106,7 +109,9 @@ export class QuestaoService {
     if (status !== undefined) where['status'] = status;
     if (materia) where['materia'] = materia;
     if (prova) {
-      where['_id'] = { $in: await this.repository.findQuestaoIdsByProva(prova) };
+      where['_id'] = {
+        $in: await this.repository.findQuestaoIdsByProva(prova),
+      };
     }
     if (enemArea) where['enemArea'] = enemArea;
 
@@ -298,7 +303,10 @@ export class QuestaoService {
     provaId: string,
     userId?: string,
   ): Promise<void> {
-    const naProva = await this.repository.provaContemQuestao(provaId, questaoId);
+    const naProva = await this.repository.provaContemQuestao(
+      provaId,
+      questaoId,
+    );
     if (!naProva) {
       throw new BadRequestException(
         'A prova indicada não contém esta questão.',
@@ -374,7 +382,11 @@ export class QuestaoService {
         updateDto.numero = classificacao.numero;
         updateDto.alternativa = questao.alternativa;
         await this.updateQuestion(updateDto);
-      } else if (classificacao.numero != null) {
+      } else if (classificacao.numero !== undefined) {
+        // `null` explícito = "remover número" (questão segue na prova, sem
+        // posição) e precisa sincronizar igual a um número novo. Só campo
+        // ausente (`undefined`) é que significa "não mexer no numero".
+        //
         // Guard: no branch numero-only assumimos que a questão já está na prova
         // enviada (a UI trava a prova). Falha alto se não estiver, em vez de o
         // syncNumero virar no-op silencioso na prova errada.
