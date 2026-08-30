@@ -572,43 +572,6 @@ describe('QuestaoService.updateClassificacao', () => {
     );
   });
 
-  it('remover número (numero: null): sincroniza o null na prova/simulados', async () => {
-    const repository: any = {
-      getByIdToUpdate: jest.fn().mockResolvedValue(questao),
-      updateClassificacao: jest.fn().mockResolvedValue(undefined),
-      provaContemQuestao: jest.fn().mockResolvedValue(true),
-    };
-    const provaService: any = {
-      syncNumero: jest.fn().mockResolvedValue(undefined),
-    };
-    const provaFactory: any = { getFactory: jest.fn() };
-    const service = new QuestaoService(
-      repository,
-      provaService,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      provaFactory,
-    );
-
-    await service.updateClassificacao('q1', {
-      prova: 'p1',
-      enemArea: 'Mat',
-      frente1: 'f1',
-      materia: 'm1',
-      numero: null,
-    } as any);
-
-    expect(provaService.syncNumero).toHaveBeenCalledWith('p1', 'q1', null);
-    expect(repository.updateClassificacao).toHaveBeenCalledWith(
-      'q1',
-      expect.anything(),
-    );
-  });
-
   it('numero ausente (undefined): não mexe no numero', async () => {
     const repository: any = {
       getByIdToUpdate: jest.fn().mockResolvedValue(questao),
@@ -675,6 +638,46 @@ describe('QuestaoService.updateClassificacao', () => {
 
     expect(provaService.syncNumero).not.toHaveBeenCalled();
     expect(repository.updateClassificacao).not.toHaveBeenCalled();
+  });
+
+  it('numero explicitamente null: chama syncNumero com null (limpar número)', async () => {
+    const repository: any = {
+      getByIdToUpdate: jest.fn().mockResolvedValue(questao),
+      updateClassificacao: jest.fn().mockResolvedValue(undefined),
+      provaContemQuestao: jest.fn().mockResolvedValue(true),
+    };
+    const provaService: any = {
+      syncNumero: jest.fn().mockResolvedValue(undefined),
+    };
+    const provaFactory: any = { getFactory: jest.fn() };
+    const { QuestaoService } = require('./questao.service');
+    const service = new QuestaoService(
+      repository,
+      provaService,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      provaFactory,
+    );
+
+    await service.updateClassificacao('q1', {
+      prova: 'p1',
+      enemArea: 'Mat',
+      frente1: 'f1',
+      materia: 'm1',
+      numero: null,
+    } as any);
+
+    expect(repository.provaContemQuestao).toHaveBeenCalledWith('p1', 'q1');
+    expect(provaService.syncNumero).toHaveBeenCalledWith('p1', 'q1', null);
+    expect(provaFactory.getFactory).not.toHaveBeenCalled();
+    expect(repository.updateClassificacao).toHaveBeenCalledWith(
+      'q1',
+      expect.anything(),
+    );
   });
 
   it('enemArea mudou: dispara factory.updateQuestion e NAO syncNumero', async () => {

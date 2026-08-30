@@ -9,8 +9,8 @@ export class QuestaoNaContainer {
 
   // Nullable: uma questão pode estar vinculada à prova sem posição definida
   // ainda (o admin remove o número na aba Classificação). Simulado com questão
-  // sem número nunca é liberado — ver `todasComNumero` em simulado/helpers.
-  @Prop({ required: false, default: null })
+  // sem número nunca é liberado — ver `todasNumeradas` em simulado/helpers.
+  @Prop({ required: false, type: Number, default: null })
   numero: number | null;
 }
 

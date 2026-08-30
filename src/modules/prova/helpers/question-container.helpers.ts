@@ -16,7 +16,7 @@ interface QuestaoContainer {
 export function addQuestaoToContainer(
   container: QuestaoContainer,
   questao: Questao,
-  numero: number,
+  numero: number | null,
 ): void {
   container.questoes.push({ questao, numero });
 }

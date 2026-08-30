@@ -387,6 +387,11 @@ export class QuestaoService {
         // posição) e precisa sincronizar igual a um número novo. Só campo
         // ausente (`undefined`) é que significa "não mexer no numero".
         //
+        // Hoje o client sempre manda `numero` no payload (o valor atual do
+        // vínculo, mudado ou não), então o guard nunca dispara. Ele existe
+        // porque o DTO marca o campo `@IsOptional()`: sem ele, um payload sem
+        // `numero` sincronizaria `undefined` e apagaria a posição em silêncio.
+        //
         // Guard: no branch numero-only assumimos que a questão já está na prova
         // enviada (a UI trava a prova). Falha alto se não estiver, em vez de o
         // syncNumero virar no-op silencioso na prova errada.
@@ -400,11 +405,16 @@ export class QuestaoService {
             HttpStatus.BAD_REQUEST,
           );
         }
-        // Só o numero mudou: sync escopado na prova editada + simulados dela.
+        // Só o numero mudou (ou ficou igual): sync escopado na prova editada
+        // + simulados dela. syncNumero é idempotente (no-op se já correto).
+        // `?? null`: o DTO declara `numero?: number | null` (campo opcional
+        // pra Swagger), mas sem o `!= null` que existia antes, o TypeScript
+        // não estreita mais pra `number` — normaliza `undefined` pra `null`
+        // porque syncNumero espera exatamente `number | null`.
         await this.provaService.syncNumero(
           classificacao.prova,
           id,
-          classificacao.numero,
+          classificacao.numero ?? null,
         );
       }
       await this.repository.updateClassificacao(id, classificacao);

@@ -17,23 +17,22 @@ export function atingiuQuantidade(
 }
 
 /**
- * Um simulado só pode ser liberado quando toda questão dele tem posição
- * definida. `numero` vive no vínculo questão↔container e passou a aceitar
- * `null` (questão na prova, ainda sem posição) — mas o fluxo do aluno usa o
- * número como identidade da questão ativa, então um `null` ali deixaria a
- * questão inalcançável na prova ao vivo. Esta é a terceira condição do
- * desbloqueio, ao lado de `atingiuQuantidade` e de todas aprovadas.
+ * Uma prova/simulado só pode ficar "pronto" (bloqueado = false) se toda
+ * questão do container já tem número atribuído. Sem essa checagem, uma
+ * questão aprovada mas sem número (numero: null) deixaria a prova/simulado
+ * desbloquear e o cartão-resposta seria gerado com layout corrompido
+ * (Math.min de um array com null vira NaN — ver template-provision.service.ts).
+ * No fluxo do aluno o mesmo `null` deixaria a questão inalcançável, já que o
+ * número é a identidade da questão ativa.
  */
-export function todasComNumero(
-  questoes: { numero?: number | null }[],
-): boolean {
-  return questoes.every((qc) => qc.numero != null);
+export function todasNumeradas(questoes: { numero: number | null }[]): boolean {
+  return questoes.every((q) => q.numero != null);
 }
 
 /** Entry questão↔container, na forma mínima que o cálculo de bloqueio exige. */
 interface QuestaoNoContainer {
   questao: { _id?: { toString(): string }; status?: Status };
-  numero?: number | null;
+  numero: number | null;
 }
 
 /** Simulado na forma mínima que o cálculo de bloqueio exige. */
@@ -72,7 +71,7 @@ export function calcularBloqueado(
     }
     return qc.questao.status === Status.Approved;
   });
-  return !(atingiu && todasAprovadas && todasComNumero(simulado.questoes));
+  return !(atingiu && todasAprovadas && todasNumeradas(simulado.questoes));
 }
 
 /**
