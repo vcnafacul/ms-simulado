@@ -23,7 +23,9 @@ describe('ProvaRepository.addQuestion (single-write questoes)', () => {
     expect(prova.questoes).toHaveLength(1);
     expect(prova.questoes[0].numero).toBe(3);
     expect(prova.totalQuestaoValidadas).toBe(1);
-    expect(updateOne).toHaveBeenCalledWith({ _id: 'p1' }, prova, { session: undefined });
+    expect(updateOne).toHaveBeenCalledWith({ _id: 'p1' }, prova, {
+      session: undefined,
+    });
   });
 
   it('não incrementa totalQuestaoValidadas quando a questão não está aprovada', async () => {
@@ -71,7 +73,9 @@ describe('ProvaRepository.removeQuestion (single-write questoes)', () => {
 
     expect(prova.questoes).toHaveLength(0);
     expect(prova.totalQuestaoValidadas).toBe(0);
-    expect(updateOne).toHaveBeenCalledWith({ _id: 'p1' }, prova, { session: undefined });
+    expect(updateOne).toHaveBeenCalledWith({ _id: 'p1' }, prova, {
+      session: undefined,
+    });
   });
 
   it('não decrementa quando a questão não estava no container', async () => {
@@ -119,7 +123,10 @@ describe('ProvaRepository.getById (popula questoes.questao)', () => {
       (c) => c && typeof c === 'object' && c.path === 'simulados',
     );
     expect(nested).toBeDefined();
-    expect(nested.populate).toEqual(['categoria', { path: 'questoes.questao' }]);
+    expect(nested.populate).toEqual([
+      'categoria',
+      { path: 'questoes.questao' },
+    ]);
   });
 });
 
@@ -143,11 +150,7 @@ describe('ProvaRepository.addQuestion (com session)', () => {
     await repo.addQuestion('p1', questao, 1, session);
 
     expect(findById).toHaveBeenCalledWith('p1', null, { session });
-    expect(updateOne).toHaveBeenCalledWith(
-      { _id: 'p1' },
-      prova,
-      { session },
-    );
+    expect(updateOne).toHaveBeenCalledWith({ _id: 'p1' }, prova, { session });
   });
 });
 
@@ -164,14 +167,14 @@ describe('ProvaRepository.removeQuestion (com session)', () => {
     const repo = new ProvaRepository({ findById, updateOne } as any);
     const session = {} as any;
 
-    await repo.removeQuestion('p1', { _id: alvo, status: Status.Approved } as any, session);
+    await repo.removeQuestion(
+      'p1',
+      { _id: alvo, status: Status.Approved } as any,
+      session,
+    );
 
     expect(findById).toHaveBeenCalledWith('p1', null, { session });
-    expect(updateOne).toHaveBeenCalledWith(
-      { _id: 'p1' },
-      prova,
-      { session },
-    );
+    expect(updateOne).toHaveBeenCalledWith({ _id: 'p1' }, prova, { session });
   });
 });
 
@@ -196,5 +199,52 @@ describe('ProvaRepository.getProvaWithQuestion (sem populate de questoes)', () =
         (a) => a && typeof a === 'object' && a.path === 'categoria',
       ),
     ).toBe(true);
+  });
+});
+
+describe('ProvaRepository.countByCategoria', () => {
+  it('conta provas que referenciam a categoria', async () => {
+    const countDocuments = jest.fn().mockResolvedValue(4);
+    const repo = new ProvaRepository({ countDocuments } as any);
+
+    const total = await repo.countByCategoria('cat-123');
+
+    expect(total).toBe(4);
+    expect(countDocuments).toHaveBeenCalledWith({ categoria: 'cat-123' });
+  });
+});
+
+describe('ProvaRepository.countsByCategoria', () => {
+  it('agrupa a contagem de provas por categoria em um único aggregate', async () => {
+    const catA = new Types.ObjectId();
+    const catB = new Types.ObjectId();
+    const aggregate = jest.fn().mockResolvedValue([
+      { _id: catA, total: 2 },
+      { _id: catB, total: 5 },
+    ]);
+    const repo = new ProvaRepository({ aggregate } as any);
+
+    const counts = await repo.countsByCategoria([
+      catA.toString(),
+      catB.toString(),
+    ]);
+
+    expect(counts).toEqual({
+      [catA.toString()]: 2,
+      [catB.toString()]: 5,
+    });
+    expect(aggregate).toHaveBeenCalledWith([
+      { $match: { categoria: { $in: [catA, catB] } } },
+      { $group: { _id: '$categoria', total: { $sum: 1 } } },
+    ]);
+  });
+
+  it('retorna objeto vazio quando não há ids', async () => {
+    const aggregate = jest.fn().mockResolvedValue([]);
+    const repo = new ProvaRepository({ aggregate } as any);
+
+    const counts = await repo.countsByCategoria([]);
+
+    expect(counts).toEqual({});
   });
 });

@@ -382,13 +382,19 @@ export class QuestaoService {
         updateDto.numero = classificacao.numero;
         updateDto.alternativa = questao.alternativa;
         await this.updateQuestion(updateDto);
-      } else {
-        // Guard: numero pode ser um valor real ou null (limpar número) — em
-        // ambos os casos assumimos que a questão já está na prova enviada (a
-        // UI trava a prova). Falha alto se não estiver, em vez de o syncNumero
-        // virar no-op silencioso na prova errada. Este endpoint sempre recebe
-        // `numero` no payload (nunca omitido) — o client manda o valor atual
-        // do vínculo, mudado ou não.
+      } else if (classificacao.numero !== undefined) {
+        // `null` explícito = "remover número" (questão segue na prova, sem
+        // posição) e precisa sincronizar igual a um número novo. Só campo
+        // ausente (`undefined`) é que significa "não mexer no numero".
+        //
+        // Hoje o client sempre manda `numero` no payload (o valor atual do
+        // vínculo, mudado ou não), então o guard nunca dispara. Ele existe
+        // porque o DTO marca o campo `@IsOptional()`: sem ele, um payload sem
+        // `numero` sincronizaria `undefined` e apagaria a posição em silêncio.
+        //
+        // Guard: no branch numero-only assumimos que a questão já está na prova
+        // enviada (a UI trava a prova). Falha alto se não estiver, em vez de o
+        // syncNumero virar no-op silencioso na prova errada.
         const naProva = await this.repository.provaContemQuestao(
           classificacao.prova,
           id,

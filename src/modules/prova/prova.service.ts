@@ -12,10 +12,7 @@ import { ProvaFactory } from './factory/prova_factory';
 import { ProvaRepository } from './prova.repository';
 import { Prova } from './prova.schema';
 import { UpdateProvaFilesDTO } from './dtos/update-files.dto.input';
-import {
-  atingiuQuantidade,
-  todasNumeradas,
-} from '../simulado/helpers/bloqueado';
+import { revalidarBloqueado } from '../simulado/helpers/bloqueado';
 import { syncNumeroNaProvaESimulados } from './helpers/question-container.helpers';
 
 @Injectable()
@@ -135,26 +132,8 @@ export class ProvaService {
         );
         if (!containsQuestion) return;
 
-        const hasRequiredCount = atingiuQuantidade(
-          simulado.categoria.quantidadeTotalQuestao,
-          simulado.questoes.length,
-        );
-        const allApproved = simulado.questoes.every(
-          (qc) =>
-            qc.questao.status === Status.Approved ||
-            qc.questao._id.toString() === questionId,
-        );
-
-        simulado.bloqueado = !(
-          hasRequiredCount &&
-          allApproved &&
-          todasNumeradas(simulado.questoes)
-        );
-        if (!simulado.bloqueado) {
-          simulado.questoes = simulado.questoes.sort(
-            (a, b) => a.numero - b.numero,
-          );
-        }
+        // A aprovação ainda não foi persistida: entra no cálculo como em trânsito.
+        revalidarBloqueado(simulado, { questaoId: questionId, aprovada: true });
         await this.simuladoRepository.update(simulado);
       }),
     );
@@ -177,19 +156,11 @@ export class ProvaService {
         );
         if (!containsQuestion) return;
 
-        // Recalcula bloqueado considerando a questão sendo rejeitada
-        const hasRequiredCount = atingiuQuantidade(
-          simulado.categoria.quantidadeTotalQuestao,
-          simulado.questoes.length,
-        );
-        const allApproved =
-          hasRequiredCount &&
-          simulado.questoes.every((qc) => {
-            if (qc.questao._id.toString() === questionId) return false;
-            return qc.questao.status === Status.Approved;
-          });
-
-        simulado.bloqueado = !allApproved;
+        // A rejeição ainda não foi persistida: entra no cálculo como em trânsito.
+        revalidarBloqueado(simulado, {
+          questaoId: questionId,
+          aprovada: false,
+        });
         await this.simuladoRepository.update(simulado);
       }),
     );
