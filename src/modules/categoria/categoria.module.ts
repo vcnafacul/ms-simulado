@@ -13,10 +13,12 @@ import { MateriaModule } from '../materia/materia.module';
 import { ExameModule } from '../exame/exame.module';
 import { ExameExistValidator } from '../exame/validator/exame-exist.validator';
 import { SimuladoModule } from '../simulado/simulado.module';
+import { ProvaModule } from '../prova/prova.module';
 
 @Module({
   imports: [
     forwardRef(() => SimuladoModule),
+    forwardRef(() => ProvaModule),
     MongooseModule.forFeature([
       { name: Categoria.name, schema: CategoriaSchema },
     ]),

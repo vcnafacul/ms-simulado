@@ -17,11 +17,10 @@ import {
   SubAproveitamento,
 } from '../historico/types/aproveitamento';
 import { MateriaRepository } from '../materia/materia.repository';
-import { Status } from '../questao/enums/status.enum';
 import { QuestaoRepository } from '../questao/questao.repository';
 import { Questao } from '../questao/questao.schema';
 import { CategoriaRepository } from '../categoria/categoria.repository';
-import { atingiuQuantidade, todasNumeradas } from './helpers/bloqueado';
+import { revalidarBloqueado } from './helpers/bloqueado';
 import {
   addQuestaoToContainer,
   removeQuestaoFromContainer,
@@ -137,23 +136,9 @@ export class SimuladoService {
         // Adiciona a nova questão (single-write em questoes).
         addQuestaoToContainer(sml, question, numero);
 
-        // Verifica se o simulado atingiu a quantidade total de questões
-        // (categoria livre / quantidadeTotalQuestao null sempre "atinge")
-        const atingiuQuantidadeTotal = atingiuQuantidade(
-          sml.categoria.quantidadeTotalQuestao,
-          sml.questoes.length,
-        );
-        // Verifica se todas as questões estão aprovadas
-        const todasAprovadas = sml.questoes.every(
-          (qc) => qc.questao.status === Status.Approved,
-        );
-
-        // Bloqueado = false só se todas adicionadas, aprovadas e numeradas
-        sml.bloqueado = !(
-          atingiuQuantidadeTotal &&
-          todasAprovadas &&
-          todasNumeradas(sml.questoes)
-        );
+        // Liberado só se atingiu a quantidade da categoria, todas aprovadas e
+        // todas numeradas.
+        revalidarBloqueado(sml);
 
         return await this.simuladoRepository.updateSession(sml, session);
       }),

@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import { Status } from '../../questao/enums/status.enum';
 import {
   addQuestaoToContainer,
   removeQuestaoFromContainer,
@@ -9,7 +10,11 @@ import {
 describe('question-container.helpers', () => {
   it('addQuestaoToContainer empurra { questao, numero } com o objeto completo', () => {
     const container: any = { questoes: [] };
-    const questao: any = { _id: new Types.ObjectId(), numero: 7, status: 'approved' };
+    const questao: any = {
+      _id: new Types.ObjectId(),
+      numero: 7,
+      status: 'approved',
+    };
 
     addQuestaoToContainer(container, questao, 7);
 
@@ -77,7 +82,9 @@ describe('syncNumeroNaProvaESimulados', () => {
       getById: jest.fn().mockResolvedValue(prova),
       update: jest.fn().mockResolvedValue(undefined),
     };
-    const simuladoRepository = { update: jest.fn().mockResolvedValue(undefined) };
+    const simuladoRepository = {
+      update: jest.fn().mockResolvedValue(undefined),
+    };
 
     await syncNumeroNaProvaESimulados(
       provaRepository as any,
@@ -118,6 +125,110 @@ describe('syncNumeroNaProvaESimulados', () => {
     expect(simuladoRepository.update).not.toHaveBeenCalled();
   });
 
+  it('re-bloqueia o simulado liberado quando o número é removido', async () => {
+    const sml = {
+      categoria: { quantidadeTotalQuestao: 2 },
+      questoes: [
+        { questao: { _id: 'q1', status: Status.Approved }, numero: 1 },
+        { questao: { _id: 'q2', status: Status.Approved }, numero: 2 },
+      ],
+      bloqueado: false,
+    };
+    const prova = {
+      _id: 'p1',
+      questoes: [{ questao: { _id: 'q1' }, numero: 1 }],
+      simulados: [sml],
+    };
+    const provaRepository = {
+      getById: jest.fn().mockResolvedValue(prova),
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+    const simuladoRepository = {
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+
+    await syncNumeroNaProvaESimulados(
+      provaRepository as any,
+      simuladoRepository as any,
+      'p1',
+      'q1',
+      null,
+    );
+
+    expect(sml.questoes[0].numero).toBeNull();
+    expect(sml.bloqueado).toBe(true);
+    expect(simuladoRepository.update).toHaveBeenCalledWith(sml, undefined);
+  });
+
+  it('libera o simulado travado só pela falta de número quando ele é preenchido', async () => {
+    const sml = {
+      categoria: { quantidadeTotalQuestao: 2 },
+      questoes: [
+        {
+          questao: { _id: 'q1', status: Status.Approved },
+          numero: null as number | null,
+        },
+        { questao: { _id: 'q2', status: Status.Approved }, numero: 2 },
+      ],
+      bloqueado: true,
+    };
+    const prova = {
+      _id: 'p1',
+      questoes: [{ questao: { _id: 'q1' }, numero: null as number | null }],
+      simulados: [sml],
+    };
+    const provaRepository = {
+      getById: jest.fn().mockResolvedValue(prova),
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+    const simuladoRepository = {
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+
+    await syncNumeroNaProvaESimulados(
+      provaRepository as any,
+      simuladoRepository as any,
+      'p1',
+      'q1',
+      1,
+    );
+
+    expect(sml.bloqueado).toBe(false);
+    expect(simuladoRepository.update).toHaveBeenCalledWith(sml, undefined);
+  });
+
+  it('não revalida simulado que não contém a questão (numero não mudou)', async () => {
+    const sml = {
+      categoria: { quantidadeTotalQuestao: 1 },
+      questoes: [
+        { questao: { _id: 'outra', status: Status.Approved }, numero: 1 },
+      ],
+      bloqueado: true,
+    };
+    const prova = {
+      _id: 'p1',
+      questoes: [{ questao: { _id: 'q1' }, numero: 5 }],
+      simulados: [sml],
+    };
+    const provaRepository = {
+      getById: jest.fn().mockResolvedValue(prova),
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+    const simuladoRepository = { update: jest.fn() };
+
+    await syncNumeroNaProvaESimulados(
+      provaRepository as any,
+      simuladoRepository as any,
+      'p1',
+      'q1',
+      9,
+    );
+
+    // Sem vínculo com a questão editada: estado preservado, sem write.
+    expect(sml.bloqueado).toBe(true);
+    expect(simuladoRepository.update).not.toHaveBeenCalled();
+  });
+
   it('retorna sem erro quando prova não existe', async () => {
     const provaRepository = {
       getById: jest.fn().mockResolvedValue(null),
@@ -150,7 +261,9 @@ describe('syncNumeroNaProvaESimulados', () => {
       getById: jest.fn().mockResolvedValue(prova),
       update: jest.fn().mockResolvedValue(undefined),
     };
-    const simuladoRepository = { update: jest.fn().mockResolvedValue(undefined) };
+    const simuladoRepository = {
+      update: jest.fn().mockResolvedValue(undefined),
+    };
 
     await syncNumeroNaProvaESimulados(
       provaRepository as any,

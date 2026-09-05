@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 import { SimuladoRepository } from './simulado.repository';
 
 describe('SimuladoRepository.countByCategoria', () => {
@@ -152,5 +153,45 @@ describe('SimuladoRepository.getById (popula questoes.questao)', () => {
       path: 'questoes.questao',
       populate: ['frente1', 'materia'],
     });
+  });
+});
+
+describe('SimuladoRepository.countsByCategoria', () => {
+  it('agrupa a contagem de simulados não-deletados por categoria em um único aggregate', async () => {
+    const catA = new Types.ObjectId();
+    const catB = new Types.ObjectId();
+    const aggregate = jest.fn().mockResolvedValue([
+      { _id: catA, total: 1 },
+      { _id: catB, total: 3 },
+    ]);
+    const repo = new SimuladoRepository({ aggregate } as any);
+
+    const counts = await repo.countsByCategoria([
+      catA.toString(),
+      catB.toString(),
+    ]);
+
+    expect(counts).toEqual({
+      [catA.toString()]: 1,
+      [catB.toString()]: 3,
+    });
+    expect(aggregate).toHaveBeenCalledWith([
+      {
+        $match: {
+          categoria: { $in: [catA, catB] },
+          deleted: { $ne: true },
+        },
+      },
+      { $group: { _id: '$categoria', total: { $sum: 1 } } },
+    ]);
+  });
+
+  it('retorna objeto vazio quando não há ids', async () => {
+    const aggregate = jest.fn().mockResolvedValue([]);
+    const repo = new SimuladoRepository({ aggregate } as any);
+
+    const counts = await repo.countsByCategoria([]);
+
+    expect(counts).toEqual({});
   });
 });

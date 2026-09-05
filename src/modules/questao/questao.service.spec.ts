@@ -572,6 +572,40 @@ describe('QuestaoService.updateClassificacao', () => {
     );
   });
 
+  it('numero ausente (undefined): não mexe no numero', async () => {
+    const repository: any = {
+      getByIdToUpdate: jest.fn().mockResolvedValue(questao),
+      updateClassificacao: jest.fn().mockResolvedValue(undefined),
+      provaContemQuestao: jest.fn().mockResolvedValue(true),
+    };
+    const provaService: any = { syncNumero: jest.fn() };
+    const provaFactory: any = { getFactory: jest.fn() };
+    const service = new QuestaoService(
+      repository,
+      provaService,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      provaFactory,
+    );
+
+    await service.updateClassificacao('q1', {
+      prova: 'p1',
+      enemArea: 'Mat',
+      frente1: 'f1',
+      materia: 'm1',
+    } as any);
+
+    expect(provaService.syncNumero).not.toHaveBeenCalled();
+    expect(repository.updateClassificacao).toHaveBeenCalledWith(
+      'q1',
+      expect.anything(),
+    );
+  });
+
   it('numero-only: falha alto se a prova enviada não contém a questão', async () => {
     const repository: any = {
       getByIdToUpdate: jest.fn().mockResolvedValue(questao),
