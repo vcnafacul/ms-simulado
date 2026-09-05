@@ -11,6 +11,16 @@ export const envSchema = z.object({
   QUEUE_DRIVER: z.enum(['redis', 'memory']).default('memory'),
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z.coerce.number().default(6379),
+
+  // Cartão resposta — storage R2/S3 (Etapa 7 · Bloco 3)
+  AWS_ENDPOINT: z.string().default('http://localhost:9000'),
+  AWS_REGION: z.string().default('us-east-1'),
+  AWS_ACCESS_KEY_ID: z.string().default(''),
+  AWS_SECRET_ACCESS_KEY: z.string().default(''),
+  CARTAO_BUCKET: z.string().default('vcnafacul-cartoes'),
+
+  // ms-omr (Etapa 12 · A3)
+  OMR_URL: z.string().url().default('http://localhost:8000'),
 });
 
 export type Env = z.infer<typeof envSchema>;

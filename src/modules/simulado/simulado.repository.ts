@@ -19,6 +19,15 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
     });
   }
 
+  async incrementarCartaoSeq(id: string): Promise<number> {
+    const doc = await this.model.findByIdAndUpdate(
+      id,
+      { $inc: { cartaoSeq: 1 } },
+      { new: true },
+    );
+    return doc?.cartaoSeq ?? 0;
+  }
+
   async countsByCategoria(
     categoriaIds: string[],
   ): Promise<Record<string, number>> {

@@ -3,4 +3,5 @@ export enum HistoricoStatus {
   Processing = 'processing',
   Completed = 'completed',
   Failed = 'failed',
+  AwaitingOmr = 'awaiting_omr',
 }

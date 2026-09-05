@@ -3,6 +3,10 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
   "compilerOptions": {
-    "deleteOutDir": true
+    "deleteOutDir": true,
+    "assets": [
+      { "include": "modules/cartao-resposta/assets/**/*.png" },
+      { "include": "modules/cartao-resposta/assets/**/*.ttf" }
+    ]
   }
 }

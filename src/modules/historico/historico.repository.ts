@@ -30,8 +30,7 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       .sort({ _id: -1 })
       .populate({
         path: 'simulado',
-        populate: 'tipo',
-        select: '_id nome tipo',
+        select: '_id nome',
       })
       .exec();
 
@@ -51,7 +50,7 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       .findById(id)
       .populate({
         path: 'simulado',
-        populate: ['tipo', { path: 'questoes.questao' }],
+        populate: [{ path: 'questoes.questao' }],
       })
       .exec();
   }
@@ -62,7 +61,6 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       .sort({ _id: -1 })
       .populate({
         path: 'simulado',
-        populate: ['tipo'],
       })
       .exec();
   }
@@ -214,6 +212,35 @@ export class HistoricoRepository extends BaseRepository<Historico> {
     });
   }
 
+  async existsCartaoAtivo(
+    usuario: string,
+    simuladoId: string,
+    cartaoCode: string,
+  ): Promise<boolean> {
+    const found = await this.model.exists({
+      usuario,
+      simulado: new Types.ObjectId(simuladoId),
+      cartaoCode,
+      status: { $ne: HistoricoStatus.Failed },
+    });
+    return found !== null;
+  }
+
+  async createAwaitingOmr(data: {
+    usuario: string;
+    simuladoId: string;
+    imageKey: string;
+    cartaoCode: string;
+  }): Promise<Historico> {
+    return this.model.create({
+      usuario: data.usuario,
+      simulado: new Types.ObjectId(data.simuladoId),
+      imageKey: data.imageKey,
+      cartaoCode: data.cartaoCode,
+      status: HistoricoStatus.AwaitingOmr,
+    });
+  }
+
   async findByStatuses(statuses: HistoricoStatus[]): Promise<Historico[]> {
     return this.model.find({ status: { $in: statuses } }).exec();
   }
@@ -222,11 +249,31 @@ export class HistoricoRepository extends BaseRepository<Historico> {
     await this.model.findByIdAndUpdate(id, { status }).exec();
   }
 
+  async findByImageKey(imageKey: string): Promise<Historico | null> {
+    return this.model.findOne({ imageKey }).exec();
+  }
+
+  async prepararParaProcessamento(
+    id: string,
+    rawRespostas: unknown[],
+  ): Promise<void> {
+    await this.model
+      .findByIdAndUpdate(id, { rawRespostas, status: HistoricoStatus.Pending })
+      .exec();
+  }
+
   async claimForProcessing(id: string): Promise<boolean> {
-    const result = await this.model.findOneAndUpdate(
-      { _id: id, status: { $in: [HistoricoStatus.Pending, HistoricoStatus.Processing] } },
-      { status: HistoricoStatus.Processing },
-    ).exec();
+    const result = await this.model
+      .findOneAndUpdate(
+        {
+          _id: id,
+          status: {
+            $in: [HistoricoStatus.Pending, HistoricoStatus.Processing],
+          },
+        },
+        { status: HistoricoStatus.Processing },
+      )
+      .exec();
     return result !== null;
   }
 
@@ -239,13 +286,15 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       aproveitamento: any;
     },
   ): Promise<void> {
-    await this.model.findByIdAndUpdate(id, {
-      status: HistoricoStatus.Completed,
-      ano: data.ano,
-      simulado: data.simulado,
-      respostas: data.respostas,
-      aproveitamento: data.aproveitamento,
-      rawRespostas: null,
-    }).exec();
+    await this.model
+      .findByIdAndUpdate(id, {
+        status: HistoricoStatus.Completed,
+        ano: data.ano,
+        simulado: data.simulado,
+        respostas: data.respostas,
+        aproveitamento: data.aproveitamento,
+        rawRespostas: null,
+      })
+      .exec();
   }
 }

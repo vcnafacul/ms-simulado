@@ -41,3 +41,7 @@ lerna-debug.log*
 
 # clone-env dump temp dirs
 .clone-env-dump-*
+
+# cartão-resposta: artefatos gerados + config local de preview
+tmp/
+cartao.config.json
