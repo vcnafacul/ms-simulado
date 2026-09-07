@@ -85,10 +85,12 @@ describe('stack do remark sob CommonJS', () => {
     );
   });
 
-  it('o package.json declara o piso de Node que a stack exige', () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const pkg = require('../../../../package.json');
-    expect(pkg.engines?.node).toBe('>=20.19');
+  it('roda num Node que suporta require(esm)', () => {
+    // ⚠️ Estes testes NÃO exercitam o require(esm): sob Jest a stack chega
+    // transpilada pelo ts-jest, de propósito. Quem exercita é só a produção.
+    // Então o único guarda real do piso é este — a versão em execução.
+    const [maior, menor] = process.versions.node.split('.').map(Number);
+    expect(maior > 20 || (maior === 20 && menor >= 19)).toBe(true);
   });
 });
 ```
@@ -136,6 +138,11 @@ Em `ms.dockerfile`, acrescentar um comentário imediatamente acima da **primeira
 > Medido: `transformIgnorePatterns` sozinho não resolve, porque o `ts-jest` recusa `.js` sem
 > `allowJs`. Com um tsconfig só para o Jest, passa. Custo: ~15 s na primeira rodada (cache frio,
 > transformando a árvore ESM) e ~1,3 s nas seguintes; sem regressão nas 12 suítes existentes.
+>
+> **E o `engines` não é advisório aqui.** Verificado pondo `>=99` e rodando `yarn install`: o yarn
+> classic 1.22.22 — o mesmo binário que o `ms.dockerfile` usa com `--frozen-lockfile` — falha com
+> exit 1 e `The engine "node" is incompatible`. O piso está enforçado no caminho que o CI e o Docker
+> percorrem, não só declarado.
 
 - [ ] **Step 5b: Fazer o Jest enxergar a stack ESM**
 
@@ -157,26 +164,21 @@ No bloco `jest` do `package.json`, trocar o `transform` e acrescentar `transform
       "^.+\\.(t|j)s$": ["ts-jest", { "tsconfig": "<rootDir>/../tsconfig.jest.json" }]
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!(unified|remark-.*|mdast-.*|micromark.*|unist-.*|vfile.*|bail|trough|is-plain-obj|extend|devlop|decode-named-character-reference|character-entities.*|ccount|escape-string-regexp|markdown-table|longest-streak|zwitch|property-information|space-separated-tokens|comma-separated-tokens|html-void-elements|stringify-entities|hast-.*)/)"
+      "node_modules/(?!(unified|remark-.*|mdast-.*|micromark.*|unist-.*|vfile.*|bail|trough|is-plain-obj|extend|devlop|decode-named-character-reference|character-entities.*|ccount|escape-string-regexp|markdown-table|longest-streak|zwitch)/)"
     ],
 ```
 
-Acrescentar ao `stack.spec.ts` um quarto teste, para que ninguém remova essa configuração achando
-que é sobra:
+Copiar as mesmas duas chaves para `test/jest-e2e.json`. Está verde hoje porque nada em e2e importa
+remark, mas nas tasks seguintes o conversor entra num módulo Nest e os specs e2e sobem o `AppModule`
+— a primeira rodada depois disso quebraria num arquivo que ninguém editou. ⚠️ O `rootDir` de lá é
+`..` (a raiz do projeto), não `src`: o caminho vira `<rootDir>/tsconfig.jest.json`, **sem** o `../`.
 
-```ts
-  it('o jest está configurado para transformar a stack ESM', () => {
-    // Sem isto o jest-runtime tenta executar o fonte ESM como CommonJS e
-    // quebra com "Unexpected token 'export'". Não é sobra de configuração:
-    // é o que faz qualquer spec que importe o remark rodar.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const pkg = require('../../../../package.json');
-    const padrao = (pkg.jest.transformIgnorePatterns ?? []).join(' ');
-    expect(padrao).toContain('unified');
-    expect(padrao).toContain('remark-');
-    expect(JSON.stringify(pkg.jest.transform)).toContain('tsconfig.jest.json');
-  });
-```
+A explicação de tudo isso vai num comentário JSONC no topo do `tsconfig.jest.json` — o `package.json`
+não aceita comentário, e é para o `tsconfig.jest.json` que tanto a regex quanto o `transform`
+apontam. Quem abrir o `package.json` e vir a regex precisa de um caminho até a razão dela.
+
+⚠️ **Não** acrescente teste que assere o conteúdo dessa configuração: se ela sumir, os dois testes
+acima já quebram no import. Um teste que lê o `package.json` e o compara com ele mesmo é tautológico.
 
 - [ ] **Step 6: Rodar e confirmar que passa**
 
@@ -184,7 +186,7 @@ que é sobra:
 npx jest --detectOpenHandles --forceExit src/modules/caderno/markdown/stack.spec.ts
 ```
 
-Esperado: PASS, 4 testes. A primeira rodada leva ~15 s (cache frio); a segunda, ~1,3 s.
+Esperado: PASS, 3 testes. A primeira rodada leva ~15 s (cache frio); a segunda, ~1,3 s.
 
 - [ ] **Step 7: Confirmar que o build continua íntegro**
 
@@ -197,7 +199,7 @@ Esperado: `dist/main.js`. Este passo existe porque este repo já teve o `dist/ma
 - [ ] **Step 8: Commit**
 
 ```bash
-git add package.json yarn.lock ms.dockerfile tsconfig.jest.json src/modules/caderno/markdown/
+git add package.json yarn.lock ms.dockerfile tsconfig.jest.json test/jest-e2e.json README.md src/modules/caderno/markdown/
 git commit -m "build(caderno): stack do remark e piso de Node 20.19
 
 unified/remark sao ESM-only e o projeto e CommonJS. Funciona pelo
@@ -250,6 +252,27 @@ describe('escapeLatex', () => {
     expect(escapeLatex('\\')).toBe('\\textbackslash{}');
   });
 
+  it('escapa a aspa dupla, que o babel[brazil] torna ativa', () => {
+    // O babel em português declara os atalhos "< "> "- "" "|. Sem escapar,
+    // `""` vira salto de largura zero e `"-` vira hífen discricionário: as
+    // aspas somem da prova impressa, sem erro nenhum.
+    expect(escapeLatex('a resposta é "" (vazio)')).toBe(
+      'a resposta é \\textquotedbl{}\\textquotedbl{} (vazio)',
+    );
+  });
+
+  it('a classe do regex e o mapa não saem de sincronia', () => {
+    // MAPA[c] é tipado como string mesmo sem a chave existir (o tsconfig não
+    // tem noUncheckedIndexedAccess), então esquecer uma entrada compila limpo
+    // e imprime "undefined" na prova de alguém.
+    const transformados = Array.from({ length: 128 }, (_, i) =>
+      String.fromCharCode(i),
+    ).filter((c) => escapeLatex(c) !== c);
+
+    expect(transformados.join('')).toBe('"#$%&<>\\^_{|}~');
+    expect(transformados.map(escapeLatex).join('')).not.toContain('undefined');
+  });
+
   it('devolve string vazia intacta e não mexe em texto comum', () => {
     expect(escapeLatex('')).toBe('');
     expect(escapeLatex('texto sem nada especial')).toBe(
@@ -285,6 +308,10 @@ Criar `src/modules/caderno/markdown/escape-latex.ts`:
  */
 const MAPA: Record<string, string> = {
   '\\': '\\textbackslash{}',
+  // O babel[brazil] do preambulo torna `"` ATIVO e declara os atalhos
+  // "< "> "- "" "|. Sem escapar, `""` vira salto de largura zero e `"-` vira
+  // hifen discricionario: as aspas somem da prova, sem erro nenhum.
+  '"': '\\textquotedbl{}',
   '{': '\\{',
   '}': '\\}',
   $: '\\$',
@@ -300,7 +327,7 @@ const MAPA: Record<string, string> = {
 };
 
 export function escapeLatex(texto: string): string {
-  return texto.replace(/[\\{}$&#_%~^<>|]/g, (c) => MAPA[c]);
+  return texto.replace(/["\\{}$&#_%~^<>|]/g, (c) => MAPA[c]);
 }
 ```
 
