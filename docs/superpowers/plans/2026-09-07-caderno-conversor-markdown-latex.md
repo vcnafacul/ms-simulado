@@ -1064,6 +1064,16 @@ describe('handlers — bloco de código', () => {
     );
   });
 
+  it('devolve o marcador do neutralizarReal como R$ puro', () => {
+    // O neutralizador roda antes do parser e não distingue prosa de código.
+    // Dentro de verbatim nada é escapado, então tem que voltar `R$` e não
+    // `R\$` — senão sai a barra literal no PDF.
+    const ctx = contexto();
+    const arvore = parse('```\ncusta R$ 50\n```');
+    arvore.children[0].value = 'custa \uE000 50';
+    expect(compilar(arvore, ctx)).toContain('custa R$ 50');
+  });
+
   it('neutraliza \\end{verbatim} dentro do bloco', () => {
     // Nada é escapado dentro do verbatim, então um \end{verbatim} no
     // conteúdo fecharia o ambiente no meio e o resto do caderno viraria
@@ -1136,7 +1146,10 @@ const HANDLERS: Record<string, Handler> = {
   strong: (no, ctx) => `\\textbf{${filhos(no, ctx)}}`,
   emphasis: (no, ctx) => `\\emph{${filhos(no, ctx)}}`,
   delete: (no, ctx) => `\\sout{${filhos(no, ctx)}}`,
-  inlineCode: (no) => `\\texttt{${escapeLatex(no.value)}}`,
+  // Idem ao `code`: o marcador volta a ser `R$`, mas aqui o escape roda, então
+  // o resultado é `R\$` como em texto normal.
+  inlineCode: (no) =>
+    `\\texttt{${escapeLatex(String(no.value ?? '').split(MARCADOR_REAL).join('R$'))}}`,
 
   // Rebaixado: o caderno já tem hierarquia própria (a numeração da questão).
   heading: (no, ctx) => `\\textbf{${filhos(no, ctx)}}\\par`,
@@ -1163,10 +1176,16 @@ const HANDLERS: Record<string, Handler> = {
     // Nada é escapado dentro do verbatim, então um \end{verbatim} no
     // conteúdo fecharia o ambiente no meio e o resto do caderno viraria
     // código. Quebrar a sequência resolve sem alterar o que se lê.
-    const conteudo = String(no.value ?? '').replace(
-      /\\end\{verbatim\}/g,
-      '\\end {verbatim}',
-    );
+    //
+    // ⚠️ O marcador do `neutralizarReal` também precisa voltar aqui, e como
+    // `R$` PURO — dentro de verbatim nada é escapado, então `R\$` sairia
+    // literal com a barra. Sem isso, um `R$ 50` dentro de bloco de código
+    // vira caixinha de glifo faltando no PDF: o neutralizador roda antes do
+    // parser e não distingue prosa de código.
+    const conteudo = String(no.value ?? '')
+      .split(MARCADOR_REAL)
+      .join('R$')
+      .replace(/\\end\{verbatim\}/g, '\\end {verbatim}');
     return `\\begin{verbatim}\n${conteudo}\n\\end{verbatim}`;
   },
 };
