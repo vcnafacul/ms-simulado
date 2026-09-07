@@ -1,5 +1,8 @@
 import { escapeLatex } from './escape-latex';
+import { NO_ALINHADO } from './pre-transform/agrupar-html';
 import { MARCADOR_REAL } from './pre-transform/neutralizar-real';
+import { EH_DISPLAY } from './pre-transform/restaurar-display';
+import { comandoBarrado } from './sanitizar-math';
 
 export interface Contexto {
   /** key `asset://` → caminho relativo dentro do zip. */
@@ -73,6 +76,172 @@ const HANDLERS: Record<string, Handler> = {
     return `\\begin{verbatim}\n${conteudo}\n\\end{verbatim}`;
   },
 };
+
+const AMBIENTE_POR_ALINHAMENTO: Record<string, string | null> = {
+  left: null, // padrão do documento: não gera ambiente
+  center: 'center',
+  right: 'flushright',
+  justify: null,
+};
+
+/**
+ * `align` do nó GFM → especificação de coluna do tabularx.
+ *
+ * ⚠️ Todas são `X`, nunca `l`/`c`/`r`. O `tabularx` **exige pelo menos uma
+ * coluna X** — sem nenhuma ele aborta com "No suitable X-column found", e uma
+ * tabela toda alinhada explicitamente não teria X nenhum. O prefixo
+ * `>{...\arraybackslash}` dá o alinhamento sem abrir mão do X, então a tabela
+ * preenche a `\linewidth` e quebra o texto das células.
+ */
+const COLUNA_POR_ALINHAMENTO: Record<string, string> = {
+  left: '>{\\raggedright\\arraybackslash}X',
+  center: '>{\\centering\\arraybackslash}X',
+  right: '>{\\raggedleft\\arraybackslash}X',
+};
+
+/**
+ * `<img ...>`, com ou sem os outros atributos, e os dois atributos que
+ * interessam extraídos à parte.
+ *
+ * ⚠️ São três regex e não uma só de propósito. A forma "tudo numa" —
+ * `<img[^>]*src=...[^>]*?(?:width=...)?[^>]*>` — **casa a tag mas nunca
+ * captura o width**: com o grupo opcional depois de um quantificador lazy, o
+ * motor acha um casamento válido pulando o grupo e não volta atrás pra
+ * preencher captura. Medido contra a saída real do editor
+ * (`serializeInlineContent` em `useRichTextEditor.ts`), que grava
+ * `<img src="..." alt="..." width="320" height="240" />` — nessa ordem, com o
+ * `alt` ENTRE o `src` e o `width`: o grupo dava `undefined` e a largura do
+ * editor sumia em silêncio.
+ */
+const IMG_HTML = /<img\b[^>]*>/i;
+const IMG_SRC = /\bsrc\s*=\s*["']([^"']+)["']/i;
+const IMG_WIDTH = /\bwidth\s*=\s*["']?(\d+)/i;
+
+function imagem(url: string, ctx: Contexto, largura?: string): string {
+  const key = url.replace(/^asset:\/\//, '');
+  const caminho = ctx.resolveAsset(key);
+
+  if (!caminho) {
+    ctx.avisos.push(
+      `imagem não encontrada (${key}) — saiu um marcador no lugar`,
+    );
+    return '\\textbf{[imagem indisponível]}';
+  }
+
+  if (!ctx.assets.includes(key)) ctx.assets.push(key);
+
+  // A largura do editor é sugestão, não imposição: o `max width` garante que
+  // nunca estoure a coluna, que em duas colunas tem ~8 cm.
+  const opcoes = largura
+    ? `[max width=\\linewidth,width=${largura}pt]`
+    : '[max width=\\linewidth]';
+
+  return `\\includegraphics${opcoes}{${caminho}}`;
+}
+
+/**
+ * Fórmula: conteúdo passa sem tocar, delimitador é normalizado.
+ *
+ * `\[…\]` em vez de `$$…$$` porque o `$$` passa por fora do tratamento de
+ * display do amsmath — inclusive `\predisplaypenalty`/`\postdisplaypenalty`,
+ * que são justamente os controles de quebra de página que importam na coluna
+ * de ~8 cm do template do card 01.
+ *
+ * ⚠️ A checagem de display tem DUAS partes. `no.type === 'math'` é o display
+ * genuíno (delimitadores em linha própria); a flag `EH_DISPLAY` é o display
+ * que o `restaurarDisplay` recuperou do `$$...$$` de uma linha só. Olhar só a
+ * flag perde o primeiro caso.
+ *
+ * E o mesmo booleano vai pro validador: `align`, `equation`, `gather` e
+ * `\tag` só existem em display, e o editor valida `$$` com
+ * `displayMode: true`. Fixar um valor aqui ou alargaria o inline em silêncio,
+ * ou reprovaria fórmula que o editor aceita.
+ */
+function matematica(no: any, ctx: Contexto): string {
+  const formula = String(no.value ?? '');
+  const ehDisplay = no.type === 'math' || no.data?.[EH_DISPLAY] === true;
+  const barrado = comandoBarrado(formula, ehDisplay);
+
+  if (barrado) {
+    // Nunca some: quem for imprimir a prova precisa VER que há algo errado
+    // ali, em vez de descobrir uma fórmula ausente na frente da turma.
+    if (barrado.motivo === 'perigoso') {
+      ctx.avisos.push(
+        `fórmula bloqueada por conter ${barrado.comando}, que em LaTeX de ` +
+          `verdade escapa da fórmula e pode ler arquivos da máquina de quem ` +
+          `compilar — reescreva a fórmula sem esse comando`,
+      );
+      return `\\textbf{[fórmula bloqueada: ${escapeLatex(barrado.comando)}]}`;
+    }
+
+    ctx.avisos.push(`fórmula inválida: ${barrado.detalhe}`);
+    return '\\textbf{[fórmula inválida]}';
+  }
+
+  return ehDisplay ? `\\[${formula}\\]` : `$${formula}$`;
+}
+
+Object.assign(HANDLERS, {
+  table: (no: any, ctx: Contexto) => {
+    // Coluna sem alinhamento declarado vira X puro: é ela que absorve a
+    // largura e quebra o texto. Sem nenhum X o tabularx aborta.
+    const colunas: string[] = (no.align ?? []).map(
+      (a: string | null) => COLUNA_POR_ALINHAMENTO[a ?? ''] ?? 'X',
+    );
+
+    const [cabecalho, ...corpo]: any[] = no.children ?? [];
+    const linha = (l: any) => `${compilarNo(l, ctx)} \\\\`;
+
+    return [
+      `\\begin{tabularx}{\\linewidth}{@{}${colunas.join('')}@{}}`,
+      '\\toprule',
+      cabecalho ? linha(cabecalho) : '',
+      '\\midrule',
+      ...corpo.map(linha),
+      '\\bottomrule',
+      '\\end{tabularx}',
+    ]
+      .filter((l) => l !== '')
+      .join('\n');
+  },
+
+  tableRow: (no: any, ctx: Contexto) => filhos(no, ctx, ' & '),
+  tableCell: (no: any, ctx: Contexto) => filhos(no, ctx),
+
+  image: (no: any, ctx: Contexto) => imagem(String(no.url ?? ''), ctx),
+
+  inlineMath: matematica,
+  math: matematica,
+
+  [NO_ALINHADO]: (no: any, ctx: Contexto) => {
+    const ambiente = AMBIENTE_POR_ALINHAMENTO[no.align] ?? null;
+    const dentro = filhos(no, ctx, '\n\n');
+    return ambiente
+      ? `\\begin{${ambiente}}\n${dentro}\n\\end{${ambiente}}`
+      : dentro;
+  },
+
+  // HTML que sobrou solto: ou é tag que o `agruparHtml` não casou, ou é algo
+  // fora do subset. A exceção é a imagem de uma linha só —
+  // `<div style="text-align: center"><img ...></div>` ou o `<img>` cru — que
+  // o `agruparHtml` deixa passar de propósito e chega aqui como um nó só.
+  // Fora isso nunca vaza pro .tex: LaTeX não entende HTML.
+  html: (no: any, ctx: Contexto) => {
+    const bruto = String(no.value ?? '').trim();
+    const tag = IMG_HTML.exec(bruto);
+    const src = tag ? IMG_SRC.exec(tag[0]) : null;
+
+    if (src) {
+      const width = IMG_WIDTH.exec(tag![0]);
+      return imagem(src[1], ctx, width?.[1]);
+    }
+
+    ctx.avisos.push(
+      `HTML não suportado no conteúdo (${bruto.slice(0, 40)}) — foi descartado`,
+    );
+    return '';
+  },
+});
 
 function compilarNo(no: any, ctx: Contexto): string {
   const handler = HANDLERS[no?.type];
