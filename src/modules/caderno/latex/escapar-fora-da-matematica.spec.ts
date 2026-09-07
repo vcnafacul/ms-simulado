@@ -31,6 +31,12 @@ describe('escaparForaDaMatematica — o que NÃO abre fórmula', () => {
       'taxa de R\\$5 e R\\$3',
     );
     expect(escaparForaDaMatematica('custa r$ 9,90')).toBe('custa r\\$ 9,90');
+    // Gêmea da fixture acima, mas com o `r` minúsculo: sem ela, a condição 1
+    // podia perder o ramo minúsculo e nenhum teste morreria — a regra do
+    // espaço já rejeitaria `r$ 9,90` sozinha.
+    expect(escaparForaDaMatematica('taxa de r$5 e r$3')).toBe(
+      'taxa de r\\$5 e r\\$3',
+    );
   });
 
   it('não abre quando o cifrão vem seguido de espaço', () => {

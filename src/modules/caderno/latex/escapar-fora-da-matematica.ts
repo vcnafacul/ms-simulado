@@ -39,7 +39,10 @@ const escaparPorcentoEmMath = (trecho: string): string =>
  * 2. **Não seguido de espaço.** O editor grava `${fórmula}$`, sempre colado.
  *    Espaço depois do cifrão é dinheiro: `custa $ 50 e $ 30`.
  * 3. **Com fechamento adiante.** Impede um cifrão solto de abrir uma região
- *    que nunca fecha e engolir o escape de todo o resto do texto.
+ *    que nunca fecha e engolir o escape de todo o resto do texto. Fim de
+ *    string conta como "sem conteúdo": um `$`/`$$` ali não tem fechamento
+ *    adiante, então esta condição já cobre esse caso sem precisar de uma
+ *    regra extra para `seguinte === undefined`.
  *
  * A condição 1 e a 2 se complementam: sozinha, a 2 não pega `R$5`, e sozinha,
  * a 1 não pega `US$ 40`.
@@ -53,7 +56,7 @@ function delimitadorQueAbre(texto: string, i: number): string | null {
   if (anterior === 'R' || anterior === 'r') return null;
 
   const seguinte = texto[i + delim.length];
-  if (seguinte === undefined || /\s/.test(seguinte)) return null;
+  if (seguinte !== undefined && /\s/.test(seguinte)) return null;
 
   if (texto.indexOf(delim, i + delim.length) === -1) return null;
 
