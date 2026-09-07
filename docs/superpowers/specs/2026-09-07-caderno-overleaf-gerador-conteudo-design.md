@@ -137,7 +137,7 @@ no cabeçalho registrando que o gerador emite só `\choice`, por decisão.
 
 ```
 texto cru
-  → remove <div style="text-align:…"> e o </div> correspondente
+  → remove <div style="text-align:…">…</div>, mantendo o conteúdo
   → segmenta nos construtos de imagem
         segmento de imagem  →  \includegraphics[…]{assets/NN.ext}   (não escapa)
         segmento de texto   →  escaparForaDaMatematica(…)           (card 01)
@@ -177,6 +177,16 @@ Os demais, do editor rico (`useRichTextEditor.ts:143-165`):
 | `<img src="…" alt="…" width="320" height="200" />` | com dimensão |
 | `<div style="text-align:…">` … `</div>` | com alinhamento — as tags somem antes da segmentação |
 
+A remoção do `<div>` é uma regex só, não casamento de pares:
+
+```
+/<div style="text-align:[^"]*">([\s\S]*?)<\/div>/g   →   $1
+```
+
+O editor gera o par sempre no mesmo "part", **nunca aninhado** (`useRichTextEditor.ts:156-163`), então
+o não-guloso casa certo mesmo com vários no mesmo campo. `</div>` órfão fica literal, escapado — que é
+o comportamento certo para HTML que não veio do nosso editor.
+
 `asset://assets/<uuid>.<ext>` é key no R2: bucket `BUCKET_QUESTION`, e o `assets/` é o **prefixo real
 da key**, não enfeite (`api-vcnafacul/.../questao.service.ts:104-111` + `s3-service.ts:45-47`).
 
@@ -204,9 +214,12 @@ construto, só o teto.
 
 ### Nomeação e dedup
 
-`assets/NN.<ext>`, `NN` sequencial de dois dígitos por ordem de aparição, **contador único no caderno
-inteiro** (não por questão). Dedup por identidade da origem — mesma key, ou mesma URL, em duas
-questões vira **um** arquivo e uma entrada em `imagens[]`.
+`assets/NN.<ext>`, `NN` sequencial por ordem de aparição, **contador único no caderno inteiro** (não
+por questão). Dedup por identidade da origem — mesma key, ou mesma URL, em duas questões vira **um**
+arquivo e uma entrada em `imagens[]`.
+
+⚠️ `NN` é `padStart(2, '0')`, **não truncado em dois dígitos**: um caderno de 90 questões pode passar
+de 99 imagens, e truncar faria a imagem 100 sobrescrever a 00.
 
 ### A superfície de injeção é só a extensão
 
