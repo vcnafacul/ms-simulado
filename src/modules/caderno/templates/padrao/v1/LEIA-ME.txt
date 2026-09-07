@@ -1,0 +1,39 @@
+Caderno de questões — pacote LaTeX gerado pelo ms-simulado
+==========================================================
+
+COMO COMPILAR
+
+  Opção 1 — Overleaf, sem instalar nada
+    1. Acesse overleaf.com e crie um projeto por "New Project > Upload Project"
+    2. Envie este .zip inteiro
+    3. Abra main.tex e clique em "Recompile"
+
+  Opção 2 — na sua máquina, com uma distribuição TeX instalada
+    latexmk -pdf main.tex
+
+GABARITO DO PROFESSOR
+
+  Abra main.tex e troque a linha
+      \documentclass[11pt,a4paper,twocolumn]{exam}
+  por
+      \documentclass[11pt,a4paper,twocolumn,answers]{exam}
+  e recompile. A alternativa correta de cada questão sai destacada.
+  Desfaça a troca para voltar à prova do aluno.
+
+O QUE VOCÊ PODE EDITAR
+
+  main.tex e preambulo.tex são o layout. Mexer é por sua conta, e as
+  mudanças ficam só nesta cópia.
+
+O QUE VOCÊ NÃO DEVE EDITAR
+
+  metadados.tex e conteudo.tex são gerados a partir do simulado cadastrado
+  na plataforma. Qualquer alteração aqui se perde no próximo download e,
+  o que importa mais, não volta para a plataforma. Se uma questão está
+  errada ou saiu mal diagramada, corrija a questão na plataforma e baixe
+  o caderno de novo.
+
+AVISOS DA GERAÇÃO
+
+  Veja o manifest.json: ele lista as questões que o gerador não conseguiu
+  converter por completo. Confira essas antes de imprimir.

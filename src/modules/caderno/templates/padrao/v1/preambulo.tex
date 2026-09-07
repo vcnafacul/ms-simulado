@@ -1,0 +1,90 @@
+% ===========================================================================
+% Caderno de questões — template padrao/v1
+% Preâmbulo: pacotes, macros e estilo. Layout mora aqui e no main.tex,
+% nunca no conteúdo gerado.
+%
+% Engine de referência: pdfLaTeX (o default do Overleaf). Se um dia a
+% compilação server-side (card 08) virar XeTeX/Tectonic, trocar
+% inputenc/fontenc por fontspec.
+% ===========================================================================
+
+% --- macros do caderno -----------------------------------------------------
+% \cadernoTitulo, \cadernoSubtitulo e \cadernoPendencias são defaults: o
+% metadados.tex gerado as sobrescreve com \def. Isso não faz o preambulo.tex
+% compilar sozinho — o main.tex faz \input{metadados} e \input{conteudo}
+% sem guarda, e sem esses dois arquivos a compilação falha — só mantém o
+% preâmbulo em si autocontido, então um metadados.tex que omita um campo
+% ainda compila.
+%
+% \ifcadernoRascunho não é \def: só liga com \cadernoRascunhotrue. Um
+% \def\cadernoRascunho{true} não faz nada, e não dá erro — a marca d'água
+% simplesmente nunca aparece.
+%
+% Contrato do metadados.tex (gerado pelo card 05):
+%   \def\cadernoTitulo{...}
+%   \def\cadernoSubtitulo{...}
+%   \def\cadernoPendencias{...}
+%   \cadernoRascunhotrue        % SÓ no modo rascunho; omitir no modo normal
+\newif\ifcadernoRascunho
+\providecommand{\cadernoTitulo}{Caderno de Questões}
+\providecommand{\cadernoSubtitulo}{}
+\providecommand{\cadernoPendencias}{}
+
+% --- idioma e codificação --------------------------------------------------
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+
+% --- geometria -------------------------------------------------------------
+\usepackage[a4paper,margin=2cm,columnsep=0.8cm]{geometry}
+
+% --- conteúdo --------------------------------------------------------------
+% enumitem, tabularx, booktabs, needspace e xcolor não são usados por nada
+% neste template: são exigidos pelo conteudo.tex gerado (cards 02/03). Não
+% remover por parecerem "não usados" aqui.
+\usepackage{graphicx}
+\usepackage[export]{adjustbox}   % max width=\linewidth: encolhe, nunca amplia
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem}
+\usepackage{tabularx,booktabs}
+% [normalem] é OBRIGATÓRIO: sem ele o ulem sequestra o \emph e sublinha todo
+% itálico, e o conversor do card 02 mapeia ênfase para \emph.
+\usepackage[normalem]{ulem}
+\usepackage{needspace}
+\usepackage{xcolor}
+
+% --- estilo das questões (exam.cls) ----------------------------------------
+\renewcommand\choicelabel{(\Alph{choice})}
+\qformat{\noindent\textbf{QUESTÃO \thequestion}\hfill}
+
+% --- rodapé ----------------------------------------------------------------
+% Mecanismo nativo da exam.cls. Não usar fancyhdr: conflita com a classe.
+%
+% \footer usa \cadernoTitulo antes do metadados.tex (que só é lido depois,
+% no main.tex) redefinir a macro. Isso funciona porque o \footer guarda o
+% argumento sem expandir e só expande no shipout de cada página — a ordem
+% de declaração aqui é higiene, não o motivo do override funcionar. Não
+% "otimizar" isto com \edef: um \edef travaria \cadernoTitulo no valor
+% default da hora da declaração, e o rodapé pararia de refletir o título
+% real em toda página.
+\pagestyle{headandfoot}
+\footer{}{\small\cadernoTitulo\ --- \thepage}{}
+
+% --- capa ------------------------------------------------------------------
+% Usada como \twocolumn[\capaCaderno] no main.tex, o que a faz atravessar as
+% duas colunas no topo da página 1.
+\newcommand{\capaCaderno}{%
+  \begin{center}
+    % O logo.png é copiado pro zip pelo card 05, não por este template — a
+    % ausência dele não pode derrubar a compilação.
+    \IfFileExists{logo.png}{\includegraphics[height=1.1cm]{logo.png}\\[0.4em]}{}%
+    {\LARGE\bfseries\cadernoTitulo}\\[0.3em]
+    {\large\cadernoSubtitulo}
+  \end{center}
+  \ifcadernoRascunho
+    \begin{center}\small\textbf{RASCUNHO} --- pendências: \cadernoPendencias\end{center}
+  \fi
+  \vspace{0.3em}\hrule\vspace{0.4em}
+  {\small Marque suas respostas no cartão-resposta.}
+  \vspace{0.6em}\hrule\vspace{1em}
+}

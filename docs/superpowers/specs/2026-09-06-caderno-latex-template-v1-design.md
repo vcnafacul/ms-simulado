@@ -68,12 +68,23 @@ src/modules/caderno/templates/padrao/v1/
 ├── LEIA-ME.txt       ← vai no zip
 └── exemplo/          ← NÃO vai no zip: smoke test deste card
     ├── metadados.tex
-    ├── conteudo.tex
-    └── main-multicol.tex
+    └── conteudo.tex
 ```
 
+> O `exemplo/` levou também um `main-multicol.tex` durante a validação — ver a seção de validação
+> abaixo. Ele foi removido depois que o round-trip no Overleaf escolheu o `twocolumn` da classe.
+
 **A `logo.png` não mora aqui.** O `\capaCaderno` faz `\includegraphics{logo.png}`, um caminho relativo
-ao `main.tex` — então o arquivo precisa estar **ao lado dele na raiz do zip**. A fonte é
+ao `main.tex` — então o arquivo precisa estar **ao lado dele na raiz do zip**.
+
+⚠️ **A capa protege a logo com `\IfFileExists`; as questões do fixture não.** A guarda existe pra que
+uma logo faltando não derrube o caderno inteiro — mas ela **relaxa o contrato do card 05**: esquecer de
+copiar a `logo.png` deixa de ser erro de compilação e passa a ser uma capa sem logo, que parece
+correta. Quem implementar o card 05 precisa tratar a cópia como obrigatória, não como best-effort.
+
+**A raiz do zip é plana.** `\input{preambulo}`, `\input{metadados}`, `\input{conteudo}` e
+`\includegraphics{logo.png}` resolvem relativo ao `main.tex`, então os arquivos do template mais a logo
+são todos irmãos na raiz. Só as imagens de questão ficam em subdiretório (`assets/`). A fonte é
 `src/modules/cartao-resposta/assets/logo.png`, e quem copia é o card 05, ao montar o zip. Para o smoke
 test deste card, a logo entra junto no upload do Overleaf. ➡️ **Reflete no card 05:** o zip ganha
 `logo.png` na raiz, além dos arquivos já listados no `design.md §5`.
@@ -81,8 +92,14 @@ test deste card, a logo entra junto no upload do Overleaf. ➡️ **Reflete no c
 `nest-cli.json` ganha dois globs ao lado dos que o cartão já tem:
 
 ```json
-{ "include": "modules/caderno/templates/**/*.tex", "exclude": "**/exemplo/**" },
-{ "include": "modules/caderno/templates/**/*.txt" }
+{
+  "include": "modules/caderno/templates/**/*.tex",
+  "exclude": "modules/caderno/templates/**/exemplo/**"
+},
+{
+  "include": "modules/caderno/templates/**/*.txt",
+  "exclude": "modules/caderno/templates/**/exemplo/**"
+}
 ```
 
 ### Mudança de contrato: `metadados.tex` separado de `conteudo.tex`
@@ -94,7 +111,7 @@ arquivo gerado, e aí layout deixa de morar só no `main.tex`.
 
 São **dois** arquivos gerados:
 
-- `metadados.tex` — só as macros (`\def\cadernoTitulo`, `\def\cadernoSubtitulo`, `\cadernorascunhotrue`,
+- `metadados.tex` — só as macros (`\def\cadernoTitulo`, `\def\cadernoSubtitulo`, `\cadernoRascunhotrue`,
   `\def\cadernoPendencias`). Lido no **preâmbulo**, antes do `\begin{document}`.
 - `conteudo.tex` — só os blocos de questão. Sem `\begin{questions}`: o ambiente subiu pro `main.tex`,
   então o arquivo gerado não carrega nenhuma estrutura de layout.
@@ -108,7 +125,7 @@ conteúdo). Atualizar aqueles cards quando chegarmos neles.
 \documentclass[11pt,a4paper,twocolumn]{exam}
 \input{preambulo}      % pacotes, macros, defaults
 \input{metadados}      % GERADO
-\ifcadernorascunho
+\ifcadernoRascunho
   \usepackage{draftwatermark}
   \SetWatermarkText{RASCUNHO}\SetWatermarkScale{1.2}\SetWatermarkColor[gray]{0.92}
 \fi
@@ -120,7 +137,7 @@ conteúdo). Atualizar aqueles cards quando chegarmos neles.
 \end{document}
 ```
 
-O rascunho é `\newif\ifcadernorascunho`, não `\def\cadernoRascunho{true}` como no design §5.2:
+O rascunho é `\newif\ifcadernoRascunho`, não `\def\cadernoRascunho{true}` como no design §5.2:
 comparar string em LaTeX exige pacote e é frágil, booleano é nativo, e permite **carregar o
 `draftwatermark` só quando é rascunho** — carregá-lo sempre estampa "DRAFT" por padrão.
 
@@ -140,7 +157,7 @@ comparar string em LaTeX exige pacote e é frágil, booleano é nativo, e permit
 \usepackage{needspace}
 \usepackage{xcolor}
 
-\newif\ifcadernorascunho
+\newif\ifcadernoRascunho
 \providecommand{\cadernoTitulo}{Caderno de Questões}
 \providecommand{\cadernoSubtitulo}{}
 \providecommand{\cadernoPendencias}{}
@@ -167,8 +184,13 @@ Três decisões com razão explícita:
 - **Sem `multicol` no caminho principal** — as duas colunas vêm da opção `twocolumn` da classe. As
   alternativas ficam uma por linha (`choices` do `exam.cls`), que é o que cabe em ~8 cm.
 
-Os `\providecommand` fazem o template compilar sozinho mesmo sem `metadados.tex`, o que torna o
-`exemplo/` opcional e o template inspecionável isolado. O `\def` do arquivo gerado sobrepõe o default.
+Os `\providecommand` mantêm o **preâmbulo** autossuficiente: um `metadados.tex` que omita um campo
+ainda compila, com o default no lugar.
+
+⚠️ Isso **não** quer dizer que o template compile sem `metadados.tex`. O `main.tex` faz
+`\input{metadados}` e `\input{conteudo}` **sem guarda**, de propósito — os dois são obrigatórios, e
+não existe caminho degradado. Se o builder do card 05 não produzir os dois arquivos, o zip é
+inentregável, e é melhor que isso falhe alto na compilação do que saia um caderno pela metade. O `\def` do arquivo gerado sobrepõe o default.
 
 ### `\capaCaderno`
 
@@ -179,7 +201,7 @@ Os `\providecommand` fazem o template compilar sozinho mesmo sem `metadados.tex`
     {\LARGE\bfseries\cadernoTitulo}\\[0.3em]
     {\large\cadernoSubtitulo}
   \end{center}
-  \ifcadernorascunho
+  \ifcadernoRascunho
     \begin{center}\small\textbf{RASCUNHO} — pendências: \cadernoPendencias\end{center}
   \fi
   \vspace{0.3em}\hrule\vspace{0.4em}
@@ -244,7 +266,7 @@ chegariam ao container. Esse critério trava o bug.
 - [ ] Trocando pra `\documentclass[...,answers]{exam}`, o gabarito sai com a correta destacada
 - [ ] Imagem larga não estoura a coluna
 - [ ] Nenhum cabeçalho "QUESTÃO NN" órfão no fim de coluna
-- [ ] Marca d'água aparece com `\cadernorascunhotrue` e some sem
+- [ ] Marca d'água aparece com `\cadernoRascunhotrue` e some sem
 - [ ] **Itálico sai itálico, não sublinhado** — o teste do `[normalem]`
 - [ ] Rodapé com nome do simulado e página
 - [ ] `LEIA-ME.txt` explica compilar, o que não editar e como tirar o gabarito
@@ -259,6 +281,16 @@ chegariam ao container. Esse critério trava o bug.
 | `inputenc`/`fontenc` amarram a pdfLaTeX | Coerente com o card 08 (TeX Live + `pdflatex`). Se virar Tectonic/XeTeX, o preâmbulo troca por `fontspec` |
 | `exclude` do `nest-cli` errado deixa o `exemplo/` vazar pro `dist` | Virou critério de aceitação automatizável |
 | Escrever LaTeX sem poder compilar | Preâmbulo conservador, só pacotes mantidos e conhecidos; dois `main` no mesmo upload; nenhuma macro esperta além das quatro do caderno |
+
+## Reflexos a propagar nos próximos cards
+
+| Card | O que muda |
+|---|---|
+| 03 | Gera **dois** arquivos — `metadados.tex` (macros, lido no preâmbulo) e `conteudo.tex` (só as questões, sem `\begin{questions}`). O booleano do rascunho é `\cadernoRascunhotrue`, **nunca** `\def\cadernoRascunho{true}`. |
+| 05 | O zip leva `main.tex`, `preambulo.tex`, `LEIA-ME.txt`, `metadados.tex`, `conteudo.tex`, `logo.png` e `manifest.json` **na raiz**, e as imagens de questão em `assets/`. |
+| 05 | Copiar a `logo.png` é obrigatório: a guarda `\IfFileExists` faz o esquecimento passar despercebido. |
+| 05 | Env ganha `CADERNO_TEMPLATE=padrao` ao lado do `CADERNO_TEMPLATE_VERSION=v1` — sem ele o eixo de variante do diretório é inutilizável. |
+| 05 | O template resolve em `path.join(__dirname, 'templates', template, versao)` a partir de `src/modules/caderno/`, **não** na raiz do repo. |
 
 ## Fora do escopo deste card
 

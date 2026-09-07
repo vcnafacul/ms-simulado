@@ -27,7 +27,7 @@ O maior risco do card é que `\documentclass[twocolumn]{exam}` não está testad
 | `src/modules/caderno/templates/padrao/v1/LEIA-ME.txt` | Como compilar, como tirar o gabarito, o que não editar. Vai no zip. |
 | `src/modules/caderno/templates/padrao/v1/exemplo/metadados.tex` | Fixture: as macros que o card 03 vai gerar. **Não** vai no zip. |
 | `src/modules/caderno/templates/padrao/v1/exemplo/conteudo.tex` | Fixture: 6 questões sintéticas, uma por risco de layout. **Não** vai no zip. |
-| `src/modules/caderno/templates/padrao/v1/exemplo/main-multicol.tex` | Plano B do layout de duas colunas, pra compilar no mesmo upload. **Não** vai no zip. |
+| `src/modules/caderno/templates/padrao/v1/exemplo/main-multicol.tex` | Plano B do layout de duas colunas, pra compilar no mesmo upload. **Não** vai no zip. ~~Removido na Task 5~~: o `twocolumn` da classe venceu. |
 | `src/modules/caderno/templates.spec.ts` | Contrato de empacotamento: caminho, presença dos arquivos e as duas armadilhas silenciosas (`normalem`, `fancyhdr`). |
 | `nest-cli.json` | Dois globs novos, com `exclude` do `exemplo/`. |
 
@@ -110,11 +110,21 @@ describe('template do caderno (padrao/v1)', () => {
     expect(ler('preambulo.tex')).toContain('\\usepackage[normalem]{ulem}');
   });
 
-  it('preambulo não usa fancyhdr, que conflita com a exam.cls', () => {
-    expect(ler('preambulo.tex')).not.toContain('fancyhdr');
+  it('preambulo não carrega o pacote fancyhdr, que conflita com a exam.cls', () => {
+    // Asserção sobre `{fancyhdr}` e não sobre a palavra solta: o comentário do
+    // preâmbulo cita o pacote de propósito, pra dizer qual não usar. A chave
+    // pega tanto `\usepackage{fancyhdr}` quanto `\usepackage[opt]{fancyhdr}`.
+    expect(ler('preambulo.tex')).not.toContain('{fancyhdr}');
   });
 });
 ```
+
+> **Correção aplicada durante a execução.** A primeira versão deste plano assertava
+> `not.toContain('fancyhdr')`, palavra solta. O `preambulo.tex` cita o pacote num comentário
+> **de propósito** — é a informação mais útil daquela linha, dizer qual pacote não usar — então
+> a asserção derrubava o próprio arquivo. A chave em `{fancyhdr}` testa o carregamento de
+> verdade e libera a menção em prosa. Verificado na execução: com um `\usepackage{fancyhdr}`
+> real o teste fica vermelho; sem ele, verde.
 
 - [ ] **Step 2: Rodar o teste e confirmar que falha**
 
@@ -142,7 +152,7 @@ Criar `src/modules/caderno/templates/padrao/v1/preambulo.tex`:
 % --- macros do caderno -----------------------------------------------------
 % Declaradas antes de qualquer uso: o \footer abaixo já usa \cadernoTitulo.
 % O metadados.tex gerado sobrescreve estes defaults com \def.
-\newif\ifcadernorascunho
+\newif\ifcadernoRascunho
 \providecommand{\cadernoTitulo}{Caderno de Questões}
 \providecommand{\cadernoSubtitulo}{}
 \providecommand{\cadernoPendencias}{}
@@ -185,7 +195,7 @@ Criar `src/modules/caderno/templates/padrao/v1/preambulo.tex`:
     {\LARGE\bfseries\cadernoTitulo}\\[0.3em]
     {\large\cadernoSubtitulo}
   \end{center}
-  \ifcadernorascunho
+  \ifcadernoRascunho
     \begin{center}\small\textbf{RASCUNHO} --- pendências: \cadernoPendencias\end{center}
   \fi
   \vspace{0.3em}\hrule\vspace{0.4em}
@@ -218,7 +228,7 @@ Criar `src/modules/caderno/templates/padrao/v1/main.tex`:
 
 % draftwatermark carregado só no modo rascunho: carregá-lo sempre estampa
 % "DRAFT" por padrão.
-\ifcadernorascunho
+\ifcadernoRascunho
   \usepackage{draftwatermark}
   \SetWatermarkText{RASCUNHO}
   \SetWatermarkScale{1.2}
@@ -288,7 +298,7 @@ AVISOS DA GERAÇÃO
 npx jest --detectOpenHandles --forceExit src/modules/caderno/templates.spec.ts
 ```
 
-Esperado: PASS, 7 testes (3 do `it.each` + 4 individuais).
+Esperado: PASS, 7 testes (3 do `it.each` + 4 individuais). A suíte cresce ao longo do plano — terminou em 12.
 
 - [ ] **Step 7: Lint e formatação do arquivo novo**
 
@@ -402,9 +412,9 @@ Conteúdo **sintético**, escrito à mão. Não é amostra do acervo — é fixt
 % Fixture do smoke test — imita o que o card 03 vai GERAR.
 \def\cadernoTitulo{Simulado de Exemplo --- Template v1}
 \def\cadernoSubtitulo{ENEM 1º dia $\cdot$ 6 questões $\cdot$ 90 min}
-\def\cadernoPendencias{52, 58}
+\def\cadernoPendencias{48, 50}
 % Descomente para testar a marca d'água e a caixa de pendências:
-% \cadernorascunhotrue
+% \cadernoRascunhotrue
 ```
 
 - [ ] **Step 2: Criar o `exemplo/conteudo.tex`**
@@ -541,7 +551,7 @@ Com base no texto, a principal causa do padrão descrito é:
 \input{metadados}
 \usepackage{multicol}
 
-\ifcadernorascunho
+\ifcadernoRascunho
   \usepackage{draftwatermark}
   \SetWatermarkText{RASCUNHO}
   \SetWatermarkScale{1.2}
@@ -577,7 +587,7 @@ Se `exemplo` aparecer, o `exclude` do Step 2 da Task 2 está errado — corrigir
 npx jest --detectOpenHandles --forceExit src/modules/caderno/templates.spec.ts
 ```
 
-Esperado: PASS, 7 testes.
+Esperado: PASS. (A suíte já tem 11 nesta altura; os reviews acrescentaram testes nas tasks 1 e 2.)
 
 - [ ] **Step 6: Commit**
 
@@ -611,13 +621,27 @@ rm -rf "$OUT" && mkdir -p "$OUT"
 cp src/modules/caderno/templates/padrao/v1/main.tex       "$OUT/"
 cp src/modules/caderno/templates/padrao/v1/preambulo.tex  "$OUT/"
 cp src/modules/caderno/templates/padrao/v1/LEIA-ME.txt    "$OUT/"
-cp src/modules/caderno/templates/padrao/v1/exemplo/*.tex  "$OUT/"
-cp src/modules/cartao-resposta/assets/logo.png            "$OUT/"
+cp src/modules/caderno/templates/padrao/v1/exemplo/metadados.tex     "$OUT/"
+cp src/modules/caderno/templates/padrao/v1/exemplo/main-multicol.tex "$OUT/"
+cp src/modules/cartao-resposta/assets/logo.png                       "$OUT/"
+
+# conteudo.tex entra DUAS vezes, de propósito.
+V=src/modules/caderno/templates/padrao/v1
+cat "$V/exemplo/conteudo.tex" "$V/exemplo/conteudo.tex" > "$OUT/conteudo.tex"
+
 (cd "$OUT" && zip -qr ../caderno-overleaf.zip .)
 ls -la "${TMPDIR:-/tmp}/caderno-overleaf.zip"
 ```
 
-Esperado: o zip existe, com 7 arquivos (`main.tex`, `main-multicol.tex`, `preambulo.tex`, `metadados.tex`, `conteudo.tex`, `LEIA-ME.txt`, `logo.png`).
+Esperado: o zip existe, com 7 arquivos (`main.tex`, `main-multicol.tex`, `preambulo.tex`, `metadados.tex`, `conteudo.tex`, `LEIA-ME.txt`, `logo.png`) e 12 `\question` no `conteudo.tex`.
+
+> **Por que o `conteudo.tex` entra duplicado.** Veio do review do card: com as 6 questões uma vez só,
+> **nenhum `\needspace` necessariamente dispara**, e o PDF fica igual quer o mecanismo funcione ou não —
+> não dá pra falsificar. Triplicando o documento, cada questão cai em várias posições de quebra
+> diferentes, o rodapé com `\thepage` é exercitado em várias páginas, e o `\needspace` passa a ser
+> testado de verdade. Isso importa porque a escolha entre `twocolumn` e `multicol` se decide exatamente
+> na interação instável do `multicol` com o `needspace`. De brinde, os números 46-51 aparecem repetidos,
+> o que prova que o `\setcounter` por questão manda mesmo.
 
 - [ ] **Step 2: Entregar o zip ao usuário com o roteiro**
 
@@ -626,21 +650,26 @@ Overleaf → *New Project* → *Upload Project* → enviar o zip. Compilar **os 
 1. `main.tex` — compilar e conferir a lista abaixo
 2. `main-multicol.tex` — no Overleaf, definir como documento principal em *Menu > Main document*, recompilar e conferir a mesma lista
 3. `main.tex` de novo, trocando o `\documentclass` por `[11pt,a4paper,twocolumn,answers]{exam}` — conferir o gabarito
-4. `metadados.tex`, descomentando `\cadernorascunhotrue` — conferir a marca d'água
+4. `metadados.tex`, descomentando `\cadernoRascunhotrue` — conferir a marca d'água
 
 - [ ] **Step 3: Checklist de conferência (o usuário responde)**
 
 - [ ] Compila sem erro
-- [ ] A primeira questão sai como **QUESTÃO 46**, não 1
-- [ ] Com `answers`, a alternativa correta sai destacada
-- [ ] A imagem da questão 48 não estoura a largura da coluna
-- [ ] Nenhum cabeçalho "QUESTÃO NN" órfão no pé de coluna (olhar a 51, que é longa)
-- [ ] A tabela da questão 50 cabe na coluna e continua legível
-- [ ] Na questão 46, **"itálico" sai em itálico e não sublinhado** — é o teste do `[normalem]`; se sair sublinhado, o `preambulo.tex` perdeu a opção
-- [ ] Marca d'água aparece com `\cadernorascunhotrue` e some sem ela
-- [ ] O rodapé traz o título do simulado e o número da página
+- [ ] A primeira questão sai como **QUESTÃO 46**, não 1 — e a sequência 46-51 aparece **duas vezes**, o que é esperado (o `conteudo.tex` é duplicado) e prova o `\setcounter` por questão
+- [ ] Na questão 46, **"itálico" sai em itálico e não sublinhado** — é o teste do `[normalem]`; sublinhado significa que o `preambulo.tex` perdeu a opção
+- [ ] A imagem da questão 48 não estoura a largura da coluna (a logo tem ~1,3× a largura útil, então o encolhimento tem que ser visível)
+- [ ] A tabela da questão 50 **quebra a célula longa** em vez de estourar a coluna
+- [ ] Nenhum cabeçalho "QUESTÃO NN" órfão no pé de coluna — com o documento triplicado há várias quebras pra conferir
+- [ ] O rodapé traz o título do simulado e o número da página, em todas as páginas
 - [ ] A capa atravessa as duas colunas no topo da página 1
+- [ ] Recompilando com `\documentclass[11pt,a4paper,twocolumn,answers]{exam}`, a alternativa correta sai destacada — **conferir a questão 49 em especial**, onde a correta é uma imagem
+- [ ] Descomentando `\cadernoRascunhotrue` no `metadados.tex`, a marca d'água aparece e a caixa de pendências mostra "48, 50"; comentando de volta, some
 - [ ] **Qual dos dois `main` ficou melhor**
+
+> Ao comparar os dois: esperar que difiram no pé das colunas por motivo que **não** é sinal de
+> qualidade. O `twocolumn` herda `\flushbottom`, então uma quebra forçada aparece como espaçamento
+> esticado entre questões; o `multicols` equilibra a última página. Nenhum dos dois é defeito — julgar
+> pelo resto.
 
 - [ ] **Step 4: Parar e aguardar**
 
@@ -649,6 +678,12 @@ Não seguir para a Task 5 sem o retorno. Se algo não compilar, a mensagem de er
 ---
 
 ### Task 5: Consolidar o resultado da compilação
+
+> **Resultado do round-trip (2026-09-07):** o usuário compilou **os dois** `main` no Overleaf e o
+> `main.tex` — opção `twocolumn` da própria `exam.cls` — ficou melhor. A hipótese não testada do card
+> se confirmou: a classe aceita `twocolumn`. O `exemplo/main-multicol.tex` foi removido, e o `main.tex`
+> passou a registrar a decisão no cabeçalho, com o motivo pra não reintroduzir `multicol` sem medir
+> (interação instável com o `\needspace`). Veredito do usuário: "ficou bom para um template inicial".
 
 **Files:**
 - Delete: o `main` perdedor (um dos dois)
