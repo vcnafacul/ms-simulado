@@ -95,4 +95,36 @@ describe('template do caderno (v1)', () => {
       .sort();
     expect(doCaderno.map((a) => a.include).sort()).toEqual(esperados);
   });
+
+  it('o LEIA-ME não aponta para o manifest.json, que não existe nesta POC', () => {
+    // Os avisos da geração saem num bloco de `% AVISO:` no topo do
+    // conteudo.tex. Apontar para um arquivo que não vem no zip manda a pessoa
+    // procurar o que não existe.
+    const leiaMe = lerTexto('LEIA-ME.txt');
+    expect(leiaMe).not.toContain('manifest.json');
+    expect(leiaMe).toContain('% AVISO:');
+  });
+
+  it('o LEIA-ME diz como tornar uma mudança de layout permanente', () => {
+    // Sem isso alguém ajusta o layout no projeto do Overleaf, imprime
+    // satisfeito, e descobre na prova seguinte que o ajuste sumiu — cada
+    // projeto é descartável e a fonte da verdade é o repo.
+    expect(lerTexto('LEIA-ME.txt')).toMatch(/reposit[óo]rio|repo\b/i);
+  });
+
+  it('o conteudo.tex de exemplo avisa que não é modelo da saída do gerador', () => {
+    const exemplo = fs.readFileSync(
+      path.join(TEMPLATE_DIR, 'exemplo/conteudo.tex'),
+      'utf-8',
+    );
+    expect(exemplo).toContain('não é modelo');
+  });
+
+  it('os cabeçalhos do template não citam um diretório que não existe', () => {
+    // O nível `padrao/` foi decidido fora nesta POC. Um comentário que se
+    // descreve como `padrao/v1` manda o leitor procurar o que não há.
+    for (const arquivo of ['main.tex', 'preambulo.tex']) {
+      expect(lerTexto(arquivo)).not.toContain('padrao/v1');
+    }
+  });
 });

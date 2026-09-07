@@ -23,7 +23,12 @@ GABARITO DO PROFESSOR
 O QUE VOCÊ PODE EDITAR
 
   main.tex e preambulo.tex são o layout. Mexer é por sua conta, e as
-  mudanças ficam só nesta cópia.
+  mudanças ficam só nesta cópia — cada prova que você baixa cria um
+  projeto novo, e ele não sabe nada dos anteriores.
+
+  Se a mudança deve valer para todo mundo, daqui em diante, ela precisa
+  voltar para o repositório do ms-simulado num pull request. A fonte da
+  verdade do template é o repo; este projeto é descartável.
 
 O QUE VOCÊ NÃO DEVE EDITAR
 
@@ -35,5 +40,9 @@ O QUE VOCÊ NÃO DEVE EDITAR
 
 AVISOS DA GERAÇÃO
 
-  Veja o manifest.json: ele lista as questões que o gerador não conseguiu
-  converter por completo. Confira essas antes de imprimir.
+  Abra o conteudo.tex e olhe o topo do arquivo. As linhas que começam com
+  "% AVISO:" listam o que o gerador não conseguiu resolver — alternativa
+  em branco, imagem que não foi encontrada — dizendo o número da questão.
+  Confira essas antes de imprimir.
+
+  São comentários de LaTeX: não afetam a compilação nem aparecem no PDF.
