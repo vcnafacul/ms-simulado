@@ -1,6 +1,17 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import nestCli from '../../../nest-cli.json';
+
+/**
+ * Lido em runtime, não importado. Um `import` de arquivo fora de `src/` puxa o
+ * JSON pro module graph do TypeScript e desloca o `rootDir` inferido: o
+ * `dist/main.js` muda de lugar e o PM2 sobe com "Script not found
+ * /var/www/main.js". Hoje isso não acontece só porque o `tsconfig.build.json`
+ * exclui todo arquivo `*.spec.ts` do build — uma linha de config de distância
+ * do bug.
+ */
+const nestCli = JSON.parse(
+  fs.readFileSync(path.join(__dirname, '../../../nest-cli.json'), 'utf-8'),
+) as { compilerOptions: { assets: { include: string; exclude?: string }[] } };
 
 /**
  * Contrato de layout de origem do template do caderno, mais a metade de
@@ -57,6 +68,20 @@ describe('template do caderno (padrao/v1)', () => {
     expect(posicoes).toEqual([...posicoes].sort((a, b) => a - b));
   });
 
+  it('draftwatermark é carregado depois do metadados e antes do document', () => {
+    // A condicional só funciona nessa ordem: o \ifcadernoRascunho é ligado
+    // pelo metadados.tex, e um \usepackage tem que estar no preâmbulo. Fora
+    // dela a marca d'água morre em silêncio — sem erro, sem aviso.
+    const main = ler('main.tex');
+    const metadados = main.indexOf('\\input{metadados}');
+    const watermark = main.indexOf('\\usepackage{draftwatermark}');
+    const documento = main.indexOf('\\begin{document}');
+
+    expect(metadados).toBeGreaterThan(-1);
+    expect(watermark).toBeGreaterThan(metadados);
+    expect(documento).toBeGreaterThan(watermark);
+  });
+
   it('preambulo carrega ulem com [normalem]', () => {
     // Sem normalem o ulem sequestra o \emph e sublinha todo itálico — e o
     // conversor (card 02) mapeia ênfase para \emph. Falha silenciosa: só
@@ -80,6 +105,11 @@ describe('template do caderno (padrao/v1)', () => {
     // substring: senão renomear \capaCaderno para \capaCadernoAmpliada só no
     // preambulo passaria no teste com o main.tex já quebrado — e é justamente
     // esse o rename que a variante `ampliada` vai querer fazer.
+    //
+    // A varredura não descarta comentários: um macro citado só em prosa no
+    // main.tex passa a ser exigido no preambulo. É aceitável hoje (todo macro
+    // citado lá existe mesmo), mas é a mesma armadilha do fancyhdr — se um dia
+    // um comentário citar um macro de propósito inexistente, é aqui que quebra.
     const preambulo = ler('preambulo.tex');
     const usadosNoMain = new Set(
       ler('main.tex').match(
@@ -117,7 +147,7 @@ describe('template do caderno (padrao/v1)', () => {
     expect(leiaMe).toContain(comGabarito);
   });
 
-  it('nest-cli.json copia o template pro dist', () => {
+  it('os globs do nest-cli.json cobrem o template e excluem o exemplo', () => {
     // A outra metade do contrato. O spec acima roda sobre `src/` e passaria
     // mesmo que nada fosse empacotado; o ms.dockerfile faz `COPY dist ./`, e
     // sem estes globs a imagem sobe sem template — falha só em runtime, no
