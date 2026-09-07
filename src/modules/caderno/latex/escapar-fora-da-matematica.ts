@@ -20,18 +20,29 @@ import { escapeLatex } from './escape-latex';
  * Único caractere escapado dentro da fórmula: `%` é comentário em qualquer
  * modo, inclusive dentro de `$...$`.
  *
- * ⚠️ Só o que ainda não está escapado. `$50\%$` é fórmula plausível — uma
- * porcentagem dentro de conta — e escapar de novo faria `\%` virar `\\%`, que
- * é quebra de linha seguida de comentário.
+ * ⚠️ O critério é a PARIDADE das barras que vêm antes do `%`, não a presença
+ * de uma barra. Um número ÍMPAR de barras significa que o `%` já está
+ * escapado — a última barra pertence a ele. Um número PAR — incluindo
+ * zero — significa que ele está cru: em `$a \\% b$` as duas barras formam
+ * uma quebra de linha (`\\`), e o `%` depois dela nunca foi tocado. Um
+ * lookbehind simples (`(?<!\\)%`) confundiria "precedido de barra" com
+ * "escapado" e deixaria esse `%` passar cru.
  */
 const escaparPorcentoEmMath = (trecho: string): string =>
-  trecho.replace(/(?<!\\)%/g, '\\%');
+  trecho.replace(/(\\*)%/g, (_, barras: string) =>
+    barras.length % 2 === 0 ? `${barras}\\%` : `${barras}%`,
+  );
+
+interface Abertura {
+  delim: string;
+  fim: number; // índice onde começa o delimitador de fechamento
+}
 
 /**
- * Devolve o delimitador que abre fórmula na posição `i`, ou `null` se ali o
- * cifrão é texto.
+ * Devolve onde abre e onde fecha a fórmula que começa na posição `i`, ou
+ * `null` se ali o cifrão é texto.
  *
- * Três condições combinadas, e cada uma existe por um caso real:
+ * Quatro condições combinadas, e cada uma existe por um caso real:
  *
  * 1. **Não precedido de R/r.** `R$ 50` e `R$5` são dinheiro. A âncora olha o
  *    caractere ANTES do cifrão, e é por isso que `$R$` continua abrindo — ali
@@ -39,15 +50,21 @@ const escaparPorcentoEmMath = (trecho: string): string =>
  * 2. **Não seguido de espaço.** O editor grava `${fórmula}$`, sempre colado.
  *    Espaço depois do cifrão é dinheiro: `custa $ 50 e $ 30`.
  * 3. **Com fechamento adiante.** Impede um cifrão solto de abrir uma região
- *    que nunca fecha e engolir o escape de todo o resto do texto. Fim de
- *    string conta como "sem conteúdo": um `$`/`$$` ali não tem fechamento
- *    adiante, então esta condição já cobre esse caso sem precisar de uma
- *    regra extra para `seguinte === undefined`.
+ *    que nunca fecha e engolir o escape de todo o resto do texto. O índice
+ *    do fechamento (`fim`) é devolvido junto com a decisão de abrir — a
+ *    invariante de terminação mora na mesma função que a consome, então
+ *    quem chama nunca recalcula esse índice, e `i` sempre avança no laço.
+ * 4. **Sem quebra de linha dentro do inline.** O editor grava fórmula inline
+ *    casando `[^$\n]+?` (`useRichTextEditor.ts`, `preprocessLatex` do
+ *    client) — ou seja, `$...$` nunca contém `\n`; `$$...$$` pode. Sem esta
+ *    condição, `a) $5\nb) $10\nc) $x$` abriria a região falsa `$5\nb) $`:
+ *    em math mode `\n` é só espaço, nada estoura, e a prova sai com as
+ *    alternativas de preço em itálico matemático.
  *
  * A condição 1 e a 2 se complementam: sozinha, a 2 não pega `R$5`, e sozinha,
  * a 1 não pega `US$ 40`.
  */
-function delimitadorQueAbre(texto: string, i: number): string | null {
+function delimitadorQueAbre(texto: string, i: number): Abertura | null {
   if (texto[i] !== '$') return null;
 
   const delim = texto.startsWith('$$', i) ? '$$' : '$';
@@ -58,9 +75,12 @@ function delimitadorQueAbre(texto: string, i: number): string | null {
   const seguinte = texto[i + delim.length];
   if (seguinte !== undefined && /\s/.test(seguinte)) return null;
 
-  if (texto.indexOf(delim, i + delim.length) === -1) return null;
+  const fim = texto.indexOf(delim, i + delim.length);
+  if (fim === -1) return null;
 
-  return delim;
+  if (delim === '$' && texto.slice(i + 1, fim).includes('\n')) return null;
+
+  return { delim, fim };
 }
 
 export function escaparForaDaMatematica(texto: string): string {
@@ -78,10 +98,10 @@ export function escaparForaDaMatematica(texto: string): string {
   };
 
   while (i < texto.length) {
-    const delim = delimitadorQueAbre(texto, i);
+    const abertura = delimitadorQueAbre(texto, i);
 
-    if (delim) {
-      const fim = texto.indexOf(delim, i + delim.length);
+    if (abertura) {
+      const { delim, fim } = abertura;
       despejarTexto();
       saida.push(escaparPorcentoEmMath(texto.slice(i, fim + delim.length)));
       i = fim + delim.length;

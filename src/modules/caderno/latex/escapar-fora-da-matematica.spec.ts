@@ -45,12 +45,21 @@ describe('escaparForaDaMatematica — o que NÃO abre fórmula', () => {
       'custa \\$ 50 e \\$ 30',
     );
     expect(escaparForaDaMatematica('US$ 40')).toBe('US\\$ 40');
+    // A condição usa `\s`, não um espaço literal: tab também é "seguido de
+    // espaço em branco" e também é dinheiro.
+    expect(escaparForaDaMatematica('custa $\t50 e $x$')).toBe(
+      'custa \\$\t50 e $x$',
+    );
   });
 
   it('recusa fórmula escrita com espaço dentro dos delimitadores', () => {
-    // Falso negativo ACEITO, não bug: o editor nunca grava assim, mas
-    // conteúdo colado à mão pode. Sai como texto escapado — visível, e
-    // portanto corrigível por quem imprime.
+    // NÃO é um caso de conteúdo colado à mão fora do editor: o
+    // `EditorToolbar.tsx` chama `prompt("Digite a fórmula LaTeX:", ...)` e
+    // passa o resultado direto para `insertLatex`, sem `.trim()`. Quem cola
+    // " x^2 " com espaços no prompt grava `$ x^2 $` pelo caminho normal do
+    // editor. O comportamento continua aceitável — sai escapado, portanto
+    // visível — porque abrir região com espaço arriscaria demais para o
+    // ganho, mas o motivo é esse, não "conteúdo fora do editor".
     expect(escaparForaDaMatematica('$ x^2 $')).toBe(
       '\\$ x\\textasciicircum{}2 \\$',
     );
@@ -77,6 +86,29 @@ describe('escaparForaDaMatematica — o % dentro da fórmula', () => {
 
   it('escapa o % do texto normalmente', () => {
     expect(escaparForaDaMatematica('50% de $x$')).toBe('50\\% de $x$');
+  });
+
+  it('conta a paridade das barras, não a presença', () => {
+    // `\\` é quebra de linha; o `%` depois dela está CRU e precisa escapar.
+    expect(escaparForaDaMatematica('$a \\\\% b$')).toBe('$a \\\\\\% b$');
+  });
+});
+
+describe('escaparForaDaMatematica — quebra de linha dentro do inline', () => {
+  it('não deixa cifrão solto engolir alternativas de linhas diferentes', () => {
+    // `$5\nb) $` seria uma região de matemática plausível para o scanner, e em
+    // math mode a quebra de linha vira só um espaço — nada estoura, a prova
+    // sai com as alternativas em itálico. O editor nunca gera inline com
+    // quebra de linha, então recusar é espelhar o produtor.
+    expect(escaparForaDaMatematica('a) $5\nb) $10\nc) $x$')).toBe(
+      'a) \\$5\nb) \\$10\nc) $x$',
+    );
+  });
+
+  it('display $$ continua aceitando quebra de linha', () => {
+    // A restrição é só do inline: o produtor gera display multi-linha.
+    const entrada = '$$\\begin{aligned}\na &= b\n\\end{aligned}$$';
+    expect(escaparForaDaMatematica(entrada)).toBe(entrada);
   });
 });
 
@@ -117,10 +149,14 @@ describe('escaparForaDaMatematica — bordas', () => {
 });
 
 describe('escaparForaDaMatematica — limitação conhecida', () => {
-  it('erra em US$40 seguido de outro cifrão', () => {
-    // A âncora é só no R. Fechar isto significaria listar prefixos de moeda,
-    // e a lista nunca acaba. Registrado como limitação, não como bug oculto:
-    // se aparecer no acervo, vira ticket com um caso real na mão.
+  it('cifrão solto ainda abre região falsa quando tudo cabe numa linha', () => {
+    // O problema NÃO é prefixo de moeda: aqui não há nenhum. É um cifrão de
+    // dinheiro com outro cifrão adiante na mesma linha. Fechar isto exigiria
+    // heurística inventada — limite de tamanho, lista de moedas — e o
+    // espelhamento do produtor já foi até onde dá para justificar.
     expect(escaparForaDaMatematica('US$40 e US$50')).toBe('US$40 e US$50');
+    expect(escaparForaDaMatematica('Custa $50 e o item_2 pesa $x$ kg')).toBe(
+      'Custa $50 e o item_2 pesa $x\\$ kg',
+    );
   });
 });
