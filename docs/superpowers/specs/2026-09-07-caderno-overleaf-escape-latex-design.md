@@ -80,6 +80,7 @@ Uma passada da esquerda para a direita. Em cada `$`, decide se abre fórmula:
 abre  ⟺  não precedido de R/r
       ∧  não seguido de espaço
       ∧  existe delimitador de fechamento adiante
+      ∧  (se inline) a região não contém quebra de linha
 ```
 
 `$$` é testado antes de `$`, e fecha com `$$`. Se abre, o trecho **incluindo os delimitadores**
@@ -94,28 +95,52 @@ atravessa sem escape, com a exceção do `%`. Se não abre, o `$` é texto e vir
 | `custa $ 50 e $ 30` | nenhum abre | regra do espaço |
 | `custa $ 50` sozinho | não abre | falta fechamento |
 | `$$\int_0^1 x\,dx$$` | abre como `$$`, sai intacto | — |
+| `a) $5`⏎`b) $10`⏎`c) $x$` | só o `$x$` abre | a quarta condição |
 
 A condição do fechamento é o que impede o pior caso: um `$` solto abrindo região que nunca fecha e
-engolindo o escape do resto do texto.
+engolindo o escape do resto do texto. Ela também é o que **faz o laço terminar** — sem ela, o índice
+não avança e o processo estoura o heap, em vez de dar resultado errado.
+
+⚠️ **A quarta condição espelha o produtor, não uma heurística inventada.** O `preprocessLatex` do
+editor (`useRichTextEditor.ts`) casa inline com `[^$\n]+?` e display com `[^$]+?`: **inline nunca
+contém quebra de linha, display pode.** É o mesmo argumento que sustenta a regra do espaço.
+
+Sem ela, alternativas com preço viravam matemática inteira — `$5`⏎`b) $` é região plausível, e em math
+mode a quebra de linha é só um espaço, então **nada estoura**: a prova sai com as alternativas em
+itálico embaralhado e alguém imprime 200 cópias. Corrupção silenciosa exata, o modo de falha que esta
+etapa inteira existe para evitar.
 
 ## Casos patológicos, decididos e não emergentes
 
 | Entrada | Sai | Veredito |
 |---|---|---|
 | `$a$$b$` | duas fórmulas, `$a$` e `$b$` | Defensável. O scanner é ganancioso da esquerda |
-| `$ x^2 $` | texto escapado, não fórmula | **Falso negativo aceito.** O editor nunca grava assim |
+| `$ x^2 $` | texto escapado, não fórmula | **Falso negativo aceito.** O editor *pode* gerar: o `insertLatex` não faz trim do que veio do `prompt` |
 | `$50\%$` | intacto | a barra protege |
 | `$50% off$` | `%` escapado, resto intacto | — |
 | `US$ 40` | `US\$ 40` | pela regra do espaço, não pela âncora |
-| `US$40` | abre fórmula se houver outro `$` adiante | **Erra. Limitação conhecida** |
+| `US$40` | abre fórmula se houver outro `$` adiante **na mesma linha** | **Erra. Limitação conhecida** |
+| `$a \\% b$` | `%` escapado | Duas barras são quebra de linha; o `%` está cru. O critério é **paridade** de barras, não presença |
 | `$$` sozinho | `\$\$` — dois cifrões escapados, visíveis | Fórmula inline vazia. Não abre por falta de fechamento; o defeito fica visível, que é o que se quer |
 | `$$$$` | atravessa intacto | Display vazio. É o que o autor escreveu; renderiza uma caixa vazia |
 
 ⚠️ **Fim de string conta como "sem conteúdo".** Um `$` ou `$$` no fim não abre — não há fechamento
 adiante, e a condição já cobre isso sem regra extra.
 
-O `US$40` é o buraco que sobra. Fechá-lo significa listar prefixos de moeda, e a lista nunca acaba. Se
-aparecer no acervo, vira ticket com um caso real na mão.
+O buraco que sobra é o **cifrão solto**, e o enquadramento anterior desta spec o subestimava ao
+chamá-lo de "prefixo de moeda": o caso dominante não tem prefixo nenhum.
+
+```
+'Custa $50 e o item_2 pesa $x$ kg'  →  'Custa $50 e o item_2 pesa $x\$ kg'
+```
+
+A prosa entra na região sem escape, o `_2` vira subscrito legítimo e **compila sem erro**. Estender a
+âncora para `US`/`BRL` não conserta nada disso.
+
+A quarta condição fecha a família multi-linha, que é a de conteúdo real (alternativas). O que resta é
+tudo numa linha só, e fechá-lo exigiria heurística inventada — limite de tamanho de região, lista de
+moedas. O espelhamento do produtor já foi até onde é justificável. Se aparecer no acervo, vira ticket
+com um caso real na mão.
 
 ## Testes
 
