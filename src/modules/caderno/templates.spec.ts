@@ -43,13 +43,14 @@ describe('template do caderno (v1)', () => {
     expect(lerTexto('preambulo.tex')).toContain('\\usepackage[normalem]{ulem}');
   });
 
-  it('o exemplo existe e tem os dois arquivos', () => {
-    // O `exclude` do nest-cli protege este diretório. Se ele sumir, o exclude
-    // passa a guardar um caminho que não existe e ninguém percebe.
-    const noExemplo = fs.readdirSync(path.join(TEMPLATE_DIR, 'exemplo'));
-    expect(noExemplo).toEqual(
-      expect.arrayContaining(['conteudo.tex', 'metadados.tex']),
-    );
+  it('o exemplo existe e tem os dois arquivos, não vazios', () => {
+    // O `exclude` do nest-cli protege este diretório. Se ele sumir — ou ficar
+    // com arquivos vazios — o exclude passa a guardar coisa nenhuma e ninguém
+    // percebe.
+    for (const arquivo of ['conteudo.tex', 'metadados.tex']) {
+      const caminho = path.join(TEMPLATE_DIR, 'exemplo', arquivo);
+      expect(fs.statSync(caminho).size).toBeGreaterThan(0);
+    }
   });
 
   it('o nest-cli copia o template pro dist e deixa o exemplo de fora', () => {
@@ -84,8 +85,14 @@ describe('template do caderno (v1)', () => {
         .filter((ext) => ext !== ''),
     );
     expect(extensoes.size).toBeGreaterThan(0);
-    extensoes.forEach((ext) =>
-      expect(doCaderno.some((a) => a.include.endsWith(`*${ext}`))).toBe(true),
-    );
+
+    // Compara a lista inteira, não só a extensão. O `endsWith('*.tex')`
+    // sozinho não olha o meio do glob: um `templatesXX/` passa verde e para
+    // de empacotar main.tex e preambulo.tex, que é o bug que este teste
+    // existe pra pegar. A igualdade também acusa glob sobrando.
+    const esperados = [...extensoes]
+      .map((ext) => `modules/caderno/templates/**/*${ext}`)
+      .sort();
+    expect(doCaderno.map((a) => a.include).sort()).toEqual(esperados);
   });
 });
