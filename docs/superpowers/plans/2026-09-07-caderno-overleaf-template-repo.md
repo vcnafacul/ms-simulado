@@ -448,6 +448,30 @@ AVISOS DA GERAÇÃO
   São comentários de LaTeX: não afetam a compilação nem aparecem no PDF.
 ```
 
+- [ ] **Step 4b: Corrigir os dois cabeçalhos desatualizados do template**
+
+Achados no review da cópia — os dois mandam o leitor para o lugar errado.
+
+Em `src/modules/caderno/templates/v1/main.tex` e `src/modules/caderno/templates/v1/preambulo.tex`,
+trocar na segunda linha:
+
+```
+% Caderno de questões — template padrao/v1
+```
+
+por:
+
+```
+% Caderno de questões — template v1
+```
+
+E em `preambulo.tex`, no comentário sobre a logo, trocar `card 05` por `card 04` — a numeração era da
+POC anterior; aqui quem monta o zip é o card 04.
+
+⚠️ Isto **quebra de propósito** a byte-identidade com a `poc/caderno-latex` verificada na Task 1. É
+esperado: aquela verificação provou que a cópia veio limpa; esta corrige o que já estava errado na
+origem. Não desfaça uma pela outra.
+
 - [ ] **Step 5: Pôr o aviso no topo do `exemplo/conteudo.tex`**
 
 Acrescentar como primeiras linhas do arquivo:

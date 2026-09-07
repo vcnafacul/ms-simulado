@@ -62,6 +62,20 @@ trás:
 2. **"AVISOS DA GERAÇÃO"** manda ver o `manifest.json`. Esse arquivo **não vai existir** nesta POC.
    Passa a apontar para o bloco de `% AVISO:` no topo do `conteudo.tex`.
 
+### Dois cabeçalhos desatualizados no template
+
+Achados durante o review da cópia. Os dois enganam quem for ler o arquivo:
+
+1. `main.tex` e `preambulo.tex` abrem com `% Caderno de questões — template padrao/v1`. Este card
+   decidiu **não** criar o nível `padrao/`, então o comentário manda procurar um diretório que não
+   existe.
+2. `preambulo.tex` diz que a `logo.png` é copiada pro zip "pelo card 05". A numeração é da POC
+   anterior; aqui quem monta o zip é o **card 04**.
+
+Corrigir os dois. É por isso que a byte-identidade vale no momento da cópia e não ao fim do card:
+provar que a cópia veio limpa e depois corrigir o que já estava errado na origem são duas coisas
+diferentes.
+
 ### O comentário no `exemplo/conteudo.tex`
 
 Ele foi escrito quando existia um conversor de markdown, e o gerador desta POC produz outra coisa. Um
@@ -109,7 +123,9 @@ verdade.
 
 ## Critérios de aceitação
 
-- [ ] `diff` confirma `main.tex` e `preambulo.tex` byte-idênticos aos da `poc/caderno-latex`
+- [ ] `diff` confirma `main.tex` e `preambulo.tex` byte-idênticos aos da `poc/caderno-latex` **no
+      momento da cópia** — é o que prova que nada se corrompeu no caminho. Depois disso, dois
+      cabeçalhos são corrigidos de propósito (ver abaixo), então a identidade não vale ao fim do card
 - [ ] `yarn build` e os quatro arquivos aparecem em `dist/modules/caderno/templates/v1/`
 - [ ] `exemplo/` **não** aparece no `dist`
 - [ ] `ls dist/main.js` — continua na raiz do `dist`
