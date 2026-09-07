@@ -1,3 +1,15 @@
+// Config de compilação só para o Jest. Existe por causa de dois loaders que se
+// comportam diferente com a stack ESM do remark:
+//
+// - Produção: o TS compila `import` para `require()`, e o Node >= 20.19
+//   carrega ESM por require. Funciona, e é o que mantém o conversor síncrono.
+// - Jest: o jest-runtime tem loader CommonJS próprio, ignora esse backport e
+//   tenta executar o fonte ESM como CJS -> "Unexpected token 'export'".
+//
+// Por isso o `transformIgnorePatterns` do package.json manda o ts-jest
+// transformar esses pacotes do node_modules, e o ts-jest precisa de `allowJs`
+// para aceitar `.js`. Fica aqui, e não no tsconfig.json, para não mexer no
+// build de produção.
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "allowJs": true }

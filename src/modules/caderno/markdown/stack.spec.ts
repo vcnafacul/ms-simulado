@@ -2,22 +2,19 @@ import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
+import type { Paragraph, Root } from 'mdast';
 
 /**
  * A stack do remark é ESM-only (`"type": "module"`) e este projeto é CommonJS.
- * Funciona porque o Node 20.19 retroportou `require(esm)` — que é no que o TS
- * transforma estes `import` estáticos.
+ * Em produção funciona porque o Node 20.19 retroportou `require(esm)` — que é
+ * no que o TS transforma estes `import` estáticos.
  *
- * Este teste é a rede de segurança do piso de Node: num Node anterior a 20.19
- * ele falha aqui, no import, alto e imediato, em vez de o serviço quebrar no
- * boot em produção.
- *
- * O Jest não usa o `require(esm)` do Node: o `jest-runtime` tem loader
- * CommonJS próprio e tenta executar o fonte ESM como CJS, dando
- * `SyntaxError: Unexpected token 'export'`. Por isso o `package.json` manda
- * o ts-jest transformar esses pacotes do `node_modules` via
- * `tsconfig.jest.json` (que só acrescenta `allowJs`). Em produção nada disso
- * é usado — lá o `require(esm)` do Node ≥20.19 resolve sozinho.
+ * ⚠️ Estes testes **não** exercitam o `require(esm)` do Node. Sob Jest, o
+ * `transformIgnorePatterns` faz o ts-jest transpilar a stack ESM para
+ * CommonJS antes que ela chegue aqui — de propósito, porque o `jest-runtime`
+ * tem loader próprio e ignora o backport do Node. Quem exercita o
+ * `require(esm)` é só a produção. O único guarda real do piso é o teste da
+ * versão em execução, logo abaixo.
  */
 describe('stack do remark sob CommonJS', () => {
   it('carrega de forma síncrona, sem async', () => {
@@ -25,36 +22,24 @@ describe('stack do remark sob CommonJS', () => {
   });
 
   it('parseia math inline e tabela GFM', () => {
-    const arvore: any = unified()
+    const arvore = unified()
       .use(remarkParse)
       .use(remarkGfm)
       .use(remarkMath)
-      .parse('Com $x^2$ e:\n\n| a | b |\n|---|---|\n| 1 | 2 |\n');
+      .parse('Com $x^2$ e:\n\n| a | b |\n|---|---|\n| 1 | 2 |\n') as Root;
 
-    expect(arvore.children.map((n: any) => n.type)).toEqual([
-      'paragraph',
-      'table',
-    ]);
-    expect(arvore.children[0].children.map((n: any) => n.type)).toContain(
-      'inlineMath',
-    );
+    expect(arvore.children.map((n) => n.type)).toEqual(['paragraph', 'table']);
+    expect(
+      (arvore.children[0] as Paragraph).children.map((n) => n.type),
+    ).toContain('inlineMath');
   });
 
-  it('o package.json declara o piso de Node que a stack exige', () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const pkg = require('../../../../package.json');
-    expect(pkg.engines?.node).toBe('>=20.19');
-  });
-
-  it('o jest está configurado para transformar a stack ESM', () => {
-    // Sem isto o jest-runtime tenta executar o fonte ESM como CommonJS e
-    // quebra com "Unexpected token 'export'". Não é sobra de configuração:
-    // é o que faz qualquer spec que importe o remark rodar.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const pkg = require('../../../../package.json');
-    const padrao = (pkg.jest.transformIgnorePatterns ?? []).join(' ');
-    expect(padrao).toContain('unified');
-    expect(padrao).toContain('remark-');
-    expect(JSON.stringify(pkg.jest.transform)).toContain('tsconfig.jest.json');
+  it('roda num Node que suporta require(esm)', () => {
+    // Este é o único guarda real do piso: em produção a stack ESM é carregada
+    // pelo require(esm) do Node, que só existe a partir do 20.19. Aqui no Jest
+    // ela vem transpilada, então quem falha num Node velho é este teste — não
+    // o import.
+    const [maior, menor] = process.versions.node.split('.').map(Number);
+    expect(maior > 20 || (maior === 20 && menor >= 19)).toBe(true);
   });
 });

@@ -9,6 +9,9 @@ COPY package.json yarn.lock ./
 
 RUN yarn install --production --frozen-lockfile && yarn cache clean
 
+# Este e o estagio de runtime: e aqui que a versao do Node importa de fato
+# (require(esm) da stack do remark). Nao pinar abaixo de 20.19 -- ver
+# comentario no topo do arquivo.
 FROM node:20-alpine
 
 WORKDIR /var/www

@@ -16,12 +16,12 @@ client-vcnafacul  →  api-vcnafacul  →  ms-simulado       ← você está aqu
                     (NestJS + MongoDB)
 ```
 
-| Serviço | Stack | Banco | Porta |
-|---------|-------|-------|-------|
-| api-vcnafacul | NestJS 10 + TypeORM | MySQL 8+ | `3333` |
-| **ms-simulado** (este) | NestJS 10 + Mongoose | MongoDB | `3000` |
-| vcnafacul-form | NestJS 11 + Mongoose | MongoDB | `3001` |
-| client-vcnafacul | React 19 + Vite 6 | — | `5173` |
+| Serviço                | Stack                | Banco    | Porta  |
+| ---------------------- | -------------------- | -------- | ------ |
+| api-vcnafacul          | NestJS 10 + TypeORM  | MySQL 8+ | `3333` |
+| **ms-simulado** (este) | NestJS 10 + Mongoose | MongoDB  | `3000` |
+| vcnafacul-form         | NestJS 11 + Mongoose | MongoDB  | `3001` |
+| client-vcnafacul       | React 19 + Vite 6    | —        | `5173` |
 
 ---
 
@@ -51,7 +51,7 @@ Termos em português: _simulado_ (prova), _frente_ (subárea), _matéria_ (disci
 
 ## ⚙️ Pré-requisitos
 
-- Node.js 20+
+- Node.js 20.19+ (piso exigido pela stack ESM do remark, via `require(esm)`)
 - Yarn
 - MongoDB 6+
 
@@ -98,6 +98,12 @@ yarn test:cov
 # Um arquivo específico (flags extras ajudam com handles abertos)
 npx jest --detectOpenHandles --forceExit path/to/file.spec.ts
 ```
+
+> A primeira rodada do Jest depois de um cache limpo leva ~15s: o ts-jest
+> transpila a stack ESM do remark (`unified`/`remark-*`/`mdast-*`/...) para
+> CommonJS via `transformIgnorePatterns` + `tsconfig.jest.json`. As rodadas
+> seguintes usam o cache e caem para ~1,3s — não é lentidão pra "otimizar"
+> tirando essa configuração.
 
 ---
 

@@ -89,10 +89,15 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
-      "^.+\\.(t|j)s$": ["ts-jest", { "tsconfig": "<rootDir>/../tsconfig.jest.json" }]
+      "^.+\\.(t|j)s$": [
+        "ts-jest",
+        {
+          "tsconfig": "<rootDir>/../tsconfig.jest.json"
+        }
+      ]
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!(unified|remark-.*|mdast-.*|micromark.*|unist-.*|vfile.*|bail|trough|is-plain-obj|extend|devlop|decode-named-character-reference|character-entities.*|ccount|escape-string-regexp|markdown-table|longest-streak|zwitch|property-information|space-separated-tokens|comma-separated-tokens|html-void-elements|stringify-entities|hast-.*)/)"
+      "node_modules/(?!(unified|remark-.*|mdast-.*|micromark.*|unist-.*|vfile.*|bail|trough|is-plain-obj|extend|devlop|decode-named-character-reference|character-entities.*|ccount|escape-string-regexp|markdown-table|longest-streak|zwitch)/)"
     ],
     "collectCoverageFrom": [
       "**/*.(t|j)s"
