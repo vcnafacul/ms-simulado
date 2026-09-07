@@ -22,18 +22,47 @@ import katex from 'katex';
  * nem qualquer outra extensão). Uma fórmula rejeitada aqui **já aparecia
  * quebrada para quem cadastrou a questão** — inclusive `\ce{H2O}` (mhchem) e
  * `\SI{10}{\meter}` (siunitx), que o KaTeX bare também rejeita. Falso
- * positivo zero por construção, e por isso mesmo esta função tem que usar o
- * KaTeX exatamente como o editor usa: sem extensão, sem macro extra.
+ * positivo zero por construção — desde que a chamada aqui espelhe a do
+ * editor em tudo que muda o resultado, `displayMode` incluído (ver
+ * `ehDisplay` abaixo: o editor passa `$$...$$` com `displayMode: true`, e
+ * várias construções — `align`, `equation`, `gather`, `\tag` — só existem
+ * nesse modo).
  *
  * ⚠️ Continua sendo defesa em profundidade: o card 08 segue obrigado a
  * configurar `openin_any=p` e `-no-shell-escape` no compilador do servidor.
+ *
+ * ⚠️ FUROU UMA VEZ, e o furo importa entender: `\gdef\textbf#1{\input{/etc/
+ * passwd}}` passava. O KaTeX faz parse de `\gdef` como sintaxe — reconhece a
+ * forma "defina um macro" — mas guarda o CORPO do macro como tokens crus,
+ * sem nunca analisá-lo; a validação do corpo só aconteceria no uso do macro,
+ * que nunca ocorre dentro do `__parse`. Em TeX de verdade `\gdef` é global:
+ * escapa do `$...$` e reescreve `\textbf` (ou `\alpha`, ou qualquer nome) pro
+ * resto do documento — inclusive pra outra questão do mesmo caderno, cada
+ * uma passando pelo `__parse` isolada, sem macro compartilhado, então o
+ * KaTeX nunca vê o par def+uso. O pdflatex vê.
+ *
+ * Por isso a família de definição de macro é barrada ANTES do `__parse`, por
+ * nome, e não pelo que ela permite escrever. É a única outra construção,
+ * junto de `\verb` (catcode 12, sem expansão — inofensivo por definição, daí
+ * fora desta lista), em que o KaTeX carrega texto cru sem validar. **Isto
+ * não é lista de bloqueio.** Lista de bloqueio enumera comandos perigosos —
+ * um conjunto aberto, sempre incompleto, e foi exatamente isso que furou
+ * duas vezes antes desta versão. Esta lista enumera uma coisa fechada e
+ * inteiramente diferente: as construções em que o PRÓPRIO KaTeX decide não
+ * validar o conteúdo. Não apague por achar que é resquício da abordagem
+ * antiga — o dia em que o KaTeX ganhar uma nona forma de carregar texto cru
+ * sem validar, ela entra aqui do mesmo jeito, e a defesa continua sendo "o
+ * KaTeX valida", não "a lista cobre os payloads conhecidos".
  */
 
 /**
  * `katex.__parse` roda a mesma análise que `renderToString` usa por baixo,
  * sem construir a árvore de HTML — é só a parte que interessa aqui. Não está
  * nos tipos públicos do pacote (a API documentada é só `render`,
- * `renderToString`, `ParseError`, `version`), por isso o cast.
+ * `renderToString`, `ParseError`, `version`), por isso o cast — e por isso a
+ * checagem em tempo de carregamento logo abaixo: se uma atualização do
+ * KaTeX remover ou renomear `__parse`, isto tem que quebrar no boot do
+ * serviço, não no meio de uma requisição de geração de caderno.
  */
 type KatexComParse = typeof katex & {
   __parse: (
@@ -41,6 +70,20 @@ type KatexComParse = typeof katex & {
     configuracoes?: Record<string, unknown>,
   ) => unknown;
 };
+
+/** Exportado só para o teste que prova que o guard abaixo funciona. */
+export function katexTemParseInterno(mod: Record<string, unknown>): boolean {
+  return typeof mod.__parse === 'function';
+}
+
+if (!katexTemParseInterno(katex as unknown as Record<string, unknown>)) {
+  throw new Error(
+    'katex.__parse não está disponível nesta versão do pacote katex. ' +
+      'sanitizar-math.ts depende dessa API interna (sem tipos públicos) ' +
+      'para validar fórmula sem gerar HTML — uma mudança de versão que a ' +
+      'remova precisa quebrar aqui, no carregamento do módulo.',
+  );
+}
 
 const katexComParse = katex as KatexComParse;
 
@@ -68,34 +111,94 @@ const PADRAO_EXCECAO = new RegExp(
 );
 
 /**
- * Extrai o nome do comando da mensagem de erro do KaTeX, quando dá. A
- * mensagem crua de "Undefined control sequence" traz o nome literal do
- * comando; erros de sintaxe (chave faltando, etc.) não têm comando para
- * extrair, e a chamada cai no texto genérico.
+ * Família de definição de macro — os dez nomes em que o KaTeX guarda texto
+ * cru sem validar (ver o comentário grande no topo do arquivo). Barrada
+ * antes do `__parse`, por nome: não importa o que vier dentro, porque o
+ * KaTeX nunca vai olhar.
+ *
+ * Medido no código-fonte (`src/functions/def.ts`): `\def`, `\gdef`, `\edef`
+ * e `\xdef` são o MESMO `defineFunction`, tratados de forma idêntica — o
+ * KaTeX não implementa a semântica de expansão antecipada de `\edef`/`\xdef`,
+ * só aceita a sintaxe e guarda o corpo cru do mesmo jeito. Por isso os quatro
+ * têm que estar na lista igualmente; não dá pra confiar que algum dos quatro
+ * "não seria suportado" e cairia sozinho no `ParseError`.
+ *
+ * Também verificado na mesma fonte: `\long` (prefixo de `\global`, sem
+ * efeito próprio) só completa a definição se o token seguinte for um dos já
+ * listados aqui — é literalmente o mapa `globalMap` do arquivo, e nenhuma
+ * das suas chaves escapa desta lista. Não existe um jeito de
+ * `\long\algumacoisa` chegar em corpo de macro sem que um nome já coberto
+ * apareça logo depois. `\outer`/`\protected` nem são implementados pelo
+ * KaTeX (comando desconhecido, já cai no `ParseError`). Por isso `\long` e
+ * `\outer` não precisam entrar na lista: não têm rota própria até o corpo
+ * cru.
  */
-function comandoDoErro(
-  erro: InstanceType<typeof katex.ParseError>,
-): string | null {
-  const achado = /\\[A-Za-z@]+/.exec(erro.rawMessage);
-  return achado ? achado[0] : null;
-}
+const FAMILIA_DEFINICAO = [
+  'def',
+  'gdef',
+  'edef',
+  'xdef',
+  'global',
+  'let',
+  'futurelet',
+  'newcommand',
+  'renewcommand',
+  'providecommand',
+];
+const PADRAO_DEFINICAO = new RegExp(
+  `\\\\(${FAMILIA_DEFINICAO.join('|')})(?![A-Za-z])`,
+);
 
 /**
- * Devolve o comando (ou motivo) que bloqueia a fórmula, ou `null` se ela é
- * segura para entrar no `.tex` sem alteração.
+ * Por que a fórmula foi barrada.
+ *
+ * `perigoso` cobre o que a gente sabe que é ruim por nome — família de
+ * definição de macro e a exceção do KaTeX — e o aviso pode nomear o comando.
+ * `invalido` cobre o `ParseError` do KaTeX: a fórmula não é um ataque
+ * conhecido, é sintaxe que o KaTeX não entende — e a informação acionável
+ * pra quem cadastrou a questão é que ela já renderizava quebrada no editor,
+ * não "comando não permitido".
  */
-export function comandoBarrado(formula: string): string | null {
+export type MotivoBloqueio =
+  | { motivo: 'perigoso'; comando: string }
+  | { motivo: 'invalido'; detalhe: string };
+
+/**
+ * Devolve o motivo do bloqueio, ou `null` se a fórmula é segura para entrar
+ * no `.tex` sem alteração.
+ *
+ * `ehDisplay` espelha o `displayMode` do KaTeX: o editor passa `true` pra
+ * fórmula `$$...$$` (bloco) e `false` pra `$...$` (inline), e várias
+ * construções — `align`, `equation`, `gather`, `\tag` — só existem em modo
+ * display. Fixar `displayMode: true` aqui alargaria em silêncio o que se
+ * aceita no caminho inline; por isso o parâmetro, com default `false` pra
+ * não quebrar chamador que ainda não o repassa.
+ */
+export function comandoBarrado(
+  formula: string,
+  ehDisplay = false,
+): MotivoBloqueio | null {
+  const definicao = PADRAO_DEFINICAO.exec(formula);
+  if (definicao) {
+    return { motivo: 'perigoso', comando: `\\${definicao[1]}` };
+  }
+
   try {
-    katexComParse.__parse(formula, { strict: 'ignore', trust: false });
+    katexComParse.__parse(formula, {
+      strict: 'ignore',
+      trust: false,
+      displayMode: ehDisplay,
+    });
   } catch (erro) {
     if (erro instanceof katex.ParseError) {
-      return (
-        comandoDoErro(erro) ?? `fórmula LaTeX inválida: ${erro.rawMessage}`
-      );
+      return {
+        motivo: 'invalido',
+        detalhe: `esta fórmula já aparecia quebrada no editor (KaTeX rejeitou): ${erro.rawMessage}`,
+      };
     }
     throw erro;
   }
 
   const excecao = PADRAO_EXCECAO.exec(formula);
-  return excecao ? `\\${excecao[1]}` : null;
+  return excecao ? { motivo: 'perigoso', comando: `\\${excecao[1]}` } : null;
 }
