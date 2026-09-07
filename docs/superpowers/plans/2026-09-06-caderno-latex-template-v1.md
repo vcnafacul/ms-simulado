@@ -110,11 +110,21 @@ describe('template do caderno (padrao/v1)', () => {
     expect(ler('preambulo.tex')).toContain('\\usepackage[normalem]{ulem}');
   });
 
-  it('preambulo não usa fancyhdr, que conflita com a exam.cls', () => {
-    expect(ler('preambulo.tex')).not.toContain('fancyhdr');
+  it('preambulo não carrega o pacote fancyhdr, que conflita com a exam.cls', () => {
+    // Asserção sobre `{fancyhdr}` e não sobre a palavra solta: o comentário do
+    // preâmbulo cita o pacote de propósito, pra dizer qual não usar. A chave
+    // pega tanto `\usepackage{fancyhdr}` quanto `\usepackage[opt]{fancyhdr}`.
+    expect(ler('preambulo.tex')).not.toContain('{fancyhdr}');
   });
 });
 ```
+
+> **Correção aplicada durante a execução.** A primeira versão deste plano assertava
+> `not.toContain('fancyhdr')`, palavra solta. O `preambulo.tex` cita o pacote num comentário
+> **de propósito** — é a informação mais útil daquela linha, dizer qual pacote não usar — então
+> a asserção derrubava o próprio arquivo. A chave em `{fancyhdr}` testa o carregamento de
+> verdade e libera a menção em prosa. Verificado na execução: com um `\usepackage{fancyhdr}`
+> real o teste fica vermelho; sem ele, verde.
 
 - [ ] **Step 2: Rodar o teste e confirmar que falha**
 
@@ -611,13 +621,27 @@ rm -rf "$OUT" && mkdir -p "$OUT"
 cp src/modules/caderno/templates/padrao/v1/main.tex       "$OUT/"
 cp src/modules/caderno/templates/padrao/v1/preambulo.tex  "$OUT/"
 cp src/modules/caderno/templates/padrao/v1/LEIA-ME.txt    "$OUT/"
-cp src/modules/caderno/templates/padrao/v1/exemplo/*.tex  "$OUT/"
-cp src/modules/cartao-resposta/assets/logo.png            "$OUT/"
+cp src/modules/caderno/templates/padrao/v1/exemplo/metadados.tex     "$OUT/"
+cp src/modules/caderno/templates/padrao/v1/exemplo/main-multicol.tex "$OUT/"
+cp src/modules/cartao-resposta/assets/logo.png                       "$OUT/"
+
+# conteudo.tex entra DUAS vezes, de propósito.
+V=src/modules/caderno/templates/padrao/v1
+cat "$V/exemplo/conteudo.tex" "$V/exemplo/conteudo.tex" > "$OUT/conteudo.tex"
+
 (cd "$OUT" && zip -qr ../caderno-overleaf.zip .)
 ls -la "${TMPDIR:-/tmp}/caderno-overleaf.zip"
 ```
 
-Esperado: o zip existe, com 7 arquivos (`main.tex`, `main-multicol.tex`, `preambulo.tex`, `metadados.tex`, `conteudo.tex`, `LEIA-ME.txt`, `logo.png`).
+Esperado: o zip existe, com 7 arquivos (`main.tex`, `main-multicol.tex`, `preambulo.tex`, `metadados.tex`, `conteudo.tex`, `LEIA-ME.txt`, `logo.png`) e 12 `\question` no `conteudo.tex`.
+
+> **Por que o `conteudo.tex` entra duplicado.** Veio do review do card: com as 6 questões uma vez só,
+> **nenhum `\needspace` necessariamente dispara**, e o PDF fica igual quer o mecanismo funcione ou não —
+> não dá pra falsificar. Triplicando o documento, cada questão cai em várias posições de quebra
+> diferentes, o rodapé com `\thepage` é exercitado em várias páginas, e o `\needspace` passa a ser
+> testado de verdade. Isso importa porque a escolha entre `twocolumn` e `multicol` se decide exatamente
+> na interação instável do `multicol` com o `needspace`. De brinde, os números 46-51 aparecem repetidos,
+> o que prova que o `\setcounter` por questão manda mesmo.
 
 - [ ] **Step 2: Entregar o zip ao usuário com o roteiro**
 
@@ -631,16 +655,21 @@ Overleaf → *New Project* → *Upload Project* → enviar o zip. Compilar **os 
 - [ ] **Step 3: Checklist de conferência (o usuário responde)**
 
 - [ ] Compila sem erro
-- [ ] A primeira questão sai como **QUESTÃO 46**, não 1
-- [ ] Com `answers`, a alternativa correta sai destacada
-- [ ] A imagem da questão 48 não estoura a largura da coluna
-- [ ] Nenhum cabeçalho "QUESTÃO NN" órfão no pé de coluna (olhar a 51, que é longa)
-- [ ] A tabela da questão 50 cabe na coluna e continua legível
-- [ ] Na questão 46, **"itálico" sai em itálico e não sublinhado** — é o teste do `[normalem]`; se sair sublinhado, o `preambulo.tex` perdeu a opção
-- [ ] Marca d'água aparece com `\cadernorascunhotrue` e some sem ela
-- [ ] O rodapé traz o título do simulado e o número da página
+- [ ] A primeira questão sai como **QUESTÃO 46**, não 1 — e a sequência 46-51 aparece **duas vezes**, o que é esperado (o `conteudo.tex` é duplicado) e prova o `\setcounter` por questão
+- [ ] Na questão 46, **"itálico" sai em itálico e não sublinhado** — é o teste do `[normalem]`; sublinhado significa que o `preambulo.tex` perdeu a opção
+- [ ] A imagem da questão 48 não estoura a largura da coluna (a logo tem ~1,3× a largura útil, então o encolhimento tem que ser visível)
+- [ ] A tabela da questão 50 **quebra a célula longa** em vez de estourar a coluna
+- [ ] Nenhum cabeçalho "QUESTÃO NN" órfão no pé de coluna — com o documento triplicado há várias quebras pra conferir
+- [ ] O rodapé traz o título do simulado e o número da página, em todas as páginas
 - [ ] A capa atravessa as duas colunas no topo da página 1
+- [ ] Recompilando com `\documentclass[11pt,a4paper,twocolumn,answers]{exam}`, a alternativa correta sai destacada — **conferir a questão 49 em especial**, onde a correta é uma imagem
+- [ ] Descomentando `\cadernoRascunhotrue` no `metadados.tex`, a marca d'água aparece e a caixa de pendências mostra "48, 50"; comentando de volta, some
 - [ ] **Qual dos dois `main` ficou melhor**
+
+> Ao comparar os dois: esperar que difiram no pé das colunas por motivo que **não** é sinal de
+> qualidade. O `twocolumn` herda `\flushbottom`, então uma quebra forçada aparece como espaçamento
+> esticado entre questões; o `multicols` equilibra a última página. Nenhum dos dois é defeito — julgar
+> pelo resto.
 
 - [ ] **Step 4: Parar e aguardar**
 
