@@ -203,6 +203,10 @@ describe('handlers — imagem', () => {
   it('traduz imagem em HTML e respeita a largura do editor', () => {
     // Ordem de atributos igual à do `serializeInlineContent` do editor:
     // src, alt, width, height — o width NÃO vem logo depois do src.
+    //
+    // 320 é PIXEL CSS (é o que o editor grava) e sai como 240pt: fator 0,75,
+    // porque 1px = 1/96" e 1pt = 1/72". Emitir `320pt` daria 11,3 cm contra
+    // ~8 cm de coluna, e o `max width` engoliria a dica inteira.
     const ctx = contexto();
     const saida = tex(
       '<img src="asset://abc" alt="x" width="320" height="240" />',
@@ -210,7 +214,7 @@ describe('handlers — imagem', () => {
     );
     expect(saida).toContain('{assets/abc.png}');
     expect(saida).toContain('max width=\\linewidth');
-    expect(saida).toContain('width=320pt');
+    expect(saida).toContain('width=240pt');
     expect(ctx.assets).toEqual(['abc']);
   });
 
@@ -220,6 +224,19 @@ describe('handlers — imagem', () => {
     );
   });
 
+  it('ignora dica de largura ilegível em vez de emitir width inválido', () => {
+    // Dica errada é cosmética; `width=NaNpt` é caderno que não compila e
+    // `width=0pt` é imagem que some da prova. Nos dois casos o certo é cair
+    // no clamp puro.
+    const so_clamp = '\\includegraphics[max width=\\linewidth]{assets/abc.png}';
+
+    expect(tex('<img src="asset://abc" alt="x" width="auto" />')).toBe(
+      so_clamp,
+    );
+    expect(tex('<img src="asset://abc" alt="x" width="" />')).toBe(so_clamp);
+    expect(tex('<img src="asset://abc" alt="x" width="0" />')).toBe(so_clamp);
+  });
+
   it('trata a imagem alinhada de uma linha só, que chega como um nó html', () => {
     const ctx = contexto();
     const saida = tex(
@@ -227,7 +244,7 @@ describe('handlers — imagem', () => {
       ctx,
     );
     expect(saida).toContain('{assets/abc.png}');
-    expect(saida).toContain('width=320pt');
+    expect(saida).toContain('width=240pt');
     expect(ctx.avisos).toEqual([]);
   });
 

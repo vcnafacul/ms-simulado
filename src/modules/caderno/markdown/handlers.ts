@@ -117,6 +117,32 @@ const IMG_HTML = /<img\b[^>]*>/i;
 const IMG_SRC = /\bsrc\s*=\s*["']([^"']+)["']/i;
 const IMG_WIDTH = /\bwidth\s*=\s*["']?(\d+)/i;
 
+/**
+ * Dica de largura do editor (pixels CSS) → pontos TeX, ou `null` quando a
+ * dica não dá para usar.
+ *
+ * 1px = 1/96", 1pt = 1/72" — fator 0,75. Sem converter, os 320px que o editor
+ * grava viravam `320pt` (11,3 cm) contra os ~8 cm de coluna do template, e o
+ * `max width=\linewidth` engolia toda dica acima de ~227px: a largura que o
+ * autor viu no editor deixava de significar qualquer coisa.
+ *
+ * ⚠️ Devolver `null` (e cair no `[max width=\linewidth]` puro) é o caminho
+ * certo para dica ilegível — nunca emitir a dica mesmo assim. Uma dica errada
+ * é cosmética; um `width=NaNpt` ou `width=0pt` no `.tex` é caderno que não
+ * compila ou imagem que some da prova. Hoje o `IMG_WIDTH` só captura dígitos,
+ * então `NaN` não chega aqui pela tag HTML — mas a assinatura aceita `string`
+ * e o `width="0"` do editor chega, sim, e produzia uma imagem de largura zero.
+ */
+function larguraEmPontos(largura?: string): number | null {
+  if (!largura) return null;
+
+  const pixels = Number(largura);
+  if (!Number.isFinite(pixels) || pixels <= 0) return null;
+
+  const pontos = Math.round(pixels * 0.75);
+  return pontos > 0 ? pontos : null;
+}
+
 function imagem(url: string, ctx: Contexto, largura?: string): string {
   const key = url.replace(/^asset:\/\//, '');
   const caminho = ctx.resolveAsset(key);
@@ -144,9 +170,11 @@ function imagem(url: string, ctx: Contexto, largura?: string): string {
 
   // A largura do editor é sugestão, não imposição: o `max width` garante que
   // nunca estoure a coluna, que em duas colunas tem ~8 cm.
-  const opcoes = largura
-    ? `[max width=\\linewidth,width=${largura}pt]`
-    : '[max width=\\linewidth]';
+  const pontos = larguraEmPontos(largura);
+  const opcoes =
+    pontos === null
+      ? '[max width=\\linewidth]'
+      : `[max width=\\linewidth,width=${pontos}pt]`;
 
   return `\\includegraphics${opcoes}{${caminho}}`;
 }
