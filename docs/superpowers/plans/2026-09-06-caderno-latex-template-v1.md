@@ -679,6 +679,12 @@ Não seguir para a Task 5 sem o retorno. Se algo não compilar, a mensagem de er
 
 ### Task 5: Consolidar o resultado da compilação
 
+> **Resultado do round-trip (2026-09-07):** o usuário compilou **os dois** `main` no Overleaf e o
+> `main.tex` — opção `twocolumn` da própria `exam.cls` — ficou melhor. A hipótese não testada do card
+> se confirmou: a classe aceita `twocolumn`. O `exemplo/main-multicol.tex` foi removido, e o `main.tex`
+> passou a registrar a decisão no cabeçalho, com o motivo pra não reintroduzir `multicol` sem medir
+> (interação instável com o `\needspace`). Veredito do usuário: "ficou bom para um template inicial".
+
 **Files:**
 - Delete: o `main` perdedor (um dos dois)
 - Modify: o que a compilação apontar

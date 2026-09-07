@@ -10,9 +10,11 @@
 % NÃO EDITE os arquivos metadados.tex e conteudo.tex: os dois são gerados
 % pelo ms-simulado e sobrescritos a cada download.
 %
-% Plano B (multicol) para este mesmo caderno vive em exemplo/main-multicol.tex,
-% só para o smoke test — apagado assim que o round-trip no Overleaf decidir
-% qual dos dois vence.
+% As duas colunas vêm da opção `twocolumn` da própria exam.cls. Um plano B com
+% o pacote multicol foi escrito e compilado lado a lado no Overleaf; este aqui
+% ficou melhor, e o outro foi removido. Não reintroduzir multicol sem motivo
+% medido: ele tem interação instável com o \needspace, que é o que impede
+% cabeçalho de questão órfão no pé da coluna.
 % ===========================================================================
 \documentclass[11pt,a4paper,twocolumn]{exam}
 
