@@ -23,11 +23,43 @@ describe('comandoBarrado', () => {
     expect(comandoBarrado('')).toBeNull();
   });
 
-  it('não confunde comando barrado com prefixo de outro', () => {
-    // \inputs e \reader não existem, mas se existissem não seriam \input
-    // nem \read. O limite de nome do LaTeX é o primeiro não-letra.
-    expect(comandoBarrado('\\inputs{x}')).toBeNull();
-    expect(comandoBarrado('\\reader')).toBeNull();
-    expect(comandoBarrado('\\writes')).toBeNull();
+  it('barra a família inteira, não só a grafia exata', () => {
+    // A primeira versão casava só o início do nome e deixava passar estes.
+    // \InputIfFileExists e filecontents sao kernel do LaTeX2e: estao sempre
+    // disponiveis, sem pacote nenhum.
+    expect(comandoBarrado('\\InputIfFileExists{/etc/passwd}{}{}')).toContain(
+      'InputIfFileExists',
+    );
+    expect(comandoBarrado('\\makeatletter\\@input{/etc/passwd}')).toContain(
+      'input',
+    );
+    expect(comandoBarrado('\\lstinputlisting{/etc/passwd}')).toContain(
+      'lstinputlisting',
+    );
+    expect(comandoBarrado('\\verbatiminput{/etc/passwd}')).toContain(
+      'verbatiminput',
+    );
+    expect(
+      comandoBarrado('\\begin{filecontents}{mau.tex}x\\end{filecontents}'),
+    ).not.toBeNull();
+    expect(
+      comandoBarrado('\\ior_open:Nn \\g_tmp {/etc/passwd}'),
+    ).not.toBeNull();
+    expect(comandoBarrado('\\IfFileExists{/etc/passwd}{s}{n}')).toBeNull();
+  });
+
+  it('o padrão mais largo não pega fórmula legítima', () => {
+    for (const f of [
+      '\\frac{1}{2}',
+      '\\int_0^1 x\\,dx',
+      '\\sum_{i=1}^{n} i^2',
+      '\\sqrt[3]{27}',
+      '\\begin{matrix} a & b \\\\ c & d \\end{matrix}',
+      '\\alpha \\beta \\Gamma \\Delta',
+      '\\overline{AB} \\perp \\overrightarrow{CD}',
+      '\\text{velocidade} = \\frac{\\Delta s}{\\Delta t}',
+    ]) {
+      expect(comandoBarrado(f)).toBeNull();
+    }
   });
 });
