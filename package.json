@@ -5,6 +5,9 @@
   "author": "",
   "private": true,
   "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.19"
+  },
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -40,7 +43,11 @@
     "pm2": "^5.3.0",
     "qrcode": "^1.5.4",
     "reflect-metadata": "^0.1.13",
+    "remark-gfm": "^4",
+    "remark-math": "^6",
+    "remark-parse": "^11",
     "rxjs": "^7.8.1",
+    "unified": "^11",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -49,6 +56,7 @@
     "@nestjs/testing": "^10.0.0",
     "@types/express": "^4.17.17",
     "@types/jest": "^29.5.2",
+    "@types/mdast": "^4",
     "@types/node": "^20.3.1",
     "@types/pdfmake": "^0.3.3",
     "@types/pngjs": "^6.0.5",
@@ -81,8 +89,11 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+\\.(t|j)s$": ["ts-jest", { "tsconfig": "<rootDir>/../tsconfig.jest.json" }]
     },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(unified|remark-.*|mdast-.*|micromark.*|unist-.*|vfile.*|bail|trough|is-plain-obj|extend|devlop|decode-named-character-reference|character-entities.*|ccount|escape-string-regexp|markdown-table|longest-streak|zwitch|property-information|space-separated-tokens|comma-separated-tokens|html-void-elements|stringify-entities|hast-.*)/)"
+    ],
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],

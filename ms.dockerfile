@@ -1,3 +1,6 @@
+# Node >= 20.19 e obrigatorio: a stack do remark e ESM-only e o projeto e
+# CommonJS, entao depende do require(esm) que so existe a partir dessa versao.
+# Nao pinar uma 20.x anterior sem antes trocar a stack.
 FROM node:20-alpine AS deps
 
 WORKDIR /app
