@@ -128,6 +128,18 @@ function imagem(url: string, ctx: Contexto, largura?: string): string {
     return '\\textbf{[imagem indisponível]}';
   }
 
+  // Defesa de quem emite o comando, não só de quem fornece o caminho: um `}`
+  // no caminho fecha o grupo do \includegraphics cedo e o resto da questão
+  // vira LaTeX solto. Espaço quebra o graphicx. O `resolveAsset` deveria
+  // entregar caminho limpo (contrato da task seguinte), mas quem escreve o
+  // `.tex` é este arquivo.
+  if (/[{}\\%#$^~ ]/.test(caminho)) {
+    ctx.avisos.push(
+      `caminho de imagem inválido (${key}) — tem caractere que quebra o LaTeX; saiu um marcador no lugar`,
+    );
+    return '\\textbf{[imagem indisponível]}';
+  }
+
   if (!ctx.assets.includes(key)) ctx.assets.push(key);
 
   // A largura do editor é sugestão, não imposição: o `max width` garante que
@@ -159,6 +171,19 @@ function imagem(url: string, ctx: Contexto, largura?: string): string {
  */
 function matematica(no: any, ctx: Contexto): string {
   const formula = String(no.value ?? '');
+
+  // Fórmula vazia não é conteúdo, e emiti-la é ativo: `$` + `$` colados
+  // formam `$$`, que em LaTeX ABRE matemática em display e engole a prosa
+  // seguinte até o próximo `$$`. O editor salva nó latex com `formula: ''`
+  // sem reclamar, então isto chega de verdade — e corromperia a questão em
+  // silêncio, sem erro nenhum.
+  if (!formula.trim()) {
+    ctx.avisos.push(
+      'fórmula vazia na questão — foi removida; confira se faltou conteúdo',
+    );
+    return '';
+  }
+
   const ehDisplay = no.type === 'math' || no.data?.[EH_DISPLAY] === true;
   const barrado = comandoBarrado(formula, ehDisplay);
 

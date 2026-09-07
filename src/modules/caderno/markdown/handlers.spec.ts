@@ -238,12 +238,39 @@ describe('handlers — imagem', () => {
     expect(ctx.avisos.join(' ')).toContain('sumida');
     expect(ctx.assets).toEqual([]);
   });
+
+  it('recusa caminho de imagem com caractere que quebra o LaTeX', () => {
+    // `}` fecha o grupo do \includegraphics cedo: injeção no .tex via key
+    // hostil. Espaço quebra o graphicx.
+    for (const ruim of ['assets/fo}to.png', 'assets/foto com espaco.png']) {
+      const ctx: Contexto = { ...contexto(), resolveAsset: () => ruim };
+      const saida = tex('![](asset://x)', ctx);
+      expect(saida).toContain('imagem indisponível');
+      expect(saida).not.toContain(ruim);
+      expect(ctx.avisos.join(' ')).toContain('inválido');
+    }
+  });
 });
 
 describe('handlers — matemática', () => {
   it('passa o conteúdo da fórmula sem tocar', () => {
     expect(tex('$\\frac{1}{2}$')).toBe('$\\frac{1}{2}$');
     expect(tex('$x^2 + y^2$')).toBe('$x^2 + y^2$');
+  });
+
+  it('fórmula vazia some, em vez de virar $$ que engole a prosa', () => {
+    // `$$` em LaTeX ABRE display math: uma fórmula vazia inline engoliria
+    // todo o texto seguinte até o próximo `$$`. Corrompe a questão em
+    // silêncio.
+    const ctx = contexto();
+    const arvore = parse('antes $x$ depois');
+    arvore.children[0].children[1].value = '';
+    const saida = compilar(arvore, ctx);
+
+    expect(saida).not.toContain('$$');
+    expect(saida).toContain('antes');
+    expect(saida).toContain('depois');
+    expect(ctx.avisos.join(' ')).toContain('vazia');
   });
 
   it('emite \\[...\\] para nó math, que já é display por construção', () => {
