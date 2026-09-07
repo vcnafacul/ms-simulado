@@ -117,7 +117,7 @@ describe('template do caderno (v1)', () => {
       path.join(TEMPLATE_DIR, 'exemplo/conteudo.tex'),
       'utf-8',
     );
-    expect(exemplo).toContain('não é modelo');
+    expect(exemplo).toMatch(/n[ÃA]O é modelo/i);
   });
 
   it('os cabeçalhos do template não citam um diretório que não existe', () => {
@@ -126,5 +126,18 @@ describe('template do caderno (v1)', () => {
     for (const arquivo of ['main.tex', 'preambulo.tex']) {
       expect(lerTexto(arquivo)).not.toContain('padrao/v1');
     }
+  });
+
+  it('o template não cita cards que não existem nesta POC', () => {
+    // Os arquivos vieram da POC anterior, com outra numeração. Card 05, 08 e
+    // o "conversor do card 02" não existem aqui.
+    for (const arquivo of ['main.tex', 'preambulo.tex']) {
+      expect(lerTexto(arquivo)).not.toMatch(/card 0[5-9]/);
+    }
+    const exemplo = fs.readFileSync(
+      path.join(TEMPLATE_DIR, 'exemplo/metadados.tex'),
+      'utf-8',
+    );
+    expect(exemplo).not.toMatch(/card 0[3-9]/);
   });
 });

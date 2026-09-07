@@ -3,9 +3,9 @@
 % Preâmbulo: pacotes, macros e estilo. Layout mora aqui e no main.tex,
 % nunca no conteúdo gerado.
 %
-% Engine de referência: pdfLaTeX (o default do Overleaf). Se um dia a
-% compilação server-side (card 08) virar XeTeX/Tectonic, trocar
-% inputenc/fontenc por fontspec.
+% Engine de referência: pdfLaTeX, o default do Overleaf. Não há compilação
+% no servidor nesta POC — quem compila é o Overleaf, ou o usuário local com
+% latexmk.
 % ===========================================================================
 
 % --- macros do caderno -----------------------------------------------------
@@ -20,7 +20,7 @@
 % \def\cadernoRascunho{true} não faz nada, e não dá erro — a marca d'água
 % simplesmente nunca aparece.
 %
-% Contrato do metadados.tex (gerado pelo card 05):
+% Contrato do metadados.tex (gerado pelo card 02):
 %   \def\cadernoTitulo{...}
 %   \def\cadernoSubtitulo{...}
 %   \def\cadernoPendencias{...}
@@ -47,8 +47,14 @@
 \usepackage{amsmath,amssymb}
 \usepackage{enumitem}
 \usepackage{tabularx,booktabs}
-% [normalem] é OBRIGATÓRIO: sem ele o ulem sequestra o \emph e sublinha todo
-% itálico, e o conversor do card 02 mapeia ênfase para \emph.
+% [normalem] é obrigatório sempre que o \emph aparecer: sem ele o ulem
+% sequestra o \emph e sublinha todo itálico, e a falha é silenciosa — só
+% aparece olhando o PDF.
+%
+% Nesta POC o gerador NÃO emite \emph: o markdown da questão entra literal,
+% então `*itálico*` sai com os asteriscos mesmo. Os pacotes de conteúdo daqui
+% (ulem, enumitem, tabularx, booktabs) servem ao exemplo/ e deixam a porta
+% aberta pra um card futuro emitir essas construções sem mexer no preâmbulo.
 \usepackage[normalem]{ulem}
 \usepackage{needspace}
 \usepackage{xcolor}
