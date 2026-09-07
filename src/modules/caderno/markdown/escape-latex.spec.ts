@@ -35,4 +35,29 @@ describe('escapeLatex', () => {
       'texto sem nada especial',
     );
   });
+
+  it('escapa a aspa dupla, que o babel[brazil] torna ativa', () => {
+    // O babel em português declara os atalhos "< "> "- "" "|. Sem escapar,
+    // `""` vira salto de largura zero e `"-` vira hífen discricionário: as
+    // aspas somem da prova impressa, sem erro nenhum.
+    expect(escapeLatex('a resposta é "" (vazio)')).toBe(
+      'a resposta é \\textquotedbl{}\\textquotedbl{} (vazio)',
+    );
+    expect(escapeLatex('digite "-" entre')).toBe(
+      'digite \\textquotedbl{}-\\textquotedbl{} entre',
+    );
+  });
+
+  it('a classe do regex e o mapa não saem de sincronia', () => {
+    // MAPA[c] é tipado como string mesmo quando a chave não existe (o
+    // tsconfig não tem noUncheckedIndexedAccess), então esquecer uma entrada
+    // compila limpo e imprime "undefined" na prova. Este teste varre o ASCII
+    // e fixa exatamente quais caracteres mudam.
+    const transformados = Array.from({ length: 128 }, (_, i) =>
+      String.fromCharCode(i),
+    ).filter((c) => escapeLatex(c) !== c);
+
+    expect(transformados.join('')).toBe('"#$%&<>\\^_{|}~');
+    expect(transformados.map(escapeLatex).join('')).not.toContain('undefined');
+  });
 });

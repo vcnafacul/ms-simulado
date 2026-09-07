@@ -23,8 +23,9 @@ const MAPA: Record<string, string> = {
   '<': '\\textless{}',
   '>': '\\textgreater{}',
   '|': '\\textbar{}',
+  '"': '\\textquotedbl{}',
 };
 
 export function escapeLatex(texto: string): string {
-  return texto.replace(/[\\{}$&#_%~^<>|]/g, (c) => MAPA[c]);
+  return texto.replace(/[\\{}$&#_%~^<>|"]/g, (c) => MAPA[c]);
 }
