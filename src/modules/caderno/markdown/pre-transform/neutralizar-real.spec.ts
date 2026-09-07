@@ -15,6 +15,11 @@ describe('neutralizarReal', () => {
     expect(neutralizarReal('custa R$ 50,00 e outro R$ 30,00')).toBe(
       `custa ${m} 50,00 e outro ${m} 30,00`,
     );
+    // O remark-math não olha a letra, só os cifrões: o `r$` minúsculo
+    // produzia o mesmo inlineMath espúrio.
+    expect(neutralizarReal('custa r$ 50,00 e outro r$ 30,00')).toBe(
+      `custa ${m} 50,00 e outro ${m} 30,00`,
+    );
   });
 
   it('NÃO destrói $R$, que é fórmula legítima', () => {
@@ -26,6 +31,10 @@ describe('neutralizarReal', () => {
     );
     expect(neutralizarReal('Área $\\pi R^2$ com R$ 5 de taxa.')).toBe(
       `Área $\\pi R^2$ com ${m} 5 de taxa.`,
+    );
+    // r minúsculo também é variável comum (raio), e a âncora protege os dois.
+    expect(neutralizarReal('o raio $r$ e o dobro.')).toBe(
+      'o raio $r$ e o dobro.',
     );
   });
 

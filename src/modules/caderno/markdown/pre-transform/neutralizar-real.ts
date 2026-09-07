@@ -16,8 +16,13 @@
  * legítima e comuníssima (R de raio, de resistência). Sem ela,
  * `O raio $R$ e o dobro` vira `O raio $ e o dobro` e o cifrão órfão quebra a
  * matemática do resto do parágrafo.
+ *
+ * Flag `i`: o `remark-math` não olha a letra antes do `$`, só os cifrões —
+ * dois `r$` minúsculos no mesmo parágrafo produzem o mesmo `inlineMath`
+ * espúrio. A âncora à esquerda protege `$r$` (r de raio) tanto quanto
+ * `$R$`, então a flag não abre brecha nova.
  */
-const PADRAO = /(^|[^$])R\$(?=[\s\d])/g;
+const PADRAO = /(^|[^$])R\$(?=[\s\d])/gi;
 
 /**
  * Caractere de uso privado do Unicode. O remark não atribui significado a ele,
