@@ -434,6 +434,28 @@ Não basta a suíte passar. Rode contra a implementação tudo que já derrotou 
 `\includegraphicsinput`) e de fazer o KaTeX aceitar algo perigoso (`\def`, `\newcommand`, `\let`,
 `\text{}` com LaTeX cru dentro). Reporte o que passar.
 
+- [ ] **Step 6b: A família de definição de macro**
+
+O KaTeX **não** fecha sozinho. `\gdef\textbf#1{\input{/etc/passwd}}` passa: ele parseia o `\gdef` como
+sintaxe mas guarda o corpo como tokens crus, sem analisar. Em TeX real `\gdef` é global e reescreve o
+`\textbf` que o próprio template emite. Barre `def gdef edef xdef global let futurelet newcommand
+renewcommand providecommand` **antes** do `__parse`.
+
+Isso não é voltar à lista de bloqueio: aquela enumerava comandos perigosos (conjunto aberto); esta
+enumera as construções em que o KaTeX decide não validar o conteúdo (conjunto fechado, dois membros,
+sendo `\verb` inerte por catcode).
+
+- [ ] **Step 6c: `displayMode` espelhando o editor**
+
+Assinatura vira `comandoBarrado(formula, ehDisplay = false)`. Sem isso,
+`$$\begin{align}...\end{align}$$` renderiza no editor e é barrada na impressão — `align`, `equation`,
+`gather`, `alignat` e `\tag` só existem em modo display. Destruiria a premissa de falso positivo zero.
+
+O retorno vira discriminado: `{ motivo: 'perigoso' | 'invalido', ... }`.
+
+➡️ **Reflete na Task 8:** o handler de matemática passa o resultado do `restaurarDisplay` e trata os
+dois motivos com avisos diferentes.
+
 - [ ] **Step 7: Lint e commit**
 
 ```bash

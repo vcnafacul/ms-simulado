@@ -216,6 +216,35 @@ Sobra uma lista de exceção pequena, para o que o KaTeX aceita mas é perigoso 
 `\includegraphics` (embute qualquer arquivo do disco de quem compila), `\href` e `\url`. Os três
 foram encontrados medindo o gate `isTrusted()` do KaTeX, não adivinhando.
 
+### E a família de definição de macro
+
+A validação por KaTeX **furou uma vez**, e o furo vale entender: `\gdef\textbf#1{\input{/etc/passwd}}`
+passava. O KaTeX faz parse do `\gdef` como sintaxe, mas guarda o **corpo do macro como tokens crus,
+sem nunca analisá-lo** — a validação do corpo só aconteceria no uso, que nunca ocorre dentro do
+`__parse`. Em TeX de verdade `\gdef` é global: escapa do `$...$` e reescreve o `\textbf` que o próprio
+template emite. Uma fórmula só, auto-disparável. E na variante em duas questões (`\gdef` numa, `\alpha`
+noutra) cada chamada é um `__parse` isolado, então o KaTeX nunca vê o par.
+
+Por isso a família `\def \gdef \edef \xdef \global \let \futurelet \newcommand \renewcommand
+\providecommand` é barrada **antes** do `__parse`.
+
+⚠️ **Isso não é voltar à lista de bloqueio**, e a distinção é o que sustenta o desenho: lista de
+bloqueio enumera *comandos perigosos* — conjunto aberto, sempre incompleto. Esta enumera *as
+construções em que o próprio KaTeX decide não validar o conteúdo* — conjunto fechado, com dois
+membros, e o outro (`\verb`) é inerte no TeX por catcode.
+
+### `displayMode` tem que espelhar o editor
+
+O sanitizador precisa receber se a fórmula era `$$...$$`. O KaTeX condiciona `align`, `equation`,
+`gather`, `alignat` e `\tag` ao modo display — e o editor passa `displayMode: true` para `$$`. Sem
+espelhar isso, `$$\begin{align}...\end{align}$$` renderiza no editor e é **barrada** na impressão,
+destruindo a premissa de falso positivo zero. Assinatura:
+`comandoBarrado(formula, ehDisplay = false)`, alimentada pelo resultado do `restaurarDisplay`.
+
+O retorno é discriminado — `{ motivo: 'perigoso' | 'invalido', ... }` — porque um comando de I/O e um
+erro de digitação precisam de avisos diferentes: o de `invalido` diz que a fórmula **já aparecia
+quebrada no editor**, que é a informação acionável.
+
 Fórmula barrada vira **texto escapado visível** mais um aviso — quem for imprimir vê que há algo
 errado ali, em vez de o comando sumir em silêncio.
 
@@ -287,6 +316,7 @@ quê. A própria suíte é a rede de segurança: num Node anterior ela falha no 
 | Card | O que muda |
 |---|---|
 | 03 | Recebe `markdownToLatex` **síncrona**; prefixa os `avisos` com o número da questão; usa o `escapeLatex` exportado para o `\def\cadernoTitulo` |
+| 02→08 | O handler de matemática chama `comandoBarrado(formula, ehDisplay)` e trata o retorno discriminado: `perigoso` e `invalido` geram avisos com texto diferente |
 | 05 | Os `avisos` acumulados dos cards 02/03/04 vão pro `manifest.json` |
 | 08 | A validação por KaTeX é defesa em profundidade, **não** substitui `openin_any=p` e `-no-shell-escape`. E ela cobre só a **matemática**: texto fora de math não passa por lá |
 | 01 | A fixture `exemplo/conteudo.tex` usa `$$…$$` na questão 47. Ela existe para imitar o que o gerador emite, e o gerador passa a emitir `\[…\]` — vale alinhar quando alguém mexer nela. Não é urgente: é fixture sintética, não código que roda. |
