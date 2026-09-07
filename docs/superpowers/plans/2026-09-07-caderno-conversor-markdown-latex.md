@@ -2006,6 +2006,10 @@ Não seguir sem o retorno. Se algo não compilar, o log do Overleaf é o insumo:
 
 ### Task 11: Consolidar o resultado da compilação
 
+> **Resultado do round-trip (2026-09-07):** o usuário compilou o caderno de 13 fixtures no Overleaf e
+> aprovou — "ficou bom". Nenhum ajuste de saída foi necessário, o que era o desfecho esperado depois
+> de os handlers terem sido corrigidos por medição em vez de por inspeção.
+
 **Files:** o que a compilação apontar, em `src/modules/caderno/markdown/`
 
 - [ ] **Step 1: Corrigir o que a rodada revelou**
