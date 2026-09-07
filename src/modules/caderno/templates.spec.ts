@@ -51,4 +51,41 @@ describe('template do caderno (v1)', () => {
       expect.arrayContaining(['conteudo.tex', 'metadados.tex']),
     );
   });
+
+  it('o nest-cli copia o template pro dist e deixa o exemplo de fora', () => {
+    // Lido em runtime, não importado. Um `import` de arquivo fora de `src/`
+    // puxa o JSON pro module graph do TypeScript e desloca o `rootDir`
+    // inferido: o `dist/main.js` muda de lugar e o PM2 sobe com "Script not
+    // found". Já aconteceu neste repo.
+    const nestCli = JSON.parse(
+      fs.readFileSync(path.join(__dirname, '../../../nest-cli.json'), 'utf-8'),
+    ) as {
+      compilerOptions: { assets: { include: string; exclude?: string }[] };
+    };
+
+    const doCaderno = nestCli.compilerOptions.assets.filter((a) =>
+      a.include.startsWith('modules/caderno/templates'),
+    );
+    expect(doCaderno.length).toBeGreaterThan(0);
+    expect(doCaderno.every((a) => a.exclude?.includes('exemplo'))).toBe(true);
+
+    // Assere o efeito, não a grafia: toda extensão do nível de topo do
+    // template precisa estar coberta por um glob. Sem isto, o próximo arquivo
+    // posto ali — um `.sty`, uma `exam.cls` vendorizada — some do `dist` com o
+    // teste verde, e o defeito só aparece dentro do container.
+    //
+    // Nível de topo e não recursivo, de propósito: é exatamente o conjunto que
+    // viaja no zip. O `exemplo/` está fora por decisão.
+    const extensoes = new Set(
+      fs
+        .readdirSync(TEMPLATE_DIR, { withFileTypes: true })
+        .filter((entrada) => entrada.isFile())
+        .map((entrada) => path.extname(entrada.name))
+        .filter((ext) => ext !== ''),
+    );
+    expect(extensoes.size).toBeGreaterThan(0);
+    extensoes.forEach((ext) =>
+      expect(doCaderno.some((a) => a.include.endsWith(`*${ext}`))).toBe(true),
+    );
+  });
 });
