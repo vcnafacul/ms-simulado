@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { markdownToLatex } from './markdown-to-latex';
+import { MARCADOR_REAL } from './pre-transform/neutralizar-real';
 
 const opts = { resolveAsset: (key: string) => `assets/${key}.png` };
 
@@ -43,6 +44,40 @@ describe('markdownToLatex — a armadilha do R$', () => {
     const r = markdownToLatex('custa R$ 50,00 e outro R$ 30,00', opts);
     expect(r.latex).toBe('custa R\\$ 50,00 e outro R\\$ 30,00');
     expect(r.latex).toContain('e outro');
+  });
+});
+
+describe('markdownToLatex — o marcador nunca chega ao .tex', () => {
+  it('não deixa o marcador vazar pelo fallback de nó não suportado', () => {
+    // O `textoCru` lê `.value` dos descendentes cru, por fora do handler de
+    // `text`. Sem desfazer o marcador ali, ele vira caixinha de glifo
+    // faltando no PDF e o R do "R$" some junto: o preço sai "custa  50,00".
+    //
+    // Alcançável por link de referência e nota de rodapé — construções que
+    // aparecem em conteúdo colado, não exóticas.
+    for (const md of [
+      'Veja [custa R$ 50,00][ref] aqui.\n\n[ref]: http://x.com',
+      'Texto[^1]\n\n[^1]: nota custa R$ 50,00',
+    ]) {
+      const { latex } = markdownToLatex(md, opts);
+      expect(latex).not.toContain(MARCADOR_REAL);
+      expect(latex).toContain('R\\$ 50,00');
+    }
+  });
+
+  it('não deixa o marcador vazar pelos avisos', () => {
+    // Os avisos vão pro manifest.json do zip e são lidos por pessoa; um
+    // U+E000 no meio do texto é ruído inexplicável pra quem for corrigir.
+    for (const md of [
+      '<span data-x="R$ 50,00">z</span>',
+      // O rawMessage do KaTeX ecoa o caractere ofensor, e aqui o ofensor é o
+      // próprio marcador: "Unexpected character: ''".
+      'Vale $x + R$ 50 aqui$ fim.',
+    ]) {
+      const { avisos } = markdownToLatex(md, opts);
+      expect(avisos.length).toBeGreaterThan(0);
+      for (const aviso of avisos) expect(aviso).not.toContain(MARCADOR_REAL);
+    }
   });
 });
 

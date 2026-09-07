@@ -93,6 +93,21 @@ const AMBIENTE_POR_ALINHAMENTO: Record<string, string | null> = {
  * `>{...\arraybackslash}` dá o alinhamento sem abrir mão do X, então a tabela
  * preenche a `\linewidth` e quebra o texto das células.
  */
+/**
+ * Embrulha conteúdo já compilado no ambiente do alinhamento pedido.
+ *
+ * Existe para os DOIS caminhos de alinhamento ficarem com o mesmo formato: o
+ * nó agrupado pelo `agruparHtml` (bloco com vários filhos) e a imagem
+ * alinhada de uma linha só, que o `agruparHtml` deixa passar de propósito e
+ * chega inteira no handler de `html`. `left` e `justify` não geram ambiente.
+ */
+function envolverAlinhamento(conteudo: string, align?: string): string {
+  const ambiente = AMBIENTE_POR_ALINHAMENTO[align ?? ''] ?? null;
+  return ambiente
+    ? `\\begin{${ambiente}}\n${conteudo}\n\\end{${ambiente}}`
+    : conteudo;
+}
+
 const COLUNA_POR_ALINHAMENTO: Record<string, string> = {
   left: '>{\\raggedright\\arraybackslash}X',
   center: '>{\\centering\\arraybackslash}X',
@@ -113,6 +128,14 @@ const COLUNA_POR_ALINHAMENTO: Record<string, string> = {
  * `alt` ENTRE o `src` e o `width`: o grupo dava `undefined` e a largura do
  * editor sumia em silêncio.
  */
+/**
+ * O `<div style="text-align: …">` que abre a linha da imagem alinhada. Sem
+ * `$` no fim, ao contrário do `ABERTURA` do `agrupar-html`: aqui a tag é só o
+ * começo do nó, que segue com o `<img>` e o `</div>` na MESMA string.
+ */
+const DIV_ALINHADO_INLINE =
+  /^<div\s+style\s*=\s*["']?\s*text-align:\s*(left|center|right|justify)\s*;?\s*["']?\s*>/i;
+
 const IMG_HTML = /<img\b[^>]*>/i;
 const IMG_SRC = /\bsrc\s*=\s*["']([^"']+)["']/i;
 const IMG_WIDTH = /\bwidth\s*=\s*["']?(\d+)/i;
@@ -149,7 +172,7 @@ function imagem(url: string, ctx: Contexto, largura?: string): string {
 
   if (!caminho) {
     ctx.avisos.push(
-      `imagem não encontrada (${key}) — saiu um marcador no lugar`,
+      `imagem não encontrada (${semMarcador(key, false)}) — saiu um marcador no lugar`,
     );
     return '\\textbf{[imagem indisponível]}';
   }
@@ -161,7 +184,7 @@ function imagem(url: string, ctx: Contexto, largura?: string): string {
   // `.tex` é este arquivo.
   if (/[{}\\%#$^~ ]/.test(caminho)) {
     ctx.avisos.push(
-      `caminho de imagem inválido (${key}) — tem caractere que quebra o LaTeX; saiu um marcador no lugar`,
+      `caminho de imagem inválido (${semMarcador(key, false)}) — tem caractere que quebra o LaTeX; saiu um marcador no lugar`,
     );
     return '\\textbf{[imagem indisponível]}';
   }
@@ -227,7 +250,12 @@ function matematica(no: any, ctx: Contexto): string {
       return `\\textbf{[fórmula bloqueada: ${escapeLatex(barrado.comando)}]}`;
     }
 
-    ctx.avisos.push(`fórmula inválida: ${barrado.detalhe}`);
+    // O `detalhe` traz o `rawMessage` do KaTeX, que ecoa o caractere ofensor
+    // — e quando o ofensor é o próprio marcador, o aviso sai com um U+E000
+    // invisível ("Unexpected character: ''"). Mesmo vazamento dos outros
+    // três. O `barrado.comando` do ramo acima não precisa: é `\` mais um
+    // nome de uma lista fechada, nunca conteúdo da questão.
+    ctx.avisos.push(`fórmula inválida: ${semMarcador(barrado.detalhe, false)}`);
     return '\\textbf{[fórmula inválida]}';
   }
 
@@ -266,13 +294,8 @@ Object.assign(HANDLERS, {
   inlineMath: matematica,
   math: matematica,
 
-  [NO_ALINHADO]: (no: any, ctx: Contexto) => {
-    const ambiente = AMBIENTE_POR_ALINHAMENTO[no.align] ?? null;
-    const dentro = filhos(no, ctx, '\n\n');
-    return ambiente
-      ? `\\begin{${ambiente}}\n${dentro}\n\\end{${ambiente}}`
-      : dentro;
-  },
+  [NO_ALINHADO]: (no: any, ctx: Contexto) =>
+    envolverAlinhamento(filhos(no, ctx, '\n\n'), no.align),
 
   // HTML que sobrou solto: ou é tag que o `agruparHtml` não casou, ou é algo
   // fora do subset. A exceção é a imagem de uma linha só —
@@ -286,11 +309,19 @@ Object.assign(HANDLERS, {
 
     if (src) {
       const width = IMG_WIDTH.exec(tag![0]);
-      return imagem(src[1], ctx, width?.[1]);
+      // Esta é a ÚNICA forma que o editor usa pra codificar alinhamento de
+      // imagem (`serializeInlineContent`): o div de uma linha envolvendo o
+      // <img>. Sem ler o alinhamento aqui, ele some sem aviso e a imagem cai
+      // encostada à esquerda na coluna.
+      const div = DIV_ALINHADO_INLINE.exec(bruto);
+      return envolverAlinhamento(
+        imagem(src[1], ctx, width?.[1]),
+        div?.[1].toLowerCase(),
+      );
     }
 
     ctx.avisos.push(
-      `HTML não suportado no conteúdo (${bruto.slice(0, 40)}) — foi descartado`,
+      `HTML não suportado no conteúdo (${semMarcador(bruto.slice(0, 40), false)}) — foi descartado`,
     );
     return '';
   },
@@ -305,7 +336,12 @@ function compilarNo(no: any, ctx: Contexto): string {
   ctx.avisos.push(
     `construção não suportada (${no?.type}) — o conteúdo saiu como texto simples`,
   );
-  return escapeLatex(textoCru(no));
+  // ⚠️ `semMarcador` é obrigatório aqui: o `textoCru` lê `.value` dos
+  // descendentes cru, por fora do handler de `text`, então o marcador do
+  // `neutralizarReal` chega intacto. Sem desfazê-lo, o U+E000 vira caixinha
+  // de glifo faltando no PDF e o `R` do "R$" some junto — o preço sai
+  // "custa  50,00". Alcançável por link de referência e nota de rodapé.
+  return semMarcador(escapeLatex(textoCru(no)), true);
 }
 
 /** Texto de qualquer nó, para o fallback. */

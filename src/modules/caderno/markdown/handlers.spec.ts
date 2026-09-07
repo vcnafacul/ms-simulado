@@ -248,6 +248,43 @@ describe('handlers — imagem', () => {
     expect(ctx.avisos).toEqual([]);
   });
 
+  it('respeita o alinhamento da imagem de uma linha só', () => {
+    // Esta é a ÚNICA forma que o editor usa pra codificar alinhamento de
+    // imagem (`serializeInlineContent`): o div de uma linha envolvendo o
+    // <img>. O `agruparHtml` deixa passar de propósito, então quem tem que
+    // ler o alinhamento é o handler de `html` — senão a imagem cai encostada
+    // à esquerda na coluna, sem aviso nenhum.
+    const centro = tex(
+      '<div style="text-align: center"><img src="asset://abc" alt="x" /></div>',
+    );
+    expect(centro).toBe(
+      '\\begin{center}\n' +
+        '\\includegraphics[max width=\\linewidth]{assets/abc.png}\n' +
+        '\\end{center}',
+    );
+
+    const direita = tex(
+      '<div style="text-align: right"><img src="asset://abc" alt="x" /></div>',
+    );
+    expect(direita).toContain('\\begin{flushright}');
+    expect(direita).toContain('\\end{flushright}');
+  });
+
+  it('não gera ambiente para imagem alinhada à esquerda ou justificada', () => {
+    const so_imagem =
+      '\\includegraphics[max width=\\linewidth]{assets/abc.png}';
+    expect(
+      tex(
+        '<div style="text-align: left"><img src="asset://abc" alt="x" /></div>',
+      ),
+    ).toBe(so_imagem);
+    expect(
+      tex(
+        '<div style="text-align: justify"><img src="asset://abc" alt="x" /></div>',
+      ),
+    ).toBe(so_imagem);
+  });
+
   it('avisa e não some quando o asset é desconhecido', () => {
     const ctx: Contexto = { ...contexto(), resolveAsset: () => '' };
     const saida = tex('![](asset://sumida)', ctx);
