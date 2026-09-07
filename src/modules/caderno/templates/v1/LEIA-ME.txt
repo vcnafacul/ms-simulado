@@ -38,6 +38,11 @@ O QUE VOCÊ NÃO DEVE EDITAR
   errada ou saiu mal diagramada, corrija a questão na plataforma e baixe
   o caderno de novo.
 
+  O mesmo vale para a pasta assets/: são as imagens das questões, também
+  geradas pelo download. Diferente do logo.png da capa, essas imagens não
+  têm proteção contra arquivo ausente — apagar ou renomear uma quebra a
+  compilação com um erro de LaTeX.
+
 AVISOS DA GERAÇÃO
 
   Abra o conteudo.tex e olhe o topo do arquivo. As linhas que começam com
@@ -46,3 +51,11 @@ AVISOS DA GERAÇÃO
   Confira essas antes de imprimir.
 
   São comentários de LaTeX: não afetam a compilação nem aparecem no PDF.
+
+MODO RASCUNHO
+
+  Se o caderno vier com uma marca d'água "RASCUNHO" atravessando a página
+  e uma caixa "pendências: <números>" no topo, é o simulado avisando que
+  essas questões ainda não estão fechadas na plataforma. Não é erro do
+  template — finalize as questões pendentes e baixe o caderno de novo pra
+  tirar a marca.

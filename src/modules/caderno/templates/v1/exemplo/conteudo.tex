@@ -17,11 +17,10 @@
 % Recompile também com \documentclass[...,answers]{exam} para conferir o
 % gabarito — em especial a questão 4, onde a alternativa correta é uma imagem.
 %
-% O zip do smoke test inclui este arquivo DUAS vezes, de propósito: triplicar
-% o documento força várias quebras de coluna e de página, que é o que
-% realmente exercita o \needspace e o rodapé com \thepage. Os números 46-51
-% aparecem repetidos — isso é esperado, e de quebra prova que o \setcounter
-% por questão manda mesmo.
+% Teste de esforço opcional: para exercitar mais quebras de coluna e de
+% página — o que testa melhor o \needspace e o rodapé com \thepage —
+% duplique o \input{conteudo} no main.tex. As seis questões abaixo já
+% cobrem os riscos de layout descritos no comentário de cada uma.
 
 % (1) Texto curto + numeração real: tem que sair "QUESTÃO 46", não 1.
 %     Carrega também o sampler de formatação inline: se o ulem tiver sido

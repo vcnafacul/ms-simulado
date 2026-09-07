@@ -39,9 +39,13 @@
 \usepackage[a4paper,margin=2cm,columnsep=0.8cm]{geometry}
 
 % --- conteúdo --------------------------------------------------------------
-% enumitem, tabularx, booktabs, needspace e xcolor não são usados por nada
-% neste template: são exigidos pelo conteudo.tex gerado (cards 02/03). Não
-% remover por parecerem "não usados" aqui.
+% graphicx, adjustbox e needspace são exigidos pelo conteudo.tex que o card 02
+% gera.
+%
+% ulem, enumitem, tabularx e booktabs são usados pelo exemplo/, mantidos para
+% um card futuro poder emitir essas construções sem mexer aqui.
+%
+% xcolor é para o \SetWatermarkColor do modo rascunho (main.tex).
 \usepackage{graphicx}
 \usepackage[export]{adjustbox}   % max width=\linewidth: encolhe, nunca amplia
 \usepackage{amsmath,amssymb}
@@ -50,11 +54,6 @@
 % [normalem] é obrigatório sempre que o \emph aparecer: sem ele o ulem
 % sequestra o \emph e sublinha todo itálico, e a falha é silenciosa — só
 % aparece olhando o PDF.
-%
-% Nesta POC o gerador NÃO emite \emph: o markdown da questão entra literal,
-% então `*itálico*` sai com os asteriscos mesmo. Os pacotes de conteúdo daqui
-% (ulem, enumitem, tabularx, booktabs) servem ao exemplo/ e deixam a porta
-% aberta pra um card futuro emitir essas construções sem mexer no preâmbulo.
 \usepackage[normalem]{ulem}
 \usepackage{needspace}
 \usepackage{xcolor}

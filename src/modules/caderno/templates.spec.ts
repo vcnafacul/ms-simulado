@@ -1,26 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-
-/**
- * Contrato de empacotamento do template do caderno.
- *
- * O caminho aqui é o mesmo que o card 04 vai usar para montar o zip:
- * `path.join(__dirname, 'templates/v1')` a partir de `src/modules/caderno/`.
- *
- * O `ms.dockerfile` faz `COPY dist ./` e mais nada. Template que não chega no
- * `dist` não existe em produção, e a falha só aparece em runtime, dentro do
- * container — nunca em build. Como este card não tem código de runtime, este
- * spec é a única verificação automatizável que ele tem.
- */
-const TEMPLATE_DIR = path.join(__dirname, 'templates/v1');
-
-/** Os quatro arquivos que viajam no zip do usuário. */
-const ARQUIVOS_DO_ZIP = [
-  'main.tex',
-  'preambulo.tex',
-  'logo.png',
-  'LEIA-ME.txt',
-];
+import { ARQUIVOS_DO_ZIP, TEMPLATE_DIR } from './templates';
 
 const lerTexto = (arquivo: string): string =>
   fs.readFileSync(path.join(TEMPLATE_DIR, arquivo), 'utf-8');
@@ -68,7 +48,6 @@ describe('template do caderno (v1)', () => {
       a.include.startsWith('modules/caderno/templates'),
     );
     expect(doCaderno.length).toBeGreaterThan(0);
-    expect(doCaderno.every((a) => a.exclude?.includes('exemplo'))).toBe(true);
 
     // Assere o efeito, não a grafia: toda extensão do nível de topo do
     // template precisa estar coberta por um glob. Sem isto, o próximo arquivo
@@ -86,14 +65,27 @@ describe('template do caderno (v1)', () => {
     );
     expect(extensoes.size).toBeGreaterThan(0);
 
-    // Compara a lista inteira, não só a extensão. O `endsWith('*.tex')`
-    // sozinho não olha o meio do glob: um `templatesXX/` passa verde e para
-    // de empacotar main.tex e preambulo.tex, que é o bug que este teste
-    // existe pra pegar. A igualdade também acusa glob sobrando.
+    // Compara o par include/exclude inteiro, não só a extensão nem só um
+    // pedaço do exclude. `endsWith('*.tex')` sozinho não olha o meio do
+    // glob: um `templatesXX/` passa verde e para de empacotar main.tex e
+    // preambulo.tex. E `exclude?.includes('exemplo')` sozinho passa verde
+    // até com um exclude errado tipo `templatesXX/**/exemplo/**` — o
+    // `includes` olha um pedaço da string e ignora o prefixo do caminho.
+    // Sem comparar o par inteiro, o `exemplo/` vaza pro zip a partir do
+    // card 04: o coordenador baixa as questões sintéticas do smoke test
+    // junto com as reais.
     const esperados = [...extensoes]
-      .map((ext) => `modules/caderno/templates/**/*${ext}`)
-      .sort();
-    expect(doCaderno.map((a) => a.include).sort()).toEqual(esperados);
+      .map((ext) => ({
+        include: `modules/caderno/templates/**/*${ext}`,
+        exclude: 'modules/caderno/templates/**/exemplo/**',
+      }))
+      .sort((a, b) => a.include.localeCompare(b.include));
+
+    expect(
+      doCaderno
+        .map(({ include, exclude }) => ({ include, exclude }))
+        .sort((a, b) => a.include.localeCompare(b.include)),
+    ).toEqual(esperados);
   });
 
   it('o LEIA-ME não aponta para o manifest.json, que não existe nesta POC', () => {
@@ -129,15 +121,17 @@ describe('template do caderno (v1)', () => {
   });
 
   it('o template não cita cards que não existem nesta POC', () => {
-    // Os arquivos vieram da POC anterior, com outra numeração. Card 05, 08 e
-    // o "conversor do card 02" não existem aqui.
+    // Os arquivos vieram com a numeração da POC anterior. Aqui não existe
+    // card 08 (nem além): não há compilação no servidor, quem compila é o
+    // Overleaf ou o usuário local com latexmk. Cards 05, 06 e 07 existem e
+    // não devem ser banidos por engano.
     for (const arquivo of ['main.tex', 'preambulo.tex']) {
-      expect(lerTexto(arquivo)).not.toMatch(/card 0[5-9]/);
+      expect(lerTexto(arquivo)).not.toMatch(/card 0[89]/);
     }
     const exemplo = fs.readFileSync(
       path.join(TEMPLATE_DIR, 'exemplo/metadados.tex'),
       'utf-8',
     );
-    expect(exemplo).not.toMatch(/card 0[3-9]/);
+    expect(exemplo).not.toMatch(/card 0[89]/);
   });
 });
