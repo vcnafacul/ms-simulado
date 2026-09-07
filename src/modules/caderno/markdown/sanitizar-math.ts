@@ -45,8 +45,21 @@ const PADRAO_EXATO = new RegExp(`\\\\(${EXATOS.join('|')})(?![A-Za-z])`, 'i');
  */
 const PADRAO_RADICAL = new RegExp(
   `\\\\[A-Za-z@]*(?:${RADICAIS.join('|')})[A-Za-z@]*`,
-  'i',
+  'gi',
 );
+
+/**
+ * Comandos que contêm um radical bloqueado mas são inofensivos.
+ *
+ * O preço de casar por radical: `\includegraphics` contém `include`, e
+ * `\spreadlines` do amsmath contém `read` (sp-READ-lines). Nenhum dos dois
+ * toca arquivo — o primeiro insere imagem, o segundo dá espaçamento em
+ * equação de várias linhas, e os dois aparecem em questão de verdade.
+ *
+ * Lista nomeada em vez de lookahead: quando a quinta exceção chegar, uma
+ * lista continua legível e um lookahead com cinco alternativas, não.
+ */
+const EXCECOES = /^\\(includegraphics|includeonly|includepdf|spreadlines)$/i;
 
 /**
  * Primitivas de arquivo do expl3 (`\ior_open:Nn`, `\iow_new:N`) e o
@@ -60,8 +73,9 @@ export function comandoBarrado(formula: string): string | null {
   const exato = PADRAO_EXATO.exec(formula);
   if (exato) return `\\${exato[1]}`;
 
-  const radical = PADRAO_RADICAL.exec(formula);
-  if (radical) return radical[0];
+  for (const achado of formula.matchAll(PADRAO_RADICAL)) {
+    if (!EXCECOES.test(achado[0])) return achado[0];
+  }
 
   const extra = PADRAO_EXTRA.exec(formula);
   return extra ? extra[0].trim() : null;

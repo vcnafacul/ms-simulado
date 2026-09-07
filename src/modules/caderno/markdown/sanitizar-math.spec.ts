@@ -62,4 +62,24 @@ describe('comandoBarrado', () => {
       expect(comandoBarrado(f)).toBeNull();
     }
   });
+
+  it('não barra comandos que só contêm o radical por acidente', () => {
+    // O preço de casar por radical. \includegraphics contém `include` e
+    // \spreadlines contém `read` (sp-READ-lines) — os dois são legítimos.
+    expect(comandoBarrado('\\includegraphics{fig.png}')).toBeNull();
+    expect(comandoBarrado('\\includegraphics[width=3cm]{fig.png}')).toBeNull();
+    expect(comandoBarrado('\\spreadlines{5pt}')).toBeNull();
+    expect(comandoBarrado('\\includeonly{cap1}')).toBeNull();
+  });
+
+  it('a exceção não vira porta dos fundos', () => {
+    // Se a varredura parasse no primeiro casamento, a exceção na frente
+    // esconderia o comando perigoso atrás dela.
+    expect(
+      comandoBarrado('\\includegraphics{a.png} e \\input{/etc/passwd}'),
+    ).toContain('input');
+    expect(
+      comandoBarrado('\\spreadlines{5pt} \\lstinputlisting{/etc/passwd}'),
+    ).not.toBeNull();
+  });
 });
