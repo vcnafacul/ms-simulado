@@ -130,13 +130,61 @@ Em `ms.dockerfile`, acrescentar um comentário imediatamente acima da **primeira
 # Nao pinar uma 20.x anterior sem antes trocar a stack.
 ```
 
+> **Descoberto na execução, e o plano original não previa.** O `require(esm)` do Node **não vale
+> dentro do Jest**: o `jest-runtime` tem loader CommonJS próprio, ignora o backport, e tenta executar
+> o fonte ESM como CJS — `SyntaxError: Unexpected token 'export'`. Produção funciona, teste não.
+> Medido: `transformIgnorePatterns` sozinho não resolve, porque o `ts-jest` recusa `.js` sem
+> `allowJs`. Com um tsconfig só para o Jest, passa. Custo: ~15 s na primeira rodada (cache frio,
+> transformando a árvore ESM) e ~1,3 s nas seguintes; sem regressão nas 12 suítes existentes.
+
+- [ ] **Step 5b: Fazer o Jest enxergar a stack ESM**
+
+Criar `tsconfig.jest.json` na raiz do repo. Arquivo separado de propósito: `allowJs` no
+`tsconfig.json` mudaria o build de produção, e só o Jest precisa disso.
+
+```json
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "allowJs": true }
+}
+```
+
+No bloco `jest` do `package.json`, trocar o `transform` e acrescentar `transformIgnorePatterns`
+(o `<rootDir>/../` é porque o `rootDir` do Jest aqui é `src`, não a raiz):
+
+```json
+    "transform": {
+      "^.+\\.(t|j)s$": ["ts-jest", { "tsconfig": "<rootDir>/../tsconfig.jest.json" }]
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(unified|remark-.*|mdast-.*|micromark.*|unist-.*|vfile.*|bail|trough|is-plain-obj|extend|devlop|decode-named-character-reference|character-entities.*|ccount|escape-string-regexp|markdown-table|longest-streak|zwitch|property-information|space-separated-tokens|comma-separated-tokens|html-void-elements|stringify-entities|hast-.*)/)"
+    ],
+```
+
+Acrescentar ao `stack.spec.ts` um quarto teste, para que ninguém remova essa configuração achando
+que é sobra:
+
+```ts
+  it('o jest está configurado para transformar a stack ESM', () => {
+    // Sem isto o jest-runtime tenta executar o fonte ESM como CommonJS e
+    // quebra com "Unexpected token 'export'". Não é sobra de configuração:
+    // é o que faz qualquer spec que importe o remark rodar.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pkg = require('../../../../package.json');
+    const padrao = (pkg.jest.transformIgnorePatterns ?? []).join(' ');
+    expect(padrao).toContain('unified');
+    expect(padrao).toContain('remark-');
+    expect(JSON.stringify(pkg.jest.transform)).toContain('tsconfig.jest.json');
+  });
+```
+
 - [ ] **Step 6: Rodar e confirmar que passa**
 
 ```bash
 npx jest --detectOpenHandles --forceExit src/modules/caderno/markdown/stack.spec.ts
 ```
 
-Esperado: PASS, 3 testes.
+Esperado: PASS, 4 testes. A primeira rodada leva ~15 s (cache frio); a segunda, ~1,3 s.
 
 - [ ] **Step 7: Confirmar que o build continua íntegro**
 
@@ -149,7 +197,7 @@ Esperado: `dist/main.js`. Este passo existe porque este repo já teve o `dist/ma
 - [ ] **Step 8: Commit**
 
 ```bash
-git add package.json yarn.lock ms.dockerfile src/modules/caderno/markdown/
+git add package.json yarn.lock ms.dockerfile tsconfig.jest.json src/modules/caderno/markdown/
 git commit -m "build(caderno): stack do remark e piso de Node 20.19
 
 unified/remark sao ESM-only e o projeto e CommonJS. Funciona pelo
