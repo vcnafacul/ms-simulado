@@ -27,7 +27,7 @@ O maior risco do card é que `\documentclass[twocolumn]{exam}` não está testad
 | `src/modules/caderno/templates/padrao/v1/LEIA-ME.txt` | Como compilar, como tirar o gabarito, o que não editar. Vai no zip. |
 | `src/modules/caderno/templates/padrao/v1/exemplo/metadados.tex` | Fixture: as macros que o card 03 vai gerar. **Não** vai no zip. |
 | `src/modules/caderno/templates/padrao/v1/exemplo/conteudo.tex` | Fixture: 6 questões sintéticas, uma por risco de layout. **Não** vai no zip. |
-| `src/modules/caderno/templates/padrao/v1/exemplo/main-multicol.tex` | Plano B do layout de duas colunas, pra compilar no mesmo upload. **Não** vai no zip. |
+| `src/modules/caderno/templates/padrao/v1/exemplo/main-multicol.tex` | Plano B do layout de duas colunas, pra compilar no mesmo upload. **Não** vai no zip. ~~Removido na Task 5~~: o `twocolumn` da classe venceu. |
 | `src/modules/caderno/templates.spec.ts` | Contrato de empacotamento: caminho, presença dos arquivos e as duas armadilhas silenciosas (`normalem`, `fancyhdr`). |
 | `nest-cli.json` | Dois globs novos, com `exclude` do `exemplo/`. |
 
@@ -152,7 +152,7 @@ Criar `src/modules/caderno/templates/padrao/v1/preambulo.tex`:
 % --- macros do caderno -----------------------------------------------------
 % Declaradas antes de qualquer uso: o \footer abaixo já usa \cadernoTitulo.
 % O metadados.tex gerado sobrescreve estes defaults com \def.
-\newif\ifcadernorascunho
+\newif\ifcadernoRascunho
 \providecommand{\cadernoTitulo}{Caderno de Questões}
 \providecommand{\cadernoSubtitulo}{}
 \providecommand{\cadernoPendencias}{}
@@ -195,7 +195,7 @@ Criar `src/modules/caderno/templates/padrao/v1/preambulo.tex`:
     {\LARGE\bfseries\cadernoTitulo}\\[0.3em]
     {\large\cadernoSubtitulo}
   \end{center}
-  \ifcadernorascunho
+  \ifcadernoRascunho
     \begin{center}\small\textbf{RASCUNHO} --- pendências: \cadernoPendencias\end{center}
   \fi
   \vspace{0.3em}\hrule\vspace{0.4em}
@@ -228,7 +228,7 @@ Criar `src/modules/caderno/templates/padrao/v1/main.tex`:
 
 % draftwatermark carregado só no modo rascunho: carregá-lo sempre estampa
 % "DRAFT" por padrão.
-\ifcadernorascunho
+\ifcadernoRascunho
   \usepackage{draftwatermark}
   \SetWatermarkText{RASCUNHO}
   \SetWatermarkScale{1.2}
@@ -298,7 +298,7 @@ AVISOS DA GERAÇÃO
 npx jest --detectOpenHandles --forceExit src/modules/caderno/templates.spec.ts
 ```
 
-Esperado: PASS, 7 testes (3 do `it.each` + 4 individuais).
+Esperado: PASS, 7 testes (3 do `it.each` + 4 individuais). A suíte cresce ao longo do plano — terminou em 12.
 
 - [ ] **Step 7: Lint e formatação do arquivo novo**
 
@@ -412,9 +412,9 @@ Conteúdo **sintético**, escrito à mão. Não é amostra do acervo — é fixt
 % Fixture do smoke test — imita o que o card 03 vai GERAR.
 \def\cadernoTitulo{Simulado de Exemplo --- Template v1}
 \def\cadernoSubtitulo{ENEM 1º dia $\cdot$ 6 questões $\cdot$ 90 min}
-\def\cadernoPendencias{52, 58}
+\def\cadernoPendencias{48, 50}
 % Descomente para testar a marca d'água e a caixa de pendências:
-% \cadernorascunhotrue
+% \cadernoRascunhotrue
 ```
 
 - [ ] **Step 2: Criar o `exemplo/conteudo.tex`**
@@ -551,7 +551,7 @@ Com base no texto, a principal causa do padrão descrito é:
 \input{metadados}
 \usepackage{multicol}
 
-\ifcadernorascunho
+\ifcadernoRascunho
   \usepackage{draftwatermark}
   \SetWatermarkText{RASCUNHO}
   \SetWatermarkScale{1.2}
@@ -587,7 +587,7 @@ Se `exemplo` aparecer, o `exclude` do Step 2 da Task 2 está errado — corrigir
 npx jest --detectOpenHandles --forceExit src/modules/caderno/templates.spec.ts
 ```
 
-Esperado: PASS, 7 testes.
+Esperado: PASS. (A suíte já tem 11 nesta altura; os reviews acrescentaram testes nas tasks 1 e 2.)
 
 - [ ] **Step 6: Commit**
 
@@ -650,7 +650,7 @@ Overleaf → *New Project* → *Upload Project* → enviar o zip. Compilar **os 
 1. `main.tex` — compilar e conferir a lista abaixo
 2. `main-multicol.tex` — no Overleaf, definir como documento principal em *Menu > Main document*, recompilar e conferir a mesma lista
 3. `main.tex` de novo, trocando o `\documentclass` por `[11pt,a4paper,twocolumn,answers]{exam}` — conferir o gabarito
-4. `metadados.tex`, descomentando `\cadernorascunhotrue` — conferir a marca d'água
+4. `metadados.tex`, descomentando `\cadernoRascunhotrue` — conferir a marca d'água
 
 - [ ] **Step 3: Checklist de conferência (o usuário responde)**
 
