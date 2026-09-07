@@ -572,6 +572,10 @@ não só "deu erro".
 
 ### Task 5: Fechar
 
+> **Resultado do gate (2026-09-07):** o usuário compilou o zip do template no Overleaf e aprovou —
+> "ficou bom". Nenhum ajuste necessário: a cópia chegou íntegra, com acentuação e numeração
+> preservadas.
+
 - [ ] **Step 1: Corrigir o que a compilação apontar**
 
 Se algo quebrou, é quase certo que foi a cópia — o template compilou nesta forma antes. Comparar de novo
