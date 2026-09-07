@@ -354,53 +354,55 @@ Passada unica de proposito: em varias passadas a barra vira
 
 ---
 
-### Task 3: `sanitizarMath`
+### Task 3: `sanitizarMath` — validação por KaTeX
+
+> **Reescrita durante a execução.** A versão original desta task especificava uma **lista de bloqueio**
+> de oito comandos. Ela foi implementada, revisada e **derrotada estruturalmente** — vale ler o porquê
+> antes de tocar neste arquivo, porque o motivo elimina a abordagem inteira e não só aquela lista:
+>
+> | Ataque | Por que a lista não alcança |
+> |---|---|
+> | `^^5cinput{/etc/passwd}` | **Não contém barra invertida nenhuma.** O `^^5c` vira `\` antes da tokenização do TeX |
+> | `\pdffiledump{0}{4096}{/etc/passwd}` | Primitiva do pdfTeX, sem pacote, lê arquivo e não contém radical algum |
+> | `\tex_input:D`, `\sys_shell_now:n` | expl3, no formato desde 2020. O `_` cai fora da classe de nome |
+> | `\InputIfFileExists`, `filecontents` | Kernel do LaTeX2e, sempre disponíveis |
+>
+> O lexer do TeX sabe soletrar `\input` sem as letras de `input`. **Não volte para lista de bloqueio.**
 
 **Files:**
 - Create: `src/modules/caderno/markdown/sanitizar-math.ts`
 - Create: `src/modules/caderno/markdown/sanitizar-math.spec.ts`
+- Modify: `package.json` (`katex` como dependência direta)
 
-- [ ] **Step 1: Escrever o teste que falha**
+A abordagem é inverter: **validar com o próprio KaTeX**. Ele aceita só o que entende, e não entende
+I/O de arquivo. O que torna isso barato é que **o editor renderiza com o mesmo KaTeX puro** — sem
+mhchem, sem siunitx, sem `trust` (verificado em `LatexExtension.ts` e `RichTextRenderer.tsx`). Uma
+fórmula rejeitada aqui **já aparecia quebrada para quem cadastrou a questão**, então o falso positivo
+é zero por construção.
 
-Criar `src/modules/caderno/markdown/sanitizar-math.spec.ts`:
+Sobra uma lista de exceção de três: `\includegraphics`, `\href` e `\url` — o KaTeX os aceita (com
+`trust: false` ele troca por um indicador de "não suportado" em vez de lançar, mas essa troca é só na
+árvore de renderização; o texto cru que vira o `.tex` carrega o comando intacto). Os três foram
+encontrados medindo o gate `isTrusted()` no fonte do KaTeX: são sete comandos com esse gate, e só
+estes três têm capacidade de arquivo ou rede em LaTeX de verdade.
 
-```ts
-import { comandoBarrado } from './sanitizar-math';
+- [ ] **Step 1: Adicionar o katex como dependência direta**
 
-describe('comandoBarrado', () => {
-  it('barra comandos que leem ou escrevem arquivo', () => {
-    expect(comandoBarrado('\\input{/etc/passwd}')).toBe('\\input');
-    expect(comandoBarrado('\\include{segredo}')).toBe('\\include');
-    expect(comandoBarrado('\\openin1=/tmp/x')).toBe('\\openin');
-    expect(comandoBarrado('\\read1 to \\linha')).toBe('\\read');
-  });
-
-  it('barra escrita e manipulação de catcode', () => {
-    expect(comandoBarrado('\\write18{rm -rf /}')).toBe('\\write18');
-    expect(comandoBarrado('\\write1{x}')).toBe('\\write');
-    expect(comandoBarrado('\\catcode`\\@=11')).toBe('\\catcode');
-    expect(comandoBarrado('\\csname input\\endcsname')).toBe('\\csname');
-  });
-
-  it('deixa passar fórmula legítima', () => {
-    expect(comandoBarrado('\\frac{1}{2}')).toBeNull();
-    expect(comandoBarrado('\\int_0^1 x\\,dx')).toBe(null);
-    expect(comandoBarrado('x^2 + y^2 = z^2')).toBeNull();
-    expect(comandoBarrado('\\alpha \\beta \\gamma')).toBeNull();
-    expect(comandoBarrado('')).toBeNull();
-  });
-
-  it('não confunde comando barrado com prefixo de outro', () => {
-    // \inputs e \reader não existem, mas se existissem não seriam \input
-    // nem \read. O limite de nome do LaTeX é o primeiro não-letra.
-    expect(comandoBarrado('\\inputs{x}')).toBeNull();
-    expect(comandoBarrado('\\reader')).toBeNull();
-    expect(comandoBarrado('\\writes')).toBeNull();
-  });
-});
+```bash
+yarn add katex@^0.16.47
 ```
 
-- [ ] **Step 2: Rodar e confirmar que falha**
+Ele já está na árvore como transitiva do `remark-math`, então não baixa nada novo — mas depender de
+hoisting de transitiva é frágil.
+
+- [ ] **Step 2: Escrever os testes que falham**
+
+A suíte cobre cinco grupos: os onze ataques medidos (com `^^5cinput{/etc/passwd}` e
+`\tex_input:D{/etc/passwd}` nominalmente, cada um com comentário dizendo por que a abordagem mudou);
+a lista de exceção; dez fórmulas legítimas de prova; fórmula vazia; e uma fórmula inválida mas
+inofensiva (`\frac{1}`), que é barrada **corretamente** — o KaTeX também a rejeitava no editor.
+
+- [ ] **Step 3: Rodar e confirmar que falha**
 
 ```bash
 npx jest --detectOpenHandles --forceExit src/modules/caderno/markdown/sanitizar-math.spec.ts
@@ -408,71 +410,37 @@ npx jest --detectOpenHandles --forceExit src/modules/caderno/markdown/sanitizar-
 
 Esperado: FAIL — `Cannot find module './sanitizar-math'`.
 
-- [ ] **Step 3: Implementar**
+- [ ] **Step 4: Implementar**
 
-Criar `src/modules/caderno/markdown/sanitizar-math.ts`:
+O arquivo final está em `src/modules/caderno/markdown/sanitizar-math.ts`. Pontos que não podem se
+perder numa reescrita futura:
 
-```ts
-/**
- * Comandos LaTeX barrados dentro de fórmula.
- *
- * A matemática passa sem escape — o editor grava LaTeX de verdade e escapar
- * mataria a feature. Mas isso abre um canal: quem cadastra questão pode
- * escrever `$\input{/etc/passwd}$`, o KaTeX mostra erro no editor e salva
- * mesmo assim, e o `.tex` gerado carrega o comando intacto.
- *
- * Na fase 1 quem compila é o usuário, na máquina dele ou no Overleaf — as
- * proteções que o card 08 planeja (`openin_any=p`, `-no-shell-escape`) não
- * existem lá. Esta lista é o que cobre essa janela.
- *
- * ⚠️ Defesa em profundidade, NÃO substituto: o card 08 continua obrigado a
- * configurar o compilador do servidor.
- *
- * São oito comandos que nenhuma fórmula de prova usa, então o falso positivo
- * é quase zero. `write18` vem antes de `write` na alternância porque a regex
- * casa a primeira alternativa que serve.
- */
-const BARRADOS = [
-  'write18',
-  'write',
-  'input',
-  'include',
-  'openin',
-  'read',
-  'catcode',
-  'csname',
-];
+- `katex.__parse` em vez de `renderToString`: mesma análise, sem construir HTML. Medido, 2,3x mais
+  rápido (90 fórmulas: 7,5 ms contra 17,3 ms). Não está nos tipos públicos, por isso o cast.
+- `{ strict: 'ignore', trust: false }` — tem que espelhar exatamente como o editor chama o KaTeX.
+- A exceção usa `(?![A-Za-z])`: `\preccurlyeq` e `\curlyeqprec` contêm `url` como substring.
+- `ParseError` vira mensagem legível; qualquer outro erro é relançado.
 
-/** `(?![A-Za-z])` é o limite de nome do LaTeX: `\inputs` não é `\input`. */
-const PADRAO = new RegExp(`\\\\(${BARRADOS.join('|')})(?![A-Za-z])`);
+- [ ] **Step 5: Rodar e confirmar que passa**
 
-/** Devolve o comando barrado encontrado, ou `null` se a fórmula está limpa. */
-export function comandoBarrado(formula: string): string | null {
-  const achado = PADRAO.exec(formula);
-  return achado ? `\\${achado[1]}` : null;
-}
-```
+Esperado: PASS, 5 testes.
 
-- [ ] **Step 4: Rodar e confirmar que passa**
+- [ ] **Step 6: Bateria de evasão**
+
+Não basta a suíte passar. Rode contra a implementação tudo que já derrotou a versão anterior —
+`\InputIfFileExists`, `\@input`, `\lstinputlisting`, `\verbatiminput`, `filecontents`,
+`\ior_open:Nn`, `^^5cinput`, `\tex_input:D`, `\pdffiledump`, `\directlua`, `\special`,
+`\scantokens` — mais tentativas de burlar a exceção (`\INCLUDEGRAPHICS`, `\Href`,
+`\includegraphicsinput`) e de fazer o KaTeX aceitar algo perigoso (`\def`, `\newcommand`, `\let`,
+`\text{}` com LaTeX cru dentro). Reporte o que passar.
+
+- [ ] **Step 7: Lint e commit**
 
 ```bash
-npx jest --detectOpenHandles --forceExit src/modules/caderno/markdown/sanitizar-math.spec.ts
-```
-
-Esperado: PASS, 4 testes.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add src/modules/caderno/markdown/sanitizar-math.ts src/modules/caderno/markdown/sanitizar-math.spec.ts
-git commit -m "feat(caderno): barrar comandos de arquivo dentro de formula
-
-A matematica passa sem escape porque o editor grava LaTeX de verdade,
-mas isso abre um canal: \\input{/etc/passwd} numa formula sai intacto no
-.tex. Na fase 1 quem compila e o usuario, sem as protecoes do card 08.
-
-Oito comandos que nenhuma formula de prova usa. Defesa em profundidade,
-nao substituto do openin_any=p."
+npx prettier --write src/modules/caderno/markdown/sanitizar-math.ts src/modules/caderno/markdown/sanitizar-math.spec.ts
+npx eslint src/modules/caderno/markdown/sanitizar-math.ts src/modules/caderno/markdown/sanitizar-math.spec.ts
+git add src/modules/caderno/markdown/sanitizar-math.ts src/modules/caderno/markdown/sanitizar-math.spec.ts package.json yarn.lock
+git commit -m "feat(caderno): validar formula com o proprio KaTeX"
 ```
 
 ---

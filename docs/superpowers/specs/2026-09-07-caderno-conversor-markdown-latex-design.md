@@ -95,7 +95,7 @@ neutraliza o dinheiro.
 | `singleDollarTextMath` | Fica no default `true` | Desligar mataria a math inline do editor, que é a feature. O `R$` se resolve antes do parser. |
 | `R$` | Neutralizado **antes** do parser, ancorado nos dois lados | O estrago acontece na tokenização; depois de virar nó a informação já se perdeu. |
 | Display math | Restaurado pelo `position.start.offset` na fonte | Única forma — o mdast sozinho não distingue. |
-| Matemática | Passa sem escape, mas com **lista curta de comandos barrados** | Na fase 1 quem compila é o usuário, sem as proteções que o card 08 planeja. Ver "Sanitização". |
+| Matemática | Passa sem escape, mas **validada pelo próprio KaTeX** | Na fase 1 quem compila é o usuário, sem as proteções que o card 08 planeja. Lista de bloqueio foi tentada e derrotada — ver "Sanitização". |
 | Falha de conversão | Nunca lança: fallback textual + aviso | Um markdown exótico não pode derrubar um caderno de 90 questões. |
 | `avisos` | Sem contexto de questão | Quem sabe o número é o card 03, que prefixa. Mantém o conversor puro. |
 
@@ -188,8 +188,33 @@ questão pode escrever `$\input{/etc/passwd}$`, o KaTeX mostra erro no editor e 
 `.tex` gerado carrega o comando intacto. **Na fase 1 quem compila é o usuário**, na máquina dele ou no
 Overleaf — as proteções que o card 08 planeja (`openin_any=p`, `-no-shell-escape`) não existem lá.
 
-Barrados: `\input`, `\include`, `\openin`, `\read`, `\write`, `\write18`, `\catcode`, `\csname`.
-São oito comandos que nenhuma fórmula de prova usa, então o falso positivo é quase zero.
+### A lista de bloqueio não sustentou — o que ficou no lugar
+
+A primeira versão desta seção especificava uma lista de oito comandos barrados. **Ela foi derrotada
+estruturalmente**, e vale registrar como, porque o motivo elimina a abordagem inteira e não só aquela
+lista:
+
+| Ataque | Por que a lista não alcança |
+|---|---|
+| `^^5cinput{/etc/passwd}` | **Não contém barra invertida nenhuma.** O `^^5c` vira `\` antes da tokenização do TeX, então nada ancorado em `\\` pode ver |
+| `\pdffiledump{0}{4096}{/etc/passwd}` | Primitiva do pdfTeX, sem pacote, lê arquivo e não contém radical algum |
+| `\tex_input:D`, `\sys_shell_now:n` | expl3, no formato do LaTeX desde 2020. O `_` cai fora de qualquer classe de caractere de nome |
+| `\InputIfFileExists`, `filecontents` | Kernel do LaTeX2e, sempre disponíveis |
+
+O lexer do TeX sabe soletrar `\input` sem as letras de `input`. Nenhuma lista de bloqueio sobrevive a
+isso.
+
+**O que ficou: validar com o próprio KaTeX** (`katex.__parse`). Ele aceita só o que entende, e não
+entende I/O de arquivo. Medido: rejeita os onze ataques acima e aceita as fórmulas legítimas de prova.
+
+O que torna isso barato é que **o editor renderiza com o mesmo KaTeX puro** (verificado em
+`LatexExtension.ts` e `RichTextRenderer.tsx`: sem mhchem, sem siunitx, sem `trust`). Uma fórmula que
+esta função rejeita **já aparecia quebrada para quem cadastrou a questão** — então o falso positivo é
+zero por construção, coisa que nenhuma lista de bloqueio consegue prometer.
+
+Sobra uma lista de exceção pequena, para o que o KaTeX aceita mas é perigoso em LaTeX de verdade:
+`\includegraphics` (embute qualquer arquivo do disco de quem compila), `\href` e `\url`. Os três
+foram encontrados medindo o gate `isTrusted()` do KaTeX, não adivinhando.
 
 Fórmula barrada vira **texto escapado visível** mais um aviso — quem for imprimir vê que há algo
 errado ali, em vez de o comando sumir em silêncio.
@@ -247,7 +272,7 @@ quê. A própria suíte é a rede de segurança: num Node anterior ela falha no 
 | Heurística do `R$` com falso positivo não previsto | Ancorada nos dois lados, coberta por fixture. Falso positivo vira fórmula literal visível, não conteúdo sumido |
 | Reordenar o pipeline desalinha o offset do `restaurarDisplay` | Comentário no ponto exato e teste que passa explicitamente a string neutralizada |
 | Fixture escrita "como a gente escreveria" e não como o editor grava | Fixtures derivadas dos dois serializers, com a origem anotada |
-| `sanitizar-math` barrando fórmula legítima | Oito comandos que nenhuma fórmula de prova usa; barrado sai visível com aviso |
+| `sanitizar-math` barrando fórmula legítima | Falso positivo é zero por construção: o editor usa o mesmo KaTeX, então o que é rejeitado aqui já estava quebrado lá. Barrado sai visível com aviso, nunca some |
 | Node pinado abaixo de 20.19 quebra o boot | `engines` + nota no Dockerfile; a suíte falha alto |
 
 ## Fora do escopo
@@ -263,5 +288,5 @@ quê. A própria suíte é a rede de segurança: num Node anterior ela falha no 
 |---|---|
 | 03 | Recebe `markdownToLatex` **síncrona**; prefixa os `avisos` com o número da questão; usa o `escapeLatex` exportado para o `\def\cadernoTitulo` |
 | 05 | Os `avisos` acumulados dos cards 02/03/04 vão pro `manifest.json` |
-| 08 | A lista de comandos barrados do `sanitizar-math` é defesa em profundidade, **não** substitui `openin_any=p` e `-no-shell-escape` |
+| 08 | A validação por KaTeX é defesa em profundidade, **não** substitui `openin_any=p` e `-no-shell-escape`. E ela cobre só a **matemática**: texto fora de math não passa por lá |
 | 01 | A fixture `exemplo/conteudo.tex` usa `$$…$$` na questão 47. Ela existe para imitar o que o gerador emite, e o gerador passa a emitir `\[…\]` — vale alinhar quando alguém mexer nela. Não é urgente: é fixture sintética, não código que roda. |
