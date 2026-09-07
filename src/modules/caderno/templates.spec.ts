@@ -1,17 +1,21 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import nestCli from '../../../nest-cli.json';
 
 /**
- * Contrato de layout de origem do template do caderno — não de empacotamento.
+ * Contrato de layout de origem do template do caderno, mais a metade de
+ * empacotamento no fim do arquivo.
  *
- * Sob ts-jest, `__dirname` aponta pra árvore `src`, então esta suite passa
- * do mesmo jeito com ou sem o `nest-cli.json` copiando estes arquivos pra
- * `dist`. O que ela trava é o layout dentro de `src/modules/caderno/`: o
- * mesmo caminho que o CadernoService (card 05) vai usar —
- * `path.join(__dirname, 'templates/padrao/v1')`. A metade `dist` do
- * contrato (o que o `ms.dockerfile`, que faz `COPY dist ./`, e os globs do
- * `nest-cli.json` realmente colocam no pacote publicado) é travada à
- * parte, na tarefa que adiciona esses globs.
+ * Sob ts-jest, `__dirname` aponta pra árvore `src`, então os testes que leem
+ * `TEMPLATE_DIR` passam do mesmo jeito com ou sem o `nest-cli.json` copiando
+ * estes arquivos pra `dist` — eles travam só o layout dentro de
+ * `src/modules/caderno/`: o mesmo caminho que o CadernoService (card 05) vai
+ * usar — `path.join(__dirname, 'templates/padrao/v1')`. Quem trava a metade
+ * de empacotamento do contrato é o último teste da suite: ele lê os globs
+ * declarados em `nest-cli.json` (não roda `nest build` nem inspeciona
+ * `dist/`) e confere que cobrem toda extensão presente no diretório do
+ * template. O que de fato acaba no pacote publicado — via `nest build` e o
+ * `COPY dist ./` do `ms.dockerfile` — fica fora desta suite.
  */
 const TEMPLATE_DIR = path.join(__dirname, 'templates/padrao/v1');
 
@@ -111,5 +115,36 @@ describe('template do caderno (padrao/v1)', () => {
     const comGabarito = (declarado as string).replace(']', ',answers]');
     expect(ler('main.tex')).toContain(comGabarito);
     expect(leiaMe).toContain(comGabarito);
+  });
+
+  it('nest-cli.json copia o template pro dist', () => {
+    // A outra metade do contrato. O spec acima roda sobre `src/` e passaria
+    // mesmo que nada fosse empacotado; o ms.dockerfile faz `COPY dist ./`, e
+    // sem estes globs a imagem sobe sem template — falha só em runtime, no
+    // container. O exclude mantém o exemplo/ (fixture de validação manual)
+    // fora do pacote.
+    const assets = nestCli.compilerOptions.assets;
+
+    const doCaderno = assets.filter((a) =>
+      a.include.startsWith('modules/caderno/templates'),
+    );
+    expect(doCaderno.length).toBeGreaterThan(0);
+    expect(doCaderno.every((a) => a.exclude?.includes('exemplo'))).toBe(true);
+
+    // Assere o efeito, não a grafia: toda extensão que existe no diretório do
+    // template precisa estar coberta por um glob. Sem isso, o próximo arquivo
+    // adicionado aqui (um .sty, uma exam.cls vendorizada) reproduz este mesmo
+    // bug com o teste verde.
+    const extensoes = new Set(
+      fs
+        .readdirSync(TEMPLATE_DIR, { withFileTypes: true })
+        .filter((entrada) => entrada.isFile())
+        .map((entrada) => path.extname(entrada.name))
+        .filter((ext) => ext !== ''),
+    );
+    expect(extensoes.size).toBeGreaterThan(0);
+    extensoes.forEach((ext) =>
+      expect(doCaderno.some((a) => a.include.endsWith(`*${ext}`))).toBe(true),
+    );
   });
 });
