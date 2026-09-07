@@ -131,6 +131,23 @@ describe('template do caderno (padrao/v1)', () => {
     expect(doCaderno.length).toBeGreaterThan(0);
     expect(doCaderno.every((a) => a.exclude?.includes('exemplo'))).toBe(true);
 
+    // O exclude protege um caminho real e não-vazio: sem esta âncora, batizar
+    // o fixture de `amostra/` tornaria o exclude um no-op, e um exemplo/ vazio
+    // não provaria nada. O que importa é existir ali um arquivo cuja extensão
+    // os globs pegariam.
+    const noExemplo = fs.readdirSync(path.join(TEMPLATE_DIR, 'exemplo'), {
+      withFileTypes: true,
+    });
+    expect(
+      noExemplo.some(
+        (entrada) =>
+          entrada.isFile() &&
+          doCaderno.some((a) =>
+            a.include.endsWith(`*${path.extname(entrada.name)}`),
+          ),
+      ),
+    ).toBe(true);
+
     // Assere o efeito, não a grafia: toda extensão que existe no diretório do
     // template precisa estar coberta por um glob. Sem isso, o próximo arquivo
     // adicionado aqui (um .sty, uma exam.cls vendorizada) reproduz este mesmo

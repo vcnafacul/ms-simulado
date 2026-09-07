@@ -1,23 +1,18 @@
 % ===========================================================================
-% Caderno de questões — template padrao/v1
+% PLANO B do card 01 — só existe para o smoke test.
 %
-% Compile:  latexmk -pdf main.tex      (ou suba esta pasta no Overleaf)
+% Se \documentclass[twocolumn]{exam} (o main.tex) não funcionar, este arquivo
+% faz as duas colunas com o pacote multicol. Compile OS DOIS no mesmo upload
+% e mantenha só o que funcionar melhor; o perdedor é apagado antes do PR.
 %
-% Gabarito do professor: troque a linha do \documentclass abaixo por
-%   \documentclass[11pt,a4paper,twocolumn,answers]{exam}
-% e recompile. A alternativa correta sai destacada.
-%
-% NÃO EDITE os arquivos metadados.tex e conteudo.tex: os dois são gerados
-% pelo ms-simulado e sobrescritos a cada download.
-%
-% Plano B (multicol) para este mesmo caderno vive em exemplo/main-multicol.tex,
-% só para o smoke test — apagado assim que o round-trip no Overleaf decidir
-% qual dos dois vence.
+% Só compila a partir do zip montado, onde todos os arquivos ficam no mesmo
+% diretório — não de dentro de exemplo/.
 % ===========================================================================
-\documentclass[11pt,a4paper,twocolumn]{exam}
+\documentclass[11pt,a4paper]{exam}
 
 \input{preambulo}
 \input{metadados}
+\usepackage{multicol}
 
 % draftwatermark carregado só no modo rascunho: carregá-lo sempre estampa
 % "DRAFT" por padrão. Fica aqui, e não no preambulo.tex (onde diz que
@@ -39,10 +34,12 @@
 
 \begin{document}
 
-\twocolumn[\capaCaderno]
+\capaCaderno
 
+\begin{multicols}{2}
 \begin{questions}
 \input{conteudo}
 \end{questions}
+\end{multicols}
 
 \end{document}
