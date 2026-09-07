@@ -46,7 +46,7 @@ const HANDLERS: Record<string, Handler> = {
     return `\\begin{${ambiente}}[nosep]\n${filhos(no, ctx, '\n')}\n\\end{${ambiente}}`;
   },
 
-  listItem: (no, ctx) => `\\item ${filhos(no, ctx).trim()}`,
+  listItem: (no, ctx) => `\\item ${filhos(no, ctx, '\n\n').trim()}`,
 
   blockquote: (no, ctx) =>
     `\\begin{quote}\n${filhos(no, ctx, '\n\n')}\n\\end{quote}`,
@@ -87,9 +87,17 @@ function compilarNo(no: any, ctx: Contexto): string {
 }
 
 /** Texto de qualquer nó, para o fallback. */
-function textoCru(no: any): string {
+function textoCru(no: any, profundidade = 0): string {
+  // Guarda de profundidade: `compilar` promete nunca lançar, e o card 03
+  // conta com isso pra não perder um caderno inteiro por uma questão. Sem
+  // ela, uma árvore com ciclo derruba tudo com RangeError em vez de
+  // degradar. Não deveria acontecer com saída do remark — é cinto de
+  // segurança, não caminho esperado.
+  if (profundidade > 50) return '';
   if (typeof no?.value === 'string') return no.value;
-  if (Array.isArray(no?.children)) return no.children.map(textoCru).join('');
+  if (Array.isArray(no?.children)) {
+    return no.children.map((f: any) => textoCru(f, profundidade + 1)).join('');
+  }
   return '';
 }
 

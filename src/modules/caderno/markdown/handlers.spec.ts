@@ -83,6 +83,16 @@ describe('handlers — blocos', () => {
     // links do acervo é ruído de colagem.
     expect(tex('veja [o site](https://exemplo.com)')).toBe('veja o site');
   });
+
+  it('separa os parágrafos de um item de lista', () => {
+    // Sem separador os dois viram uma palavra só: "primeirosegundo".
+    expect(tex('- primeiro\n\n  segundo')).toContain('primeiro\n\nsegundo');
+  });
+
+  it('põe a lista aninhada em linha própria', () => {
+    const saida = tex('- a\n  - b');
+    expect(saida).toContain('\\item a\n\n\\begin{itemize}');
+  });
 });
 
 describe('handlers — bloco de código', () => {
@@ -128,5 +138,15 @@ describe('handlers — degradação', () => {
 
   it('árvore vazia devolve string vazia', () => {
     expect(tex('')).toBe('');
+  });
+
+  it('não estoura a pilha com árvore circular', () => {
+    // "nunca lança" é invariante da etapa, não aproximação: o card 03 conta
+    // com ela pra não perder um caderno de 90 questões por causa de uma.
+    const ctx = contexto();
+    const circular: any = { type: 'circular', children: [] };
+    circular.children.push(circular);
+
+    expect(() => compilar(circular, ctx)).not.toThrow();
   });
 });
