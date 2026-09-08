@@ -1,16 +1,24 @@
 import {
   ColetorDeImagens,
   ImagemAceita,
+  ImagemRecusada,
   emitirImagem,
   emitirMarcador,
 } from './imagens';
 
 // `registrar` devolve `ImagemAceita | ImagemRecusada`, sem discriminante
-// compartilhado — TS não deixa acessar `.arquivo` direto no union. Nestes
-// pontos o teste já sabe (pelo cenário) que o retorno é sempre a aceita; o
-// cast é só para satisfazer o compilador, sem mudar nenhum valor esperado.
-const arquivoDe = (r: ReturnType<ColetorDeImagens['registrar']>): string =>
-  (r as ImagemAceita).arquivo;
+// compartilhado, então TS não deixa acessar `.arquivo` direto no union.
+//
+// Estreita de verdade em vez de fazer cast: um cast devolveria `undefined`
+// caladamente se o coletor passasse a recusar o que não devia, e a falha
+// apareceria como `undefined !== 'assets/01.png'`. Assim a mensagem diz o
+// motivo da recusa.
+const arquivoDe = (r: ImagemAceita | ImagemRecusada): string => {
+  if ('motivo' in r) {
+    throw new Error(`esperava imagem aceita, veio recusa: ${r.motivo}`);
+  }
+  return r.arquivo;
+};
 
 describe('ColetorDeImagens — o que reconhece', () => {
   it('aceita URL externa, que é o caso dominante do acervo', () => {
