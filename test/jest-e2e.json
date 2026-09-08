@@ -5,8 +5,11 @@
   "testRegex": "test/.+\\.e2e-spec\\.ts$",
   "testTimeout": 30000,
   "transform": {
-    "^.+\\.(t|j)s$": "ts-jest"
+    "^.+\\.(t|j)s$": ["ts-jest", { "tsconfig": "<rootDir>/tsconfig.jest.json" }]
   },
+  "transformIgnorePatterns": [
+    "node_modules/(?!(unified|remark-.*|mdast-.*|micromark.*|unist-.*|vfile.*|bail|trough|is-plain-obj|extend|devlop|decode-named-character-reference|character-entities.*|ccount|escape-string-regexp|markdown-table|longest-streak|zwitch)/)"
+  ],
   "moduleNameMapper": {
     "^src/(.*)$": "<rootDir>/src/$1"
   }

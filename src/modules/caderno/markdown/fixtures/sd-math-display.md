@@ -1,0 +1,1 @@
+A área sob a curva é $$\int_0^1 x\,dx$$ conforme o gráfico.
