@@ -1432,6 +1432,12 @@ EOF
 - Create: `src/modules/caderno/imagens/resolver.spec.ts`
 - Create: `src/modules/caderno/imagens/resolver.ts`
 
+⚠️ **Armadilha de tipo deste repo, descoberta na Task 4:** o `tsconfig.json` tem
+`strictNullChecks: false` (ao lado de `strict: true`, e o `false` explícito vence). Com isso o
+TypeScript **não estreita união discriminada por negação** — `if (!resultado.ok)` não funciona, mas
+`if (resultado.ok === false)` sim. Pela mesma razão, função aninhada dentro de object literal de teste
+pode precisar de anotação explícita de retorno.
+
 ⚠️ **Os testes desta task usam `arquivo: 'assets/01'`, sem extensão — e nesta altura o card 02 ainda
 emite `'assets/01.png'`.** Não é engano: quem tira a extensão é a Task 8, logo a seguir. O resolver
 recebe `arquivo` pronto e só acrescenta a extensão que os bytes disserem, então a unidade não depende
@@ -1767,7 +1773,10 @@ export class ResolverDeImagens {
     }
 
     const resultado = await this.buscar(ref.url);
-    if (!resultado.ok) {
+    // ⚠️ `=== false`, não `!resultado.ok`: este repo tem
+    // `strictNullChecks: false` no tsconfig (apesar de `strict: true`), e sem
+    // ele o TypeScript não estreita união discriminada por negação.
+    if (resultado.ok === false) {
       avisos.push(`${ref.arquivo} — ${resultado.motivo}`);
       metricas.falhas += 1;
       return null;
