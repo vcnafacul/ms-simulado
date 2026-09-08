@@ -44,7 +44,7 @@ describe('textoParaLatex — imagens', () => {
       '![](https://enem.dev/2016/questions/3/abc.png)',
     );
     expect(latex).toBe(
-      '\n\n\\includegraphics[max width=\\linewidth]{assets/01.png}\n\n',
+      '\n\n\\includegraphics[max width=\\linewidth]{assets/01}\n\n',
     );
     expect(coletor.imagens[0].origem).toBe('url');
   });
@@ -56,7 +56,7 @@ describe('textoParaLatex — imagens', () => {
       '![](https://x.com/a.png)Os moradores de Andalsnes, na Noruega',
     );
     expect(latex).toBe(
-      '\n\n\\includegraphics[max width=\\linewidth]{assets/01.png}\n\nOs moradores de Andalsnes, na Noruega',
+      '\n\n\\includegraphics[max width=\\linewidth]{assets/01}\n\nOs moradores de Andalsnes, na Noruega',
     );
   });
 
@@ -67,7 +67,7 @@ describe('textoParaLatex — imagens', () => {
     expect(coletor.imagens[0]).toEqual({
       origem: 'r2',
       key: 'assets/a02398bc-1d10-48ad-b41f-d4296faf0fe7.jpeg',
-      arquivo: 'assets/01.jpeg',
+      arquivo: 'assets/01',
     });
   });
 
@@ -76,7 +76,7 @@ describe('textoParaLatex — imagens', () => {
       '<img src="https://x.com/a.png" alt="mapa" width="320" height="200" />',
     );
     expect(latex).toBe(
-      '\n\n\\includegraphics[width=240pt,max width=\\linewidth]{assets/01.png}\n\n',
+      '\n\n\\includegraphics[width=240pt,max width=\\linewidth]{assets/01}\n\n',
     );
   });
 
@@ -99,7 +99,7 @@ describe('textoParaLatex — imagens', () => {
     // Se fosse mantido sem escape, um `%` no alt apagaria a linha.
     const { latex } = converter('![100% do mapa](https://x.com/a.png)');
     expect(latex).not.toContain('100');
-    expect(latex).toContain('assets/01.png');
+    expect(latex).toContain('assets/01');
   });
 
   it('o contador é do coletor, então continua entre campos', () => {
@@ -110,7 +110,7 @@ describe('textoParaLatex — imagens', () => {
       coletor,
       () => {},
     );
-    expect(segundo).toContain('assets/02.png');
+    expect(segundo).toContain('assets/02');
   });
 });
 
@@ -139,7 +139,7 @@ describe('textoParaLatex — o div de alinhamento', () => {
       '<div style="text-align: center"><img src="https://x.com/a.png" /></div>',
     );
     expect(latex).toBe(
-      '\n\n\\includegraphics[max width=\\linewidth]{assets/01.png}\n\n',
+      '\n\n\\includegraphics[max width=\\linewidth]{assets/01}\n\n',
     );
   });
 

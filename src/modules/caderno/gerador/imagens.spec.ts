@@ -27,12 +27,12 @@ describe('ColetorDeImagens — o que reconhece', () => {
     const r = c.registrar(
       'https://enem.dev/2016/questions/3/812288c1-3e37-4369-914a-057525abd52e.png',
     );
-    expect(r).toEqual({ arquivo: 'assets/01.png' });
+    expect(r).toEqual({ arquivo: 'assets/01' });
     expect(c.imagens).toEqual([
       {
         origem: 'url',
         url: 'https://enem.dev/2016/questions/3/812288c1-3e37-4369-914a-057525abd52e.png',
-        arquivo: 'assets/01.png',
+        arquivo: 'assets/01',
       },
     ]);
   });
@@ -44,21 +44,21 @@ describe('ColetorDeImagens — o que reconhece', () => {
     const r = c.registrar(
       'asset://assets/a02398bc-1d10-48ad-b41f-d4296faf0fe7.jpeg',
     );
-    expect(r).toEqual({ arquivo: 'assets/01.jpeg' });
+    expect(r).toEqual({ arquivo: 'assets/01' });
     expect(c.imagens[0]).toEqual({
       origem: 'r2',
       key: 'assets/a02398bc-1d10-48ad-b41f-d4296faf0fe7.jpeg',
-      arquivo: 'assets/01.jpeg',
+      arquivo: 'assets/01',
     });
   });
 
   it('tira query e fragmento antes de ler a extensão', () => {
     const c = new ColetorDeImagens();
     expect(c.registrar('https://x.com/a/b.png?v=2&w=3')).toEqual({
-      arquivo: 'assets/01.png',
+      arquivo: 'assets/01',
     });
     expect(c.registrar('https://x.com/a/c.jpg#topo')).toEqual({
-      arquivo: 'assets/02.jpg',
+      arquivo: 'assets/02',
     });
   });
 });
@@ -67,9 +67,9 @@ describe('ColetorDeImagens — numeração e dedup', () => {
   it('numera na ordem de aparição, contínuo no caderno inteiro', () => {
     // O contador NÃO reinicia por questão: o zip é um só.
     const c = new ColetorDeImagens();
-    expect(arquivoDe(c.registrar('https://x.com/a.png'))).toBe('assets/01.png');
-    expect(arquivoDe(c.registrar('https://x.com/b.png'))).toBe('assets/02.png');
-    expect(arquivoDe(c.registrar('https://x.com/c.png'))).toBe('assets/03.png');
+    expect(arquivoDe(c.registrar('https://x.com/a.png'))).toBe('assets/01');
+    expect(arquivoDe(c.registrar('https://x.com/b.png'))).toBe('assets/02');
+    expect(arquivoDe(c.registrar('https://x.com/c.png'))).toBe('assets/03');
   });
 
   it('deduplica por identidade da origem', () => {
@@ -92,28 +92,31 @@ describe('ColetorDeImagens — numeração e dedup', () => {
     // passa de 99 imagens fácil, e truncar faria a 100 sobrescrever a 00.
     const c = new ColetorDeImagens();
     for (let i = 1; i <= 100; i += 1) c.registrar(`https://x.com/${i}.png`);
-    expect(c.imagens[98].arquivo).toBe('assets/99.png');
-    expect(c.imagens[99].arquivo).toBe('assets/100.png');
+    expect(c.imagens[98].arquivo).toBe('assets/99');
+    expect(c.imagens[99].arquivo).toBe('assets/100');
   });
 });
 
 describe('ColetorDeImagens — o que recusa', () => {
-  it('recusa extensão que quebraria o grupo do \\includegraphics', () => {
-    // s3-service.ts monta a extensão com originalname.split('.').pop(), sem
-    // filtro. `mapa.p}ng` produz key terminada em `}`, que fecha o grupo cedo
-    // e derrama o resto como LaTeX solto.
-    const c = new ColetorDeImagens();
-    expect(c.registrar('asset://assets/mapa.p}ng')).toEqual({
-      motivo: 'extensão inválida',
-    });
-    expect(c.imagens).toHaveLength(0);
-  });
-
-  it('recusa quando não há extensão nenhuma', () => {
+  it('aceita referência sem extensão, porque quem decide são os bytes', () => {
+    // A extensão do nome mente: um `.png` que serve JPEG faz o graphicx
+    // escolher o driver errado. O card 03 nomeia o arquivo pelos magic bytes,
+    // e por isso o `.tex` não carrega extensão nenhuma.
     const c = new ColetorDeImagens();
     expect(c.registrar('https://x.com/sem-extensao')).toEqual({
-      motivo: 'extensão inválida',
+      arquivo: 'assets/01',
     });
+  });
+
+  it('a extensão do nome não vaza para o .tex', () => {
+    // Era a única superfície de injeção que restava: `mapa.p}ng` fecharia o
+    // grupo do \includegraphics cedo. Sem extensão no caminho emitido, deixa
+    // de ser possível em vez de ser barrada.
+    const c = new ColetorDeImagens();
+    const r = c.registrar('asset://assets/mapa.p}ng');
+    expect(r).toEqual({ arquivo: 'assets/01' });
+    expect(JSON.stringify(c.imagens)).not.toContain('}ng"');
+    expect((r as { arquivo: string }).arquivo).not.toContain('}');
   });
 
   it('recusa esquema fora de http, https e asset', () => {

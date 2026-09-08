@@ -319,7 +319,7 @@ describe('gerarCaderno — espaço em branco do molde', () => {
       { draft: false },
     );
     expect(r.conteudo).toContain(
-      '\\question\n\\includegraphics[max width=\\linewidth]{assets/01.png}',
+      '\\question\n\\includegraphics[max width=\\linewidth]{assets/01}',
     );
   });
 
@@ -421,8 +421,8 @@ describe('gerarCaderno — imagens', () => {
       { draft: false },
     );
     expect(r.imagens).toHaveLength(2);
-    expect(r.imagens[0].arquivo).toBe('assets/01.png');
-    expect(r.imagens[1].arquivo).toBe('assets/02.jpeg');
+    expect(r.imagens[0].arquivo).toBe('assets/01');
+    expect(r.imagens[1].arquivo).toBe('assets/02');
   });
 
   it('mesma imagem em duas questões vira um arquivo só', () => {
