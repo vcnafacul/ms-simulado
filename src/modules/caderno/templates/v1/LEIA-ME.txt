@@ -11,14 +11,13 @@ COMO COMPILAR
   Opção 2 — na sua máquina, com uma distribuição TeX instalada
     latexmk -pdf main.tex
 
-GABARITO DO PROFESSOR
+A RESPOSTA CORRETA NÃO VEM NO PACOTE
 
-  Abra main.tex e troque a linha
-      \documentclass[11pt,a4paper,twocolumn]{exam}
-  por
-      \documentclass[11pt,a4paper,twocolumn,answers]{exam}
-  e recompile. A alternativa correta de cada questão sai destacada.
-  Desfaça a troca para voltar à prova do aluno.
+  Todas as alternativas saem iguais neste caderno, de propósito. A resposta
+  correta fica só na plataforma: um arquivo que se sobe para o Overleaf e se
+  compartilha por link não é lugar para gabarito.
+
+  Para conferir as respostas, use a questão na plataforma.
 
 O QUE VOCÊ PODE EDITAR
 

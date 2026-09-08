@@ -135,3 +135,45 @@ describe('template do caderno (v1)', () => {
     expect(exemplo).not.toMatch(/card 0[89]/);
   });
 });
+
+describe('template não promete o gabarito do professor', () => {
+  // O gerador emite só \choice: \CorrectChoice renderiza idêntico sem a opção
+  // `answers`, então o gabarito não apareceria no PDF mas estaria em texto
+  // claro no conteudo.tex, que vai para um projeto compartilhável do Overleaf.
+  //
+  // ⚠️ O que precisa sumir é a INSTRUÇÃO, não a palavra. Os dois arquivos
+  // explicam por que a opção não serve, e para isso precisam nomeá-la — um
+  // teste que banisse a substring crua forçaria circunlóquio, e circunlóquio é
+  // o que faz alguém "consertar" o texto reintroduzindo a promessa.
+  const arquivosDoZip = ['main.tex', 'LEIA-ME.txt'];
+
+  it.each(arquivosDoZip)('%s não manda ligar a opção answers', (arquivo) => {
+    const texto = lerTexto(arquivo);
+    expect(texto).not.toContain('answers]{exam}');
+    expect(texto.toLowerCase()).not.toContain('destacada');
+  });
+
+  it('LEIA-ME.txt não tem mais a seção do gabarito do professor', () => {
+    expect(lerTexto('LEIA-ME.txt')).not.toMatch(/GABARITO DO PROFESSOR/i);
+  });
+
+  it.each(arquivosDoZip)(
+    '%s diz que a resposta não vem no pacote',
+    (arquivo) => {
+      // Asserção POSITIVA de propósito. Banir a promessa não impede o texto de
+      // simplesmente ficar calado sobre o assunto — e calado é como a dúvida
+      // volta ("cadê o gabarito?"). O template tem que responder.
+      expect(lerTexto(arquivo).toLowerCase()).toMatch(
+        /(não|nao) (vem|viaja|aparece).{0,40}(pacote|zip|caderno)|fonte da verdade/,
+      );
+    },
+  );
+
+  it('o exemplo continua usando CorrectChoice, e diz por quê', () => {
+    // O fixture é smoke test do template, não amostra da saída do gerador.
+    // Prova que o exam.cls faz aquilo, e o cabeçalho registra a diferença.
+    const texto = lerTexto('exemplo/conteudo.tex');
+    expect(texto).toContain('\\CorrectChoice');
+    expect(texto).toMatch(/gerador emite (apenas |só )?\\choice/i);
+  });
+});
