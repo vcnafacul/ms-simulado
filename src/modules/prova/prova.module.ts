@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ExameModule } from '../exame/exame.module';
 import { FrenteModule } from '../frente/frente.module';
@@ -28,7 +28,7 @@ import { EnemService } from './services/enem_service';
     QuestaoModule,
     MateriaModule,
     FrenteModule,
-    SimuladoModule,
+    forwardRef(() => SimuladoModule),
   ],
   controllers: [ProvaController],
   providers: [
