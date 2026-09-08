@@ -103,6 +103,14 @@ sintaxe:
 ⚠️ Reescrever o topo, não concatenar no fim: o `LEIA-ME` manda olhar o **topo do arquivo**, e um
 segundo bloco lá embaixo seria pior que nenhum.
 
+**Como, sem ambiguidade:** o `conteudo.tex` do card 02 ou começa com linhas `% AVISO:` seguidas de uma
+linha em branco, ou começa direto no `\needspace`. A operação é: **remover o bloco de abertura**
+(zero ou mais linhas consecutivas começando com `% AVISO:`, mais a linha em branco que as segue) e
+prefixar o bloco novo com as duas listas na ordem — card 02 primeiro, card 03 depois.
+
+Remover e reescrever, em vez de inserir no meio, evita o caso em que uma questão contém a string
+`% AVISO:` no texto e a inserção acerta o lugar errado.
+
 ⚠️ O achatamento de `\n` (`umaLinhaSo`, card 02) vale para os avisos do card 03 também. Uma quebra de
 linha encerra o comentário LaTeX e joga o resto impresso na prova.
 
@@ -160,6 +168,19 @@ O total somado dos dois cards, para o client mostrar um aviso sem abrir o zip.
 ```
 CADERNO_DRAFT_ENABLED=true
 ```
+
+No schema Zod, o default é calculado na carga do módulo:
+
+```ts
+CADERNO_DRAFT_ENABLED: z.coerce
+  .boolean()
+  .default(process.env.NODE_ENV !== 'production'),
+```
+
+⚠️ `z.coerce.boolean()` trata **qualquer string não vazia como `true`**, inclusive `"false"`. Se a
+variável vier do ambiente como texto, use uma transformação explícita (`z.enum(['true','false'])` ou
+`.transform((v) => v === 'true')`) — senão desligar a flag em produção não desliga nada, e o defeito é
+invisível até alguém baixar um caderno que não devia existir.
 
 Default `true` fora de produção, `false` em produção — rascunho é ferramenta de quem monta a prova, e
 em produção liberar isso por acidente entregaria caderno de simulado incompleto.
