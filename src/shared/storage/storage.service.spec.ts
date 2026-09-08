@@ -77,3 +77,60 @@ describe('StorageService', () => {
     });
   });
 });
+
+/**
+ * O cartão-resposta é a rede de segurança desta mudança: ele chama
+ * `get`/`exists`/`putObject` sem bucket e não pode nem perceber que o
+ * parâmetro existe.
+ */
+describe('StorageService — bucket opcional', () => {
+  const env = {
+    get: (chave: string) =>
+      ({
+        AWS_ENDPOINT: 'http://localhost:9000',
+        AWS_REGION: 'us-east-1',
+        AWS_ACCESS_KEY_ID: 'k',
+        AWS_SECRET_ACCESS_KEY: 's',
+        CARTAO_BUCKET: 'bucket-do-cartao',
+      })[chave],
+  } as any;
+
+  const capturarBucket = (service: StorageService) => {
+    const enviados: string[] = [];
+    (service as any).client = {
+      send: (comando: any) => {
+        enviados.push(comando.input.Bucket);
+        return Promise.resolve({
+          Body: { transformToByteArray: async () => new Uint8Array([1]) },
+        });
+      },
+    };
+    return enviados;
+  };
+
+  it('sem bucket, usa o CARTAO_BUCKET', async () => {
+    const service = new StorageService(env);
+    const enviados = capturarBucket(service);
+    await service.get('k1');
+    await service.exists('k2');
+    await service.putObject('k3', Buffer.from('x'), 'image/png');
+    expect(enviados).toEqual([
+      'bucket-do-cartao',
+      'bucket-do-cartao',
+      'bucket-do-cartao',
+    ]);
+  });
+
+  it('com bucket, usa o que foi passado', async () => {
+    const service = new StorageService(env);
+    const enviados = capturarBucket(service);
+    await service.get('k1', 'outro-bucket');
+    await service.putObject(
+      'k2',
+      Buffer.from('x'),
+      'image/png',
+      'outro-bucket',
+    );
+    expect(enviados).toEqual(['outro-bucket', 'outro-bucket']);
+  });
+});
