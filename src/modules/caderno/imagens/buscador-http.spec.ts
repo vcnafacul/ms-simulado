@@ -87,6 +87,33 @@ describe('buscarImagem', () => {
   });
 });
 
+describe('buscarImagem — conexão que cai no meio do corpo', () => {
+  it('erro durante a leitura vira falha, não exceção', () => {
+    // O status já veio 200 e os primeiros bytes chegaram; a conexão cai
+    // depois. Sem o catch em volta da leitura, a exceção sobe e derruba a
+    // geração inteira do caderno por causa de uma imagem.
+    const corpoQueQuebra = {
+      getReader: () => ({
+        read: async (): Promise<any> => {
+          throw new Error('ECONNRESET no meio do corpo');
+        },
+        cancel: async (): Promise<undefined> => undefined,
+      }),
+    };
+    const fetch = jest.fn().mockResolvedValue({
+      status: 200,
+      headers: { get: (): string | null => null },
+      body: corpoQueQuebra,
+    });
+    return expect(
+      buscarImagem('https://x.com/a.png', {
+        fetch: fetch as any,
+        verificar: sempreLiberado,
+      }),
+    ).resolves.toEqual({ ok: false, motivo: 'imagem não pôde ser baixada' });
+  });
+});
+
 describe('buscarImagem — redirecionamento', () => {
   const redireciona = (para: string) => ({
     status: 302,

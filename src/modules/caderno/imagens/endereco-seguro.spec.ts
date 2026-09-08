@@ -40,6 +40,19 @@ describe('ehPrivado — IPv4', () => {
   });
 });
 
+describe('ehPrivado — na dúvida, recusa', () => {
+  it('recusa o que não consegue interpretar como endereço', () => {
+    // Este é o default mais importante do módulo. Se alguém inverter para
+    // `false`, entrada malformada passa a ser ACEITA — e a defesa inteira vira
+    // decoração para qualquer coisa que o parser não entenda.
+    expect(ehPrivado('nao-e-um-ip')).toBe(true);
+    expect(ehPrivado('1.2.3')).toBe(true);
+    expect(ehPrivado('1.2.3.4.5')).toBe(true);
+    expect(ehPrivado('999.1.1.1')).toBe(false); // 999 é inteiro: cai nas faixas
+    expect(ehPrivado('')).toBe(true);
+  });
+});
+
 describe('ehPrivado — IPv6', () => {
   it('recusa loopback, ULA e link-local', () => {
     expect(ehPrivado('::1')).toBe(true);
