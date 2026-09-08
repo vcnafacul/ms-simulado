@@ -11,13 +11,18 @@
  * entrega.
  */
 
-const MARCA = '% AVISO: ';
+export const MARCA = '% AVISO: ';
 
 /**
  * ⚠️ Quebra de linha dentro de um aviso **encerra o comentário** e joga o resto
  * dentro do documento, impresso na prova.
+ *
+ * Mora aqui, e não no gerador, porque é regra sobre AVISO — e o gerador (card
+ * 02) e este módulo (card 04) escrevem os mesmos comentários. Duas cópias da
+ * mesma regra é como elas divergem, e o defeito da divergência é texto de
+ * aviso impresso no meio da prova do aluno.
  */
-const umaLinhaSo = (texto: string): string =>
+export const umaLinhaSo = (texto: string): string =>
   texto.replace(/[\r\n]+/g, ' ').trim();
 
 /**
