@@ -100,14 +100,22 @@ describe('verificarEndereco', () => {
     expect(r.ok).toBe(false);
   });
 
-  it('recusa IP literal privado na URL, sem passar pelo DNS', async () => {
+  it('recusa IP literal privado na URL, sem sequer consultar o DNS', async () => {
     // Sem nome de host não há o que resolver; a checagem tem que olhar o
-    // literal também, senão a defesa inteira se contorna com uma URL numérica.
+    // literal também, senão a defesa inteira se contorna trocando o nome pelo
+    // endereço numérico.
+    //
+    // ⚠️ O resolvedor aqui MENTE de propósito: se for chamado, devolve um IP
+    // público e o endereço passaria. É o que torna a decisão observável — com
+    // um mock que rejeita tudo, o teste passa mesmo sem o curto-circuito do
+    // literal, e não prova nada.
+    const resolvedorQueMente = jest.fn(async () => [{ address: '8.8.8.8' }]);
     const r = await verificarEndereco(
       'http://169.254.169.254/latest/meta-data/',
-      comDns({}) as any,
+      resolvedorQueMente as any,
     );
     expect(r.ok).toBe(false);
+    expect(resolvedorQueMente).not.toHaveBeenCalled();
   });
 
   it('recusa URL que não dá para interpretar', async () => {
