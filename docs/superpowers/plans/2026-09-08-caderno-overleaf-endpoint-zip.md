@@ -689,6 +689,40 @@ EOF
 **Files:**
 - Create: `src/modules/caderno/caderno.service.spec.ts`
 - Create: `src/modules/caderno/caderno.service.ts`
+- Modify: `src/shared/modules/env/env.ts`
+- Modify: `.env.example`
+
+⚠️ **A entrada de env vem NESTA task, não na 5.** O serviço lê
+`CADERNO_DRAFT_ENABLED`, e sem a chave no schema o `EnvService.get` não compila — a task inteira ficaria
+com zero teste rodando. A Task 5 **não** a reintroduz.
+
+Acrescente ao schema em `src/shared/modules/env/env.ts`:
+
+```ts
+  // Caderno · card 04. Rascunho é ferramenta de quem monta a prova; liberar
+  // isso por acidente em produção entregaria caderno de simulado incompleto.
+  //
+  // ⚠️ NÃO use `z.coerce.boolean()`: ele trata qualquer string não vazia como
+  // `true`, inclusive `"false"` — desligar a flag em produção não desligaria
+  // nada, e o defeito ficaria invisível até alguém baixar um caderno que não
+  // devia existir.
+  CADERNO_DRAFT_ENABLED: z
+    .enum(['true', 'false'])
+    .default(process.env.NODE_ENV === 'production' ? 'false' : 'true')
+    .transform((v) => v === 'true'),
+```
+
+e ao `.env.example`:
+
+```
+# Caderno (card 04) — geração de rascunho. Default: false em produção.
+CADERNO_DRAFT_ENABLED=true
+```
+
+Duas verificações, porque `.transform` no meio de um schema Zod é onde isto falha calado:
+
+- `Env['CADERNO_DRAFT_ENABLED']` precisa ser inferido como `boolean`, não `'true' | 'false'`
+- `CADERNO_DRAFT_ENABLED=false` tem que produzir `false`, não `true`
 
 - [ ] **Step 1: Escrever o teste que falha**
 
@@ -1076,8 +1110,6 @@ EOF
 - Create: `src/modules/caderno/caderno.controller.ts`
 - Create: `src/modules/caderno/caderno.controller.spec.ts`
 - Create: `src/modules/caderno/caderno.module.ts`
-- Modify: `src/shared/modules/env/env.ts`
-- Modify: `.env.example`
 - Modify: `src/app.module.ts`
 
 - [ ] **Step 1: Escrever o teste que falha**
@@ -1196,30 +1228,10 @@ export class CadernoController {
 }
 ```
 
-- [ ] **Step 4: A env, com a armadilha do boolean**
+- [ ] **Step 4: (já feito na Task 4) — conferir a env**
 
-Em `src/shared/modules/env/env.ts`, acrescente ao schema:
-
-```ts
-  // Caderno · card 04. Rascunho é ferramenta de quem monta a prova; liberar
-  // isso por acidente em produção entregaria caderno de simulado incompleto.
-  //
-  // ⚠️ NÃO use `z.coerce.boolean()`: ele trata qualquer string não vazia como
-  // `true`, inclusive `"false"` — desligar a flag em produção não desligaria
-  // nada, e o defeito ficaria invisível até alguém baixar um caderno que não
-  // devia existir.
-  CADERNO_DRAFT_ENABLED: z
-    .enum(['true', 'false'])
-    .default(process.env.NODE_ENV === 'production' ? 'false' : 'true')
-    .transform((v) => v === 'true'),
-```
-
-Em `.env.example`:
-
-```
-# Caderno (card 04) — geração de rascunho. Default: false em produção.
-CADERNO_DRAFT_ENABLED=true
-```
+⚠️ `CADERNO_DRAFT_ENABLED` **já entrou no schema na Task 4**, porque o serviço não compilava sem ela.
+Só confirme que está lá e que `.env.example` a menciona. **Não reintroduza.**
 
 - [ ] **Step 5: O módulo e o wiring**
 
