@@ -11,10 +11,20 @@ O card 02 devolve `ImagemRef[]` — de onde cada imagem vem e sob que nome ela a
 card busca os bytes e devolve os arquivos que vão no zip.
 
 ```ts
-export async function resolverImagens(
-  refs: ImagemRef[],
-): Promise<ResultadoDaResolucao>;
+@Injectable()
+export class ResolverDeImagens {
+  constructor(
+    private readonly storage: StorageService,
+    private readonly env: EnvService,
+  ) {}
+
+  async resolver(refs: ImagemRef[]): Promise<ResultadoDaResolucao>;
+}
 ```
+
+⚠️ Serviço Nest, não função livre: precisa do `StorageService` e do `EnvService`. As peças **abaixo**
+dele (`formato`, `endereco-seguro`, `buscador-http`) são funções puras sem injeção — é o que permite
+testá-las sem levantar módulo nenhum.
 
 Diferente do card 02, **este faz I/O**: lê do R2, busca na internet, grava cache. É a fronteira onde
 o gerador puro encosta no mundo.
@@ -122,8 +132,9 @@ Antes de cada requisição:
 1. Extrai o host, resolve o DNS com `dns.promises.lookup(host, { all: true })`
 2. Recusa se **qualquer** endereço resolvido cair em faixa privada, loopback, link-local ou CGNAT —
    IPv4 e IPv6. `169.254.169.254` (metadata da VPS) é o alvo clássico.
-3. Redirecionamento é **manual** (`redirect: 'manual'`): cada salto refaz 1 e 2, com teto de saltos.
-   Seguir redirecionamento automaticamente anula a checagem — é o furo mais comum desta defesa.
+3. Redirecionamento é **manual** (`redirect: 'manual'`): cada salto refaz 1 e 2, com teto de **3
+   saltos**. Seguir redirecionamento automaticamente anula a checagem — é o furo mais comum desta
+   defesa, porque o `fetch` segue por padrão e a checagem inicial passa.
 4. Timeout de 5 s por imagem, via `AbortSignal.timeout`.
 5. Teto de 10 MB por imagem, contado **enquanto lê o corpo**. `Content-Length` é informado pelo
    servidor remoto e pode mentir ou faltar.
@@ -171,7 +182,8 @@ O card 02 já escreveu `\includegraphics{assets/01}` no `.tex`. Se este card nã
 nenhum para aquele nome, o LaTeX para com "File not found" — o pior desfecho desta POC, o zip que não
 compila.
 
-Então **toda** falha grava o `imagem-indisponivel.png` sob aquele nome, mais um aviso:
+Então **toda** falha grava os bytes do `imagem-indisponivel.png` como `assets/NN.png` — o `NN` que o
+card 02 escolheu, mais `.png`, que é o formato do placeholder — e acrescenta um aviso:
 
 | Falha | Aviso |
 |---|---|
