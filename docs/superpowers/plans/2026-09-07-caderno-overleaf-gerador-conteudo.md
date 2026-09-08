@@ -1947,13 +1947,15 @@ layout deste plano encontram um compilador pela primeira vez.
 
 - [ ] **Step 1: Gerar os arquivos do fixture**
 
-Exporte o `SIMULADO` da Task 6 (`export const SIMULADO`) e crie `scripts/caderno-exemplo.ts`:
+O fixture já mora em `src/modules/caderno/gerador/simulado-exemplo.ts` (fora do `.spec.ts` de
+propósito: importar de um arquivo de teste arrastaria o `describe` do Jest para fora do Jest e este
+script quebraria). Crie `scripts/caderno-exemplo.ts`:
 
 ```ts
 import * as fs from 'fs';
 import * as path from 'path';
 import { gerarCaderno } from '../src/modules/caderno/gerador/gerar-caderno';
-import { SIMULADO } from '../src/modules/caderno/gerador/gerar-caderno.snapshot.spec';
+import { SIMULADO } from '../src/modules/caderno/gerador/simulado-exemplo';
 // ⚠️ Importe TEMPLATE_DIR e ARQUIVOS_DO_ZIP — não recalcule o caminho. O card
 // 00 os expôs justamente para não haver duas verdades sobre onde o template
 // mora.
