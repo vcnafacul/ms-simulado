@@ -24,6 +24,16 @@ describe('slugDoSimulado', () => {
     expect(slugDoSimulado('   ', 'abc123')).toBe('abc123');
   });
 
+  it('simulado sem nome não quebra', () => {
+    // O campo `nome` não é `required` no schema do simulado, e um documento
+    // antigo pode não ter. Sem a guarda, `.normalize` de `undefined` lança e
+    // o download morre com 500 em vez de entregar o caderno.
+    expect(slugDoSimulado(undefined as unknown as string, 'abc123')).toBe(
+      'abc123',
+    );
+    expect(slugDoSimulado(null as unknown as string, 'abc123')).toBe('abc123');
+  });
+
   it('o resultado é sempre [a-z0-9-]', () => {
     for (const nome of [
       'Simulão!! de Nôvembro/2026',
