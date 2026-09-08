@@ -1,0 +1,89 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`gerarCaderno — snapshot as imagens coletadas 1`] = `
+[
+  {
+    "arquivo": "assets/01.png",
+    "origem": "url",
+    "url": "https://enem.dev/2016/questions/3/812288c1-3e37-4369-914a-057525abd52e.png",
+  },
+  {
+    "arquivo": "assets/02.jpeg",
+    "key": "assets/a02398bc-1d10-48ad-b41f-d4296faf0fe7.jpeg",
+    "origem": "r2",
+  },
+]
+`;
+
+exports[`gerarCaderno — snapshot conteudo.tex do fixture completo 1`] = `
+"% AVISO: questão 46 — alternativa C está em branco
+% AVISO: questão 48 — imagem recusada: esquema não aceito
+
+\\needspace{10\\baselineskip}
+\\setcounter{question}{45}
+\\question Considere a função $f(x) = x^2 - 4$, que representa 100\\% do fenômeno.
+
+As raízes de $f$ são:
+\\begin{choices}
+  \\choice $x = 0$ e $x = 4$
+  \\choice $x = -2$ e $x = 2$
+  \\choice{}
+  \\choice $x \\in \\emptyset$
+  \\choice $x = 1$ e $x = -1$
+\\end{choices}
+
+\\needspace{10\\baselineskip}
+\\setcounter{question}{46}
+\\question 
+
+\\includegraphics[max width=\\linewidth]{assets/01.png}
+
+Os moradores de Andalsnes, na Noruega, poderiam se dar ao luxo de morar perto do trabalho.
+
+O texto trata de:
+\\begin{choices}
+  \\choice Mobilidade urbana
+  \\choice Arquitetura **modular**
+  \\choice Turismo de inverno
+  \\choice Custo de R\\$ 1.200,00 por mês
+  \\choice Nenhuma das anteriores
+\\end{choices}
+
+\\needspace{10\\baselineskip}
+\\setcounter{question}{47}
+\\question 
+
+\\includegraphics[width=240pt,max width=\\linewidth]{assets/02.jpeg}
+
+
+
+A imagem mostra:
+\\begin{choices}
+  \\choice Um mapa
+  \\choice 
+
+\\textbf{[imagem indisponível]}
+
+
+  \\choice Uma fotografia
+  \\choice Um gráfico
+  \\choice Uma tabela
+\\end{choices}
+"
+`;
+
+exports[`gerarCaderno — snapshot metadados.tex do fixture completo 1`] = `
+"% gerado automaticamente por ms-simulado — não editar
+\\def\\cadernoTitulo{Simulado 100\\% ENEM — 1º dia}
+\\def\\cadernoSubtitulo{ENEM 1º dia $\\cdot$ 3 questões $\\cdot$ 300 min}
+"
+`;
+
+exports[`gerarCaderno — snapshot metadados.tex no modo rascunho 1`] = `
+"% gerado automaticamente por ms-simulado — não editar
+\\def\\cadernoTitulo{Simulado 100\\% ENEM — 1º dia}
+\\def\\cadernoSubtitulo{ENEM 1º dia $\\cdot$ 3 questões $\\cdot$ 300 min}
+\\cadernoRascunhotrue
+\\def\\cadernoPendencias{}
+"
+`;
