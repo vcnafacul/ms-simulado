@@ -3,9 +3,11 @@
 %
 % Compile:  latexmk -pdf main.tex      (ou suba esta pasta no Overleaf)
 %
-% Gabarito do professor: troque a linha do \documentclass abaixo por
-%   \documentclass[11pt,a4paper,twocolumn,answers]{exam}
-% e recompile. A alternativa correta sai destacada.
+% A alternativa correta NÃO viaja neste pacote: todas saem como \choice. A
+% aplicação é a fonte da verdade do gabarito. (Um \CorrectChoice renderiza
+% idêntico a \choice sem a opção `answers`, então o gabarito não apareceria no
+% PDF — mas ficaria legível dentro do conteudo.tex, e este projeto se
+% compartilha por link.)
 %
 % NÃO EDITE os arquivos metadados.tex e conteudo.tex: os dois são
 % regerados a cada download; suas edições ficam neste projeto e não voltam
