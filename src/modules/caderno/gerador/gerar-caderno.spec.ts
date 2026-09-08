@@ -286,6 +286,61 @@ describe('gerarCaderno — degradação', () => {
   });
 });
 
+describe('gerarCaderno — espaço em branco do molde', () => {
+  it('não deixa parágrafo vazio entre o \\question e uma figura', () => {
+    // O emitirImagem cerca a figura de linha em branco dos dois lados, sem
+    // saber onde ela vai cair. Sem normalizar, sai `\question ` seguido de
+    // linha em branco — um \par colado no \item da lista, ou seja, um
+    // parágrafo vazio entre o número da questão e o enunciado.
+    const r = gerarCaderno(
+      simulado([
+        {
+          questao: questao({ textoQuestao: '![](https://x.com/a.png)' }),
+          numero: 1,
+        },
+      ]),
+      { draft: false },
+    );
+    expect(r.conteudo).toContain(
+      '\\question\n\\includegraphics[max width=\\linewidth]{assets/01.png}',
+    );
+  });
+
+  it('não deixa linha em branco dentro do ambiente choices', () => {
+    // Alternativa que é uma figura traz `\n\n` nas pontas. Dentro de uma
+    // lista, isso vira quebra de parágrafo no meio do item.
+    const r = gerarCaderno(
+      simulado([
+        {
+          questao: questao({ textoAlternativaB: '![](https://x.com/a.png)' }),
+          numero: 1,
+        },
+      ]),
+      { draft: false },
+    );
+    const choices = r.conteudo.slice(
+      r.conteudo.indexOf('\\begin{choices}'),
+      r.conteudo.indexOf('\\end{choices}'),
+    );
+    expect(choices).not.toContain('\n\n');
+  });
+
+  it('nunca emite três quebras de linha seguidas', () => {
+    const r = gerarCaderno(
+      simulado([
+        {
+          questao: questao({
+            textoQuestao: '![](https://x.com/a.png)![](https://x.com/b.png)',
+          }),
+          numero: 1,
+        },
+      ]),
+      { draft: false },
+    );
+    expect(r.conteudo).not.toMatch(/\n{3}/);
+  });
+});
+
 describe('gerarCaderno — imagens', () => {
   it('coleta de todos os campos, com contador contínuo', () => {
     const r = gerarCaderno(

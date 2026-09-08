@@ -21,7 +21,8 @@ exports[`gerarCaderno — snapshot conteudo.tex do fixture completo 1`] = `
 
 \\needspace{10\\baselineskip}
 \\setcounter{question}{45}
-\\question Considere a função $f(x) = x^2 - 4$, que representa 100\\% do fenômeno.
+\\question
+Considere a função $f(x) = x^2 - 4$, que representa 100\\% do fenômeno.
 
 As raízes de $f$ são:
 \\begin{choices}
@@ -34,8 +35,7 @@ As raízes de $f$ são:
 
 \\needspace{10\\baselineskip}
 \\setcounter{question}{46}
-\\question 
-
+\\question
 \\includegraphics[max width=\\linewidth]{assets/01.png}
 
 Os moradores de Andalsnes, na Noruega, poderiam se dar ao luxo de morar perto do trabalho.
@@ -51,20 +51,13 @@ O texto trata de:
 
 \\needspace{10\\baselineskip}
 \\setcounter{question}{47}
-\\question 
-
+\\question
 \\includegraphics[width=240pt,max width=\\linewidth]{assets/02.jpeg}
-
-
 
 A imagem mostra:
 \\begin{choices}
   \\choice Um mapa
-  \\choice 
-
-\\textbf{[imagem indisponível]}
-
-
+  \\choice \\textbf{[imagem indisponível]}
   \\choice Uma fotografia
   \\choice Um gráfico
   \\choice Uma tabela

@@ -170,6 +170,20 @@ function faltantes(
   return saida;
 }
 
+/**
+ * Normaliza o espaço em branco de um campo já convertido.
+ *
+ * O `emitirImagem` cerca a figura de linha em branco dos dois lados, sem saber
+ * onde ela vai cair. Encaixado num molde que já tem sua própria pontuação, isso
+ * vira parágrafo vazio depois do `\question` e linha em branco tripla entre a
+ * figura e o texto seguinte.
+ *
+ * Apara as pontas e reduz qualquer sequência de linhas em branco a uma só.
+ */
+function arrumarEspaco(latex: string): string {
+  return latex.replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function blocoDaQuestao(
   questao: QuestaoParaCaderno,
   numero: number,
@@ -181,8 +195,8 @@ function blocoDaQuestao(
       avisos.push(`questão ${numero} — ${m}`),
     );
 
-  const enunciado = converter(questao.textoQuestao);
-  const pergunta = converter(questao.pergunta);
+  const enunciado = arrumarEspaco(converter(questao.textoQuestao));
+  const pergunta = arrumarEspaco(converter(questao.pergunta));
 
   const alternativas = LETRAS.map((letra) => {
     const bruto = questao[`textoAlternativa${letra}` as const];
@@ -190,7 +204,7 @@ function blocoDaQuestao(
       avisos.push(`questão ${numero} — alternativa ${letra} está em branco`);
       return '  \\choice{}';
     }
-    return `  \\choice ${converter(bruto)}`;
+    return `  \\choice ${arrumarEspaco(converter(bruto))}`;
   });
 
   return [
@@ -199,7 +213,13 @@ function blocoDaQuestao(
     // contador vai a 47. E é um por questão, não só no primeiro, para que um
     // buraco de numeração não desalinhe todas as seguintes.
     `\\setcounter{question}{${numero - 1}}`,
-    `\\question ${enunciado}`,
+    // ⚠️ Quebra de linha, não espaço, depois do `\question`. Um campo que
+    // começa com figura traz `\n\n` na frente, e `\question ` + linha em
+    // branco é um `\par` colado no `\item` da lista — parágrafo vazio entre o
+    // número da questão e o enunciado. Com a quebra, o caso de texto fica
+    // igual (uma quebra simples é só um espaço em LaTeX) e o caso de figura
+    // sai na forma idiomática.
+    `\\question\n${enunciado}`,
     '',
     pergunta,
     '\\begin{choices}',
