@@ -102,6 +102,7 @@ describe('slugDoSimulado', () => {
       'ção çedilha ünïcode',
       'A:B\\C|D*E?F"G<H>I',
       '日本語',
+      '1º lugar ½ ﬁnal',
     ]) {
       expect(slugDoSimulado(nome, 'abc123')).toMatch(/^[a-z0-9-]+$/);
     }
@@ -164,9 +165,13 @@ Esperado: FAIL — `Cannot find module './nome-do-arquivo'`.
  */
 export function slugDoSimulado(nome: string, simuladoId: string): string {
   const slug = (nome ?? '')
-    .normalize('NFD')
-    // Remove os diacríticos que o NFD separou das letras.
-    .replace(/[̀-ͯ]/g, '')
+    // NFKD, não NFD: `º` e `ª` são caracteres de COMPATIBILIDADE, não letra
+    // com diacrítico, e o NFD não os decompõe. Vale para `½`, `ﬁ` e largura
+    // completa também — tratar caso a caso deixaria os outros virando hífen
+    // em silêncio.
+    .normalize('NFKD')
+    // Remove os diacríticos que a decomposição separou das letras.
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
