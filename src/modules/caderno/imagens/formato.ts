@@ -11,6 +11,13 @@
  * que um erro de compilação que ninguém liga à questão que o causou.
  */
 
+/**
+ * A checagem de tamanho é **redundante para a correção**, e está aqui para o
+ * leitor: `buffer[i]` fora do fim devolve `undefined`, e `undefined === <byte>`
+ * já é `false`, então o `every` sozinho recusa buffer curto. Sem esta linha o
+ * resultado seria o mesmo — nenhum teste consegue matá-la, e isso foi medido,
+ * não suposto.
+ */
 const comeca = (buffer: Buffer, bytes: number[]): boolean =>
   buffer.length >= bytes.length && bytes.every((byte, i) => buffer[i] === byte);
 

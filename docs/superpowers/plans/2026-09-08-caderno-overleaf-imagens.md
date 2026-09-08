@@ -367,12 +367,17 @@ npx jest --detectOpenHandles --forceExit src/modules/caderno/imagens/formato.spe
 
 Esperado: PASS, 5 testes.
 
-- [ ] **Step 6: Provar que a checagem de tamanho morde**
+- [ ] **Step 6: (corrigido) a checagem de tamanho é redundante, e o teste prova isso**
 
-Troque `buffer.length >= bytes.length &&` por `true &&` e confirme que
-`não estoura com buffer curto` fica vermelho — sem a guarda, `buffer[i]` devolve `undefined` e a
-comparação com o byte esperado é `false`, então o PNG curto vira `null` **por acidente**, não por
-decisão. Restaure.
+⚠️ A versão anterior deste passo mandava provar que a guarda `buffer.length >= bytes.length` morde.
+**Ela não morde**, e a premissa estava errada: `buffer[i]` fora do fim devolve `undefined`, e
+`undefined === <byte>` já é `false`, então o `every` sozinho recusa buffer curto.
+
+Confirme, para o registro: troque `buffer.length >= bytes.length &&` por `true &&` e verifique que os
+5 testes **continuam verdes**. Restaure.
+
+A guarda fica no código como sinal de intenção, com um comentário dizendo que é redundante — porque um
+guard que parece load-bearing e não é engana o próximo leitor.
 
 - [ ] **Step 7: Commit**
 
