@@ -1693,18 +1693,21 @@ export class ResolverDeImagens {
     // Uma busca por origem, não por referência: a mesma imagem costuma
     // aparecer em várias questões, e o card 02 não deduplica quando os nomes
     // no zip diferem.
-    const jaBuscado = new Map<string, Buffer | null>();
+    // ⚠️ Guarda a PROMESSA em voo, não o valor resolvido. O `Promise.all`
+    // dispara todos os handlers do lote antes de qualquer um terminar, então
+    // deduplicar pelo resultado não dedupica nada: duas refs para a mesma URL
+    // no mesmo lote veem o mapa vazio e ambas buscam.
+    const jaBuscado = new Map<string, Promise<Buffer | null>>();
 
     const umaPorVez = async (ref: ImagemRef): Promise<void> => {
       const identidade = ref.origem === 'r2' ? `r2:${ref.key}` : `url:${ref.url}`;
 
-      let bytes: Buffer | null;
-      if (jaBuscado.has(identidade)) {
-        bytes = jaBuscado.get(identidade)!;
-      } else {
-        bytes = await this.obter(ref, metricas, avisos);
-        jaBuscado.set(identidade, bytes);
+      let promessa = jaBuscado.get(identidade);
+      if (!promessa) {
+        promessa = this.obter(ref, metricas, avisos);
+        jaBuscado.set(identidade, promessa);
       }
+      const bytes = await promessa;
 
       if (!bytes) {
         arquivos.push({ nome: `${ref.arquivo}.png`, buffer: lerPlaceholder() });
@@ -1715,7 +1718,7 @@ export class ResolverDeImagens {
       if (!extensao) {
         avisos.push(`${ref.arquivo} — formato de imagem não suportado`);
         metricas.falhas += 1;
-        jaBuscado.set(identidade, null);
+        jaBuscado.set(identidade, Promise.resolve(null));
         arquivos.push({ nome: `${ref.arquivo}.png`, buffer: lerPlaceholder() });
         return;
       }
