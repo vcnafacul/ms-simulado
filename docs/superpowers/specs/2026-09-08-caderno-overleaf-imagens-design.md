@@ -200,9 +200,12 @@ Cada aviso diz o nome do arquivo no zip, para casar com o `% AVISO:` do card 02.
 armadilha do card 00: `ms.dockerfile` faz `COPY dist ./` e nada mais, então arquivo fora do `dist` não
 existe em produção.
 
-⚠️ O `templates.spec.ts` do card 00 tem um teste que compara a **lista completa** de globs do caderno.
-Acrescentar um glob **vai** quebrá-lo, e isso é esperado: o teste existe para que ninguém acrescente
-asset sem pensar. Atualizá-lo é parte deste card.
+⚠️ E o teste de globs do card 00 **não** vai pegar isso. Ele filtra por
+`startsWith('modules/caderno/templates')`, então um glob em `modules/caderno/imagens/` não entra na
+lista comparada e o teste segue verde com o placeholder sumindo do `dist`.
+
+O placeholder precisa de **teste próprio**, no mesmo espírito: o arquivo existe no repo, e existe um
+glob que o cobre. Um asset sem teste é exatamente como o problema do card 00 volta.
 
 ## Tetos
 
