@@ -1,5 +1,5 @@
 import { Status } from '../../questao/enums/status.enum';
-import { gerarCaderno } from './gerar-caderno';
+import { gerarCaderno, umaLinhaSo } from './gerar-caderno';
 import { QuestaoParaCaderno, SimuladoParaCaderno } from './tipos';
 
 const questao = (
@@ -320,5 +320,141 @@ describe('gerarCaderno — imagens', () => {
       { draft: false },
     );
     expect(r.imagens).toHaveLength(1);
+  });
+});
+
+describe('gerarCaderno — metadados.tex', () => {
+  it('escapa o nome do simulado', () => {
+    // "Simulado 100% ENEM" sem escape apaga o resto da linha, e o título da
+    // capa some sem nenhum erro de compilação.
+    const r = gerarCaderno(
+      simulado([{ questao: questao(), numero: 1 }], {
+        nome: 'Simulado 100% ENEM',
+      }),
+      { draft: false },
+    );
+    expect(r.metadados).toContain('\\def\\cadernoTitulo{Simulado 100\\% ENEM}');
+  });
+
+  it('monta o subtítulo com categoria, contagem e duração', () => {
+    const r = gerarCaderno(
+      simulado(
+        [
+          { questao: questao(), numero: 1 },
+          { questao: questao(), numero: 2 },
+        ],
+        {
+          categoria: {
+            nome: 'ENEM 1º dia',
+            duracao: 300,
+            quantidadeTotalQuestao: 2,
+          },
+        },
+      ),
+      { draft: false },
+    );
+    // O separador é $\cdot$, não o `·` literal: o glifo depende do T1.
+    expect(r.metadados).toContain(
+      '\\def\\cadernoSubtitulo{ENEM 1º dia $\\cdot$ 2 questões $\\cdot$ 300 min}',
+    );
+  });
+
+  it('escapa o nome da categoria também', () => {
+    const r = gerarCaderno(
+      simulado([{ questao: questao(), numero: 1 }], {
+        categoria: {
+          nome: 'Exatas & Naturais',
+          duracao: 60,
+          quantidadeTotalQuestao: 1,
+        },
+      }),
+      { draft: false },
+    );
+    expect(r.metadados).toContain('Exatas \\& Naturais');
+  });
+
+  it('no modo normal, nada de rascunho', () => {
+    const r = gerarCaderno(simulado([{ questao: questao(), numero: 1 }]), {
+      draft: false,
+    });
+    expect(r.metadados).not.toContain('cadernoRascunho');
+    expect(r.metadados).not.toContain('cadernoPendencias');
+  });
+
+  it('no rascunho, liga o newif e lista as pendências', () => {
+    // ⚠️ \cadernoRascunho é um \newif declarado no preambulo.tex, NÃO um \def.
+    // `\def\cadernoRascunho{true}` não liga a marca d'água e não dá erro — ela
+    // simplesmente não aparece.
+    const r = gerarCaderno(
+      simulado(
+        [
+          { questao: questao(), numero: 1 },
+          { questao: questao(), numero: 3 },
+        ],
+        { categoria: { nome: 'c', duracao: 60, quantidadeTotalQuestao: 4 } },
+      ),
+      { draft: true },
+    );
+    expect(r.metadados).toContain('\\cadernoRascunhotrue');
+    expect(r.metadados).not.toContain('\\def\\cadernoRascunho{');
+    expect(r.metadados).toContain('\\def\\cadernoPendencias{2, 4}');
+  });
+});
+
+describe('gerarCaderno — bloco de avisos', () => {
+  it('vai no topo do conteudo.tex, um por linha', () => {
+    const r = gerarCaderno(
+      simulado([{ questao: questao({ textoAlternativaC: '' }), numero: 47 }]),
+      { draft: false },
+    );
+    expect(r.conteudo.startsWith('% AVISO:')).toBe(true);
+    expect(r.conteudo).toContain(
+      '% AVISO: questão 47 — alternativa C está em branco',
+    );
+  });
+
+  it('sem aviso nenhum, não há bloco', () => {
+    const r = gerarCaderno(simulado([{ questao: questao(), numero: 1 }]), {
+      draft: false,
+    });
+    expect(r.conteudo).not.toContain('% AVISO:');
+  });
+
+  it('uma linha de comentário por aviso, sempre', () => {
+    const r = gerarCaderno(
+      simulado([
+        {
+          questao: questao({ textoAlternativaA: '', textoAlternativaC: '' }),
+          numero: 1,
+        },
+      ]),
+      { draft: false },
+    );
+    const linhasDeAviso = r.conteudo
+      .split('\n')
+      .filter((l) => l.startsWith('% AVISO:'));
+    expect(linhasDeAviso).toHaveLength(r.avisos.length);
+  });
+});
+
+describe('umaLinhaSo', () => {
+  // ⚠️ Testado direto, e não através de `gerarCaderno`, porque HOJE nenhum
+  // aviso carrega texto de questão — então um teste de ponta a ponta passaria
+  // sem exercitar nada, e seria daqueles que dão a impressão de proteger.
+  //
+  // A proteção é para quando um aviso passar a embutir conteúdo (nome de
+  // arquivo, trecho do enunciado). Uma quebra de linha ali ENCERRA o
+  // comentário LaTeX e joga o resto do aviso dentro do documento, impresso na
+  // prova do aluno.
+  it('troca quebra de linha por espaço', () => {
+    expect(umaLinhaSo('questão 3 —\nalternativa vazia')).toBe(
+      'questão 3 — alternativa vazia',
+    );
+    expect(umaLinhaSo('a\r\nb')).toBe('a b');
+    expect(umaLinhaSo('a\n\n\nb')).toBe('a b');
+  });
+
+  it('apara as pontas', () => {
+    expect(umaLinhaSo('  texto  ')).toBe('texto');
   });
 });

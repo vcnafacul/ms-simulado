@@ -1,4 +1,5 @@
 import { Status } from '../../questao/enums/status.enum';
+import { escaparForaDaMatematica } from '../latex/escapar-fora-da-matematica';
 import { ColetorDeImagens } from './imagens';
 import { textoParaLatex } from './texto-para-latex';
 import {
@@ -43,14 +44,71 @@ export function gerarCaderno(
       )
     : [blocoMarcadorDeVazio(avisos)];
 
+  // ⚠️ O bloco de avisos é montado DEPOIS de os blocos de questão rodarem,
+  // porque é durante eles que os avisos aparecem. Calculá-lo antes o deixaria
+  // vazio, e nenhum teste acusaria — o conteudo simplesmente não teria os
+  // `% AVISO:`.
+  const questoesFaltantes = opts.draft
+    ? faltantes(simulado, questoesIncluidas)
+    : [];
+
   return {
-    conteudo: blocos.join('\n'),
-    metadados: '',
+    conteudo: blocoDeAvisos(avisos) + blocos.join('\n'),
+    metadados: gerarMetadados(
+      simulado,
+      questoesIncluidas,
+      questoesFaltantes,
+      opts.draft,
+    ),
     imagens: [...coletor.imagens],
     avisos,
     questoesIncluidas,
-    questoesFaltantes: opts.draft ? faltantes(simulado, questoesIncluidas) : [],
+    questoesFaltantes,
   };
+}
+
+/**
+ * ⚠️ Quebra de linha dentro de um aviso **encerra o comentário** e joga o
+ * resto dentro do documento, impresso na prova.
+ */
+export const umaLinhaSo = (texto: string): string =>
+  texto.replace(/[\r\n]+/g, ' ').trim();
+
+function blocoDeAvisos(avisos: string[]): string {
+  if (!avisos.length) return '';
+  return `${avisos.map((a) => `% AVISO: ${umaLinhaSo(a)}`).join('\n')}\n\n`;
+}
+
+/**
+ * ⚠️ São dois arquivos porque o `metadados.tex` é lido **no preâmbulo**, antes
+ * do `\begin{document}`, e o `conteudo.tex` dentro do documento. A capa
+ * precisa do título antes de as questões serem diagramadas.
+ */
+function gerarMetadados(
+  simulado: SimuladoParaCaderno,
+  incluidas: number[],
+  faltando: number[],
+  draft: boolean,
+): string {
+  const escapar = (t: string) => escaparForaDaMatematica(t);
+  const linhas = [
+    '% gerado automaticamente por ms-simulado — não editar',
+    `\\def\\cadernoTitulo{${escapar(simulado.nome)}}`,
+    // O separador é $\cdot$, não o `·` literal: o glifo depende do T1.
+    `\\def\\cadernoSubtitulo{${escapar(simulado.categoria.nome)} $\\cdot$ ${
+      incluidas.length
+    } questões $\\cdot$ ${simulado.categoria.duracao} min}`,
+  ];
+
+  if (draft) {
+    // ⚠️ \cadernoRascunho é um \newif declarado no preambulo.tex, NÃO um
+    // \def. `\def\cadernoRascunho{true}` não liga a marca d'água e NÃO dá
+    // erro — ela simplesmente não aparece.
+    linhas.push('\\cadernoRascunhotrue');
+    linhas.push(`\\def\\cadernoPendencias{${faltando.join(', ')}}`);
+  }
+
+  return `${linhas.join('\n')}\n`;
 }
 
 /**
