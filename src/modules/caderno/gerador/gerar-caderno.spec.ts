@@ -169,6 +169,23 @@ describe('gerarCaderno — modo rascunho', () => {
     expect(r.questoesFaltantes).toEqual([47]);
   });
 
+  it('sem nenhuma questão numerada, a faixa parte de 1', () => {
+    // Simulado recém-criado: as questões existem mas ainda não receberam
+    // número. Não há de onde tirar a base, e 1 é o único palpite honesto.
+    const r = gerarCaderno(
+      simulado(
+        [
+          { questao: questao(), numero: null },
+          { questao: questao(), numero: null },
+        ],
+        { categoria: { nome: 'c', duracao: 60, quantidadeTotalQuestao: 3 } },
+      ),
+      { draft: true },
+    );
+    expect(r.questoesIncluidas).toEqual([]);
+    expect(r.questoesFaltantes).toEqual([1, 2, 3]);
+  });
+
   it('categoria custom, de quantidade livre, não tem faltantes', () => {
     // `quantidadeTotalQuestao: null` é categoria custom (etapa 3). Ver
     // `atingiuQuantidade` em simulado/helpers/bloqueado.ts.

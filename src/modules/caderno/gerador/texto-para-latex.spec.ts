@@ -114,6 +114,18 @@ describe('textoParaLatex — imagens', () => {
   });
 });
 
+describe('textoParaLatex — img sem src', () => {
+  it('deixa a tag literal em vez de virar imagem', () => {
+    // Sem `src` não há referência nenhuma para registrar. A tag fica como
+    // texto escapado, visível — coerente com o resto da POC: o que não dá para
+    // resolver aparece, não some.
+    const { latex, coletor, avisos } = converter('<img alt="sem fonte" />');
+    expect(coletor.imagens).toHaveLength(0);
+    expect(avisos).toEqual([]);
+    expect(latex).toContain('\\textless{}img');
+  });
+});
+
 describe('textoParaLatex — o div de alinhamento', () => {
   it('some, e o conteúdo fica', () => {
     const { latex } = converter(
