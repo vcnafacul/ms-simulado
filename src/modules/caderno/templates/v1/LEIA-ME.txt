@@ -51,6 +51,11 @@ AVISOS DA GERAÇÃO
 
   São comentários de LaTeX: não afetam a compilação nem aparecem no PDF.
 
+  Se no lugar de uma figura aparecer uma CAIXA CINZA VAZIA, é a imagem que
+  não pôde ser baixada. O motivo está numa linha "% AVISO:" citando o
+  arquivo (por exemplo assets/03). A prova compila assim de propósito:
+  preferimos entregar o caderno com um buraco visível a não entregar nada.
+
 MODO RASCUNHO
 
   Se o caderno vier com uma marca d'água "RASCUNHO" atravessando a página

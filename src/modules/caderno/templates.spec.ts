@@ -97,6 +97,15 @@ describe('template do caderno (v1)', () => {
     expect(leiaMe).toContain('% AVISO:');
   });
 
+  it('o LEIA-ME explica o que é a caixa cinza no lugar da figura', () => {
+    // O placeholder de imagem indisponível é uma caixa cinza sem texto —
+    // visível, mas muda. Sem esta explicação o coordenador vê um retângulo e
+    // não sabe se é defeito do template, da questão ou da impressão.
+    const leiaMe = lerTexto('LEIA-ME.txt');
+    expect(leiaMe.toLowerCase()).toContain('caixa cinza');
+    expect(leiaMe).toMatch(/n[ãa]o p[ôo]de ser baixada/i);
+  });
+
   it('o LEIA-ME diz como tornar uma mudança de layout permanente', () => {
     // Sem isso alguém ajusta o layout no projeto do Overleaf, imprime
     // satisfeito, e descobre na prova seguinte que o ajuste sumiu — cada

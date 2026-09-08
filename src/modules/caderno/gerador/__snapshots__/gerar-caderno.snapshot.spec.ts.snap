@@ -3,12 +3,12 @@
 exports[`gerarCaderno — snapshot as imagens coletadas 1`] = `
 [
   {
-    "arquivo": "assets/01.png",
+    "arquivo": "assets/01",
     "origem": "url",
     "url": "https://enem.dev/2016/questions/3/812288c1-3e37-4369-914a-057525abd52e.png",
   },
   {
-    "arquivo": "assets/02.jpeg",
+    "arquivo": "assets/02",
     "key": "assets/a02398bc-1d10-48ad-b41f-d4296faf0fe7.jpeg",
     "origem": "r2",
   },
@@ -36,7 +36,7 @@ As raízes de $f$ são:
 \\needspace{10\\baselineskip}
 \\setcounter{question}{46}
 \\question
-\\includegraphics[max width=\\linewidth]{assets/01.png}
+\\includegraphics[max width=\\linewidth]{assets/01}
 
 Os moradores de Andalsnes, na Noruega, poderiam se dar ao luxo de morar perto do trabalho.
 
@@ -52,7 +52,7 @@ O texto trata de:
 \\needspace{10\\baselineskip}
 \\setcounter{question}{47}
 \\question
-\\includegraphics[width=240pt,max width=\\linewidth]{assets/02.jpeg}
+\\includegraphics[width=240pt,max width=\\linewidth]{assets/02}
 
 A imagem mostra:
 \\begin{choices}

@@ -27,10 +27,19 @@ export class StorageService {
     this.bucket = this.env.get('CARTAO_BUCKET');
   }
 
-  async exists(key: string): Promise<boolean> {
+  /**
+   * O bucket de cada chamada. Omitido, cai no `CARTAO_BUCKET` — o único que
+   * este serviço conhecia antes, e é o que garante zero regressão no
+   * cartão-resposta.
+   */
+  private bucketDe(bucket?: string): string {
+    return bucket ?? this.bucket;
+  }
+
+  async exists(key: string, bucket?: string): Promise<boolean> {
     try {
       await this.client.send(
-        new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
+        new HeadObjectCommand({ Bucket: this.bucketDe(bucket), Key: key }),
       );
       return true;
     } catch (err: any) {
@@ -42,10 +51,10 @@ export class StorageService {
     }
   }
 
-  async get(key: string): Promise<Buffer> {
+  async get(key: string, bucket?: string): Promise<Buffer> {
     try {
       const resp = await this.client.send(
-        new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+        new GetObjectCommand({ Bucket: this.bucketDe(bucket), Key: key }),
       );
       const bytes = await resp.Body!.transformToByteArray();
       return Buffer.from(bytes);
@@ -58,11 +67,12 @@ export class StorageService {
     key: string,
     body: Buffer | string,
     contentType: string,
+    bucket?: string,
   ): Promise<void> {
     try {
       await this.client.send(
         new PutObjectCommand({
-          Bucket: this.bucket,
+          Bucket: this.bucketDe(bucket),
           Key: key,
           Body: body,
           ContentType: contentType,

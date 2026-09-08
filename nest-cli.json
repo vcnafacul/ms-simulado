@@ -18,7 +18,8 @@
       {
         "include": "modules/caderno/templates/**/*.png",
         "exclude": "modules/caderno/templates/**/exemplo/**"
-      }
+      },
+      { "include": "modules/caderno/imagens/*.png" }
     ]
   }
 }

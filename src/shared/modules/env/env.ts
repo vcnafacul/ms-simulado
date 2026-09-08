@@ -19,6 +19,12 @@ export const envSchema = z.object({
   AWS_SECRET_ACCESS_KEY: z.string().default(''),
   CARTAO_BUCKET: z.string().default('vcnafacul-cartoes'),
 
+  // Bucket das imagens de questão (Caderno · card 03). SEM default: um
+  // default silencioso apontaria para o bucket errado, e a falha apareceria
+  // como "imagem não encontrada" — o sintoma mais confuso possível.
+  // Credencial de LEITURA APENAS neste bucket.
+  QUESTAO_BUCKET: z.string().optional(),
+
   // ms-omr (Etapa 12 · A3)
   OMR_URL: z.string().url().default('http://localhost:8000'),
 });

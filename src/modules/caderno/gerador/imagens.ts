@@ -1,26 +1,22 @@
 import { ImagemRef } from './tipos';
 
 /**
- * As imagens de um caderno: reconhecimento, validação, numeração e dedup.
+ * As imagens de um caderno: reconhecimento, numeração e dedup.
  *
  * O gerador é puro e **não baixa nada**. Este módulo só decide se uma
  * referência é aceitável, dá a ela um nome de arquivo dentro do zip, e guarda
  * de onde ela vem para o card 03 materializar.
+ *
+ * O caminho emitido (`assets/NN`, sem extensão) não carrega **nenhum** byte
+ * vindo do usuário: `assets/` e `NN` são gerados por nós. A extensão sai da
+ * jogada de propósito — o card 03 é quem abre os bytes e nomeia o arquivo
+ * pelos magic bytes, porque é a extensão do nome que mente (um `.png` que
+ * serve JPEG faz o `graphicx` escolher o driver errado). O LaTeX acha
+ * `assets/01` sozinho, sem sufixo.
  */
 
 /** Esquemas aceitos. Fechado de propósito — ver `registrar`. */
 const ESQUEMAS = ['http:', 'https:', 'asset:'];
-
-/**
- * A extensão é o **único byte da referência que chega ao `.tex`**: tudo é
- * renomeado para `assets/NN.<ext>`, e `assets/` e `NN` são gerados por nós.
- *
- * ⚠️ E ela não é sanitizada rio acima: `s3-service.ts:43` monta com
- * `originalname.split('.').pop()?.toLowerCase()`, sem filtro. Um arquivo
- * chamado `mapa.p}ng` produz key terminada em `}`, que fecha o grupo do
- * `\includegraphics` cedo e derrama o resto do documento como LaTeX solto.
- */
-const EXTENSAO_VALIDA = /^[A-Za-z0-9]{1,5}$/;
 
 /** Por que uma referência foi recusada. Vira aviso e marcador visível. */
 export interface ImagemRecusada {
@@ -30,21 +26,6 @@ export interface ImagemRecusada {
 /** Onde a imagem aceita mora dentro do zip. */
 export interface ImagemAceita {
   arquivo: string;
-}
-
-/**
- * Extrai a extensão de uma referência, descartando query e fragmento.
- *
- * Feito na mão em vez de `new URL()` porque `asset://assets/x.png` não tem
- * host e o parser trata o caminho de forma inconsistente entre runtimes.
- */
-function extensaoDe(referencia: string): string | null {
-  const semQuery = referencia.split(/[?#]/)[0];
-  const ultimoSegmento = semQuery.split('/').pop() ?? '';
-  const ponto = ultimoSegmento.lastIndexOf('.');
-  if (ponto === -1) return null;
-  const ext = ultimoSegmento.slice(ponto + 1);
-  return EXTENSAO_VALIDA.test(ext) ? ext : null;
 }
 
 export class ColetorDeImagens {
@@ -70,16 +51,13 @@ export class ColetorDeImagens {
     const esquema = ESQUEMAS.find((e) => referencia.startsWith(e));
     if (!esquema) return { motivo: 'esquema não aceito' };
 
-    const ext = extensaoDe(referencia);
-    if (!ext) return { motivo: 'extensão inválida' };
-
     // A identidade inclui o esquema: uma URL e uma key podem terminar igual
     // sem serem a mesma imagem.
     const identidade = referencia.split(/[?#]/)[0];
     const jaVisto = this.porIdentidade.get(identidade);
     if (jaVisto) return jaVisto;
 
-    const arquivo = `assets/${String(this.refs.length + 1).padStart(2, '0')}.${ext}`;
+    const arquivo = `assets/${String(this.refs.length + 1).padStart(2, '0')}`;
     const aceita: ImagemAceita = { arquivo };
 
     this.refs.push(
