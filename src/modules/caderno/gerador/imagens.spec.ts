@@ -108,15 +108,31 @@ describe('ColetorDeImagens — o que recusa', () => {
     });
   });
 
-  it('a extensão do nome não vaza para o .tex', () => {
+  it('o caminho emitido não carrega byte nenhum vindo do usuário', () => {
     // Era a única superfície de injeção que restava: `mapa.p}ng` fecharia o
-    // grupo do \includegraphics cedo. Sem extensão no caminho emitido, deixa
-    // de ser possível em vez de ser barrada.
+    // grupo do \includegraphics cedo e derramaria o resto do documento como
+    // LaTeX solto. Sem extensão no caminho emitido, deixa de ser POSSÍVEL em
+    // vez de ser barrada.
+    //
+    // ⚠️ A key crua CONTINUA guardada em `imagens[]`, com `}` e tudo — é com
+    // ela que o card 03 busca os bytes no R2, e lá ela é chave de objeto, não
+    // LaTeX. O que não pode vazar é o `arquivo`.
     const c = new ColetorDeImagens();
     const r = c.registrar('asset://assets/mapa.p}ng');
     expect(r).toEqual({ arquivo: 'assets/01' });
-    expect(JSON.stringify(c.imagens)).not.toContain('}ng"');
-    expect((r as { arquivo: string }).arquivo).not.toContain('}');
+    expect((c.imagens[0] as { key: string }).key).toBe('assets/mapa.p}ng');
+  });
+
+  it('o nome no .tex é sempre gerado por nós, nunca derivado da referência', () => {
+    const c = new ColetorDeImagens();
+    for (const ref of [
+      'asset://assets/mapa.p}ng',
+      'https://x.com/a b/c%20d.png?q=1#f',
+      'https://x.com/sem-extensao',
+    ]) {
+      const r = c.registrar(ref) as { arquivo: string };
+      expect(r.arquivo).toMatch(/^assets\/\d+$/);
+    }
   });
 
   it('recusa esquema fora de http, https e asset', () => {
