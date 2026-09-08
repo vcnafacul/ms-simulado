@@ -1,4 +1,7 @@
 import { Status } from '../../questao/enums/status.enum';
+// A regra de formatação de aviso mora no módulo de avisos: o card 02 e o card
+// 04 escrevem os mesmos comentários, e duas cópias divergem.
+import { MARCA, umaLinhaSo } from '../avisos';
 import { escaparForaDaMatematica } from '../latex/escapar-fora-da-matematica';
 import { ColetorDeImagens } from './imagens';
 import { textoParaLatex } from './texto-para-latex';
@@ -67,16 +70,9 @@ export function gerarCaderno(
   };
 }
 
-/**
- * ⚠️ Quebra de linha dentro de um aviso **encerra o comentário** e joga o
- * resto dentro do documento, impresso na prova.
- */
-export const umaLinhaSo = (texto: string): string =>
-  texto.replace(/[\r\n]+/g, ' ').trim();
-
 function blocoDeAvisos(avisos: string[]): string {
   if (!avisos.length) return '';
-  return `${avisos.map((a) => `% AVISO: ${umaLinhaSo(a)}`).join('\n')}\n\n`;
+  return `${avisos.map((a) => `${MARCA}${umaLinhaSo(a)}`).join('\n')}\n\n`;
 }
 
 /**
@@ -254,3 +250,5 @@ function blocoMarcadorDeVazio(avisos: string[]): string {
     '',
   ].join('\n');
 }
+
+export { umaLinhaSo };

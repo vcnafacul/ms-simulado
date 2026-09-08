@@ -16,6 +16,7 @@ import { SimuladoModule } from './modules/simulado/simulado.module';
 import { SubjectModule } from './modules/questao/subject/subject.module';
 import { CategoriaModule } from './modules/categoria/categoria.module';
 import { CartaoRespostaModule } from './modules/cartao-resposta/cartao-resposta.module';
+import { CadernoModule } from './modules/caderno/caderno.module';
 import { EnvModule } from './shared/modules/env/env.module';
 import { Env, envSchema } from './shared/modules/env/env';
 
@@ -49,6 +50,7 @@ import { Env, envSchema } from './shared/modules/env/env';
     AdjustmentProposalModule,
     UserGroupAggregateModule,
     CartaoRespostaModule,
+    CadernoModule,
   ],
   providers: [],
 })
