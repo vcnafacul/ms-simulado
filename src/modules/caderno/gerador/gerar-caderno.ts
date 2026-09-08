@@ -171,17 +171,25 @@ function faltantes(
 }
 
 /**
- * Normaliza o espaço em branco de um campo já convertido.
+ * Deixa um campo já convertido pronto para encaixar no molde.
  *
- * O `emitirImagem` cerca a figura de linha em branco dos dois lados, sem saber
- * onde ela vai cair. Encaixado num molde que já tem sua própria pontuação, isso
- * vira parágrafo vazio depois do `\question` e linha em branco tripla entre a
- * figura e o texto seguinte.
+ * **Espaço em branco.** O `emitirImagem` cerca a figura de linha em branco dos
+ * dois lados, sem saber onde ela vai cair. Encaixado num molde que já tem sua
+ * própria pontuação, isso vira parágrafo vazio depois do `\question` e linha em
+ * branco tripla entre a figura e o texto seguinte.
  *
- * Apara as pontas e reduz qualquer sequência de linhas em branco a uma só.
+ * ⚠️ **Colchete no começo.** `\question` aceita `[pontos]` como argumento
+ * opcional, e `\choice` é um `\item`, que aceita `[rótulo]`. Um enunciado que
+ * comece com "[Adaptado]" ou "[UFRJ 2015]" — comum em prova brasileira — seria
+ * lido como argumento e **sumiria do texto**; uma alternativa "[I] apenas"
+ * viraria o rótulo do item, apagando o "(A)".
+ *
+ * O grupo vazio `{}` na frente resolve: não é `[`, então encerra a busca pelo
+ * argumento opcional, e não imprime nada.
  */
-function arrumarEspaco(latex: string): string {
-  return latex.replace(/\n{3,}/g, '\n\n').trim();
+function prepararParaOMolde(latex: string): string {
+  const limpo = latex.replace(/\n{3,}/g, '\n\n').trim();
+  return limpo.startsWith('[') ? `{}${limpo}` : limpo;
 }
 
 function blocoDaQuestao(
@@ -195,8 +203,8 @@ function blocoDaQuestao(
       avisos.push(`questão ${numero} — ${m}`),
     );
 
-  const enunciado = arrumarEspaco(converter(questao.textoQuestao));
-  const pergunta = arrumarEspaco(converter(questao.pergunta));
+  const enunciado = prepararParaOMolde(converter(questao.textoQuestao));
+  const pergunta = prepararParaOMolde(converter(questao.pergunta));
 
   const alternativas = LETRAS.map((letra) => {
     const bruto = questao[`textoAlternativa${letra}` as const];
@@ -204,7 +212,7 @@ function blocoDaQuestao(
       avisos.push(`questão ${numero} — alternativa ${letra} está em branco`);
       return '  \\choice{}';
     }
-    return `  \\choice ${arrumarEspaco(converter(bruto))}`;
+    return `  \\choice ${prepararParaOMolde(converter(bruto))}`;
   });
 
   return [

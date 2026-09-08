@@ -341,6 +341,54 @@ describe('gerarCaderno — espaço em branco do molde', () => {
   });
 });
 
+describe('gerarCaderno — colchete no começo do campo', () => {
+  it('protege o enunciado que começa com colchete', () => {
+    // `\question` aceita `[pontos]` como argumento OPCIONAL. Um enunciado
+    // começando com "[Adaptado]" ou "[UFRJ 2015]" -- comum em prova
+    // brasileira -- seria lido como a pontuação da questão, e o texto sumiria
+    // do enunciado. O grupo vazio encerra a busca pelo argumento opcional e
+    // não imprime nada.
+    const r = gerarCaderno(
+      simulado([
+        {
+          questao: questao({
+            textoQuestao: '[Adaptado] O texto trata de urbanização.',
+          }),
+          numero: 1,
+        },
+      ]),
+      { draft: false },
+    );
+    expect(r.conteudo).toContain('\\question\n{}[Adaptado]');
+  });
+
+  it('protege a alternativa que começa com colchete', () => {
+    // `\choice` é um `\item`, e `\item[...]` troca o rótulo. Uma alternativa
+    // "[I] apenas" viraria o rótulo do item, e o "(A)" sumiria.
+    const r = gerarCaderno(
+      simulado([
+        { questao: questao({ textoAlternativaA: '[I] apenas' }), numero: 1 },
+      ]),
+      { draft: false },
+    );
+    expect(r.conteudo).toContain('\\choice {}[I] apenas');
+  });
+
+  it('não mexe em campo que não começa com colchete', () => {
+    const r = gerarCaderno(
+      simulado([
+        {
+          questao: questao({ textoQuestao: 'Normal [meio] normal' }),
+          numero: 1,
+        },
+      ]),
+      { draft: false },
+    );
+    expect(r.conteudo).toContain('\\question\nNormal [meio] normal');
+    expect(r.conteudo).not.toContain('{}');
+  });
+});
+
 describe('gerarCaderno — imagens', () => {
   it('coleta de todos os campos, com contador contínuo', () => {
     const r = gerarCaderno(
