@@ -25,9 +25,14 @@ O QUE VOCÊ PODE EDITAR
   mudanças ficam só nesta cópia — cada prova que você baixa cria um
   projeto novo, e ele não sabe nada dos anteriores.
 
-  Se a mudança deve valer para todo mundo, daqui em diante, ela precisa
-  voltar para o repositório do ms-simulado num pull request. A fonte da
-  verdade do template é o repo; este projeto é descartável.
+  Se a mudança deve valer para todo mundo, daqui em diante, o main.tex e o
+  preambulo.tex que você editou precisam ser publicados na plataforma: é a
+  versão publicada lá que o gerador usa para montar cada caderno novo. Quem
+  administra a plataforma faz essa publicação — fale com essa pessoa e
+  entregue os dois arquivos.
+
+  A fonte da verdade do template é essa versão publicada; este projeto do
+  Overleaf continua descartável.
 
 O QUE VOCÊ NÃO DEVE EDITAR
 

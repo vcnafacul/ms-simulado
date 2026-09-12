@@ -35,17 +35,7 @@ describe('template do caderno (v1)', () => {
     expect(lerTexto('preambulo.tex')).toContain('\\usepackage[normalem]{ulem}');
   });
 
-  it('o exemplo existe e tem os dois arquivos, não vazios', () => {
-    // O `exclude` do nest-cli protege este diretório. Se ele sumir — ou ficar
-    // com arquivos vazios — o exclude passa a guardar coisa nenhuma e ninguém
-    // percebe.
-    for (const arquivo of ['conteudo.tex', 'metadados.tex']) {
-      const caminho = path.join(TEMPLATE_DIR, 'exemplo', arquivo);
-      expect(fs.statSync(caminho).size).toBeGreaterThan(0);
-    }
-  });
-
-  it('o nest-cli copia o template pro dist e deixa o exemplo de fora', () => {
+  it('o nest-cli copia toda extensão do template pro dist', () => {
     // Lido em runtime, não importado. Um `import` de arquivo fora de `src/`
     // puxa o JSON pro module graph do TypeScript e desloca o `rootDir`
     // inferido: o `dist/main.js` muda de lugar e o PM2 sobe com "Script not
@@ -67,7 +57,7 @@ describe('template do caderno (v1)', () => {
     // teste verde, e o defeito só aparece dentro do container.
     //
     // Nível de topo e não recursivo, de propósito: é exatamente o conjunto que
-    // viaja no zip. O `exemplo/` está fora por decisão.
+    // viaja no zip.
     const extensoes = new Set(
       fs
         .readdirSync(TEMPLATE_DIR, { withFileTypes: true })
@@ -77,26 +67,18 @@ describe('template do caderno (v1)', () => {
     );
     expect(extensoes.size).toBeGreaterThan(0);
 
-    // Compara o par include/exclude inteiro, não só a extensão nem só um
-    // pedaço do exclude. `endsWith('*.tex')` sozinho não olha o meio do
-    // glob: um `templatesXX/` passa verde e para de empacotar main.tex e
-    // preambulo.tex. E `exclude?.includes('exemplo')` sozinho passa verde
-    // até com um exclude errado tipo `templatesXX/**/exemplo/**` — o
-    // `includes` olha um pedaço da string e ignora o prefixo do caminho.
-    // Sem comparar o par inteiro, o `exemplo/` vaza pro zip a partir do
-    // card 04: o coordenador baixa as questões sintéticas do smoke test
-    // junto com as reais.
+    // Compara o objeto inteiro, não só a extensão. `endsWith('*.tex')`
+    // sozinho não olha o meio do glob: um `templatesXX/` passa verde e para
+    // de empacotar main.tex e preambulo.tex. E comparar só o `include`
+    // deixaria passar um `exclude` reintroduzido — o card 11 tirou os três
+    // que havia, e um exclude novo tira arquivo do `dist` sem quebrar mais
+    // nada.
     const esperados = [...extensoes]
-      .map((ext) => ({
-        include: `modules/caderno/templates/**/*${ext}`,
-        exclude: 'modules/caderno/templates/**/exemplo/**',
-      }))
+      .map((ext) => ({ include: `modules/caderno/templates/**/*${ext}` }))
       .sort((a, b) => a.include.localeCompare(b.include));
 
     expect(
-      doCaderno
-        .map(({ include, exclude }) => ({ include, exclude }))
-        .sort((a, b) => a.include.localeCompare(b.include)),
+      [...doCaderno].sort((a, b) => a.include.localeCompare(b.include)),
     ).toEqual(esperados);
   });
 
@@ -118,19 +100,14 @@ describe('template do caderno (v1)', () => {
     expect(leiaMe).toMatch(/n[ãa]o p[ôo]de ser baixada/i);
   });
 
-  it('o LEIA-ME diz como tornar uma mudança de layout permanente', () => {
-    // Sem isso alguém ajusta o layout no projeto do Overleaf, imprime
-    // satisfeito, e descobre na prova seguinte que o ajuste sumiu — cada
-    // projeto é descartável e a fonte da verdade é o repo.
-    expect(lerTexto('LEIA-ME.txt')).toMatch(/reposit[óo]rio|repo\b/i);
-  });
-
-  it('o conteudo.tex de exemplo avisa que não é modelo da saída do gerador', () => {
-    const exemplo = fs.readFileSync(
-      path.join(TEMPLATE_DIR, 'exemplo/conteudo.tex'),
-      'utf-8',
-    );
-    expect(exemplo).toMatch(/n[ÃA]O é modelo/i);
+  it('o LEIA-ME manda publicar na plataforma, não abrir um PR', () => {
+    // ⚠️ Este arquivo viaja dentro de TODA prova gerada. Antes do card 11 a
+    // fonte da verdade era o repo e a instrução certa era um pull request.
+    // Agora é a versão publicada no Mongo — e mandar pedir PR a um
+    // desenvolvedor é exatamente o atrito que os cards 10 a 13 removem.
+    const leiaMe = lerTexto('LEIA-ME.txt');
+    expect(leiaMe).not.toMatch(/pull request/i);
+    expect(leiaMe.toLowerCase()).toContain('plataforma');
   });
 
   it('os cabeçalhos do template não citam um diretório que não existe', () => {
@@ -149,11 +126,6 @@ describe('template do caderno (v1)', () => {
     for (const arquivo of ['main.tex', 'preambulo.tex']) {
       expect(lerTexto(arquivo)).not.toMatch(/card 0[89]/);
     }
-    const exemplo = fs.readFileSync(
-      path.join(TEMPLATE_DIR, 'exemplo/metadados.tex'),
-      'utf-8',
-    );
-    expect(exemplo).not.toMatch(/card 0[89]/);
   });
 });
 
@@ -189,12 +161,4 @@ describe('template não promete o gabarito do professor', () => {
       );
     },
   );
-
-  it('o exemplo continua usando CorrectChoice, e diz por quê', () => {
-    // O fixture é smoke test do template, não amostra da saída do gerador.
-    // Prova que o exam.cls faz aquilo, e o cabeçalho registra a diferença.
-    const texto = lerTexto('exemplo/conteudo.tex');
-    expect(texto).toContain('\\CorrectChoice');
-    expect(texto).toMatch(/gerador emite (apenas |só )?\\choice/i);
-  });
 });
