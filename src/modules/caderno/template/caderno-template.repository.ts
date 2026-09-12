@@ -7,6 +7,16 @@ import { CadernoTemplate } from './caderno-template.schema';
 /** O que o serviço entrega para virar um rascunho. */
 export type DadosRascunho = Partial<CadernoTemplate>;
 
+/**
+ * A resposta, não só a proibição: quem esbarrar num caminho de escrita
+ * herdado precisa sair daqui sabendo o que usar no lugar.
+ */
+const SO_OS_METODOS_COM_STATUS =
+  'Versão publicada é imutável nesta coleção: use criarRascunho, ' +
+  'substituirRascunho, descartarRascunho, arquivarPublicada ou ' +
+  'promoverRascunho — são os únicos caminhos de escrita, e cada um carrega o ' +
+  'status esperado no filtro.';
+
 @Injectable()
 export class CadernoTemplateRepository extends BaseRepository<CadernoTemplate> {
   constructor(
@@ -100,5 +110,40 @@ export class CadernoTemplateRepository extends BaseRepository<CadernoTemplate> {
         { session },
       )
       .exec();
+  }
+
+  // --------------------------------------------- o que esta classe PROÍBE
+  /**
+   * ⚠️ `BaseRepository` traz três caminhos de escrita que ignoram o status, e
+   * o critério do card ("não há caminho de escrita que altere uma publicada")
+   * é sobre a SUPERFÍCIE DESTA CLASSE, não sobre quem chama: se a garantia
+   * depender de o serviço se comportar bem, ela deixa de ser propriedade do
+   * repositório e vira convenção. Medido em `src/shared/base/base.repository.ts`:
+   *
+   * - `update(entity)` (l.58) filtra por `{ _id: entity._id }` — um `_id` não
+   *   diz em que estado o documento está, e alteraria uma `publicada`.
+   * - `delete(id)` (l.47) faz `findOneAndUpdate({ _id: id }, { deleted: true })`
+   *   em documento de QUALQUER estado, `publicada` incluída.
+   * - `create(item)` (l.14) é agnóstico de estado: deixaria inserir uma
+   *   SEGUNDA `publicada`, porque o índice parcial só restringe `rascunho`.
+   *   É o menos óbvio dos três — nada no schema proíbe duas publicadas.
+   *
+   * A catraca do spec não pega nenhum deles: `Object.getOwnPropertyNames` não
+   * enumera membro herdado. Alargar o regex dela também não resolveria —
+   * detectar não é impedir. Por isso os três lançam.
+   *
+   * Nenhum dos cinco métodos acima passa por aqui: todos vão direto ao
+   * `this.model`.
+   */
+  create(): Promise<CadernoTemplate> {
+    throw new Error(SO_OS_METODOS_COM_STATUS);
+  }
+
+  update(): Promise<void> {
+    throw new Error(SO_OS_METODOS_COM_STATUS);
+  }
+
+  delete(): Promise<void> {
+    throw new Error(SO_OS_METODOS_COM_STATUS);
   }
 }

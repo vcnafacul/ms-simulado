@@ -1,3 +1,4 @@
+import { BaseRepository } from 'src/shared/base/base.repository';
 import { CadernoTemplateRepository } from './caderno-template.repository';
 
 function repoCom(overrides: Record<string, unknown> = {}) {
@@ -142,5 +143,64 @@ describe('CadernoTemplateRepository — a imutabilidade da publicada', () => {
       'promoverRascunho',
       'substituirRascunho',
     ]);
+  });
+
+  it('POR QUE A CATRACA NÃO BASTA: getOwnPropertyNames não enumera herdado', () => {
+    // ⚠️ Irmão da catraca, e o registro do buraco dela. A catraca varre
+    // `Object.getOwnPropertyNames(prototype)`, que lista só membros PRÓPRIOS:
+    // os três caminhos de escrita de `BaseRepository` seriam invisíveis para
+    // ela. E o regex é português — `create`/`update`/`delete` não casariam
+    // nem se aparecessem. Sem isto escrito, o próximo leitor confia na
+    // catraca para uma cobertura que ela não tem.
+    // Quem realmente fecha o buraco é a sobrescrita que lança, abaixo:
+    // detectar não é impedir.
+    class SemSobrescritas extends BaseRepository<any> {}
+
+    for (const escrita of ['create', 'update', 'delete']) {
+      expect(Object.getOwnPropertyNames(BaseRepository.prototype)).toContain(
+        escrita,
+      );
+      expect(
+        Object.getOwnPropertyNames(SemSobrescritas.prototype),
+      ).not.toContain(escrita);
+    }
+  });
+});
+
+describe('CadernoTemplateRepository — o que a classe proíbe do que herdou', () => {
+  it('create, update e delete herdados lançam, e dizem o que usar no lugar', () => {
+    // ⚠️ `BaseRepository.update` filtra por `{_id}` e `delete` faz
+    // `findOneAndUpdate({_id}, {deleted:true})` em documento de qualquer
+    // estado, `publicada` incluída; `create` é agnóstico de estado e deixaria
+    // inserir uma SEGUNDA publicada, porque o índice parcial só restringe
+    // `rascunho`. A garantia do card é sobre a superfície da classe, não
+    // sobre quem chama — por isso os três morrem aqui.
+    const { model, repo } = repoCom();
+
+    for (const herdado of ['create', 'update', 'delete']) {
+      let erro: Error;
+      try {
+        const devolvido = (repo as any)[herdado]({ _id: 'x' });
+        // ⚠️ Não lançou. Se devolveu promise, a rejeição do método herdado
+        // derrubaria o processo inteiro e esconderia o vermelho — engole aqui
+        // para a asserção abaixo poder falhar limpo.
+        if (devolvido && typeof devolvido.then === 'function') {
+          devolvido.catch((): void => {});
+        }
+      } catch (e) {
+        erro = e as Error;
+      }
+
+      // lança SÍNCRONO: morre na chamada, não numa promise que alguém esquece
+      expect(erro).toBeInstanceOf(Error);
+      expect(erro.message).toMatch(/imutável/i);
+      // quem esbarra sai com a resposta, não só com a proibição
+      expect(erro.message).toMatch(/criarRascunho/);
+    }
+
+    // morrem ANTES de tocar o banco
+    expect(model.create).not.toHaveBeenCalled();
+    expect(model.updateOne).not.toHaveBeenCalled();
+    expect(model.deleteOne).not.toHaveBeenCalled();
   });
 });
