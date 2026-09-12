@@ -33,11 +33,29 @@ function recusa(erro: string): ResultadoDaExtracao {
  * disso: um zip com uma entrada dessas não é um projeto do Overleaf, é outra
  * coisa — então rejeita o ZIP INTEIRO, não só a entrada.
  *
- * ⚠️ Vale também para entradas de **diretório**. O JSZip normaliza o `..` na
- * escrita (`../x.tex` vira a entrada `x.tex` mais o diretório `/`), então quem
- * denuncia a travessia nesse caso é a barra inicial do diretório.
+ * ⚠️ Vale também para entradas de **diretório** — ver a medição abaixo: em
+ * alguns casos o diretório é a única entrada que denuncia a travessia.
+ *
+ * ⚠️ **A regra de `..` é inalcançável hoje, e mesmo assim fica.** Não é código
+ * morto por descuido; é rede. O que foi medido, em **jszip 3.10.1**:
+ *
+ * - `lib/load.js:66` faz `var safeName = utils.resolve(input.fileNameStr)` —
+ *   a sanitização é na **leitura**, não só na escrita. Todo nome que chega no
+ *   `forEach` já passou por ali.
+ * - `utils.resolve` colapsa `..` com `result.pop()`: `../x.tex` vira `x.tex`,
+ *   `a/../../x.tex` vira `x.tex`, `..` vira string vazia. **Nenhuma** entrada
+ *   sobrevive com um segmento `..`.
+ * - O mesmo `resolve` **preserva** barra inicial (`/etc/passwd`) e letra de
+ *   unidade (`C:/x.tex`), e não toca em caractere de controle.
+ *
+ * Ou seja: a defesa que de fato morde num zip real é **barra inicial + letra
+ * de unidade + caractere de controle**. A de `..` só volta a ser alcançável se
+ * a porta de entrada mudar — outro parser, ou um jszip que pare de resolver.
+ * Existe um teste de contrato em `extrair-zip.spec.ts` que quebra nesse dia e
+ * diz o que fazer. Enquanto ele passar, `..` não chega aqui — e a regra é
+ * testada direto, na função, não pelo pipeline.
  */
-function nomePerigoso(caminho: string): boolean {
+export function nomePerigoso(caminho: string): boolean {
   if (CONTROLE.test(caminho)) return true;
   if (caminho.startsWith('/') || caminho.startsWith('\\')) return true;
   if (/^[a-zA-Z]:/.test(caminho)) return true;

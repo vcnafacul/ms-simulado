@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
 import { zipCom } from './__fixtures__/zip';
-import { extrairTemplateDoZip, LIMITES } from './extrair-zip';
+import { extrairTemplateDoZip, LIMITES, nomePerigoso } from './extrair-zip';
 
 const PROJETO_OVERLEAF = {
   'main.tex': '\\documentclass{exam}',
@@ -154,5 +154,83 @@ describe('extrairTemplateDoZip — a ordem, provada por instrumentação', () =>
     await extrairTemplateDoZip(Buffer.alloc(LIMITES.zipBytes + 1));
     expect(espiao).not.toHaveBeenCalled();
     espiao.mockRestore();
+  });
+});
+
+describe('nomePerigoso — a regra testada direto, na função', () => {
+  // ⚠️ Estes testes chamam a FUNÇÃO, não o pipeline, e isso é de propósito.
+  // A regra de `..` é inalcançável por um zip de verdade: o jszip resolve os
+  // nomes na leitura (ver o teste de contrato abaixo). Testar pelo pipeline
+  // seria fingir que um zip a alcança; testar direto prova que ela funciona.
+
+  it.each([
+    ['../x.tex', 'travessia com ..'],
+    ['a/../../x.tex', '.. no meio'],
+    ['/etc/passwd', 'barra inicial'],
+    ['C:/x.tex', 'letra de unidade'],
+    ['ma\u0001in.tex', 'caractere de controle'],
+  ])('%s (%s) é perigoso', (caminho) => {
+    expect(nomePerigoso(caminho)).toBe(true);
+  });
+
+  it.each([
+    ['main.tex', 'na raiz'],
+    ['sub/arquivo.tex', 'em subpasta'],
+    // ⚠️ Mostra que a regra olha SEGMENTO, não substring: `..b` começa com
+    // dois pontos e não é travessia nenhuma.
+    ['..b/c', 'segmento que apenas começa com dois pontos'],
+  ])('%s (%s) não é perigoso', (caminho) => {
+    expect(nomePerigoso(caminho)).toBe(false);
+  });
+});
+
+describe('contrato com o jszip', () => {
+  it('o jszip sanitiza `..` na LEITURA, e é por isso que a regra de `..` é inalcançável', async () => {
+    // ⚠️ ESTE TESTE GUARDA UMA PREMISSA, NÃO UM COMPORTAMENTO NOSSO.
+    //
+    // Se ele quebrar depois de um upgrade do jszip, a consequência é:
+    // **a regra de `..` em `nomePerigoso` virou alcançável** — passou a existir
+    // um zip real capaz de entregar um segmento `..` para o nosso código. Aí
+    // escreva o teste de integração que hoje é impossível (um zip com `../x.tex`
+    // atravessando `extrairTemplateDoZip` inteiro) e apague este.
+    //
+    // ⚠️ Os bytes são mexidos na mão porque não existe outro jeito. O
+    // `zip.file()` do jszip normaliza o nome na ESCRITA, então pedir
+    // `../x.tex` a ele produz `x.tex` e o fixture testaria outra coisa. O
+    // contorno: gravar com um nome de MESMO COMPRIMENTO e trocar os bytes
+    // depois. O nome aparece duas vezes (local file header e central
+    // directory); trocando as duas por uma string de tamanho idêntico, os
+    // campos de comprimento, os offsets e os CRCs seguem válidos — o zip
+    // continua bem-formado, só com o nome perigoso.
+    const DE = Buffer.from('zz/x.tex'); // 8 bytes
+    const PARA = Buffer.from('../x.tex'); // 8 bytes
+    expect(PARA.length).toBe(DE.length);
+
+    const buffer = await zipCom({
+      'main.tex': 'a',
+      'preambulo.tex': 'b',
+      'zz/x.tex': 'x',
+    });
+
+    let trocas = 0;
+    for (let i = buffer.indexOf(DE); i !== -1; i = buffer.indexOf(DE, i + 8)) {
+      PARA.copy(buffer, i);
+      trocas += 1;
+    }
+    expect(trocas).toBe(2); // local file header + central directory
+    // O arquivo em memória agora carrega mesmo o nome perigoso. Sem esta
+    // asserção o teste poderia estar guardando um fixture que não ficou
+    // perigoso coisa nenhuma.
+    expect(buffer.includes(PARA)).toBe(true);
+
+    const lido = await JSZip.loadAsync(buffer);
+    const nomes: string[] = [];
+    lido.forEach((caminho) => nomes.push(caminho));
+
+    // O zip no disco CARREGA `../x.tex` — e mesmo assim nenhum nome que sai do
+    // `forEach` tem um segmento `..`. É exatamente disso que dependemos.
+    expect(nomes.some((n) => n.split('/').some((seg) => seg === '..'))).toBe(
+      false,
+    );
   });
 });
