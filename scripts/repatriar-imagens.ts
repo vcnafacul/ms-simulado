@@ -7,6 +7,7 @@
  * Uso:
  *   yarn repatriar:imagens --dry-run
  *   yarn repatriar:imagens --limite 5
+ *   yarn repatriar:imagens --questao <id> [--dry-run]
  *   yarn repatriar:imagens
  *   yarn repatriar:imagens --reverter reversao-<timestamp>.jsonl
  *
@@ -51,6 +52,14 @@ const CONTENT_TYPE_POR_EXTENSAO: Record<string, string> = {
 const REGEX_CANDIDATA = /!\[[^\]]*\]\(https?:\/\/|<img\b[^>]*src="https?:\/\//i;
 
 /**
+ * Chave FIXA do objeto de teste do preflight de permissão — de propósito.
+ * Cada corrida real sobrescreve o mesmo objeto (não acumula um por corrida),
+ * então ele aparece no relatório com a mesma chave sempre: quem encontrar
+ * isto num audit do bucket sabe exatamente o que é e que pode apagar.
+ */
+const CHAVE_TESTE_PERMISSAO = 'assets/_permissao-teste-repatriar-imagens.txt';
+
+/**
  * `StorageService` é `@Injectable()` e pede `EnvService`, que por sua vez
  * pede o `ConfigService` do Nest. Um CLI de manutenção não tem esse
  * container de pé, e não vale a pena subir um `NestFactory.createApplicationContext`
@@ -77,15 +86,19 @@ function criarStorageService(): StorageService {
  * TODAS as 840 ocorrências, uma a uma, disfarçada de falha genérica. Este
  * preflight existe pra pegar esse caso ANTES do laço, com uma mensagem que
  * aponta exatamente o problema.
+ *
+ * ⚠️ Grava sempre na mesma chave (`CHAVE_TESTE_PERMISSAO`) — cada corrida
+ * SOBRESCREVE o objeto anterior, nunca cria um novo. Não acumula lixo no
+ * bucket, e a chave aparece no relatório final para quem for auditar saber
+ * o que é.
  */
 async function verificarPermissaoDeEscrita(
   storage: StorageService,
   bucket: string,
 ): Promise<void> {
-  const chave = 'assets/_permissao-teste-repatriar-imagens.txt';
   try {
     await storage.putObject(
-      chave,
+      CHAVE_TESTE_PERMISSAO,
       Buffer.from(
         'teste de permissao de escrita — scripts/repatriar-imagens.ts',
       ),
@@ -121,6 +134,8 @@ interface Relatorio {
   falhasPorMotivo: Map<string, number>;
   urlsDistintas: number;
   arquivoDeReversao: string | null;
+  /** Só preenchido quando o preflight rodou de verdade (corrida real). */
+  objetoDeTestePermissao: string | null;
 }
 
 function linha(rotulo: string, valor: string | number): string {
@@ -155,16 +170,37 @@ function imprimirRelatorio(r: Relatorio): void {
       r.arquivoDeReversao ?? '(nenhum — nada foi alterado)',
     ),
   );
+  if (r.objetoDeTestePermissao) {
+    console.log(
+      linha(
+        'objeto de teste de permissão',
+        `${r.objetoDeTestePermissao} (sobrescrito a cada corrida, pode ser apagado)`,
+      ),
+    );
+  }
   console.log('');
 }
 
+/** 24 caracteres hex — o formato de um ObjectId do Mongo. */
+const REGEX_OBJECT_ID = /^[0-9a-fA-F]{24}$/;
+
 async function repatriar(
   db: MongoDb,
-  opts: { dryRun: boolean; limite?: number },
+  opts: { dryRun: boolean; limite?: number; questaoId?: string },
 ): Promise<void> {
   const bucket = process.env.QUESTAO_BUCKET;
   if (!bucket) {
     console.error('❌ Variável de ambiente QUESTAO_BUCKET não definida.');
+    process.exit(1);
+  }
+
+  // ⚠️ Falha aqui, clara, em vez de deixar o driver estourar dentro do
+  // `ObjectId.createFromHexString` com uma mensagem que não diz qual flag
+  // causou o problema.
+  if (opts.questaoId !== undefined && !REGEX_OBJECT_ID.test(opts.questaoId)) {
+    console.error(
+      `❌ --questao precisa de um ObjectId válido (24 caracteres hex). Recebido: "${opts.questaoId}"`,
+    );
     process.exit(1);
   }
 
@@ -232,16 +268,19 @@ async function repatriar(
     },
   };
 
-  const filtroCandidata = {
-    $or: CAMPOS_DE_TEXTO.map((campo) => ({ [campo]: REGEX_CANDIDATA })),
-  };
+  // ⚠️ `--questao` substitui o pré-filtro por texto: a intenção ali é mirar
+  // numa questão específica (o gate, depois do `--limite 5`), não achar
+  // candidatas. O relatório final sai igual, só que sobre uma questão só.
+  const filtro = opts.questaoId
+    ? { _id: new mongoose.Types.ObjectId(opts.questaoId) }
+    : { $or: CAMPOS_DE_TEXTO.map((campo) => ({ [campo]: REGEX_CANDIDATA })) };
   const projecao = Object.fromEntries(
     CAMPOS_DE_TEXTO.map((campo) => [campo, 1]),
   );
 
   const cursor = db
     .collection('questaos')
-    .find(filtroCandidata, { projection: projecao });
+    .find(filtro, { projection: projecao });
   if (opts.limite) cursor.limit(opts.limite);
 
   const urlsDistintas = new Set<string>();
@@ -285,6 +324,7 @@ async function repatriar(
     falhasPorMotivo,
     urlsDistintas: urlsDistintas.size,
     arquivoDeReversao,
+    objetoDeTestePermissao: opts.dryRun ? null : CHAVE_TESTE_PERMISSAO,
   });
 }
 
@@ -339,6 +379,7 @@ async function run(): Promise<void> {
 
   const dryRun = temFlag('dry-run');
   const arquivoReversao = flagValor('reverter');
+  const questaoId = flagValor('questao');
   const limiteStr = flagValor('limite');
   if (limiteStr !== undefined && Number.isNaN(Number(limiteStr))) {
     console.error(`❌ --limite precisa de um número. Recebido: "${limiteStr}"`);
@@ -357,7 +398,7 @@ async function run(): Promise<void> {
     if (arquivoReversao) {
       await reverter(db, arquivoReversao);
     } else {
-      await repatriar(db, { dryRun, limite });
+      await repatriar(db, { dryRun, limite, questaoId });
     }
   } finally {
     await mongoose.disconnect();
