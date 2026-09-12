@@ -19,8 +19,26 @@ export const envSchema = z.object({
   AWS_SECRET_ACCESS_KEY: z.string().default(''),
   CARTAO_BUCKET: z.string().default('vcnafacul-cartoes'),
 
+  // Bucket das imagens de questão (Caderno · card 03). SEM default: um
+  // default silencioso apontaria para o bucket errado, e a falha apareceria
+  // como "imagem não encontrada" — o sintoma mais confuso possível.
+  // Credencial de LEITURA APENAS neste bucket.
+  QUESTAO_BUCKET: z.string().optional(),
+
   // ms-omr (Etapa 12 · A3)
   OMR_URL: z.string().url().default('http://localhost:8000'),
+
+  // Caderno · card 04. Rascunho é ferramenta de quem monta a prova; liberar
+  // isso por acidente em produção entregaria caderno de simulado incompleto.
+  //
+  // ⚠️ NÃO use `z.coerce.boolean()`: ele trata qualquer string não vazia como
+  // `true`, inclusive `"false"` — desligar a flag em produção não desligaria
+  // nada, e o defeito ficaria invisível até alguém baixar um caderno que não
+  // devia existir.
+  CADERNO_DRAFT_ENABLED: z
+    .enum(['true', 'false'])
+    .default(process.env.NODE_ENV === 'production' ? 'false' : 'true')
+    .transform((v) => v === 'true'),
 });
 
 export type Env = z.infer<typeof envSchema>;

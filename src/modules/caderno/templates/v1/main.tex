@@ -1,0 +1,58 @@
+% ===========================================================================
+% Caderno de questões — template v1
+%
+% Compile:  latexmk -pdf main.tex      (ou suba esta pasta no Overleaf)
+%
+% A alternativa correta NÃO viaja neste pacote: todas saem como \choice. A
+% aplicação é a fonte da verdade do gabarito. (Um \CorrectChoice renderiza
+% idêntico a \choice sem a opção `answers`, então o gabarito não apareceria no
+% PDF — mas ficaria legível dentro do conteudo.tex, e este projeto se
+% compartilha por link.)
+%
+% NÃO EDITE os arquivos metadados.tex e conteudo.tex: os dois são
+% regerados a cada download; suas edições ficam neste projeto e não voltam
+% para a plataforma.
+%
+% \input{preambulo} e \includegraphics{logo.png} resolvem relativo a este
+% arquivo, então os arquivos do template e o logo.png ficam lado a lado, na
+% raiz do zip — só as imagens das questões vão em assets/, que é a única
+% subpasta.
+%
+% As duas colunas vêm da opção `twocolumn` da própria exam.cls. Um plano B com
+% o pacote multicol foi escrito e compilado lado a lado no Overleaf; este aqui
+% ficou melhor, e o outro foi removido. Não reintroduzir multicol sem motivo
+% medido: ele tem interação instável com o \needspace, que é o que impede
+% cabeçalho de questão órfão no pé da coluna.
+% ===========================================================================
+\documentclass[11pt,a4paper,twocolumn]{exam}
+
+\input{preambulo}
+\input{metadados}
+
+% draftwatermark carregado só no modo rascunho: carregá-lo sempre estampa
+% "DRAFT" por padrão. Fica aqui, e não no preambulo.tex (onde diz que
+% "pacotes moram aqui"), porque \ifcadernoRascunho só é ligado pelo
+% metadados.tex, que é lido depois do preambulo — o \usepackage precisa
+% vir depois de saber se o modo rascunho está ativo.
+%
+% \SetWatermarkText/\SetWatermarkScale/\SetWatermarkColor são a interface
+% pré-3.0 do draftwatermark, hoje depreciada em favor de
+% \DraftwatermarkOptions{...}. Mantida de propósito aqui — funciona nas
+% duas versões — só pra um aviso de depreciação no Overleaf não virar
+% mistério.
+\ifcadernoRascunho
+  \usepackage{draftwatermark}
+  \SetWatermarkText{RASCUNHO}
+  \SetWatermarkScale{1.2}
+  \SetWatermarkColor[gray]{0.92}
+\fi
+
+\begin{document}
+
+\twocolumn[\capaCaderno]
+
+\begin{questions}
+\input{conteudo}
+\end{questions}
+
+\end{document}

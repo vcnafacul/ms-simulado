@@ -1,0 +1,65 @@
+Caderno de questões — pacote LaTeX gerado pelo ms-simulado
+==========================================================
+
+COMO COMPILAR
+
+  Opção 1 — Overleaf, sem instalar nada
+    1. Acesse overleaf.com e crie um projeto por "New Project > Upload Project"
+    2. Envie este .zip inteiro
+    3. Abra main.tex e clique em "Recompile"
+
+  Opção 2 — na sua máquina, com uma distribuição TeX instalada
+    latexmk -pdf main.tex
+
+A RESPOSTA CORRETA NÃO VEM NO PACOTE
+
+  Todas as alternativas saem iguais neste caderno, de propósito. A resposta
+  correta fica só na plataforma: um arquivo que se sobe para o Overleaf e se
+  compartilha por link não é lugar para gabarito.
+
+  Para conferir as respostas, use a questão na plataforma.
+
+O QUE VOCÊ PODE EDITAR
+
+  main.tex e preambulo.tex são o layout. Mexer é por sua conta, e as
+  mudanças ficam só nesta cópia — cada prova que você baixa cria um
+  projeto novo, e ele não sabe nada dos anteriores.
+
+  Se a mudança deve valer para todo mundo, daqui em diante, ela precisa
+  voltar para o repositório do ms-simulado num pull request. A fonte da
+  verdade do template é o repo; este projeto é descartável.
+
+O QUE VOCÊ NÃO DEVE EDITAR
+
+  metadados.tex e conteudo.tex são gerados a partir do simulado cadastrado
+  na plataforma. Qualquer alteração aqui se perde no próximo download e,
+  o que importa mais, não volta para a plataforma. Se uma questão está
+  errada ou saiu mal diagramada, corrija a questão na plataforma e baixe
+  o caderno de novo.
+
+  O mesmo vale para a pasta assets/: são as imagens das questões, também
+  geradas pelo download. Diferente do logo.png da capa, essas imagens não
+  têm proteção contra arquivo ausente — apagar ou renomear uma quebra a
+  compilação com um erro de LaTeX.
+
+AVISOS DA GERAÇÃO
+
+  Abra o conteudo.tex e olhe o topo do arquivo. As linhas que começam com
+  "% AVISO:" listam o que o gerador não conseguiu resolver — alternativa
+  em branco, imagem que não foi encontrada — dizendo o número da questão.
+  Confira essas antes de imprimir.
+
+  São comentários de LaTeX: não afetam a compilação nem aparecem no PDF.
+
+  Se no lugar de uma figura aparecer uma CAIXA CINZA VAZIA, é a imagem que
+  não pôde ser baixada. O motivo está numa linha "% AVISO:" citando o
+  arquivo (por exemplo assets/03). A prova compila assim de propósito:
+  preferimos entregar o caderno com um buraco visível a não entregar nada.
+
+MODO RASCUNHO
+
+  Se o caderno vier com uma marca d'água "RASCUNHO" atravessando a página
+  e uma caixa "pendências: <números>" no topo, é o simulado avisando que
+  essas questões ainda não estão fechadas na plataforma. Não é erro do
+  template — finalize as questões pendentes e baixe o caderno de novo pra
+  tirar a marca.

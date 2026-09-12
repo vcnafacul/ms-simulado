@@ -6,7 +6,20 @@
     "deleteOutDir": true,
     "assets": [
       { "include": "modules/cartao-resposta/assets/**/*.png" },
-      { "include": "modules/cartao-resposta/assets/**/*.ttf" }
+      { "include": "modules/cartao-resposta/assets/**/*.ttf" },
+      {
+        "include": "modules/caderno/templates/**/*.tex",
+        "exclude": "modules/caderno/templates/**/exemplo/**"
+      },
+      {
+        "include": "modules/caderno/templates/**/*.txt",
+        "exclude": "modules/caderno/templates/**/exemplo/**"
+      },
+      {
+        "include": "modules/caderno/templates/**/*.png",
+        "exclude": "modules/caderno/templates/**/exemplo/**"
+      },
+      { "include": "modules/caderno/imagens/*.png" }
     ]
   }
 }
