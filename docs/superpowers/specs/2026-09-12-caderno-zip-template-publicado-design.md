@@ -304,6 +304,21 @@ PR e sem review. As travas continuam sendo as do card 10 — lint bloqueante, im
 publicadas e restaurar de um clique — e o que este card acrescenta é o `template=<versao>` no log, que
 é como se descobre *qual* edição quebrou.
 
+## O que o card 12 herda daqui
+
+**Um endpoint a mais do que ele previa:** `GET /v1/caderno/template/teste`, com `?versao=` e
+`?rascunho=`.
+
+**Permissão: `alterarPermissao`, a mesma dos outros endpoints de template** — decidido pelo dono em
+2026-09-12. Vale inclusive para `?rascunho=1`, que mostra trabalho ainda não publicado: quem pode
+publicar um template já pode ver o rascunho, então uma permissão separada só para ele não protegeria
+nada e criaria um segundo eixo de autorização para manter.
+
+**Ordem de deploy:** o `seed:template-caderno` precisa ter rodado no ambiente **antes** deste código
+subir. Sem versão publicada, a geração de prova passa a devolver 503 — comportamento correto por
+desenho, mas indesejado como surpresa. Medido em 2026-09-12: homologação tem a coleção e os quatro
+índices, e **nenhuma versão publicada**.
+
 ## O que este card NÃO faz
 
 **Não expõe os endpoints pela api** — card 12.
