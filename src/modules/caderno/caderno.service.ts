@@ -13,6 +13,7 @@ import { gerarCaderno } from './gerador/gerar-caderno';
 import { SimuladoParaCaderno } from './gerador/tipos';
 import { ResolverDeImagens } from './imagens/resolver';
 import { nomeDoArquivo } from './nome-do-arquivo';
+import { CadernoTemplateService } from './template/caderno-template.service';
 import { montarZip } from './zip';
 
 /**
@@ -37,6 +38,7 @@ export class CadernoService {
     private readonly simuladoService: SimuladoService,
     private readonly resolver: ResolverDeImagens,
     private readonly env: EnvService,
+    private readonly template: CadernoTemplateService,
   ) {}
 
   async gerarZip(
@@ -58,6 +60,10 @@ export class CadernoService {
       throw new ConflictException(MENSAGEM_BLOQUEADO);
     }
 
+    // Sem versão publicada isto lança 503, e é para lançar: não existe
+    // fallback ao disco. Ver o card 10.
+    const templatePublicado = await this.template.publicada();
+
     const caderno = gerarCaderno(simulado as unknown as SimuladoParaCaderno, {
       draft: opts.draft,
     });
@@ -78,6 +84,7 @@ export class CadernoService {
     );
 
     const buffer = await montarZip({
+      template: templatePublicado.arquivos,
       conteudo,
       metadados: caderno.metadados,
       imagens: resolucao.arquivos,
@@ -85,6 +92,7 @@ export class CadernoService {
 
     this.logger.log(
       `caderno ${simuladoId} draft=${opts.draft} ` +
+        `template=${templatePublicado.versao} ` +
         `questoes=${caderno.questoesIncluidas.length} ` +
         `imagens=${resolucao.arquivos.length} ` +
         `cache=${resolucao.metricas.doCache} bucket=${resolucao.metricas.doBucket} ` +
