@@ -967,6 +967,13 @@ Esperado: FAIL — `Cannot find module './caderno-template.schema'`.
 
 `src/modules/caderno/template/caderno-template.schema.ts`:
 
+
+> ⚠️ **CORREÇÃO APLICADA DEPOIS, NA TASK 7 (commit `956da04`).** O `type: Map` abaixo está **errado** e
+> foi trocado por objeto simples. Mongoose 7.6.11 **recusa chave com `.`** num `Map`: lança no write e
+> devolve `undefined` no read hidratado — e as chaves são `main.tex` e `preambulo.tex` por construção.
+> O texto original fica aqui porque é o que os subagentes das Tasks 4 a 6 executaram; o código no
+> repositório é o corrigido. Ver a seção **Correção do schema** no fim deste plano.
+
 ```ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { ApiProperty } from '@nestjs/swagger';
@@ -1995,8 +2002,11 @@ run().catch(async (err) => {
 ```
 
 ⚠️ **`arquivos` entra como objeto simples**, não `Map`: o driver nativo não conhece o `Map` do
-Mongoose, e um `@Prop({type: Map})` lê um subdocumento comum sem problema. Inserir um `Map` pelo driver
-gravaria `{}`.
+Mongoose e gravaria `{}`.
+
+⚠️ **A segunda metade desta observação, no plano original, estava errada** — ela dizia que um
+`@Prop({type: Map})` lê um subdocumento comum sem problema. Não lê, quando a chave tem ponto. Foi assim
+que o defeito passou pela revisão. Ver **Correção do schema**, no fim.
 
 ⚠️ **O nome da coleção é `cadernotemplates`** — a pluralização automática do Mongoose para
 `CadernoTemplate`. Confirme no gate da Task 8 antes de rodar em homologação; errar aqui cria uma
@@ -2297,3 +2307,42 @@ Cole no PR a saída da Task 8 — as contagens de teste e os quatro itens do e2e
 | seed em `scripts/`, não `scripts/migrations/` | aquele diretório é shell+mongosh; este seed lê o repo e lint-a |
 | seed passa pelo próprio lint | é a versão que o "restaurar" traz de volta |
 | e2e opt-in, e não fingido | não há mongodb-memory-server e o CI não roda `test/` |
+
+
+---
+
+## Correção do schema — `Map` não aceita chave com ponto
+
+Descoberto ao executar o Step 4 da Task 7, contra Mongo de verdade. Corrigido no commit `956da04`.
+
+**O defeito.** `@Prop({ type: Map, of: String })` com as chaves `main.tex` e `preambulo.tex`:
+
+| caminho | o que acontecia |
+|---|---|
+| `model.create` / `validate` | `CastError: Cast to Map failed` — todo upload falharia |
+| `findOne().exec()` (hidratado) | `arquivos` volta **`undefined`** |
+| `findOne().lean()` | volta certo — por isso o `mongosh` mostrava tudo perfeito |
+
+As chaves têm ponto **por construção**: são a whitelist do `extrair-zip.ts`.
+
+**Por que nenhum teste pegou.** Todos os specs do diretório mockam o model, e o
+`caderno-template.schema.spec.ts` só inspecionava metadados do `SchemaFactory`. Nenhum cast passava
+pelo Mongoose. Pior: o helper `comoMap()` do spec do serviço reproduzia fielmente a forma quebrada — o
+teste **certificava o defeito**.
+
+**A correção.** `arquivos` virou `Record<string, string>` (`@Prop({ type: Object })`). Escolhido em vez
+de escapar as chaves (trocaria um defeito silencioso por um mecanismo silencioso) e em vez de um array
+de `{nome, conteudo}` (muda a forma armazenada, e a única vantagem real — consultar por nome — é algo
+que nunca fazemos). O objeto simples ainda **apaga código**: o lint já recebia `Record` e a extração já
+devolvia `Record`, então as três conversões do serviço deixaram de existir.
+
+**A rede que faltava, e que agora existe.** A hidratação do Mongoose é **offline**: `Model.hydrate(cru)`
+cast pelo schema sem conexão nenhuma. Dá para testar no CI, que roda só `src/**/*.spec.ts`. Os dois
+testes novos no `caderno-template.schema.spec.ts` cobrem leitura e escrita, e a mutação (voltar o
+`type: Map`) deixa **os dois vermelhos e os cinco antigos verdes** — a medida exata da cegueira que a
+suíte tinha.
+
+⚠️ **Chave com ponto ainda tem uma aresta:** um `$set` com caminho pontilhado (`'arquivos.main.tex'`)
+criaria `{arquivos:{main:{tex:…}}}` aninhado, em silêncio. Não fazemos isso em lugar nenhum — toda
+escrita troca o documento inteiro, e o repositório proíbe `create`/`update`/`delete` — mas quem
+escrever a próxima escrita precisa saber. Está comentado no `@Prop`.
