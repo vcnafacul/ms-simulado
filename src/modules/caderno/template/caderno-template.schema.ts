@@ -60,8 +60,27 @@ export class CadernoTemplate extends BaseSchema {
 export const CadernoTemplateSchema =
   SchemaFactory.createForClass(CadernoTemplate);
 
-CadernoTemplateSchema.index({ versao: 1 }, { unique: true });
-CadernoTemplateSchema.index({ status: 1 });
+// ⚠️ **TODO ÍNDICE DAQUI PARA BAIXO LEVA `name` EXPLÍCITO.** Não é estilo —
+// é o que impede o índice de não existir. Medido contra `mongo:7`:
+//
+//   - o nome autogerado vem da CHAVE, não da opção: `{ status: 1 }` vira
+//     `status_1` nas DUAS declarações abaixo, a simples e a parcial;
+//   - o servidor recusa a segunda com `IndexKeySpecsConflict`: "An existing
+//     index has the same name as the requested index";
+//   - com `autoIndex` (o padrão do Mongoose, e como a app sobe), esse erro
+//     **não aparece no boot**: a aplicação inicializa limpa e a coleção fica
+//     só com `_id_`, `versao_1` e `status_1`. O parcial único simplesmente
+//     não está lá, e dois `criarRascunho` concorrentes entram os dois.
+//
+// Quem for adicionar o quarto índice: nome obrigatório, e diferente dos três.
+// Isto foi um bug de verdade, pego pelo `test/caderno-template.e2e-spec.ts`,
+// depois de passar por spec, review e seis tasks — porque as specs conferiam
+// a DECLARAÇÃO, e o que faltava era a CONSTRUÇÃO.
+CadernoTemplateSchema.index({ versao: 1 }, { unique: true, name: 'versao_1' });
+
+// ⚠️ `name: 'status_1'` é o nome que o Mongoose já geraria: mantê-lo evita
+// derrubar e recriar o índice nos bancos que já o têm.
+CadernoTemplateSchema.index({ status: 1 }, { name: 'status_1' });
 
 // ⚠️ O parcial é o que garante NO MÁXIMO UM RASCUNHO. Sem o
 // partialFilterExpression, `status` viraria único no mundo: uma só versão
@@ -69,5 +88,9 @@ CadernoTemplateSchema.index({ status: 1 });
 // errado e o erro só aparece na segunda escrita.
 CadernoTemplateSchema.index(
   { status: 1 },
-  { unique: true, partialFilterExpression: { status: 'rascunho' } },
+  {
+    unique: true,
+    partialFilterExpression: { status: 'rascunho' },
+    name: 'status_rascunho_unico',
+  },
 );

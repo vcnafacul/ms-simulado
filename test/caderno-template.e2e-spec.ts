@@ -113,11 +113,23 @@ describe('Card 10 — template do caderno contra Mongo de verdade (e2e opt-in)',
     // do autoIndex do Mongoose ter terminado a tempo.
     await model.createIndexes();
 
+    // ⚠️ `createIndexes()` sem erro NÃO quer dizer que o índice que interessa
+    // entrou — o bug que este arquivo pegou era exatamente esse: o parcial
+    // colidia de nome com o simples (`status_1` nos dois), o servidor recusava
+    // com `IndexKeySpecsConflict`, e com `autoIndex` a app subia limpa sem
+    // ele. Então o que se confere é a LISTA DO SERVIDOR, por nome.
     const indices = await model.collection.indexes();
-    const parcial = indices.find(
-      (i) => i.unique === true && i.partialFilterExpression !== undefined,
-    );
-    expect(parcial).toBeDefined();
+    const nomes = indices.map((i) => i.name);
+    expect(nomes).toContain('status_rascunho_unico');
+    expect(nomes).toContain('status_1');
+
+    const parcial = indices.find((i) => i.name === 'status_rascunho_unico');
+    expect(parcial?.unique).toBe(true);
+    expect(parcial?.partialFilterExpression).toEqual({ status: 'rascunho' });
+    // Só um parcial: dois seriam duas regras disputando a mesma garantia.
+    expect(
+      indices.filter((i) => i.partialFilterExpression !== undefined),
+    ).toHaveLength(1);
 
     // ⚠️ CONCORRENTES, e com `versao` DIFERENTE nos dois. Sequencial passaria
     // sem índice nenhum (o código checa antes de escrever), e `versao` igual
@@ -148,8 +160,9 @@ describe('Card 10 — template do caderno contra Mongo de verdade (e2e opt-in)',
 
     const mensagem = String(recusados[0].reason?.message ?? '');
     expect(mensagem).toContain('E11000');
-    // O E11000 tem de ser do índice de `status`, não do de `versao`.
-    expect(mensagem).toContain('status');
+    // ⚠️ O E11000 tem de vir do índice PARCIAL, nomeado — não do único de
+    // `versao`, que provaria outra coisa.
+    expect(mensagem).toContain('status_rascunho_unico');
     expect(mensagem).not.toContain('versao_1');
 
     expect(await model.countDocuments({ status: 'rascunho' })).toBe(1);

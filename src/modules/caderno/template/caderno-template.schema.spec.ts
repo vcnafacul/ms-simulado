@@ -64,6 +64,34 @@ describe('CadernoTemplate schema', () => {
   });
 
   /**
+   * ⚠️ **O teste que teria pego o bug do índice que nunca existiu.** Os dois
+   * de cima conferem a forma de cada índice de `status` isoladamente, e os
+   * dois passavam enquanto o parcial único **não era construído em banco
+   * nenhum**: sem `name`, as duas declarações de `{ status: 1 }` pedem o mesmo
+   * nome autogerado (`status_1`), o servidor recusa a segunda com
+   * `IndexKeySpecsConflict` e o `autoIndex` do Mongoose engole o erro — a app
+   * sobe limpa, e dois rascunhos concorrentes entram.
+   *
+   * O nome só é comparável entre índices, então nenhuma asserção sobre um
+   * índice sozinho pega isto. Esta pega, e roda no CI.
+   */
+  it('NOME: os dois índices de status são nomeados, e com nomes diferentes', () => {
+    const deStatus = indices().filter(
+      ([campos]) => (campos as Record<string, unknown>).status === 1,
+    );
+    expect(deStatus).toHaveLength(2);
+
+    const nomes = deStatus.map(
+      ([, opts]) => (opts as Record<string, unknown>).name,
+    );
+    // Nomeados: sem `name`, o Mongo gera o nome a partir da chave, e a chave
+    // é a mesma nos dois.
+    for (const nome of nomes) expect(typeof nome).toBe('string');
+    // E diferentes: é a colisão que fazia o parcial não existir.
+    expect(new Set(nomes).size).toBe(2);
+  });
+
+  /**
    * ⚠️ **O teste que faltava.** Todo o resto deste diretório é mock: nada
    * cast um documento pelo Mongoose de verdade, e foi exatamente por isso que
    * o `type: Map` original passou por spec, review e seis tasks.
