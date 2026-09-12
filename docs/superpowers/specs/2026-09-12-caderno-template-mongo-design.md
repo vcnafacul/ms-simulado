@@ -79,8 +79,17 @@ dia o zip ganhar subpastas.
 **Avisam, sem bloquear (2):**
 
 - **chaves desbalanceadas** — decisão do usuário
-- template referencia macro que o `metadados.tex` gerado não define (`\cadernoTitulo`,
-  `\cadernoSubtitulo`, `\cadernoRascunho`)
+- template referencia macro `\caderno…` que ninguém define — nem o `metadados.tex` gerado, nem o
+  próprio template
+
+⚠️ **São quatro macros geradas, não três** — medido em `gerar-caderno.ts:90-105`: `\cadernoTitulo` e
+`\cadernoSubtitulo` sempre; `\cadernoRascunho` (como `\cadernoRascunhotrue`) e `\cadernoPendencias`
+**só no modo rascunho**. O `preambulo.tex` real usa `\cadernoPendencias` na linha 90; uma lista de três
+faria o template do repo avisar, contra o que esta spec afirma.
+
+E a regra conta como definida também a macro que **o próprio template define** — o `preambulo.tex` tem
+`\providecommand{\cadernoTitulo}{...}` justamente para o caso de o `metadados.tex` não vir. Ignorar
+isso transformaria o mecanismo de default em aviso.
 
 ⚠️ **Por que chaves não bloqueiam.** É a única regra que pode dar falso positivo num template válido:
 LaTeX tem construtos onde chave desbalanceada é legítima (`\verb|{|`, mudança de catcode). As outras
@@ -200,7 +209,8 @@ todos os outros uploads passam é uma exceção que ninguém lembra depois.
 
 *Lint — as duas que avisam*
 - chave desbalanceada → **aviso, e o resultado permite publicar**
-- macro não definida pelo `metadados.tex` → aviso
+- macro `\caderno…` que ninguém define → aviso
+- `\cadernoPendencias`, usada pelo `preambulo.tex` real, **não** avisa
 
 *Extração*
 - zip do Overleaf com pasta raiz → funciona
