@@ -68,6 +68,14 @@ Por isso a limpeza vira **peça própria, testada isoladamente**, e não uma lin
 - `\begin`/`\end` balanceados, por pilha
 - proibidos: `\write18`, `\openin`, `\usepackage{shellesc}`, `\input`/`\include` com caminho absoluto ou `..`
 
+⚠️ **`\input{sub/arquivo}` — relativo com barra — NÃO é bloqueado**, e isso é decisão, não lacuna. A
+regra existe para impedir **sair** do diretório do projeto; um subcaminho relativo não sai. Ele
+simplesmente não vai existir no zip da prova, e a falha aparece na compilação — visível, não
+silenciosa.
+
+Bloqueá-lo seria bloquear algo que não é perigoso e que o coordenador poderia usar legitimamente se um
+dia o zip ganhar subpastas.
+
 **Avisam, sem bloquear (2):**
 
 - **chaves desbalanceadas** — decisão do usuário
@@ -186,6 +194,8 @@ todos os outros uploads passam é uma exceção que ninguém lembra depois.
 - **`\input{conteudo}` só dentro de comentário → ERRO** (o caso mais perigoso do card)
 - `\begin{questions}` sem `\end` → erro
 - `\write18` → erro; `\input{/etc/passwd}` → erro; `\input{../x}` → erro
+- **`\input{sub/arquivo}` → NÃO é erro** — a regra é sobre sair do diretório, não sobre ter barra
+- `\input{preambulo}` legítimo não dispara a regra dos proibidos
 - o `main.tex` + `preambulo.tex` **reais do repo** passam nas oito
 
 *Lint — as duas que avisam*
