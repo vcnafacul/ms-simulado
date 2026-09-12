@@ -128,6 +128,11 @@ CadernoTemplateSchema.index(
 );
 ```
 
+⚠️ **Os três precisam de `name` explícito.** Sem ele o nome vem da chave, e as duas declarações sobre
+`{status: 1}` pedem ambas `status_1` — o servidor recusa a segunda com `IndexKeySpecsConflict` e o
+parcial **nunca é construído**. Com `autoIndex`, a app sobe sem erro e dois rascunhos concorrentes
+passam. Medido contra replica set real; corrigido com `status_rascunho_unico`.
+
 ⚠️ O índice parcial é o que garante **no máximo um rascunho**. Ele é fácil de declarar errado e só
 falha sob concorrência — por isso tem spec própria, como o do `historico`, e um teste com dois uploads
 **concorrentes**, não sequenciais.

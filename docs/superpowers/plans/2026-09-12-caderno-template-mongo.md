@@ -2346,3 +2346,39 @@ suíte tinha.
 criaria `{arquivos:{main:{tex:…}}}` aninhado, em silêncio. Não fazemos isso em lugar nenhum — toda
 escrita troca o documento inteiro, e o repositório proíbe `create`/`update`/`delete` — mas quem
 escrever a próxima escrita precisa saber. Está comentado no `@Prop`.
+
+
+---
+
+## Correção dos índices — dois `index({status:1})` colidem no nome
+
+Descoberto ao executar o Step 2 da Task 8, contra replica set de verdade. Corrigido no commit
+`8926d92`.
+
+**O defeito.** O nome de um índice, quando omitido, é derivado da **chave**. As duas declarações sobre
+`{status: 1}` pediam ambas o nome `status_1`, e o servidor recusa a segunda com
+`IndexKeySpecsConflict`. Resultado: **o índice parcial único nunca era construído**.
+
+**O silêncio é o problema, não o erro.** Com `autoIndex` (default do Mongoose, e o repo conta com ele —
+veja `simulado.schema.ts:65` e `prova.schema.ts:84`), a aplicação sobe **sem erro nenhum** e a coleção
+fica com `_id_`, `versao_1` e `status_1`. Dois `criarRascunho` concorrentes gravavam **dois rascunhos**,
+que é exatamente o que o comentário do schema afirmava ser impossível.
+
+**Por que os testes não pegavam.** O `caderno-template.schema.spec.ts` conferia a **declaração** de cada
+índice, e a declaração estava certa. Nome só é comparável **entre** índices — nenhuma asserção sobre um
+índice isolado alcança isso. Medido na mutação: tirando o `name`, os cinco testes de índice
+pré-existentes seguem **verdes** e só o teste novo fica vermelho.
+
+**A correção.** `name` explícito nos três. `versao_1` e `status_1` mantêm o nome que o Mongoose já
+gerava, para não recriar índice em banco que já o tem; o parcial virou `status_rascunho_unico`.
+
+⚠️ **Consequência de deploy, que vale para o gate.** A correção torna o índice **criável**, não
+criado. Onde a coleção já existe, o `autoIndex` vai tentar construí-lo no próximo boot — e se já houver
+dois rascunhos, a construção falha, **de novo em silêncio**. Antes de fechar o card, em cada ambiente:
+
+```js
+db.cadernotemplates.getIndexes()
+db.cadernotemplates.countDocuments({ status: 'rascunho' })
+```
+
+Mais de um rascunho: tem de sobrar um antes de o índice subir.
