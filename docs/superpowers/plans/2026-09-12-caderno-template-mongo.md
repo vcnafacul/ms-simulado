@@ -807,7 +807,7 @@ esconder.
 npx jest --detectOpenHandles --forceExit src/modules/caderno/template/extrair-zip.spec.ts
 ```
 
-Esperado: PASS, 13 testes.
+Esperado: PASS, 14 testes (o `it.each` de travessia conta 4 casos).
 
 - [ ] **Step 5: Provar que as decisões mordem**
 
