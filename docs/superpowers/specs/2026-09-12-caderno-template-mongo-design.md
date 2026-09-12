@@ -106,7 +106,16 @@ rascunho pode ter vindo de uma restauração feita antes de uma regra nova exist
 
 ## O modelo
 
-Uma coleção, uma linha por versão, **publicada é imutável**. O esquema é o do card, sem alteração.
+Uma coleção, uma linha por versão, **publicada é imutável**. O esquema é o do card, com **uma
+correção**.
+
+⚠️ **`arquivos` é `Record<string, string>` (`@Prop({type: Object})`), NÃO `Map`.** O card diz `Map`, e
+está errado: Mongoose 7.6.11 recusa chave com `.` num `Map` — lança no write e devolve `undefined` no
+read hidratado. As chaves são `main.tex` e `preambulo.tex`, pontuadas por construção.
+
+Medido só ao rodar o seed contra Mongo de verdade: o `.lean()` lê certo, então o `mongosh` mostrava
+tudo perfeito enquanto a aplicação via `undefined`. Nenhum teste pegava, porque todos mockavam o model.
+A rede que fechou isso é um teste de **hidratação offline** (`Model.hydrate`), que roda no CI sem banco.
 
 Índices, no estilo do `historico.schema.ts`:
 
