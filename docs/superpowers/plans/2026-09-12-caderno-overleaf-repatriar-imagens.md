@@ -175,9 +175,15 @@ describe('chaveDaUrl', () => {
 
 describe('trocarUrl', () => {
   it('troca todas as ocorrências daquela URL', () => {
-    const t = '![](https://x.com/a.png) meio ![](https://x.com/a.png)';
-    expect(trocarUrl(t, 'https://x.com/a.png', 'assets/K.png')).toBe(
-      '![](asset://assets/K.png) meio ![](asset://assets/K.png)',
+    // ⚠️ Chave com o tamanho REAL (64 hex), e não uma abreviada. Com chave
+    // curta, o delta de comprimento entre a URL e a substituição é pequeno o
+    // bastante para o off-by-one da ordem errada se auto-cancelar — e o teste
+    // passa sem provar nada. Medido.
+    const CHAVE = `assets/${'a'.repeat(64)}.png`;
+    const URL = 'https://enem.dev/2016/questions/3/abc.png';
+    const t = `![](${URL}) meio ![](${URL}) fim`;
+    expect(trocarUrl(t, URL, CHAVE)).toBe(
+      `![](asset://${CHAVE}) meio ![](asset://${CHAVE}) fim`,
     );
   });
 
@@ -271,6 +277,10 @@ export function chaveDaUrl(url: string, extensao: string): string {
  *
  * A troca é por posição, usando as ocorrências que o gerador reconhece — e de
  * trás para a frente, para os índices das anteriores continuarem válidos.
+ *
+ * ⚠️ De trás para a frente. Com chave real (83 caracteres contra ~40 da URL),
+ * processar na ordem crescente desloca os índices seguintes e corrompe a
+ * segunda ocorrência em diante.
  */
 export function trocarUrl(texto: string, url: string, chave: string): string {
   const alvos = acharImagens(texto)
