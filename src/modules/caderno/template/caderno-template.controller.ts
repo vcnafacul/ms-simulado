@@ -4,17 +4,22 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   NotFoundException,
   Param,
   ParseIntPipe,
   Post,
+  Query,
+  Res,
+  StreamableFile,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { CadernoTemplate } from './caderno-template.schema';
 import {
   CadernoTemplateService,
@@ -22,6 +27,7 @@ import {
 } from './caderno-template.service';
 import { UploadRascunhoDto } from './dtos/upload-rascunho.dto';
 import { extrairTemplateDoZip, LIMITES } from './extrair-zip';
+import { montarZipDeTeste } from './teste/zip-de-teste';
 
 /**
  * A superfície HTTP do template do caderno.
@@ -30,8 +36,10 @@ import { extrairTemplateDoZip, LIMITES } from './extrair-zip';
  * chega no corpo, injetado pelo api-vcnafacul a partir do JWT — mesmo padrão
  * de `prova/dtos/create.dto.input.ts`. Quem protege estas rotas é o card 12.
  *
- * ⚠️ **`GET /template/teste` não mora aqui** — é do card 11, apesar de
- * aparecer no fluxo desenhado no card 10.
+ * ⚠️ **`GET /template/teste` vem antes de qualquer `GET /:algo`.** Hoje não
+ * há rota com parâmetro solto neste controller, então não colide com nada; se
+ * um dia houver, `teste` tem de continuar declarada antes, ou o zip modelo
+ * vira "versão chamada teste" e o cliente leva 400.
  */
 @ApiTags('caderno-template')
 @Controller('v1/caderno/template')
@@ -132,6 +140,83 @@ export class CadernoTemplateController {
   @Get('versoes')
   async versoes(): Promise<CadernoTemplate[]> {
     return await this.service.versoes();
+  }
+
+  /**
+   * O zip modelo: o template escolhido, com uma prova fabricada dentro.
+   *
+   * Fecha o ciclo do card 10 — o que sai daqui, editado no Overleaf, é o que
+   * volta pelo `POST /rascunho`. Serve também para conferir uma versão antiga
+   * antes de restaurá-la.
+   *
+   * Sem parâmetro sai a publicada; `?versao=N` uma específica; `?rascunho=1`
+   * o rascunho em edição.
+   *
+   * ⚠️ **Leitura pura.** Nenhum método de escrita do serviço é alcançado.
+   * Uma versão anterior gravava `testadoEm` a cada download; saiu quando
+   * compilar no Overleaf virou passo obrigatório por construção.
+   */
+  @Get('teste')
+  @Header('Content-Type', 'application/zip')
+  async zipDeTeste(
+    @Query('versao') versao: string | undefined,
+    @Query('rascunho') rascunho: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    // ⚠️ `!== undefined`, não truthiness: `?rascunho=` chega como string
+    // vazia, que é falsy. Com `if (rascunho)` o parâmetro vazio cairia na
+    // publicada em silêncio, que é exatamente o que a validação abaixo existe
+    // para impedir.
+    const pediuRascunho = rascunho !== undefined;
+    const pediuVersao = versao !== undefined;
+
+    if (pediuVersao && pediuRascunho) {
+      throw new BadRequestException(
+        'Escolha um só: "versao" ou "rascunho". Os dois juntos são ambíguos.',
+      );
+    }
+
+    let origem: CadernoTemplate;
+
+    if (pediuRascunho) {
+      // ⚠️ Só `1` e `true`. Qualquer outro valor é 400, e nunca a publicada
+      // por engano: este projeto já se queimou com `z.coerce.boolean()`
+      // tratando `"false"` como `true`, e devolver a versão errada sem sinal
+      // nenhum é o defeito que este endpoint existe para evitar.
+      if (rascunho !== '1' && rascunho !== 'true') {
+        throw new BadRequestException(
+          `"rascunho" só aceita 1 ou true; recebi "${rascunho}".`,
+        );
+      }
+      origem = await this.service.rascunho();
+      if (!origem) {
+        throw new NotFoundException(
+          'Não há rascunho do template do caderno. Envie um zip do Overleaf.',
+        );
+      }
+    } else if (pediuVersao) {
+      // ⚠️ Validado à mão, e não com `ParseIntPipe`: `versao` é opcional, e o
+      // pipe cru rejeitaria a AUSÊNCIA junto com o lixo — mas a ausência é o
+      // caso normal, que usa a publicada.
+      if (/^\d+$/.test(versao) === false) {
+        throw new BadRequestException(
+          `"versao" tem de ser um número inteiro; recebi "${versao}".`,
+        );
+      }
+      origem = await this.service.porVersao(Number(versao));
+    } else {
+      origem = await this.service.publicada();
+    }
+
+    const nome = pediuRascunho
+      ? 'template-teste-rascunho.zip'
+      : `template-teste-v${origem.versao}.zip`;
+
+    const buffer = await montarZipDeTeste(origem.arquivos);
+
+    res.set({ 'Content-Disposition': `attachment; filename="${nome}"` });
+
+    return new StreamableFile(buffer);
   }
 
   /**

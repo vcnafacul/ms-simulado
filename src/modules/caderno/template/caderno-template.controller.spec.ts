@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import JSZip from 'jszip';
 import request from 'supertest';
 import { zipCom } from './__fixtures__/zip';
 import { CadernoTemplateController } from './caderno-template.controller';
@@ -19,6 +20,7 @@ function controllerCom(servico: Record<string, unknown> = {}) {
       .mockResolvedValue({ aceitos: [], ignorados: [], erros: [], avisos: [] }),
     publicar: jest.fn().mockResolvedValue({ versao: 4 }),
     restaurar: jest.fn().mockResolvedValue(undefined),
+    porVersao: jest.fn().mockResolvedValue({ versao: 2 }),
     descartarRascunho: jest.fn().mockResolvedValue(undefined),
     ...servico,
   } as any;
@@ -168,6 +170,144 @@ describe('POST /template/versoes/:n/restaurar', () => {
     await expect(
       controller.restaurar(99, { criadorId: 'u1' }),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+/**
+ * ⚠️ O mock padrão de `controllerCom` devolve documentos sem `arquivos`
+ * (`{ versao: 3 }`), o que basta para os endpoints que só repassam. O zip de
+ * teste MONTA o pacote de verdade, então aqui a origem precisa carregar os
+ * dois `.tex`. É de propósito que o montador não seja dublado: assim estes
+ * testes provam que o template escolhido é o que sai no zip, e não só que o
+ * método certo do serviço foi chamado.
+ */
+describe('GET /template/teste', () => {
+  const arquivosCom = (marca: string) => ({
+    'main.tex': `\\documentclass{exam}% ${marca}\n`,
+    'preambulo.tex': '\\usepackage{amsmath}\n',
+  });
+
+  const resFalso = () => ({ set: jest.fn() }) as any;
+
+  const controllerDeTeste = (servico: Record<string, unknown> = {}) =>
+    controllerCom({
+      publicada: jest
+        .fn()
+        .mockResolvedValue({ versao: 3, arquivos: arquivosCom('PUBLICADA') }),
+      rascunho: jest
+        .fn()
+        .mockResolvedValue({ versao: 0, arquivos: arquivosCom('RASCUNHO') }),
+      porVersao: jest
+        .fn()
+        .mockResolvedValue({ versao: 2, arquivos: arquivosCom('V2') }),
+      ...servico,
+    });
+
+  const texDoZip = async (streamable: any, nome: string) =>
+    await (await JSZip.loadAsync(streamable.getStream().read()))
+      .file(nome)!
+      .async('string');
+
+  it('sem parâmetro, usa a PUBLICADA', async () => {
+    const { servico, controller } = controllerDeTeste();
+    await controller.zipDeTeste(undefined, undefined, resFalso());
+    expect(servico.publicada).toHaveBeenCalled();
+    expect(servico.rascunho).not.toHaveBeenCalled();
+  });
+
+  it('?versao=3 usa a v3', async () => {
+    const { servico, controller } = controllerDeTeste();
+    await controller.zipDeTeste('3', undefined, resFalso());
+    expect(servico.porVersao).toHaveBeenCalledWith(3);
+  });
+
+  it('?rascunho=1 usa o rascunho', async () => {
+    const { servico, controller } = controllerDeTeste();
+    await controller.zipDeTeste(undefined, '1', resFalso());
+    expect(servico.rascunho).toHaveBeenCalled();
+  });
+
+  it('?rascunho=true também', async () => {
+    const { servico, controller } = controllerDeTeste();
+    await controller.zipDeTeste(undefined, 'true', resFalso());
+    expect(servico.rascunho).toHaveBeenCalled();
+  });
+
+  it('os dois juntos → 400', async () => {
+    const { controller } = controllerDeTeste();
+    await expect(
+      controller.zipDeTeste('3', '1', resFalso()),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it.each(['xis', 'sim', 'false', '0', ''])(
+    '?rascunho=%s → 400, e NÃO a publicada em silêncio',
+    async (valor) => {
+      // ⚠️ Este projeto já se queimou com z.coerce.boolean() tratando "false"
+      // como true. Cair na publicada porque o valor não foi entendido devolve
+      // a versão errada sem sinal nenhum — o defeito exato que este endpoint
+      // existe para evitar.
+      const { servico, controller } = controllerDeTeste();
+      await expect(
+        controller.zipDeTeste(undefined, valor, resFalso()),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(servico.publicada).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['abc', '', '1.5', '-1'])('?versao=%s → 400', async (valor) => {
+    // ⚠️ `versao` é query OPCIONAL: um ParseIntPipe cru rejeitaria a ausência
+    // junto com o lixo, e a ausência é o caso normal.
+    const { servico, controller } = controllerDeTeste();
+    await expect(
+      controller.zipDeTeste(valor, undefined, resFalso()),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(servico.porVersao).not.toHaveBeenCalled();
+  });
+
+  it('sem rascunho pendente → 404', async () => {
+    const { controller } = controllerDeTeste({
+      rascunho: jest.fn().mockResolvedValue(null),
+    });
+    await expect(
+      controller.zipDeTeste(undefined, '1', resFalso()),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('o zip sai com o template da ORIGEM escolhida, não com o da publicada', async () => {
+    // ⚠️ Sem isto, um controller que chamasse `porVersao` e depois montasse o
+    // zip com a publicada passaria em todos os testes acima: eles só olham
+    // qual método foi chamado.
+    const { controller } = controllerDeTeste();
+    const zip = await controller.zipDeTeste('2', undefined, resFalso());
+    expect(await texDoZip(zip, 'main.tex')).toContain('% V2');
+  });
+
+  it('o nome do arquivo diz a versão', async () => {
+    const { controller } = controllerDeTeste();
+    const res = resFalso();
+    await controller.zipDeTeste('2', undefined, res);
+    expect(res.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        'Content-Disposition': 'attachment; filename="template-teste-v2.zip"',
+      }),
+    );
+  });
+
+  it('NÃO escreve nada', async () => {
+    // O card é explícito: leitura pura. Uma versão anterior gravava
+    // `testadoEm` a cada download; saiu quando a compilação no Overleaf
+    // virou passo obrigatório por construção.
+    const { servico, controller } = controllerDeTeste();
+    await controller.zipDeTeste(undefined, undefined, resFalso());
+    for (const escrita of [
+      'salvarRascunho',
+      'publicar',
+      'restaurar',
+      'descartarRascunho',
+    ]) {
+      expect(servico[escrita]).not.toHaveBeenCalled();
+    }
   });
 });
 
