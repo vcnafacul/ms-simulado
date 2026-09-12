@@ -45,3 +45,8 @@ lerna-debug.log*
 # cartão-resposta: artefatos gerados + config local de preview
 tmp/
 cartao.config.json
+
+# Artefatos de corrida do repatriar:imagens (card 08). Carregam o texto
+# original das questoes e sao a UNICA forma de desfazer — guarde-os fora do
+# repo enquanto a migracao nao estiver conferida.
+reversao-*.jsonl
