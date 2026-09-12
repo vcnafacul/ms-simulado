@@ -1,13 +1,23 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import JSZip from 'jszip';
-import { ARQUIVOS_DO_ZIP, TEMPLATE_DIR } from './templates';
+import { ARQUIVOS_DO_REPO, TEMPLATE_DIR } from './templates';
 import { montarZip } from './zip';
 
 const abrir = async (buffer: Buffer) => JSZip.loadAsync(buffer);
 
+/**
+ * ⚠️ O template do teste é DIFERENTE do que está no repo, de propósito: é o
+ * que prova que o zip levou o que recebeu, e não o que está no disco.
+ */
+const TEMPLATE_FALSO: Record<string, string> = {
+  'main.tex': '\\documentclass{exam}% VEM DO MONGO\n',
+  'preambulo.tex': '\\usepackage{amsmath}% VEM DO MONGO\n',
+};
+
 const pacote = () =>
   montarZip({
+    template: TEMPLATE_FALSO,
     conteudo: '% AVISO: um\n\n\\question Teste\n',
     metadados: '\\def\\cadernoTitulo{Teste}\n',
     imagens: [
@@ -34,17 +44,53 @@ describe('montarZip — estrutura', () => {
     ]);
   });
 
-  it('os arquivos do template são byte-idênticos ao repo', async () => {
-    // O template é a fonte da verdade do layout. Se o zip levar uma cópia
-    // divergente, o usuário ajusta no Overleaf uma coisa que não é a que está
-    // versionada.
+  it('os .tex saem do que foi RECEBIDO, não do disco', async () => {
+    // ⚠️ O teste central deste card. Antes, o zip lia os quatro arquivos do
+    // repo; agora os dois de layout vêm da versão publicada no Mongo. Se ele
+    // continuasse lendo do disco, editar o template no banco não mudaria a
+    // prova — e nada falharia: o zip sairia perfeito, com o layout velho.
     const zip = await abrir(await pacote());
-    for (const arquivo of ARQUIVOS_DO_ZIP) {
+
+    for (const [nome, texto] of Object.entries(TEMPLATE_FALSO)) {
+      expect(await zip.file(nome)!.async('string')).toBe(texto);
+    }
+
+    const noRepo = fs.readFileSync(
+      path.join(TEMPLATE_DIR, 'main.tex'),
+      'utf-8',
+    );
+    expect(await zip.file('main.tex')!.async('string')).not.toBe(noRepo);
+  });
+
+  it('logo.png e LEIA-ME.txt continuam byte-idênticos ao repo', async () => {
+    const zip = await abrir(await pacote());
+    for (const arquivo of ARQUIVOS_DO_REPO) {
       const noZip = await zip.file(arquivo)!.async('nodebuffer');
       const noRepo = fs.readFileSync(path.join(TEMPLATE_DIR, arquivo));
       expect(noZip.equals(noRepo)).toBe(true);
     }
   });
+
+  it.each(['main.tex', 'preambulo.tex'])(
+    'template sem %s → recusa, nomeando o que faltou',
+    async (ausente) => {
+      // ⚠️ Sem isto o zip sai com um arquivo só e o LaTeX para com
+      // "File not found" — a pessoa recebe um zip que não compila e nada
+      // dizendo por quê. O lint do card 10 torna isso improvável, não
+      // impossível: uma versão semeada à mão passa longe dele.
+      const incompleto = { ...TEMPLATE_FALSO };
+      delete incompleto[ausente];
+
+      await expect(
+        montarZip({
+          template: incompleto,
+          conteudo: '',
+          metadados: '',
+          imagens: [],
+        }),
+      ).rejects.toThrow(ausente);
+    },
+  );
 
   it('leva o conteudo.tex e o metadados.tex gerados', async () => {
     const zip = await abrir(await pacote());
@@ -56,17 +102,9 @@ describe('montarZip — estrutura', () => {
     );
   });
 
-  it('não leva o exemplo/ do smoke test', async () => {
-    // ⚠️ O `exemplo/` do card 00 são questões SINTÉTICAS, escritas à mão para
-    // provar que o template compila. Vazar para o zip entregaria essas
-    // questões junto com as reais, na prova do aluno.
-    const zip = await abrir(await pacote());
-    const nomes = Object.keys(zip.files);
-    expect(nomes.some((n) => n.includes('exemplo'))).toBe(false);
-  });
-
   it('sem imagem nenhuma, ainda monta', async () => {
     const buffer = await montarZip({
+      template: TEMPLATE_FALSO,
       conteudo: '\\question Teste\n',
       metadados: '\\def\\cadernoTitulo{T}\n',
       imagens: [],
@@ -90,6 +128,7 @@ describe('montarZip — o conteúdo chega inteiro', () => {
     // Acento e cedilha estão em todo enunciado. Um zip que grave latin-1
     // entregaria "questÃ£o" na prova.
     const buffer = await montarZip({
+      template: TEMPLATE_FALSO,
       conteudo: 'A resistência é 100\\% da questão — ação\n',
       metadados: '\\def\\cadernoTitulo{Ação}\n',
       imagens: [],

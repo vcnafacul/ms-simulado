@@ -11,10 +11,21 @@ import * as path from 'path';
  */
 export const TEMPLATE_DIR = path.join(__dirname, 'templates/v1');
 
-/** Os quatro arquivos que viajam no zip do usuário. O `exemplo/` não entra. */
-export const ARQUIVOS_DO_ZIP = [
-  'main.tex',
-  'preambulo.tex',
-  'logo.png',
-  'LEIA-ME.txt',
-];
+/**
+ * Os dois arquivos de layout. **Vêm do Mongo** desde o card 11 — a versão
+ * publicada, não o disco.
+ *
+ * ⚠️ Eles continuam existindo em `templates/v1/` e continuam sendo copiados
+ * para o `dist`: são a semente do `seed:template-caderno` e a cópia de
+ * resgate. O que mudou é quem o zip da prova lê.
+ */
+export const ARQUIVOS_DO_TEMPLATE = ['main.tex', 'preambulo.tex'];
+
+/**
+ * O que continua vindo do disco.
+ *
+ * `logo.png` é binário e trocar logo é raro; o `LEIA-ME.txt` descreve o
+ * *fluxo*, que muda com o código, não com o layout. Nenhum dos dois é
+ * editável pelo Overleaf, então nenhum dos dois entrou no card 10.
+ */
+export const ARQUIVOS_DO_REPO = ['logo.png', 'LEIA-ME.txt'];
