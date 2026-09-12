@@ -23,8 +23,6 @@ const TEMPLATE_RUIM = {
   ),
 };
 
-const comoMap = (o: Record<string, string>) => new Map(Object.entries(o));
-
 function servicoCom(repo: Record<string, unknown> = {}) {
   const sessao = {
     startTransaction: jest.fn(),
@@ -117,9 +115,7 @@ describe('publicar()', () => {
     // ⚠️ O lint roda de novo aqui: o rascunho pode ter vindo de uma
     // restauração feita antes de uma regra nova existir.
     const { repositorio, servico } = servicoCom({
-      rascunho: jest
-        .fn()
-        .mockResolvedValue({ arquivos: comoMap(TEMPLATE_RUIM) }),
+      rascunho: jest.fn().mockResolvedValue({ arquivos: TEMPLATE_RUIM }),
     });
 
     await expect(servico.publicar()).rejects.toBeInstanceOf(ConflictException);
@@ -132,10 +128,10 @@ describe('publicar()', () => {
     // teria sido revertida silenciosamente no serviço.
     const { repositorio, servico } = servicoCom({
       rascunho: jest.fn().mockResolvedValue({
-        arquivos: comoMap({
+        arquivos: {
           ...TEMPLATE_BOM,
           'preambulo.tex': '\\def\\x{aberta',
-        }),
+        },
       }),
       maiorVersao: jest.fn().mockResolvedValue(3),
     });
@@ -150,9 +146,7 @@ describe('publicar()', () => {
 
   it('versao = max + 1, olhando o maior de TODOS os status', async () => {
     const { repositorio, servico } = servicoCom({
-      rascunho: jest
-        .fn()
-        .mockResolvedValue({ arquivos: comoMap(TEMPLATE_BOM) }),
+      rascunho: jest.fn().mockResolvedValue({ arquivos: TEMPLATE_BOM }),
       maiorVersao: jest.fn().mockResolvedValue(7),
     });
 
@@ -171,9 +165,7 @@ describe('publicar()', () => {
     // este card existe para evitar.
     const ordem: string[] = [];
     const { servico } = servicoCom({
-      rascunho: jest
-        .fn()
-        .mockResolvedValue({ arquivos: comoMap(TEMPLATE_BOM) }),
+      rascunho: jest.fn().mockResolvedValue({ arquivos: TEMPLATE_BOM }),
       arquivarPublicada: jest.fn(async () => {
         ordem.push('arquivar');
       }),
@@ -189,9 +181,7 @@ describe('publicar()', () => {
 
   it('commita a transação no caminho feliz', async () => {
     const { sessao, servico } = servicoCom({
-      rascunho: jest
-        .fn()
-        .mockResolvedValue({ arquivos: comoMap(TEMPLATE_BOM) }),
+      rascunho: jest.fn().mockResolvedValue({ arquivos: TEMPLATE_BOM }),
     });
 
     await servico.publicar();
@@ -205,9 +195,7 @@ describe('publicar()', () => {
   it('ABORTA quando a segunda escrita falha', async () => {
     // ⚠️ Sem o abort, a sessão fica aberta e a primeira escrita pode vazar.
     const { sessao, servico } = servicoCom({
-      rascunho: jest
-        .fn()
-        .mockResolvedValue({ arquivos: comoMap(TEMPLATE_BOM) }),
+      rascunho: jest.fn().mockResolvedValue({ arquivos: TEMPLATE_BOM }),
       promoverRascunho: jest.fn().mockRejectedValue(new Error('boom')),
     });
 
@@ -223,7 +211,7 @@ describe('restaurar()', () => {
     const { repositorio, servico } = servicoCom({
       porVersao: jest
         .fn()
-        .mockResolvedValue({ versao: 2, arquivos: comoMap(TEMPLATE_BOM) }),
+        .mockResolvedValue({ versao: 2, arquivos: TEMPLATE_BOM }),
     });
 
     await servico.restaurar(2, 'u1');
@@ -231,7 +219,7 @@ describe('restaurar()', () => {
     const [dados] = repositorio.substituirRascunho.mock.calls[0];
     expect(dados.origemVersao).toBe(2);
     expect(dados.criadorId).toBe('u1');
-    expect(Object.fromEntries(dados.arquivos)).toEqual(TEMPLATE_BOM);
+    expect(dados.arquivos).toEqual(TEMPLATE_BOM);
   });
 
   it('versão inexistente → 404', async () => {
@@ -247,7 +235,7 @@ describe('restaurar()', () => {
     const { repositorio, servico } = servicoCom({
       porVersao: jest
         .fn()
-        .mockResolvedValue({ versao: 2, arquivos: comoMap(TEMPLATE_BOM) }),
+        .mockResolvedValue({ versao: 2, arquivos: TEMPLATE_BOM }),
     });
 
     await servico.restaurar(2, 'u1');

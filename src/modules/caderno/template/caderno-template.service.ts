@@ -92,7 +92,7 @@ export class CadernoTemplateService {
 
     await this.repo.substituirRascunho({
       versao: VERSAO_DO_RASCUNHO,
-      arquivos: new Map(Object.entries(entrada.arquivos)),
+      arquivos: entrada.arquivos,
       criadorId: entrada.criadorId,
       notas: entrada.notas,
       origemVersao: null,
@@ -125,7 +125,7 @@ export class CadernoTemplateService {
       );
     }
 
-    const lint = lintarTemplate(Object.fromEntries(rascunho.arquivos));
+    const lint = lintarTemplate(rascunho.arquivos);
     // ⚠️ `=== false`: com `strictNullChecks: false` o TS não estreita união
     // por negação, e só o aviso não impede publicar.
     if (lint.podePublicar === false) {
@@ -168,7 +168,7 @@ export class CadernoTemplateService {
 
     await this.repo.substituirRascunho({
       versao: VERSAO_DO_RASCUNHO,
-      arquivos: new Map(origem.arquivos),
+      arquivos: origem.arquivos,
       criadorId,
       notas: `Restaurado da versão ${versao}`,
       origemVersao: versao,

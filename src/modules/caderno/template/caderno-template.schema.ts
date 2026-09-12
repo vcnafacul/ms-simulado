@@ -14,10 +14,30 @@ export class CadernoTemplate extends BaseSchema {
   @ApiProperty({ enum: ['rascunho', 'publicada', 'arquivada'] })
   public status: StatusTemplate;
 
-  /** `'main.tex'` -> o texto inteiro. Só os dois da whitelist. */
-  @Prop({ type: Map, of: String, required: true })
+  /**
+   * `'main.tex'` -> o texto inteiro. Só os dois da whitelist.
+   *
+   * ⚠️ **`type: Object`, NÃO `type: Map` — e isto é medido, não preferência.**
+   * Mongoose 7.6.11 recusa chave com `.` em `type: Map`: o write lança
+   * `CastError` (`Mongoose maps do not support keys that contain "."`) e o read
+   * hidratado (`findOne().exec()`) devolve `arquivos` como **`undefined`**, em
+   * silêncio — só o `.lean()` enxerga o campo. As chaves aqui são `main.tex` e
+   * `preambulo.tex` **por construção**: são os `ALVOS` da whitelist em
+   * `extrair-zip.ts`. Ou seja, com `Map` este campo nunca funciona, e falha
+   * calada na leitura. Quem for "melhorar" o tipo de volta para `Map`: o
+   * `caderno-template.schema.spec.ts` tem um teste de hidratação que fica
+   * vermelho na hora.
+   *
+   * ⚠️ Como as chaves têm ponto, **nunca escreva com caminho pontilhado**: um
+   * `$set: { 'arquivos.main.tex': ... }` criaria `{arquivos:{main:{tex:…}}}`
+   * aninhado, em silêncio. Hoje não há nenhuma escrita assim — todas trocam o
+   * documento inteiro, e o repositório proíbe `create`/`update`/`delete`
+   * justamente para não abrir esse caminho. Quem escrever a próxima precisa
+   * saber.
+   */
+  @Prop({ type: Object, required: true })
   @ApiProperty()
-  public arquivos: Map<string, string>;
+  public arquivos: Record<string, string>;
 
   @Prop({ required: true })
   @ApiProperty()
