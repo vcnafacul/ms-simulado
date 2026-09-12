@@ -156,8 +156,14 @@ describe('template não promete o gabarito do professor', () => {
       // Asserção POSITIVA de propósito. Banir a promessa não impede o texto de
       // simplesmente ficar calado sobre o assunto — e calado é como a dúvida
       // volta ("cadê o gabarito?"). O template tem que responder.
+      //
+      // ⚠️ O alternante é `fonte da verdade DO GABARITO`, ancorado, e não
+      // `fonte da verdade` solto: o LEIA-ME usa a mesma expressão na seção de
+      // layout ("a fonte da verdade do template é a versão publicada"), que
+      // não fala de gabarito nenhum. Solto, ele casava com aquela frase e
+      // apagar a seção da resposta correta deixava este teste verde.
       expect(lerTexto(arquivo).toLowerCase()).toMatch(
-        /(não|nao) (vem|viaja|aparece).{0,40}(pacote|zip|caderno)|fonte da verdade/,
+        /(não|nao) (vem|viaja|aparece).{0,40}(pacote|zip|caderno)|fonte da verdade do gabarito/,
       );
     },
   );
