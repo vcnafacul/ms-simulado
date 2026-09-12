@@ -1,15 +1,27 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ARQUIVOS_DO_ZIP, TEMPLATE_DIR } from './templates';
+import {
+  ARQUIVOS_DO_REPO,
+  ARQUIVOS_DO_TEMPLATE,
+  TEMPLATE_DIR,
+} from './templates';
 
 const lerTexto = (arquivo: string): string =>
   fs.readFileSync(path.join(TEMPLATE_DIR, arquivo), 'utf-8');
 
 describe('template do caderno (v1)', () => {
-  it.each(ARQUIVOS_DO_ZIP)('%s existe e não está vazio', (arquivo) => {
-    const tamanho = fs.statSync(path.join(TEMPLATE_DIR, arquivo)).size;
-    expect(tamanho).toBeGreaterThan(0);
-  });
+  // ⚠️ Este teste mudou de sentido no card 11. Antes era "os quatro arquivos
+  // que o zip leva existem"; agora o zip lê os dois `.tex` da versão publicada
+  // no Mongo. Os quatro seguem aqui por motivos diferentes: os de layout como
+  // semente do `seed:template-caderno` e cópia de resgate, os do repo porque o
+  // zip ainda os lê daqui. Sumir qualquer um continua sendo defeito.
+  it.each([...ARQUIVOS_DO_TEMPLATE, ...ARQUIVOS_DO_REPO])(
+    '%s existe e não está vazio',
+    (arquivo) => {
+      const tamanho = fs.statSync(path.join(TEMPLATE_DIR, arquivo)).size;
+      expect(tamanho).toBeGreaterThan(0);
+    },
+  );
 
   it('main.tex usa a exam.cls em duas colunas', () => {
     expect(lerTexto('main.tex')).toContain(
