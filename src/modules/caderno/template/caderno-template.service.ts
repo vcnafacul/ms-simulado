@@ -16,6 +16,26 @@ export interface RespostaDoRascunho {
   avisos: string[];
 }
 
+/**
+ * O `versao` que todo rascunho carrega enquanto é rascunho.
+ *
+ * Três fatos sustentam o `0`:
+ *
+ * 1. `versao` é `required: true` no schema, então o rascunho precisa de
+ *    ALGUM número — não dá para deixar de fora.
+ * 2. `0` não colide com o índice único de `versao`: existe no máximo um
+ *    rascunho por vez (índice parcial em `status: 'rascunho'`), e nenhuma
+ *    publicada ou arquivada chega a ter `0`, porque `maiorVersao()` devolve
+ *    `0` para coleção vazia e a primeira publicada é `1`.
+ * 3. `promoverRascunho` sobrescreve com o número real no publicar.
+ *
+ * ⚠️ **O número do rascunho não tem significado — é placeholder.** Quem
+ * quiser saber a versão de um rascunho está fazendo a pergunta errada: ela só
+ * é decidida no publicar. A convenção nasce aqui, no serviço, e nenhum método
+ * do repositório a define — por isso tem nome, e não dois literais nus.
+ */
+export const VERSAO_DO_RASCUNHO = 0;
+
 /** A entrada do upload já extraída — quem abre o zip é o controller. */
 export interface EntradaDoRascunho {
   arquivos: Record<string, string>;
@@ -71,7 +91,7 @@ export class CadernoTemplateService {
     const { erros, avisos } = lintarTemplate(entrada.arquivos);
 
     await this.repo.substituirRascunho({
-      versao: 0,
+      versao: VERSAO_DO_RASCUNHO,
       arquivos: new Map(Object.entries(entrada.arquivos)),
       criadorId: entrada.criadorId,
       notas: entrada.notas,
@@ -147,7 +167,7 @@ export class CadernoTemplateService {
     }
 
     await this.repo.substituirRascunho({
-      versao: 0,
+      versao: VERSAO_DO_RASCUNHO,
       arquivos: new Map(origem.arquivos),
       criadorId,
       notas: `Restaurado da versão ${versao}`,
