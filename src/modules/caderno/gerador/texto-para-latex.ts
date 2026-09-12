@@ -74,7 +74,7 @@ export function textoParaLatex(
   return saida.join('');
 }
 
-interface OcorrenciaDeImagem {
+export interface OcorrenciaDeImagem {
   inicio: number;
   fim: number;
   referencia: string;
@@ -87,8 +87,13 @@ interface OcorrenciaDeImagem {
  * Os dois são varridos separadamente e depois ordenados porque uma regex única
  * com alternância ficaria ilegível e os grupos de captura se embaralhariam
  * entre os ramos.
+ *
+ * ⚠️ **Exportada porque o card 08 usa a mesma definição.** Se a migração e o
+ * gerador discordarem do que é um construto de imagem, a migração deixa para
+ * trás exatamente as URLs que o gerador continua encontrando — e a métrica de
+ * sucesso do card 08 (zero `origem: 'url'`) nunca fecha.
  */
-function acharImagens(texto: string): OcorrenciaDeImagem[] {
+export function acharImagens(texto: string): OcorrenciaDeImagem[] {
   const achados: OcorrenciaDeImagem[] = [];
 
   for (const m of texto.matchAll(IMG_MARKDOWN)) {
