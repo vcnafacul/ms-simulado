@@ -20,6 +20,14 @@ describe('acharUrlsExternas', () => {
     ).toEqual([]);
   });
 
+  it('campo nulo ou ausente devolve vazio, sem estourar', () => {
+    // No Mongo, `pergunta` está ausente em 185 questões e outros campos vêm
+    // como null. Sem a guarda, o `acharImagens` receberia undefined e o
+    // script morreria no meio da migração.
+    expect(acharUrlsExternas(null as unknown as string)).toEqual([]);
+    expect(acharUrlsExternas(undefined as unknown as string)).toEqual([]);
+  });
+
   it('texto sem imagem devolve vazio', () => {
     expect(
       acharUrlsExternas('Enunciado com http://fonte.com citada em prosa'),
