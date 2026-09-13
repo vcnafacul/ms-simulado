@@ -50,4 +50,98 @@ describe('CadernoController', () => {
       service.gerarZip.mock.calls.every((c: any[]) => c[1].draft === false),
     ).toBe(true);
   });
+
+  describe('POST :simuladoId — com logos', () => {
+    const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const PNG_B64 = PNG.toString('base64');
+
+    it('decodifica o corpo e repassa os buffers ao serviço', async () => {
+      const { controller, service, res } = montar();
+
+      await controller.postCaderno(
+        'sim1',
+        undefined,
+        { logos: { vnf: PNG_B64, cursinho: PNG_B64 } },
+        res as any,
+      );
+
+      expect(service.gerarZip).toHaveBeenCalledWith('sim1', {
+        draft: false,
+        logos: { vnf: PNG, cursinho: PNG },
+      });
+    });
+
+    it('corpo sem logos chega como objeto vazio, não undefined', async () => {
+      const { controller, service, res } = montar();
+
+      await controller.postCaderno('sim1', undefined, {}, res as any);
+
+      expect(service.gerarZip).toHaveBeenCalledWith('sim1', {
+        draft: false,
+        logos: {},
+      });
+    });
+
+    it('respeita o draft=true, igual ao GET', async () => {
+      const { controller, service, res } = montar();
+
+      await controller.postCaderno('sim1', 'true', {}, res as any);
+
+      expect(service.gerarZip).toHaveBeenCalledWith('sim1', {
+        draft: true,
+        logos: {},
+      });
+    });
+
+    it('só a string "true" liga o rascunho, igual ao GET', async () => {
+      const { controller, service, res } = montar();
+
+      await controller.postCaderno('sim1', 'false', {}, res as any);
+
+      expect(service.gerarZip).toHaveBeenCalledWith('sim1', {
+        draft: false,
+        logos: {},
+      });
+    });
+
+    it('manda os mesmos headers que o GET', async () => {
+      const { controller, res } = montar();
+
+      await controller.postCaderno('sim1', undefined, {}, res as any);
+
+      expect(res.set).toHaveBeenCalledWith({
+        'Content-Disposition': 'attachment; filename="prova-20260908-1432.zip"',
+        'X-Caderno-Avisos': '3',
+      });
+    });
+
+    it('logo com bytes que não são imagem não chega ao serviço', async () => {
+      const { controller, service, res } = montar();
+      const lixo = Buffer.from('hello world').toString('base64');
+
+      await controller.postCaderno(
+        'sim1',
+        undefined,
+        { logos: { vnf: PNG_B64, cursinho: lixo } },
+        res as any,
+      );
+
+      expect(service.gerarZip).toHaveBeenCalledWith('sim1', {
+        draft: false,
+        logos: { vnf: PNG },
+      });
+    });
+  });
+
+  // ⚠️ O GET é o que segura a janela de deploy: se ele sumir antes de o api
+  // subir, todo download de caderno morre em 404.
+  describe('GET :simuladoId — mantido para a janela de deploy', () => {
+    it('continua gerando, sem a chave logos', async () => {
+      const { controller, service, res } = montar();
+
+      await controller.getCaderno('sim1', undefined, res as any);
+
+      expect(service.gerarZip).toHaveBeenCalledWith('sim1', { draft: false });
+    });
+  });
 });

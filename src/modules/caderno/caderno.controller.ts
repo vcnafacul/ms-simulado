@@ -1,8 +1,10 @@
 import {
+  Body,
   Controller,
   Get,
   Header,
   Param,
+  Post,
   Query,
   Res,
   StreamableFile,
@@ -10,6 +12,7 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { CadernoService } from './caderno.service';
+import { CadernoDtoInput, decodificarLogos } from './dtos/logos.dto.input';
 
 @ApiTags('caderno')
 @Controller('v1/caderno')
@@ -48,6 +51,39 @@ export class CadernoController {
     // que aparece como uma marca d'água que ninguém pediu.
     const { nome, buffer, avisos } = await this.caderno.gerarZip(simuladoId, {
       draft: draft === 'true',
+    });
+
+    res.set({
+      'Content-Disposition': `attachment; filename="${nome}"`,
+      'X-Caderno-Avisos': String(avisos),
+    });
+
+    return new StreamableFile(buffer);
+  }
+
+  /**
+   * A rota que o api usa desde o card 13.
+   *
+   * ⚠️ **O `GET` acima continua existindo, e não é sobra.** Os dois serviços
+   * sobem em deploys separados: se o api subisse antes mandando POST, todo
+   * download de caderno morreria em 404 até o segundo deploy terminar. Com o
+   * GET vivo, qualquer ordem funciona e o pior caso é um caderno sem logos por
+   * alguns minutos. Remover é card próprio, depois dos dois em produção.
+   *
+   * ⚠️ Mesma restrição de param do GET, pelo mesmo motivo: sem ela o literal
+   * `template` das rotas do `CadernoTemplateController` casa aqui.
+   */
+  @Post(':simuladoId([0-9a-fA-F]{24})')
+  @Header('Content-Type', 'application/zip')
+  async postCaderno(
+    @Param('simuladoId') simuladoId: string,
+    @Query('draft') draft: string | undefined,
+    @Body() corpo: CadernoDtoInput,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { nome, buffer, avisos } = await this.caderno.gerarZip(simuladoId, {
+      draft: draft === 'true',
+      logos: decodificarLogos(corpo?.logos),
     });
 
     res.set({
