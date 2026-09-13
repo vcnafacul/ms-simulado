@@ -16,7 +16,27 @@ import { CadernoService } from './caderno.service';
 export class CadernoController {
   constructor(private readonly caderno: CadernoService) {}
 
-  @Get(':simuladoId')
+  /**
+   * ⚠️ **O param é restrito a um ObjectId, e isso não é decoração.**
+   *
+   * Sem a restrição, `:simuladoId` casa com qualquer segmento — inclusive o
+   * literal `template` das rotas do `CadernoTemplateController`, que vive em
+   * `v1/caderno/template`. Como o `CadernoModule` é registrado antes no
+   * `app.module.ts`, ele ganhava a disputa e `GET /v1/caderno/template` caía
+   * aqui, com `simuladoId = "template"` — e morria num
+   * `CastError: Cast to ObjectId failed for value "template"` lá no
+   * `SimuladoRepository.getById`.
+   *
+   * Restringir o param é melhor do que reordenar os módulos: ordem de array é
+   * acoplamento invisível, e uma ordenação alfabética a desfaz em silêncio.
+   * Com o padrão aqui, `template` simplesmente não casa, e a ordem deixa de
+   * importar.
+   *
+   * Custo aceito: um `simuladoId` malformado passa a dar 404 em vez de chegar
+   * ao serviço. O cliente sempre manda ids de uma lista, e recusar mais cedo é
+   * mais seguro do que recusar depois.
+   */
+  @Get(':simuladoId([0-9a-fA-F]{24})')
   @Header('Content-Type', 'application/zip')
   async getCaderno(
     @Param('simuladoId') simuladoId: string,

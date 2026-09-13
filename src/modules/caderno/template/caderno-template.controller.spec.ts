@@ -6,6 +6,8 @@ import request from 'supertest';
 import { zipCom } from './__fixtures__/zip';
 import { CadernoTemplateController } from './caderno-template.controller';
 import { CadernoTemplateService } from './caderno-template.service';
+import { CadernoController } from '../caderno.controller';
+import { CadernoService } from '../caderno.service';
 
 const zipFalso = (buffer = Buffer.from('zip')) =>
   ({ buffer, originalname: 'projeto.zip' }) as Express.Multer.File;
@@ -397,5 +399,95 @@ describe('os pipes de rota (app de verdade)', () => {
       .expect(200);
 
     expect(r.body.erros).toHaveLength(1);
+  });
+});
+
+/**
+ * A colisão de rota entre os dois controllers do caderno.
+ *
+ * ⚠️ **Este bloco monta os DOIS controllers, na ordem do `app.module.ts`.**
+ * Nenhum outro teste desta suíte pega o defeito que ele guarda, porque a
+ * colisão não existe no controller — ela nasce no roteamento, depois do
+ * wiring dos módulos. Chamar o método direto nunca a alcança.
+ *
+ * O que aconteceu de verdade: `CadernoController` é `v1/caderno` com
+ * `@Get(':simuladoId')`, e o segmento literal `template` casava com o param.
+ * Como o `CadernoModule` vem antes no `app.module.ts`, ele engolia
+ * `GET /v1/caderno/template` e o pedido morria em
+ * `CastError: Cast to ObjectId failed for value "template"`.
+ */
+describe('a rota /template não é engolida pelo :simuladoId', () => {
+  let app: INestApplication;
+
+  const servicoTemplate = {
+    publicada: jest.fn().mockResolvedValue({ versao: 7 }),
+    rascunho: jest.fn(),
+    versoes: jest.fn(),
+    salvarRascunho: jest.fn(),
+    publicar: jest.fn(),
+    restaurar: jest.fn(),
+    descartarRascunho: jest.fn(),
+  };
+  const servicoCaderno = { gerarZip: jest.fn() };
+
+  beforeAll(async () => {
+    const modulo = await Test.createTestingModule({
+      // ⚠️ A ORDEM É A DO app.module.ts DE PROPÓSITO: CadernoModule antes.
+      // Inverter aqui esconderia o defeito, que é justamente o que este
+      // teste existe para impedir.
+      controllers: [CadernoController, CadernoTemplateController],
+      providers: [
+        { provide: CadernoService, useValue: servicoCaderno },
+        { provide: CadernoTemplateService, useValue: servicoTemplate },
+      ],
+    }).compile();
+    app = modulo.createNestApplication();
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  beforeEach(() => {
+    servicoCaderno.gerarZip.mockClear();
+    servicoTemplate.publicada.mockClear();
+  });
+
+  it('GET /v1/caderno/template chega no template, não no gerador de prova', async () => {
+    const r = await request(app.getHttpServer())
+      .get('/v1/caderno/template')
+      .expect(200);
+
+    expect(r.body).toEqual({ versao: 7 });
+    // ⚠️ A asserção que separa "respondeu" de "respondeu pelo caminho certo".
+    expect(servicoCaderno.gerarZip).not.toHaveBeenCalled();
+  });
+
+  it('um ObjectId de verdade continua chegando no gerador de prova', async () => {
+    // ⚠️ O par do teste acima: a restrição do param não pode ter quebrado o
+    // caminho que o card 04 entregou.
+    servicoCaderno.gerarZip.mockResolvedValue({
+      nome: 'caderno.zip',
+      buffer: Buffer.from('ZIP'),
+      avisos: 0,
+    });
+
+    await request(app.getHttpServer())
+      .get('/v1/caderno/65ecc850a528b39d273e7900')
+      .expect(200);
+
+    expect(servicoCaderno.gerarZip).toHaveBeenCalledWith(
+      '65ecc850a528b39d273e7900',
+      { draft: false },
+    );
+  });
+
+  it('um id malformado não alcança serviço nenhum', async () => {
+    await request(app.getHttpServer())
+      .get('/v1/caderno/nao-e-objectid')
+      .expect(404);
+    expect(servicoCaderno.gerarZip).not.toHaveBeenCalled();
+    expect(servicoTemplate.publicada).not.toHaveBeenCalled();
   });
 });
