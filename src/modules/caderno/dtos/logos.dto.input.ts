@@ -1,4 +1,4 @@
-import { IsBase64, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { LogosDoCaderno, temLogo } from '../logos';
 import { ChaveDeLogo, NOMES_DOS_LOGOS } from '../templates';
@@ -7,12 +7,10 @@ import { extensaoDosBytes } from '../imagens/formato';
 export class LogosDtoInput {
   @IsOptional()
   @IsString()
-  @IsBase64()
   vnf?: string | null;
 
   @IsOptional()
   @IsString()
-  @IsBase64()
   cursinho?: string | null;
 }
 
@@ -26,11 +24,13 @@ export class CadernoDtoInput {
 /**
  * Base64 → Buffer, chave a chave.
  *
- * ⚠️ **Base64 inválido vira ausência, não exceção.** Recusar a requisição
- * inteira por causa de um logo ilegível derrubaria a geração da prova — e o
- * caminho de ausência já existe e já avisa. O `@IsBase64` do DTO é que reporta
- * a malformação como 400 quando o `ValidationPipe` está ligado; isto aqui é a
- * rede embaixo.
+ * ⚠️ **Esta função é a porta única de validação, de propósito.** Qualquer
+ * defeito de logo — base64 malformado, bytes que não são imagem, chave
+ * desconhecida — degrada silenciosamente a ausência. Uma requisição com logo
+ * ruim NUNCA deve matar a geração da prova: ausência é estado normal e as
+ * rotas GET/POST já advertem cada caso. Se recusássemos aqui, um cliente que
+ * mandou base64 legível mas não-imagem teria sucesso, enquanto um que mandou
+ * base64 malformado teria 400 — mesmo problema, dois resultados, confusa.
  *
  * ⚠️ Só as chaves de `NOMES_DOS_LOGOS` atravessam. Um corpo com chave extra
  * não vira arquivo no zip.

@@ -20,6 +20,9 @@ export class CadernoController {
   constructor(private readonly caderno: CadernoService) {}
 
   /**
+   * @deprecated Substituído pelo `postCaderno`. Vivo só até o api estar em
+   * produção mandando POST — ver o docblock de lá. Não estender.
+   *
    * ⚠️ **O param é restrito a um ObjectId, e isso não é decoração.**
    *
    * Sem a restrição, `:simuladoId` casa com qualquer segmento — inclusive o
@@ -78,9 +81,12 @@ export class CadernoController {
   async postCaderno(
     @Param('simuladoId') simuladoId: string,
     @Query('draft') draft: string | undefined,
-    @Body() corpo: CadernoDtoInput,
-    @Res({ passthrough: true }) res: Response,
+    @Body() corpo?: CadernoDtoInput,
+    @Res({ passthrough: true }) res?: Response,
   ): Promise<StreamableFile> {
+    // ⚠️ Requisição sem corpo nenhum: o `@Body()` entrega undefined quando não há
+    // body parser aplicável. O `corpo?.` existe para isto.
+    // Mesma regra do GET; o porquê está no comentário de lá.
     const { nome, buffer, avisos } = await this.caderno.gerarZip(simuladoId, {
       draft: draft === 'true',
       logos: decodificarLogos(corpo?.logos),

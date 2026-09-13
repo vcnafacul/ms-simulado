@@ -131,6 +131,14 @@ describe('CadernoController', () => {
         logos: { vnf: PNG },
       });
     });
+
+    // ⚠️ Requisição sem corpo nenhum: o `@Body()` entrega undefined quando não há
+    // body parser aplicável. O `corpo?.` existe para isto.
+    it('corpo inteiramente ausente não quebra', async () => {
+      const { controller, service, res } = montar();
+      await controller.postCaderno('sim1', undefined, undefined as any, res as any);
+      expect(service.gerarZip).toHaveBeenCalledWith('sim1', { draft: false, logos: {} });
+    });
   });
 
   // ⚠️ O GET é o que segura a janela de deploy: se ele sumir antes de o api

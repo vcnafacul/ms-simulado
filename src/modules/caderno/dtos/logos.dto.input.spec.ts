@@ -35,6 +35,9 @@ describe('decodificarLogos', () => {
     ).toEqual({ vnf: PNG });
   });
 
+  // ⚠️ O DTO deliberadamente NÃO tem `@IsBase64()`: um logo ruim não pode
+  // custar a prova inteira. Base64 malformado e bytes que não são imagem
+  // devem degradar para ausência, não 400. Aqui é a porta única de validação.
   it('base64 inválido vira ausência, não exceção', () => {
     expect(decodificarLogos({ cursinho: '!!! não é base64 !!!' })).toEqual({});
   });
