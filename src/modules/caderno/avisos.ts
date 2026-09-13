@@ -62,7 +62,14 @@ export function juntarAvisos(
   return montar([...avisos, ...avisosDasImagens], corpo);
 }
 
-/** O mesmo, mais o total — que vai no header `X-Caderno-Avisos`. */
+/**
+ * O mesmo, mais o total — que vai no header `X-Caderno-Avisos`.
+ *
+ * ⚠️ **Seguro reprocessar a saída como entrada**: `separar()` remove o bloco
+ * de abertura `% AVISO:` antes de `montar()` reconstruir, então reusar o
+ * conteudo já montado não duplica. Uma única chamada ainda é preferida:
+ * mantém os avisos contíguos e em ordem de origem.
+ */
 juntarAvisos.comTotal = (
   conteudo: string,
   avisosDasImagens: string[],

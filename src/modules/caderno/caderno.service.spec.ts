@@ -201,7 +201,7 @@ describe('CadernoService — o que ele repassa', () => {
     const conteudo = await zip.file('conteudo.tex')!.async('string');
     const linhas = conteudo.split('\n').filter((l) => l.startsWith('% AVISO:'));
 
-    // 5 alternativas em branco (card 02) + 1 imagem (card 03)
+    // 5 alternativas em branco (card 02) + 1 imagem (card 03) + 2 logos (card 13)
     expect(linhas.length).toBe(r.avisos);
     expect(conteudo).toContain(
       '% AVISO: assets/01 — imagem não encontrada no acervo',
@@ -276,5 +276,91 @@ describe('o template vem do Mongo', () => {
     await servico.gerarZip('sim1', { draft: false });
 
     expect(log.mock.calls[0][0]).toContain('template=7');
+  });
+});
+
+describe('gerarZip — logos', () => {
+  it('repassa os logos recebidos para o zip', async () => {
+    const { service } = montar();
+    const vnf = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+
+    const r = await service.gerarZip('sim1', { draft: false, logos: { vnf } });
+
+    const zip = await JSZip.loadAsync(r.buffer);
+    expect(zip.file('logo_vnf.png')).not.toBeNull();
+  });
+
+  it('logo ausente vira aviso e entra na contagem', async () => {
+    const { service } = montar();
+
+    const r = await service.gerarZip('sim1', {
+      draft: false,
+      logos: { vnf: Buffer.from([0x89]) },
+    });
+
+    const zip = await JSZip.loadAsync(r.buffer);
+    const conteudo = await zip.file('conteudo.tex')!.async('string');
+
+    expect(conteudo).toContain(
+      '% AVISO: logo do cursinho não disponível — o cabeçalho sai sem a marca',
+    );
+    expect(conteudo).not.toContain('% AVISO: logo do Você na Facul');
+  });
+
+  // ⚠️ É a chamada do GET legado. Não pode lançar.
+  it('sem a opção `logos`, gera o zip e avisa os dois', async () => {
+    const { service } = montar();
+
+    const r = await service.gerarZip('sim1', { draft: false });
+
+    const zip = await JSZip.loadAsync(r.buffer);
+    const conteudo = await zip.file('conteudo.tex')!.async('string');
+
+    expect(zip.file('main.tex')).not.toBeNull();
+    expect(conteudo).toContain('% AVISO: logo do Você na Facul não disponível');
+    expect(conteudo).toContain('% AVISO: logo do cursinho não disponível');
+  });
+
+  it('logo de zero bytes avisa e não entra no zip', async () => {
+    const { service } = montar();
+    const r = await service.gerarZip('sim1', {
+      draft: false,
+      logos: { vnf: Buffer.alloc(0), cursinho: Buffer.from([0x89]) },
+    });
+    const zip = await JSZip.loadAsync(r.buffer);
+    expect(zip.file('logo_vnf.png')).toBeNull();
+    expect(await zip.file('conteudo.tex')!.async('string')).toContain(
+      '% AVISO: logo do Você na Facul não disponível',
+    );
+  });
+
+  it('avisos de logos vêm antes dos de imagens', async () => {
+    const { service } = montar({
+      resolucao: {
+        arquivos: [],
+        avisos: ['assets/01 — imagem não encontrada no acervo'],
+        metricas: {
+          doCache: 0,
+          doBucket: 0,
+          daInternet: 0,
+          falhas: 1,
+          bytes: 0,
+          ms: 0,
+        },
+      },
+    });
+    const r = await service.gerarZip('sim1', { draft: false });
+    const zip = await JSZip.loadAsync(r.buffer);
+    const conteudo = await zip.file('conteudo.tex')!.async('string');
+    const linhas = conteudo
+      .split('\n')
+      .filter((l: string) => l.startsWith('% AVISO:'));
+
+    const logoVnfIndex = linhas.findIndex((l) => l.includes('logo do Você na Facul'));
+    const imagemIndex = linhas.findIndex((l) => l.includes('assets/01'));
+
+    expect(logoVnfIndex).not.toBe(-1);
+    expect(imagemIndex).not.toBe(-1);
+    expect(logoVnfIndex).toBeLessThan(imagemIndex);
   });
 });
