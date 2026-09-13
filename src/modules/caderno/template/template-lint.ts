@@ -15,8 +15,9 @@ export interface ResultadoDoLint {
  * compilador no caminho: sem esta régua, um zip ruim para a geração de prova
  * para todo mundo.
  *
- * Sete regras bloqueiam e duas avisam. As duas que avisam são as que podem dar
- * falso positivo num template válido, e falso positivo aqui trava o
+ * As regras que bloqueiam a publicação empurram para `erros`; as que só avisam,
+ * para `avisos`. O critério da separação: avisa (não bloqueia) o que pode dar
+ * falso positivo num template válido, porque falso positivo aqui trava o
  * coordenador **depois** de ele ter visto o PDF compilar no Overleaf.
  *
  * ⚠️ **Tudo roda sobre o texto sem comentário.** Nos dois sentidos: um
