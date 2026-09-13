@@ -43,7 +43,17 @@ describe('avisosDosLogos', () => {
   });
 
   it('trata `logos` ausente como os dois ausentes', () => {
-    expect(avisosDosLogos(undefined)).toHaveLength(2);
+    expect(avisosDosLogos(undefined)).toEqual([
+      'logo do Você na Facul não disponível — o cabeçalho sai sem a marca',
+      'logo do cursinho não disponível — o cabeçalho sai sem a marca',
+    ]);
+  });
+
+  it('trata logo com zero bytes como ausente', () => {
+    expect(avisosDosLogos({ cursinho: Buffer.alloc(0) })).toEqual([
+      'logo do Você na Facul não disponível — o cabeçalho sai sem a marca',
+      'logo do cursinho não disponível — o cabeçalho sai sem a marca',
+    ]);
   });
 
   // ⚠️ Quebra de linha dentro de um aviso encerra o comentário LaTeX e joga o

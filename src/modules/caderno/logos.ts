@@ -10,7 +10,8 @@ import { ChaveDeLogo } from './templates';
  */
 export type LogosDoCaderno = Partial<Record<ChaveDeLogo, Buffer>>;
 
-const TEXTO: Record<ChaveDeLogo, string> = {
+// ⚠️ A ordem deste literal é a ordem dos avisos — o spec a afere.
+const AVISO_POR_LOGO: Record<ChaveDeLogo, string> = {
   vnf: 'logo do Você na Facul não disponível — o cabeçalho sai sem a marca',
   cursinho: 'logo do cursinho não disponível — o cabeçalho sai sem a marca',
 };
@@ -22,10 +23,14 @@ const TEXTO: Record<ChaveDeLogo, string> = {
  * no PDF, visíveis para quem abre no Overleaf. Sem eles, um cabeçalho sem a
  * marca do cursinho não tem explicação em lugar nenhum — e a pessoa vai
  * procurar o defeito no template.
+ *
+ * Um logo com zero bytes conta como ausente: um arquivo vazio passa na guard
+ * `\IfFileExists` do template mas quebra o `\includegraphics`, sem nenhum aviso
+ * explicando por que o cabeçalho saiu sem a marca.
  */
 export function avisosDosLogos(logos: LogosDoCaderno | undefined): string[] {
   const presentes = logos ?? {};
-  return (Object.keys(TEXTO) as ChaveDeLogo[])
-    .filter((chave) => !presentes[chave])
-    .map((chave) => TEXTO[chave]);
+  return (Object.keys(AVISO_POR_LOGO) as ChaveDeLogo[])
+    .filter((chave) => !presentes[chave]?.length)
+    .map((chave) => AVISO_POR_LOGO[chave]);
 }
