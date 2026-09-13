@@ -27,12 +27,11 @@ import {
  * card 11 são a versão *publicada* no Mongo. É o que fecha o circuito do
  * card 10: quem ajusta o layout publica uma versão nova, e a próxima prova sai
  * com ela. Os arquivos em `templates/v1/` deixaram de ser a fonte da verdade
- * do zip; sobraram como semente do seed e cópia de resgate. Só `logo.png` e
- * `LEIA-ME.txt` ainda saem do disco.
+ * do zip; sobraram como semente do seed e cópia de resgate.
  *
- * ⚠️ **Os logos opcionais vêm de quem chama**, junto com os `.tex`: quem chamou
- * é que sabe de qual cursinho é a inscrição. Chave ausente é estado normal.
- * Desembarcam na raiz plana, lado a lado com os `.tex` de layout.
+ * ⚠️ **`logo.png` (ARQUIVOS_DO_REPO) e `logo_vnf.png` (campo `logos`) são
+ * arquivos diferentes** — ambos desembarcam na raiz plana. `logo.png` vem do
+ * disco (template anterior); `logo_vnf.png` vem de quem chamou.
  */
 
 export interface PacoteDoCaderno {

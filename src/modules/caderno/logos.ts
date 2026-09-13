@@ -28,7 +28,7 @@ const AVISO_POR_LOGO: Record<ChaveDeLogo, string> = {
  * ⚠️ Mora aqui, e não em cada chamador, porque duas cópias da mesma regra é
  * como elas divergem — e o defeito da divergência é prova que não compila.
  */
-export const temLogo = (buffer?: Buffer): boolean => !!buffer?.length;
+export const temLogo = (buffer?: Buffer): buffer is Buffer => !!buffer?.length;
 
 /**
  * Um aviso por logo ausente.

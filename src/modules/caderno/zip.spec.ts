@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import JSZip from 'jszip';
+import { LogosDoCaderno } from './logos';
 import { ARQUIVOS_DO_REPO, TEMPLATE_DIR } from './templates';
 import { montarZip } from './zip';
 
@@ -141,7 +142,7 @@ describe('montarZip — o conteúdo chega inteiro', () => {
 });
 
 describe('montarZip — logos', () => {
-  const comLogos = (logos: Record<string, Buffer>) =>
+  const comLogos = (logos: LogosDoCaderno) =>
     montarZip({
       template: TEMPLATE_FALSO,
       conteudo: '\\question Teste\n',

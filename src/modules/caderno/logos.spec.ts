@@ -66,19 +66,21 @@ describe('avisosDosLogos', () => {
 });
 
 describe('temLogo', () => {
-  it('undefined → false', () => {
+  it('buffer ausente não conta como presente', () => {
     expect(temLogo(undefined)).toBe(false);
   });
 
-  it('null → false', () => {
-    expect(temLogo(null as any)).toBe(false);
+  it('null não conta como presente', () => {
+    // strictNullChecks: false em tsconfig.json permite que a API/DTO mande null
+    // sem erro de tipo — o chamador não consegue impedir.
+    expect(temLogo(null as unknown as Buffer)).toBe(false);
   });
 
-  it('Buffer.alloc(0) → false', () => {
+  it('logo de zero bytes não conta como presente', () => {
     expect(temLogo(Buffer.alloc(0))).toBe(false);
   });
 
-  it('Buffer não-vazio → true', () => {
+  it('buffer não-vazio conta como presente', () => {
     expect(temLogo(Buffer.from([0x89, 0x50, 0x4e, 0x47]))).toBe(true);
     expect(temLogo(Buffer.from('a'))).toBe(true);
   });
