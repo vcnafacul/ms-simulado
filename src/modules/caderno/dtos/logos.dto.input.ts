@@ -1,6 +1,8 @@
-import { IsBase64, IsOptional, IsString } from 'class-validator';
+import { IsBase64, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { LogosDoCaderno, temLogo } from '../logos';
 import { ChaveDeLogo, NOMES_DOS_LOGOS } from '../templates';
+import { extensaoDosBytes } from '../imagens/formato';
 
 export class LogosDtoInput {
   @IsOptional()
@@ -16,6 +18,8 @@ export class LogosDtoInput {
 
 export class CadernoDtoInput {
   @IsOptional()
+  @ValidateNested()
+  @Type(() => LogosDtoInput)
   logos?: LogosDtoInput;
 }
 
@@ -37,20 +41,16 @@ export function decodificarLogos(
   const logos: LogosDoCaderno = {};
   if (!corpo) return logos;
 
-  // Base64 válido contém só A-Za-z0-9+/ (e opcionalmente = para padding)
-  const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
-
   for (const chave of Object.keys(NOMES_DOS_LOGOS) as ChaveDeLogo[]) {
     const valor = corpo[chave];
     if (typeof valor !== 'string' || valor.length === 0) continue;
 
-    // Rejeitar strings que não têm o formato de base64
-    if (!base64Regex.test(valor)) continue;
-
-    // ⚠️ `Buffer.from` nunca lança em base64 inválido: ele descarta o que não
-    // reconhece. Zero byte é o sinal de que não sobrou nada.
+    // ⚠️ `Buffer.from` nunca lança em base64 inválido: descarta o que não
+    // reconhece e FICA COM O RESTO. 'abc' vira 2 bytes; lixo acentuado vira 6.
+    // Zero byte NÃO é sinal confiável de lixo — quem recusa é o
+    // `extensaoDosBytes`, pelos magic bytes. O `temLogo` cobre só o vazio.
     const buffer = Buffer.from(valor, 'base64');
-    if (temLogo(buffer)) logos[chave] = buffer;
+    if (temLogo(buffer) && extensaoDosBytes(buffer)) logos[chave] = buffer;
   }
 
   return logos;

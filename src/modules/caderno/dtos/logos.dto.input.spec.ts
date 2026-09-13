@@ -1,7 +1,9 @@
+import 'reflect-metadata';
 import { decodificarLogos } from './logos.dto.input';
 
-const PNG_B64 = Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString('base64');
-const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+// Full PNG signature (8 bytes)
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const PNG_B64 = PNG.toString('base64');
 
 describe('decodificarLogos', () => {
   it('decodifica as duas chaves', () => {
@@ -39,5 +41,14 @@ describe('decodificarLogos', () => {
 
   it('string vazia vira ausência', () => {
     expect(decodificarLogos({ cursinho: '' })).toEqual({});
+  });
+
+  it('base64 válido mas não imagem vira ausência', () => {
+    // 'abc' é base64 válido que decodifica para 2 bytes sem magic, e
+    // 'hello world' é também válido mas não tem magic de PNG/JPEG/PDF
+    expect(decodificarLogos({ vnf: 'abc' })).toEqual({});
+    expect(
+      decodificarLogos({ cursinho: Buffer.from('hello world').toString('base64') }),
+    ).toEqual({});
   });
 });
