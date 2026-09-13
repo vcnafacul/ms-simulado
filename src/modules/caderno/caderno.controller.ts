@@ -81,8 +81,8 @@ export class CadernoController {
   async postCaderno(
     @Param('simuladoId') simuladoId: string,
     @Query('draft') draft: string | undefined,
+    @Res({ passthrough: true }) res: Response,
     @Body() corpo?: CadernoDtoInput,
-    @Res({ passthrough: true }) res?: Response,
   ): Promise<StreamableFile> {
     // ⚠️ Requisição sem corpo nenhum: o `@Body()` entrega undefined quando não há
     // body parser aplicável. O `corpo?.` existe para isto.

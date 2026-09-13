@@ -61,8 +61,8 @@ describe('CadernoController', () => {
       await controller.postCaderno(
         'sim1',
         undefined,
-        { logos: { vnf: PNG_B64, cursinho: PNG_B64 } },
         res as any,
+        { logos: { vnf: PNG_B64, cursinho: PNG_B64 } },
       );
 
       expect(service.gerarZip).toHaveBeenCalledWith('sim1', {
@@ -74,7 +74,7 @@ describe('CadernoController', () => {
     it('corpo sem logos chega como objeto vazio, não undefined', async () => {
       const { controller, service, res } = montar();
 
-      await controller.postCaderno('sim1', undefined, {}, res as any);
+      await controller.postCaderno('sim1', undefined, res as any, {});
 
       expect(service.gerarZip).toHaveBeenCalledWith('sim1', {
         draft: false,
@@ -85,7 +85,7 @@ describe('CadernoController', () => {
     it('respeita o draft=true, igual ao GET', async () => {
       const { controller, service, res } = montar();
 
-      await controller.postCaderno('sim1', 'true', {}, res as any);
+      await controller.postCaderno('sim1', 'true', res as any, {});
 
       expect(service.gerarZip).toHaveBeenCalledWith('sim1', {
         draft: true,
@@ -96,7 +96,7 @@ describe('CadernoController', () => {
     it('só a string "true" liga o rascunho, igual ao GET', async () => {
       const { controller, service, res } = montar();
 
-      await controller.postCaderno('sim1', 'false', {}, res as any);
+      await controller.postCaderno('sim1', 'false', res as any, {});
 
       expect(service.gerarZip).toHaveBeenCalledWith('sim1', {
         draft: false,
@@ -107,7 +107,7 @@ describe('CadernoController', () => {
     it('manda os mesmos headers que o GET', async () => {
       const { controller, res } = montar();
 
-      await controller.postCaderno('sim1', undefined, {}, res as any);
+      await controller.postCaderno('sim1', undefined, res as any, {});
 
       expect(res.set).toHaveBeenCalledWith({
         'Content-Disposition': 'attachment; filename="prova-20260908-1432.zip"',
@@ -122,8 +122,8 @@ describe('CadernoController', () => {
       await controller.postCaderno(
         'sim1',
         undefined,
-        { logos: { vnf: PNG_B64, cursinho: lixo } },
         res as any,
+        { logos: { vnf: PNG_B64, cursinho: lixo } },
       );
 
       expect(service.gerarZip).toHaveBeenCalledWith('sim1', {
@@ -136,7 +136,7 @@ describe('CadernoController', () => {
     // body parser aplicável. O `corpo?.` existe para isto.
     it('corpo inteiramente ausente não quebra', async () => {
       const { controller, service, res } = montar();
-      await controller.postCaderno('sim1', undefined, undefined as any, res as any);
+      await controller.postCaderno('sim1', undefined, res as any, undefined as any);
       expect(service.gerarZip).toHaveBeenCalledWith('sim1', { draft: false, logos: {} });
     });
   });
