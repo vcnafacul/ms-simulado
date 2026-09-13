@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import JSZip from 'jszip';
+import { LogosDoCaderno } from './logos';
 import { ARQUIVOS_DO_REPO, TEMPLATE_DIR } from './templates';
 import { montarZip } from './zip';
 
@@ -137,5 +138,72 @@ describe('montarZip — o conteúdo chega inteiro', () => {
     expect(await zip.file('conteudo.tex')!.async('string')).toBe(
       'A resistência é 100\\% da questão — ação\n',
     );
+  });
+});
+
+describe('montarZip — logos', () => {
+  const comLogos = (logos: LogosDoCaderno) =>
+    montarZip({
+      template: TEMPLATE_FALSO,
+      conteudo: '\\question Teste\n',
+      metadados: '\\def\\cadernoTitulo{Teste}\n',
+      imagens: [],
+      logos,
+    });
+
+  it('escreve os dois logos na raiz, com os nomes de NOMES_DOS_LOGOS', async () => {
+    const zip = await abrir(
+      await comLogos({
+        vnf: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+        cursinho: Buffer.from([0x89, 0x50, 0x4e, 0x48]),
+      }),
+    );
+
+    expect(zip.files['logo_vnf.png']).toBeDefined();
+    expect(zip.files['logo_cursinho.png']).toBeDefined();
+    expect(
+      Buffer.from(await zip.files['logo_cursinho.png'].async('nodebuffer')),
+    ).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x48]));
+  });
+
+  it('a ausência de um não impede o outro', async () => {
+    const zip = await abrir(await comLogos({ vnf: Buffer.from([0x89]) }));
+
+    expect(zip.files['logo_vnf.png']).toBeDefined();
+    expect(zip.files['logo_cursinho.png']).toBeUndefined();
+  });
+
+  // ⚠️ É o caso do GET legado e do usuário sem cursinho. Se isto quebrar, o
+  // download some para quem não tem cursinho.
+  it('sem logos nenhum, o zip continua válido', async () => {
+    const zip = await abrir(await comLogos({}));
+
+    expect(zip.files['main.tex']).toBeDefined();
+    expect(zip.files['logo_vnf.png']).toBeUndefined();
+    expect(zip.files['logo_cursinho.png']).toBeUndefined();
+  });
+
+  // ⚠️ Zero byte não vira arquivo: um logo_cursinho.png vazio faria o
+  // \IfFileExists do template passar e o \includegraphics quebrar, enquanto o
+  // aviso diria que o logo está ausente.
+  it('logo de zero bytes não é escrito', async () => {
+    const zip = await abrir(
+      await comLogos({
+        vnf: Buffer.from([0x89]),
+        cursinho: Buffer.alloc(0),
+      }),
+    );
+
+    expect(zip.files['logo_vnf.png']).toBeDefined();
+    expect(zip.files['logo_cursinho.png']).toBeUndefined();
+  });
+
+  // ⚠️ O `logo.png` é de um template anterior e continua saindo do disco.
+  // Não confundir com `logo_vnf.png`, que vem do BUCKET_HOME.
+  it('não substitui o logo.png de ARQUIVOS_DO_REPO', async () => {
+    const zip = await abrir(await comLogos({ vnf: Buffer.from([0x89]) }));
+
+    expect(zip.files['logo.png']).toBeDefined();
+    expect(ARQUIVOS_DO_REPO).toContain('logo.png');
   });
 });

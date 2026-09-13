@@ -12,6 +12,7 @@ import { juntarAvisos } from './avisos';
 import { gerarCaderno } from './gerador/gerar-caderno';
 import { SimuladoParaCaderno } from './gerador/tipos';
 import { ResolverDeImagens } from './imagens/resolver';
+import { avisosDosLogos, LogosDoCaderno, temLogo } from './logos';
 import { nomeDoArquivo } from './nome-do-arquivo';
 import { CadernoTemplateService } from './template/caderno-template.service';
 import { montarZip } from './zip';
@@ -43,7 +44,7 @@ export class CadernoService {
 
   async gerarZip(
     simuladoId: string,
-    opts: { draft: boolean },
+    opts: { draft: boolean; logos?: LogosDoCaderno },
   ): Promise<{ nome: string; buffer: Buffer; avisos: number }> {
     const inicio = Date.now();
 
@@ -78,16 +79,20 @@ export class CadernoService {
       throw new ServiceUnavailableException((erro as Error).message);
     }
 
-    const { conteudo, total } = juntarAvisos.comTotal(
-      caderno.conteudo,
-      resolucao.avisos,
-    );
+    // Avisos de logos (fixo, até 2) primeiro, depois avisos de imagens
+    // (unbounded). Um coordenador abre conteudo.tex e lê de cima para baixo;
+    // com 30 imagens faltando, a marca do cursinho não pode estar na linha 35.
+    const { conteudo, total } = juntarAvisos.comTotal(caderno.conteudo, [
+      ...avisosDosLogos(opts.logos),
+      ...resolucao.avisos,
+    ]);
 
     const buffer = await montarZip({
       template: templatePublicado.arquivos,
       conteudo,
       metadados: caderno.metadados,
       imagens: resolucao.arquivos,
+      logos: opts.logos,
     });
 
     this.logger.log(
@@ -95,6 +100,7 @@ export class CadernoService {
         `template=${templatePublicado.versao} ` +
         `questoes=${caderno.questoesIncluidas.length} ` +
         `imagens=${resolucao.arquivos.length} ` +
+        `logos=${Object.values(opts.logos ?? {}).filter(temLogo).length} ` +
         `cache=${resolucao.metricas.doCache} bucket=${resolucao.metricas.doBucket} ` +
         `internet=${resolucao.metricas.daInternet} ` +
         `bytes=${buffer.length} avisos=${total} ms=${Date.now() - inicio}`,

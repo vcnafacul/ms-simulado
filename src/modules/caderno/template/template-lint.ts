@@ -15,8 +15,9 @@ export interface ResultadoDoLint {
  * compilador no caminho: sem esta régua, um zip ruim para a geração de prova
  * para todo mundo.
  *
- * Sete regras bloqueiam e duas avisam. As duas que avisam são as que podem dar
- * falso positivo num template válido, e falso positivo aqui trava o
+ * As regras que bloqueiam a publicação empurram para `erros`; as que só avisam,
+ * para `avisos`. O critério da separação: avisa (não bloqueia) o que pode dar
+ * falso positivo num template válido, porque falso positivo aqui trava o
  * coordenador **depois** de ele ter visto o PDF compilar no Overleaf.
  *
  * ⚠️ **Tudo roda sobre o texto sem comentário.** Nos dois sentidos: um
@@ -52,6 +53,7 @@ export function lintarTemplate(
   for (const arquivo of limpos) {
     erros.push(...proibidos(arquivo));
     erros.push(...ambientesDesbalanceados(arquivo));
+    erros.push(...logosSemGuarda(arquivo));
     avisos.push(...chavesDesbalanceadas(arquivo));
   }
   avisos.push(...macrosIndefinidas(limpos));
@@ -169,6 +171,67 @@ function saiDoProjeto(caminho: string): boolean {
   if (limpo.startsWith('/') || limpo.startsWith('~')) return true;
   if (/^[a-zA-Z]:[\\/]/.test(limpo)) return true;
   return limpo.split('/').some((parte) => parte === '..');
+}
+
+// --- logo opcional sem guarda (erro) ---------------------------------------
+
+/**
+ * Os logos que podem faltar no zip.
+ *
+ * ⚠️ **Não inclui `logo.png`**, que sai sempre de `ARQUIVOS_DO_REPO` e nunca
+ * falta. A regra é sobre arquivo que pode não vir: quem baixa o caderno pode
+ * não ter cursinho, e o logo do VNF depende de o `BUCKET_HOME` responder.
+ */
+const LOGOS_OPCIONAIS = ['logo_vnf.png', 'logo_cursinho.png'];
+
+/**
+ * ⚠️ O nome do arquivo entra num regex por interpolação e tem `.`, que casaria
+ * com qualquer caractere: `logo_vnf.png` aceitaria `logo_vnfXpng`. Escapar é o
+ * que torna a comparação por arquivo de verdade.
+ */
+const escapaRegex = (texto: string) =>
+  texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * ⚠️ A guarda é **do mesmo arquivo**, não "algum `\IfFileExists` por perto".
+ * `\IfFileExists{logo_vnf.png}{...\includegraphics{logo_cursinho.png}...}`
+ * compila com os dois presentes e quebra exatamente no caso que a guarda
+ * deveria cobrir — a ausência é por arquivo, o critério também.
+ */
+const guardaDe = (alvo: string) =>
+  new RegExp(`\\\\IfFileExists\\s*\\{\\s*${escapaRegex(alvo)}\\s*\\}`);
+
+/**
+ * ⚠️ A checagem é **por linha**, que é onde o `preambulo.tex` do próprio repo
+ * põe os dois construtos. Uma guarda aberta numa linha com o
+ * `\includegraphics` três linhas abaixo é reprovada: falso positivo aceito, e
+ * por isso a mensagem dita a linha inteira a escrever — a alternativa seria
+ * casar chave balanceada em LaTeX.
+ *
+ * ⚠️ Reaproveita o `PUXA_ARQUIVO` das proibidas em vez de um segundo regex
+ * quase igual: duas gramáticas de `\includegraphics` divergiriam na primeira
+ * vez que alguém aceitasse mais uma forma numa delas.
+ */
+function logosSemGuarda(arquivo: Arquivo): string[] {
+  const achados: string[] = [];
+
+  arquivo.texto.split('\n').forEach((linha, i) => {
+    for (const [comando, caminho] of matches(linha, PUXA_ARQUIVO)) {
+      if (comando !== 'includegraphics') continue;
+
+      // `\includegraphics{ logo_vnf.png }` desenha o mesmo arquivo: o alvo é o
+      // caminho sem o espaço das chaves, aqui e na guarda.
+      const alvo = caminho.trim();
+      if (!LOGOS_OPCIONAIS.includes(alvo)) continue;
+      if (guardaDe(alvo).test(linha)) continue;
+
+      achados.push(
+        `${onde(arquivo, i + 1)}: \`\\includegraphics{${alvo}}\` sem guarda — o \`${alvo}\` pode não vir no zip e a compilação quebra para quem não o tem; escreva \`\\IfFileExists{${alvo}}{\\includegraphics{${alvo}}}{}\` na MESMA linha`,
+      );
+    }
+  });
+
+  return achados;
 }
 
 // --- balanceamento de ambientes (erro) -------------------------------------

@@ -186,3 +186,99 @@ describe('lintarTemplate — o erro diz onde', () => {
     expect(r.erros[0]).toMatch(/linha 3/);
   });
 });
+
+describe('lintarTemplate — logos precisam de guarda', () => {
+  const comPreambulo = (trecho: string) =>
+    lintarTemplate({
+      ...OK,
+      'preambulo.tex': `${OK['preambulo.tex']}\n${trecho}\n`,
+    });
+
+  it('reprova \\includegraphics de logo_cursinho.png sem guarda', () => {
+    const r = comPreambulo(
+      '\\includegraphics[height=1.1cm]{logo_cursinho.png}',
+    );
+
+    expect(r.podePublicar).toBe(false);
+    expect(r.erros.join('\n')).toContain('logo_cursinho.png');
+    expect(r.erros.join('\n')).toContain('IfFileExists');
+  });
+
+  it('reprova \\includegraphics de logo_vnf.png sem guarda', () => {
+    const r = comPreambulo('\\includegraphics{logo_vnf.png}');
+
+    expect(r.podePublicar).toBe(false);
+    expect(r.erros.join('\n')).toContain('logo_vnf.png');
+  });
+
+  it('aceita quando guardado pelo IfFileExists do mesmo arquivo', () => {
+    const r = comPreambulo(
+      '\\IfFileExists{logo_vnf.png}{\\includegraphics{logo_vnf.png}}{}',
+    );
+
+    expect(r.erros.join('\n')).not.toContain('logo_vnf.png');
+  });
+
+  // ⚠️ O caso que motiva a regra ser por arquivo: guardar um e desenhar o
+  // outro compila quando os dois vêm e quebra quando falta só o segundo.
+  it('reprova guarda de um arquivo protegendo o includegraphics do outro', () => {
+    const r = comPreambulo(
+      '\\IfFileExists{logo_vnf.png}{\\includegraphics{logo_cursinho.png}}{}',
+    );
+
+    expect(r.podePublicar).toBe(false);
+    expect(r.erros.join('\n')).toContain('logo_cursinho.png');
+  });
+
+  it('aceita os dois guardados na mesma linha', () => {
+    const r = comPreambulo(
+      '\\IfFileExists{logo_vnf.png}{\\includegraphics{logo_vnf.png}}{}%' +
+        '\\IfFileExists{logo_cursinho.png}{\\includegraphics{logo_cursinho.png}}{}',
+    );
+
+    expect(r.erros.join('\n')).not.toContain('IfFileExists');
+  });
+
+  it('não se mete com imagem que não é logo', () => {
+    const r = comPreambulo('\\includegraphics{assets/01.png}');
+
+    expect(r.erros.join('\n')).not.toContain('IfFileExists');
+  });
+
+  // O `logo.png` sai sempre do disco via ARQUIVOS_DO_REPO e nunca falta.
+  it('não exige guarda para o logo.png dos ARQUIVOS_DO_REPO', () => {
+    const r = comPreambulo('\\includegraphics{logo.png}');
+
+    expect(r.erros.join('\n')).not.toContain('IfFileExists');
+  });
+
+  // ⚠️ Tudo no lint roda sobre o texto SEM comentário — um includegraphics
+  // comentado não desenha nada e não pode reprovar.
+  it('ignora includegraphics comentado', () => {
+    const r = comPreambulo('% \\includegraphics{logo_vnf.png}');
+
+    expect(r.erros.join('\n')).not.toContain('logo_vnf.png');
+  });
+
+  it('tolera espaço dentro das chaves', () => {
+    const r = comPreambulo(
+      '\\IfFileExists{ logo_vnf.png }{\\includegraphics{ logo_vnf.png }}{}',
+    );
+
+    expect(r.erros.join('\n')).not.toContain('logo_vnf.png');
+  });
+
+  // O template real do repo tem que passar na régua que ele mesmo inspirou.
+  it('o preambulo.tex do repo passa na regra', () => {
+    const dir = path.join(__dirname, '../templates/v1');
+    const r = lintarTemplate({
+      'main.tex': fs.readFileSync(path.join(dir, 'main.tex'), 'utf-8'),
+      'preambulo.tex': fs.readFileSync(
+        path.join(dir, 'preambulo.tex'),
+        'utf-8',
+      ),
+    });
+
+    expect(r.erros.join('\n')).not.toContain('IfFileExists');
+  });
+});
