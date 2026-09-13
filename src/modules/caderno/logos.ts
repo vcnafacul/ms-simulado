@@ -17,6 +17,20 @@ const AVISO_POR_LOGO: Record<ChaveDeLogo, string> = {
 };
 
 /**
+ * A única definição de "este logo existe".
+ *
+ * ⚠️ **Zero byte conta como ausente.** `Buffer.alloc(0)` é objeto, logo
+ * truthy: uma checagem por truthiness gravaria um arquivo vazio no zip, o
+ * `\IfFileExists` do template passaria e o `\includegraphics` quebraria a
+ * compilação no Overleaf — com o aviso dizendo que o logo está *ausente*,
+ * mandando procurar no lugar errado.
+ *
+ * ⚠️ Mora aqui, e não em cada chamador, porque duas cópias da mesma regra é
+ * como elas divergem — e o defeito da divergência é prova que não compila.
+ */
+export const temLogo = (buffer?: Buffer): boolean => !!buffer?.length;
+
+/**
  * Um aviso por logo ausente.
  *
  * Os avisos viram comentários `% AVISO:` no topo do `conteudo.tex`: invisíveis
@@ -31,6 +45,6 @@ const AVISO_POR_LOGO: Record<ChaveDeLogo, string> = {
 export function avisosDosLogos(logos: LogosDoCaderno | undefined): string[] {
   const presentes = logos ?? {};
   return (Object.keys(AVISO_POR_LOGO) as ChaveDeLogo[])
-    .filter((chave) => !presentes[chave]?.length)
+    .filter((chave) => !temLogo(presentes[chave]))
     .map((chave) => AVISO_POR_LOGO[chave]);
 }

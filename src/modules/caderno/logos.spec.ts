@@ -1,5 +1,5 @@
 import { NOMES_DOS_LOGOS } from './templates';
-import { avisosDosLogos } from './logos';
+import { avisosDosLogos, temLogo } from './logos';
 
 describe('NOMES_DOS_LOGOS', () => {
   it('mapeia chave semântica para nome de arquivo na raiz do zip', () => {
@@ -62,5 +62,20 @@ describe('avisosDosLogos', () => {
     for (const aviso of avisosDosLogos({})) {
       expect(aviso).not.toMatch(/[\r\n]/);
     }
+  });
+});
+
+describe('temLogo', () => {
+  it('undefined → false', () => {
+    expect(temLogo(undefined)).toBe(false);
+  });
+
+  it('Buffer.alloc(0) → false', () => {
+    expect(temLogo(Buffer.alloc(0))).toBe(false);
+  });
+
+  it('Buffer não-vazio → true', () => {
+    expect(temLogo(Buffer.from([0x89, 0x50, 0x4e, 0x47]))).toBe(true);
+    expect(temLogo(Buffer.from('a'))).toBe(true);
   });
 });

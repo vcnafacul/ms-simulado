@@ -2,9 +2,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import JSZip from 'jszip';
 import { ArquivoDoZip } from './imagens/tipos';
+import { LogosDoCaderno, temLogo } from './logos';
 import {
   ARQUIVOS_DO_REPO,
   ARQUIVOS_DO_TEMPLATE,
+  ChaveDeLogo,
+  NOMES_DOS_LOGOS,
   TEMPLATE_DIR,
 } from './templates';
 
@@ -26,6 +29,10 @@ import {
  * com ela. Os arquivos em `templates/v1/` deixaram de ser a fonte da verdade
  * do zip; sobraram como semente do seed e cópia de resgate. Só `logo.png` e
  * `LEIA-ME.txt` ainda saem do disco.
+ *
+ * ⚠️ **Os logos opcionais vêm de quem chama**, junto com os `.tex`: quem chamou
+ * é que sabe de qual cursinho é a inscrição. Chave ausente é estado normal.
+ * Desembarcam na raiz plana, lado a lado com os `.tex` de layout.
  */
 
 export interface PacoteDoCaderno {
@@ -34,6 +41,11 @@ export interface PacoteDoCaderno {
   conteudo: string;
   metadados: string;
   imagens: ArquivoDoZip[];
+  /**
+   * Vêm do api, que é quem sabe de qual cursinho é quem pediu. Opcional: o
+   * `GET` legado não manda nenhum, e chave ausente é estado normal.
+   */
+  logos?: LogosDoCaderno;
 }
 
 export async function montarZip(pacote: PacoteDoCaderno): Promise<Buffer> {
@@ -61,6 +73,11 @@ export async function montarZip(pacote: PacoteDoCaderno): Promise<Buffer> {
 
   for (const imagem of pacote.imagens) {
     zip.file(imagem.nome, imagem.buffer);
+  }
+
+  for (const chave of Object.keys(NOMES_DOS_LOGOS) as ChaveDeLogo[]) {
+    const buffer = pacote.logos?.[chave];
+    if (temLogo(buffer)) zip.file(NOMES_DOS_LOGOS[chave], buffer);
   }
 
   return zip.generateAsync({ type: 'nodebuffer' });
