@@ -70,6 +70,10 @@ describe('temLogo', () => {
     expect(temLogo(undefined)).toBe(false);
   });
 
+  it('null → false', () => {
+    expect(temLogo(null as any)).toBe(false);
+  });
+
   it('Buffer.alloc(0) → false', () => {
     expect(temLogo(Buffer.alloc(0))).toBe(false);
   });
