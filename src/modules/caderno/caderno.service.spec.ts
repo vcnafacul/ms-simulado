@@ -356,7 +356,9 @@ describe('gerarZip — logos', () => {
       .split('\n')
       .filter((l: string) => l.startsWith('% AVISO:'));
 
-    const logoVnfIndex = linhas.findIndex((l) => l.includes('logo do Você na Facul'));
+    const logoVnfIndex = linhas.findIndex((l) =>
+      l.includes('logo do Você na Facul'),
+    );
     const imagemIndex = linhas.findIndex((l) => l.includes('assets/01'));
 
     expect(logoVnfIndex).not.toBe(-1);

@@ -51,7 +51,9 @@ describe('decodificarLogos', () => {
     // 'hello world' é também válido mas não tem magic de PNG/JPEG/PDF
     expect(decodificarLogos({ vnf: 'abc' })).toEqual({});
     expect(
-      decodificarLogos({ cursinho: Buffer.from('hello world').toString('base64') }),
+      decodificarLogos({
+        cursinho: Buffer.from('hello world').toString('base64'),
+      }),
     ).toEqual({});
   });
 });
