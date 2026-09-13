@@ -48,12 +48,25 @@ const montar = (over: any = {}) => {
     ),
   };
   const env = { get: jest.fn(() => over.draftEnabled ?? true) };
+  const templateService = {
+    publicada: jest.fn(
+      async () =>
+        over.template ?? {
+          versao: 7,
+          arquivos: {
+            'main.tex': '\\documentclass{exam}\n',
+            'preambulo.tex': '\\usepackage{amsmath}\n',
+          },
+        },
+    ),
+  };
   const service = new CadernoService(
     simuladoService as any,
     resolver as any,
     env as any,
+    templateService as any,
   );
-  return { service, simuladoService, resolver, env };
+  return { service, simuladoService, resolver, env, templateService };
 };
 
 describe('CadernoService — o portão', () => {
@@ -213,5 +226,55 @@ describe('CadernoService — o que ele repassa', () => {
     const r = await service.gerarZip('sim1', { draft: false });
     const zip = await JSZip.loadAsync(r.buffer);
     expect(zip.file('assets/01.png')).not.toBeNull();
+  });
+});
+
+describe('o template vem do Mongo', () => {
+  it('o zip leva o main.tex da versão publicada', async () => {
+    const { service: servico } = montar({
+      template: {
+        versao: 9,
+        arquivos: {
+          'main.tex': '\\documentclass{exam}% DA VERSAO 9\n',
+          'preambulo.tex': '\\usepackage{amsmath}\n',
+        },
+      },
+    });
+
+    const { buffer } = await servico.gerarZip('sim1', { draft: false });
+    const zip = await JSZip.loadAsync(buffer);
+
+    expect(await zip.file('main.tex')!.async('string')).toContain(
+      'DA VERSAO 9',
+    );
+  });
+
+  it('sem versão publicada, o 503 propaga — e nada de zip', async () => {
+    // ⚠️ O 503 vem do próprio serviço do template (card 10). O que este teste
+    // guarda é que o caderno NÃO o engole para cair no disco: um fallback
+    // faria o admin achar que sua edição está no ar enquanto a prova sai com
+    // o template antigo, sem sinal nenhum.
+    const { service: servico } = montar({});
+    servico['template'].publicada = jest.fn(async () => {
+      throw new ServiceUnavailableException('nenhuma versão publicada');
+    });
+
+    await expect(
+      servico.gerarZip('sim1', { draft: false }),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  it('a linha de log registra a versão do template', async () => {
+    // ⚠️ Quando alguém disser "a prova saiu torta", a primeira pergunta é qual
+    // versão gerou. O template muda sem deploy, então não há rastro no git —
+    // o log é o único lugar onde essa resposta pode existir.
+    const { service: servico } = montar({});
+    const log = jest
+      .spyOn(servico['logger'], 'log')
+      .mockImplementation(() => undefined);
+
+    await servico.gerarZip('sim1', { draft: false });
+
+    expect(log.mock.calls[0][0]).toContain('template=7');
   });
 });

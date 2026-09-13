@@ -77,6 +77,24 @@ export class CadernoTemplateService {
     return await this.repo.versoes();
   }
 
+  /**
+   * Uma versão específica, para o zip de teste conferir um layout antigo antes
+   * de restaurá-lo.
+   *
+   * ⚠️ **404, e não `null`.** Pedir o zip de uma versão que não existe é um
+   * pedido errado; cair na publicada em silêncio entregaria um template que
+   * não é o que se pediu conferir, e a pessoa aprovaria a versão errada.
+   */
+  async porVersao(versao: number): Promise<CadernoTemplate> {
+    const encontrada = await this.repo.porVersao(versao);
+    if (!encontrada) {
+      throw new NotFoundException(
+        `Versão ${versao} do template do caderno não existe.`,
+      );
+    }
+    return encontrada;
+  }
+
   // ----------------------------------------------------------------- escritas
 
   /**

@@ -1,4 +1,8 @@
-import { ConflictException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  ConflictException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { CadernoTemplateService } from './caderno-template.service';
 
 const TEMPLATE_BOM = {
@@ -66,6 +70,29 @@ describe('publicada()', () => {
     const { servico } = servicoCom();
     await expect(servico.publicada()).rejects.toBeInstanceOf(
       ServiceUnavailableException,
+    );
+  });
+});
+
+describe('porVersao()', () => {
+  it('devolve a versão quando existe', async () => {
+    const { servico } = servicoCom({
+      porVersao: jest
+        .fn()
+        .mockResolvedValue({ versao: 2, arquivos: TEMPLATE_BOM }),
+    });
+    const encontrada = await servico.porVersao(2);
+    expect(encontrada.versao).toBe(2);
+    expect(encontrada.arquivos).toEqual(TEMPLATE_BOM);
+  });
+
+  it('versão inexistente → 404', async () => {
+    // ⚠️ 404 aqui, e não `null` devolvido ao controller: o zip de teste de
+    // uma versão que não existe é um pedido errado, e cair na publicada em
+    // silêncio devolveria um template que não é o que se pediu conferir.
+    const { servico } = servicoCom();
+    await expect(servico.porVersao(99)).rejects.toBeInstanceOf(
+      NotFoundException,
     );
   });
 });

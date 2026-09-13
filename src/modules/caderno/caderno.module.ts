@@ -5,9 +5,10 @@ import { SimuladoModule } from '../simulado/simulado.module';
 import { CadernoController } from './caderno.controller';
 import { CadernoService } from './caderno.service';
 import { ResolverDeImagens } from './imagens/resolver';
+import { CadernoTemplateModule } from './template/caderno-template.module';
 
 @Module({
-  imports: [SimuladoModule, StorageModule, EnvModule],
+  imports: [SimuladoModule, StorageModule, EnvModule, CadernoTemplateModule],
   controllers: [CadernoController],
   providers: [CadernoService, ResolverDeImagens],
 })
