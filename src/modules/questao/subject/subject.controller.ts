@@ -66,18 +66,14 @@ export class SubjectController {
     return await this.service.getById(id);
   }
 
-  @Patch(':id')
-  @ApiResponse({
-    status: 200,
-    description: 'tema atualizado com sucesso',
-  })
-  async update(
-    @Param('id') id: string,
-    @Body() model: UpdateSubjectDTOInput,
-  ): Promise<void> {
-    return await this.service.update(id, model);
-  }
-
+  // ⚠️ As rotas literais vêm ANTES do `@Patch(':id')`, e a ordem é
+  // significativa: no Express a primeira que casa vence, então com o `:id`
+  // em cima `PATCH /v1/subject/order` caía no `update()` com `id = "order"`.
+  // Reordenar matéria ficava quebrado ponta a ponta — a api chama estas duas
+  // rotas em `subject.service.ts:50-55`.
+  //
+  // Guardado por `subject.controller.spec.ts`, que monta um app de verdade:
+  // chamar o método direto nunca alcança a colisão.
   @Patch('order')
   @ApiResponse({
     status: 200,
@@ -94,6 +90,18 @@ export class SubjectController {
   })
   async swapOrder(@Body() body: { id1: string; id2: string }): Promise<void> {
     return await this.service.swapOrder(body.id1, body.id2);
+  }
+
+  @Patch(':id')
+  @ApiResponse({
+    status: 200,
+    description: 'tema atualizado com sucesso',
+  })
+  async update(
+    @Param('id') id: string,
+    @Body() model: UpdateSubjectDTOInput,
+  ): Promise<void> {
+    return await this.service.update(id, model);
   }
 
   @Delete(':id')
