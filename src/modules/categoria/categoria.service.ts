@@ -61,8 +61,9 @@ export class CategoriaService {
   }
 
   private gerarNomeAuto(dto: CreateCategoriaDTOInput): string {
-    // normaliza whitespace interno: nome tem índice unique, então "Mini  X" e
-    // "Mini X" não podem virar categorias distintas.
+    // normaliza whitespace interno: o nome entra no índice único (hoje
+    // composto, `{dono, nome}`), então "Mini  X" e "Mini X" não podem virar
+    // categorias distintas para o mesmo dono.
     const prefixo = dto.prefixo?.trim().replace(/\s+/g, ' ') || 'Personalizado';
     const qtd = dto.quantidadeTotalQuestao ?? 'livre';
     const parteQtd = qtd === 'livre' ? 'livre' : `${qtd}q`;
