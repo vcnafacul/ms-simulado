@@ -2416,8 +2416,14 @@ deploy, e o gate visual não executado.
 4. **api-vcnafacul**
 5. **client-vcnafacul**
 
-⚠️ Entre 1 e 2 o ms antigo continua rodando contra o índice novo. É seguro: ele não escreve `dono`, e
-os documentos existentes já têm `dono: "system"` do backfill.
+⚠️ **A ordem 1 → 2 não é preferência, é requisito.** O `delete` compara `categoria.dono !== dono`
+com igualdade estrita: uma categoria legada sem o campo tem `dono === undefined`, que não casa nem com
+`'system'`. Subir o ms antes do backfill deixa **toda categoria existente indeletável por qualquer
+um** — inclusive pelo admin — e o erro que aparece é um 403 "Categoria de outro dono", que não sugere
+em nada que o problema é a migração faltando.
+
+⚠️ Entre 1 e 2 o ms antigo continua rodando contra o índice novo. Isso é seguro: ele não escreve
+`dono`, e os documentos existentes já têm `dono: "system"` do backfill.
 
 ⚠️ Entre 2 e 4 a api antiga chama `v1/categoria` sem `dono` — o ms devolve as do sistema, que é
 exatamente o comportamento de hoje. Sem degradação.
