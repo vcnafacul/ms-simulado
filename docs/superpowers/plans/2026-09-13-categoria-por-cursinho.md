@@ -1422,23 +1422,25 @@ Em `src/modules/simulado/categoria/categoria.service.ts`, troque os três métod
   /**
    * ⚠️ O `dono` viaja no header `x-dono`, não no corpo. O corpo é escrito pelo
    * cliente; este header é escrito aqui, a partir do JWT.
+   *
+   * ⚠️ **Headers como `Record` simples, NÃO um config do axios.** MEDIDO: a
+   * assinatura do wrapper é `post<T>(url, body?, headers?)` e
+   * `delete<T>(url, headers?)`. Passar `{ headers: { 'x-dono': dono } }` — o
+   * reflexo natural de quem conhece axios — envia um header **chamado
+   * `headers`**: o ms nunca vê o `x-dono`, cai no default `'system'`, e toda
+   * categoria de cursinho nasce como categoria da plataforma. Sem erro nenhum.
    */
   async create(dto: CreateCategoriaDtoInput, dono: string) {
-    return await this.axios.post('v1/categoria', dto, {
-      headers: { 'x-dono': dono },
-    });
+    return await this.axios.post('v1/categoria', dto, { 'x-dono': dono });
   }
 
   async delete(id: string, dono: string) {
-    return await this.axios.delete(`v1/categoria/${id}`, {
-      headers: { 'x-dono': dono },
-    });
+    return await this.axios.delete(`v1/categoria/${id}`, { 'x-dono': dono });
   }
 ```
 
-⚠️ Confirme a assinatura de `HttpServiceAxios.post`/`delete` em
-`src/shared/services/axios/http-service-axios.factory.ts` antes de escrever — se ela não aceitar
-config, acrescente o parâmetro lá, e **cubra com teste** o repasse do header.
+⚠️ **Cubra o repasse do header com teste.** É a única coisa que separa "mandou o dono" de "mandou
+alguma coisa" — e o modo de falhar aqui é silencioso, não é exceção.
 
 - [ ] **Step 4: Implementar o controller**
 
