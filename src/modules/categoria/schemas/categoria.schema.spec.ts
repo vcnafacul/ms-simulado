@@ -38,6 +38,14 @@ describe('CategoriaSchema — dono', () => {
     )!;
 
     expect(chaves).toEqual({ dono: 1, nome: 1 });
+    /**
+     * ⚠️ **A ordem das chaves, explicitamente.** `toEqual` compara objeto sem
+     * olhar ordem, então sozinho ele deixa passar `{ nome, dono }` — provado
+     * por mutação. E a ordem importa: só o prefixo `dono` serve a consulta do
+     * `getAll` filtrando por dono sozinho. Invertido, aquela listagem vira
+     * varredura de coleção — sem erro, só mais lenta.
+     */
+    expect(Object.keys(chaves)).toEqual(['dono', 'nome']);
     expect(opcoes.unique).toBe(true);
     /**
      * ⚠️ Sem o parcial, o soft delete queima o nome PARA SEMPRE: o documento
