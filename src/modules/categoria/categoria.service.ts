@@ -12,7 +12,7 @@ import { SimuladoRepository } from '../simulado/simulado.repository';
 import { ProvaRepository } from '../prova/prova.repository';
 import { CreateCategoriaDTOInput } from './dtos/create.dto.input';
 import { CategoriaOutputDTO } from './dtos/categoria-output.dto';
-import { Categoria } from './schemas/categoria.schema';
+import { Categoria, DONO_SYSTEM } from './schemas/categoria.schema';
 import { CategoriaRepository } from './categoria.repository';
 
 @Injectable()
@@ -25,23 +25,36 @@ export class CategoriaService {
     private readonly provaRepository: ProvaRepository,
   ) {}
 
-  public async add(dto: CreateCategoriaDTOInput): Promise<Categoria> {
+  /**
+   * ⚠️ `dono` é PARÂMETRO, nunca campo do DTO. Quem o define é a api, a partir
+   * do JWT — mesma regra que o `cursinho-prova.controller` já aplica a
+   * `criadorId`/`cursinhoId`. Com o dono vindo do corpo, o cursinho A criaria
+   * categoria em nome do B mandando um campo a mais no JSON.
+   */
+  public async add(
+    dto: CreateCategoriaDTOInput,
+    dono: string = DONO_SYSTEM,
+  ): Promise<Categoria> {
     const nomeAplicado = dto.nome ?? this.gerarNomeAuto(dto);
 
     // colisão ANTES do pattern: nomes seedados (ex.: "Enem Dia 1") não seguem
     // o pattern de categoria custom, então precisam bater 409 (não 400).
-    const collision = await this.repository.getByFilter({ nome: nomeAplicado });
+    const collision = await this.repository.getAtivaByNomeEDono(
+      nomeAplicado,
+      dono,
+    );
     if (collision) {
       throw new ConflictException('Já existe uma categoria com esse nome');
     }
 
-    this.validarPatternNome(nomeAplicado);
+    this.validarPatternNome(nomeAplicado, dono);
 
     // backend é fonte de verdade: força os campos de segurança (ignora o DTO).
     const categoria = Object.assign(new Categoria(), dto, {
       nome: nomeAplicado,
       custom: true,
       selecionavel: true,
+      dono,
     });
 
     return await this.repository.create(categoria);
@@ -56,7 +69,15 @@ export class CategoriaService {
     return `${prefixo} ${parteQtd} ${dto.duracao}min`;
   }
 
-  private validarPatternNome(nome: string): void {
+  /**
+   * ⚠️ **Só vale para categoria da plataforma.** O pattern existe para o nome
+   * ser autodescritivo numa lista global de dezenas de itens. Na lista de um
+   * cursinho, com poucos itens e nomes que ele reconhece, ele custa mais do que
+   * entrega — e impediria exatamente o caso de uso do ticket ("Enem Dia 1").
+   */
+  private validarPatternNome(nome: string, dono: string): void {
+    if (dono !== DONO_SYSTEM) return;
+
     const pattern = /^(?:\S+\s+)*?(?:\d+q|livre)\s+\d+min$/;
     if (!pattern.test(nome)) {
       throw new BadRequestException(

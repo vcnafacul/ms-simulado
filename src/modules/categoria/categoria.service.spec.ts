@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CategoriaService } from './categoria.service';
+import { DONO_SYSTEM } from './schemas/categoria.schema';
 
 function makeService(overrides?: {
   getById?: jest.Mock;
@@ -99,11 +100,12 @@ describe('CategoriaService.delete', () => {
 
 describe('CategoriaService.add', () => {
   function makeAddService(over?: {
-    getByFilter?: jest.Mock;
+    getAtivaByNomeEDono?: jest.Mock;
     create?: jest.Mock;
   }) {
     const repository = {
-      getByFilter: over?.getByFilter ?? jest.fn().mockResolvedValue(null),
+      getAtivaByNomeEDono:
+        over?.getAtivaByNomeEDono ?? jest.fn().mockResolvedValue(null),
       create: over?.create ?? jest.fn().mockImplementation(async (c) => c),
     };
     const simuladoRepository = {
@@ -133,9 +135,10 @@ describe('CategoriaService.add', () => {
     expect(saved.nome).toBe('Personalizado 30q 60min');
     expect(saved.custom).toBe(true);
     expect(saved.selecionavel).toBe(true);
-    expect(repository.getByFilter).toHaveBeenCalledWith({
-      nome: 'Personalizado 30q 60min',
-    });
+    expect(repository.getAtivaByNomeEDono).toHaveBeenCalledWith(
+      'Personalizado 30q 60min',
+      DONO_SYSTEM,
+    );
   });
 
   it('auto-gera nome com prefixo fornecido', async () => {
@@ -188,7 +191,7 @@ describe('CategoriaService.add', () => {
 
   it('lança 409 quando o nome já existe (colisão antes do pattern)', async () => {
     const { service } = makeAddService({
-      getByFilter: jest.fn().mockResolvedValue({ _id: 'seed-enem' }),
+      getAtivaByNomeEDono: jest.fn().mockResolvedValue({ _id: 'seed-enem' }),
     });
     await expect(
       service.add({ nome: 'Enem Dia 1', exame: 'e1', duracao: 60 } as any),
@@ -349,5 +352,95 @@ describe('CategoriaService.getById (anexa contagem de uso)', () => {
 
     expect(result).toBeNull();
     expect(simuladoRepository.countsByCategoria).not.toHaveBeenCalled();
+  });
+});
+
+describe('CategoriaService — dono', () => {
+  let service: CategoriaService;
+  let repository: {
+    getAtivaByNomeEDono: jest.Mock;
+    create: jest.Mock;
+    getById: jest.Mock;
+    delete: jest.Mock;
+    getAll: jest.Mock;
+  };
+
+  beforeEach(() => {
+    repository = {
+      getAtivaByNomeEDono: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockImplementation(async (c) => c),
+      getById: jest.fn(),
+      delete: jest.fn(),
+      getAll: jest.fn(),
+    };
+    service = new CategoriaService(
+      repository as never,
+      { countByCategoria: jest.fn().mockResolvedValue(0) } as never,
+      { countByCategoria: jest.fn().mockResolvedValue(0) } as never,
+    );
+  });
+
+  const dto = { duracao: 60, quantidadeTotalQuestao: 30, exame: 'e1' } as never;
+
+  it('grava o dono recebido, e não o que veio no corpo', async () => {
+    /**
+     * ⚠️ A garantia de isolamento. Se o `dono` puder vir do DTO, o cursinho A
+     * cria categoria em nome do B mandando um campo a mais no JSON.
+     */
+    const criada = await service.add(
+      { ...(dto as object), dono: 'HACK' } as never,
+      'cur-1',
+    );
+    expect(criada.dono).toBe('cur-1');
+  });
+
+  it('sem dono informado, é do sistema', async () => {
+    const criada = await service.add({
+      ...(dto as object),
+      nome: 'X 30q 60min',
+    } as never);
+    expect(criada.dono).toBe(DONO_SYSTEM);
+  });
+
+  it('a colisão é por dono+nome, não só por nome', async () => {
+    await service.add(
+      { ...(dto as object), nome: 'Enem Dia 1' } as never,
+      'cur-1',
+    );
+    expect(repository.getAtivaByNomeEDono).toHaveBeenCalledWith(
+      'Enem Dia 1',
+      'cur-1',
+    );
+  });
+
+  it('mesmo nome e mesmo dono dá 409', async () => {
+    repository.getAtivaByNomeEDono.mockResolvedValue({ _id: 'ja-existe' });
+    await expect(
+      service.add({ ...(dto as object), nome: 'Enem Dia 1' } as never, 'cur-1'),
+    ).rejects.toThrow(ConflictException);
+  });
+
+  it('o pattern do nome vale para o sistema', async () => {
+    await expect(
+      service.add({ ...(dto as object), nome: 'Enem Dia 1' } as never),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('o pattern NÃO vale para categoria de cursinho', async () => {
+    // ⚠️ É o que torna possível o exemplo do ticket: o cursinho A criando a
+    // própria "Enem Dia 1", que bate 400 no pattern do admin.
+    const criada = await service.add(
+      { ...(dto as object), nome: 'Enem Dia 1' } as never,
+      'cur-1',
+    );
+    expect(criada.nome).toBe('Enem Dia 1');
+  });
+
+  it('categoria de cursinho continua custom — é o que garante 1 simulado', async () => {
+    const criada = await service.add(
+      { ...(dto as object), nome: 'Enem Dia 1' } as never,
+      'cur-1',
+    );
+    expect(criada.custom).toBe(true);
   });
 });
