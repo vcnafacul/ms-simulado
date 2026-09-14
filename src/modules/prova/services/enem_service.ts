@@ -73,8 +73,18 @@ export class EnemService {
     return await this.simuladoRepository.create(simuladoArea);
   }
 
-  public async getByName(nome: string): Promise<Prova> {
-    return await this.provarepository.getByFilter({ nome });
+  /**
+   * ⚠️ **Escopado por cursinho.** Antes era `getByFilter({ nome })`, global: o
+   * nome da prova ENEM é gerado (`categoria ano edicao aplicacao`), então o
+   * primeiro cursinho a criar "Enem Dia 1 2026 Regular 1" bloqueava todos os
+   * outros E o admin — com a mensagem "Prova já esta cadastrada", que não diz
+   * que a prova é de outra pessoa.
+   */
+  public async getByNomeECursinho(
+    nome: string,
+    cursinhoId: string | null,
+  ): Promise<Prova> {
+    return await this.provarepository.getAtivaByNomeECursinho(nome, cursinhoId);
   }
 
   public async validate(
