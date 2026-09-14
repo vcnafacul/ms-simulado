@@ -74,7 +74,15 @@ export class CategoriaController {
   }
 
   @Delete(':id')
-  public async delete(@Param('id') id: string): Promise<void> {
-    return await this.service.delete(id);
+  public async delete(
+    @Param('id') id: string,
+    /**
+     * ⚠️ Mesmo header do POST: quem diz o dono é a api, a partir do JWT. Sem o
+     * header a rota age como `system`, senão o admin perde o delete das
+     * categorias da plataforma.
+     */
+    @Headers('x-dono') dono?: string,
+  ): Promise<void> {
+    return await this.service.delete(id, dono ?? DONO_SYSTEM);
   }
 }

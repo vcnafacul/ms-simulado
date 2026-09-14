@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { CategoriaService } from './categoria.service';
@@ -13,8 +14,11 @@ function makeService(overrides?: {
   countByCategoriaProva?: jest.Mock;
 }) {
   const repository = {
+    // ⚠️ O `dono` faz parte do fixture: estes testes exercitam a trava de "em
+    // uso", e sem dono batendo com o default eles morreriam antes, no 403.
     getById:
-      overrides?.getById ?? jest.fn().mockResolvedValue({ _id: 'cat-1' }),
+      overrides?.getById ??
+      jest.fn().mockResolvedValue({ _id: 'cat-1', dono: DONO_SYSTEM }),
     delete: overrides?.deleteFn ?? jest.fn().mockResolvedValue(undefined),
   };
   const simuladoRepository = {
@@ -493,5 +497,38 @@ describe('CategoriaService — dono', () => {
       'cur-1',
     );
     expect(criada.custom).toBe(true);
+  });
+
+  it('o cursinho A não apaga categoria do cursinho B', async () => {
+    /**
+     * ⚠️ Hoje o delete apaga por id e mais nada. Com categorias por dono, isso
+     * é apagar registro alheio mandando um id — o id é público, aparece em
+     * qualquer listagem.
+     */
+    repository.getById.mockResolvedValue({ _id: 'c1', dono: 'cur-B' });
+
+    await expect(service.delete('c1', 'cur-A')).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(repository.delete).not.toHaveBeenCalled();
+  });
+
+  it('o cursinho apaga a própria categoria', async () => {
+    repository.getById.mockResolvedValue({ _id: 'c1', dono: 'cur-A' });
+    await service.delete('c1', 'cur-A');
+    expect(repository.delete).toHaveBeenCalledWith('c1');
+  });
+
+  it('o cursinho não apaga categoria do sistema', async () => {
+    repository.getById.mockResolvedValue({ _id: 'c1', dono: DONO_SYSTEM });
+    await expect(service.delete('c1', 'cur-A')).rejects.toThrow(
+      ForbiddenException,
+    );
+  });
+
+  it('o admin apaga a do sistema', async () => {
+    repository.getById.mockResolvedValue({ _id: 'c1', dono: DONO_SYSTEM });
+    await service.delete('c1', DONO_SYSTEM);
+    expect(repository.delete).toHaveBeenCalledWith('c1');
   });
 });

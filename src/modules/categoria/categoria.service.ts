@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -113,10 +114,19 @@ export class CategoriaService {
     };
   }
 
-  public async delete(id: string): Promise<void> {
+  public async delete(id: string, dono: string = DONO_SYSTEM): Promise<void> {
     const categoria = await this.repository.getById(id);
     if (!categoria) {
       throw new NotFoundException(`Categoria ${id} não encontrada`);
+    }
+
+    /**
+     * ⚠️ **A verificação de dono vem ANTES da de uso.** Invertido, o cursinho A
+     * descobriria, pela mensagem de erro, quantas provas e simulados o cursinho
+     * B tem numa categoria dele.
+     */
+    if (categoria.dono !== dono) {
+      throw new ForbiddenException('Categoria de outro dono');
     }
 
     const [simuladosUsando, provasUsando] = await Promise.all([

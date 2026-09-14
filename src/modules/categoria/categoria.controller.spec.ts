@@ -36,4 +36,18 @@ describe('CategoriaController — dono', () => {
       'cur-1',
     );
   });
+
+  it('sem dono no header, o DELETE age como sistema', async () => {
+    /**
+     * ⚠️ Sem o fallback o admin perde o delete: a rota mandaria `undefined`
+     * como dono, e a categoria da plataforma nunca casaria com ele.
+     */
+    await controller.delete('cat-1', undefined);
+    expect(service.delete).toHaveBeenCalledWith('cat-1', DONO_SYSTEM);
+  });
+
+  it('com dono no header, o DELETE repassa o dono', async () => {
+    await controller.delete('cat-1', 'cur-1');
+    expect(service.delete).toHaveBeenCalledWith('cat-1', 'cur-1');
+  });
 });
