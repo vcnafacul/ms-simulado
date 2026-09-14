@@ -98,8 +98,15 @@ export class CategoriaService {
 
   public async getAll(
     param: GetAllInput,
+    dono: string = DONO_SYSTEM,
   ): Promise<GetAllOutput<CategoriaOutputDTO>> {
-    const result = await this.repository.getAll(param);
+    /**
+     * ⚠️ O filtro é sempre aplicado — não existe "listar todas". Uma chamada
+     * sem dono devolve as do sistema, e não o universo: um default permissivo
+     * aqui vazaria as categorias de um cursinho para os outros no dia em que
+     * alguém esquecesse de passar o parâmetro.
+     */
+    const result = await this.repository.getAll({ ...param, where: { dono } });
     return {
       ...result,
       data: await this.attachUsageCounts(result.data),

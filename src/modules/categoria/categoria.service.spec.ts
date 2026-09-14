@@ -303,6 +303,57 @@ describe('CategoriaService.getAll (anexa contagem de uso)', () => {
   });
 });
 
+describe('CategoriaService.getAll (escopo por dono)', () => {
+  /**
+   * ⚠️ Estes testes existem porque uma mutação sobreviveu: trocar o
+   * `{ ...param, where: { dono } }` por `param` cru deixava TODA a suíte verde.
+   * O controller provava só o repasse do argumento; ninguém provava que o
+   * argumento vira filtro — e sem filtro a listagem de um cursinho devolve as
+   * categorias de todos os outros.
+   */
+  function makeGetAllService() {
+    const repository = {
+      getAll: jest.fn().mockResolvedValue({
+        data: [],
+        page: 1,
+        limit: 10,
+        totalItems: 0,
+      }),
+    };
+    const countsByCategoria = jest.fn().mockResolvedValue({});
+    const service = new CategoriaService(
+      repository as any,
+      { countByCategoria: jest.fn(), countsByCategoria } as any,
+      { countByCategoria: jest.fn(), countsByCategoria } as any,
+    );
+    return { service, repository };
+  }
+
+  it('sem dono, filtra pelas categorias do sistema', async () => {
+    const { service, repository } = makeGetAllService();
+
+    await service.getAll({ page: 1, limit: 10 });
+
+    expect(repository.getAll).toHaveBeenCalledWith({
+      page: 1,
+      limit: 10,
+      where: { dono: DONO_SYSTEM },
+    });
+  });
+
+  it('com dono, filtra por aquele dono', async () => {
+    const { service, repository } = makeGetAllService();
+
+    await service.getAll({ page: 1, limit: 10 }, 'cur-1');
+
+    expect(repository.getAll).toHaveBeenCalledWith({
+      page: 1,
+      limit: 10,
+      where: { dono: 'cur-1' },
+    });
+  });
+});
+
 describe('CategoriaService.getById (anexa contagem de uso)', () => {
   it('retorna a categoria com simuladosCount/provasCount', async () => {
     const repository = {
