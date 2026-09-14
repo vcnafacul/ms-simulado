@@ -4,7 +4,10 @@ import { QuestaoRepository } from 'src/modules/questao/questao.repository';
 import { SimuladoRepository } from 'src/modules/simulado/simulado.repository';
 import { SimuladoService } from 'src/modules/simulado/simulado.service';
 import { CategoriaRepository } from 'src/modules/categoria/categoria.repository';
-import { Categoria } from 'src/modules/categoria/schemas/categoria.schema';
+import {
+  Categoria,
+  DONO_SYSTEM,
+} from 'src/modules/categoria/schemas/categoria.schema';
 import { ProvaRepository } from '../prova.repository';
 import { EnemService } from '../services/enem_service';
 import { CustomProvaFactory } from './custom_prova_factory';
@@ -25,7 +28,17 @@ export class ProvaFactory {
   ) {}
 
   public getFactory(categoria: Categoria, ano: number): IProvaFactory {
-    if (categoria.custom) {
+    /**
+     * ⚠️ **`dono` entra na condição de propósito.** Toda prova de categoria de
+     * cursinho gera 1 simulado — é a regra do produto.
+     *
+     * Na prática `custom` já basta hoje, porque `CategoriaService.add` o força
+     * a `true`. Mas isso é invariante em OUTRO arquivo: um update futuro, um
+     * seed ou um ajuste manual no banco produziriam categoria de cursinho com
+     * `custom: false`, e ela cairia na fábrica do ENEM — 5 simulados para quem
+     * pediu 1, sem erro nenhum. A condição explícita custa uma linha.
+     */
+    if (categoria.custom || categoria.dono !== DONO_SYSTEM) {
       return new CustomProvaFactory(
         this.questaoRepository,
         this.provaRepository,
