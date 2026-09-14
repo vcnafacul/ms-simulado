@@ -1696,9 +1696,17 @@ import { exame } from "../urls";
  * lista de categorias. Com o recorte por dono, um cursinho novo tem zero
  * categorias — e ficaria sem nenhum exame para escolher, sem conseguir criar a
  * primeira.
+ *
+ * ⚠️ A resposta é **envelope paginado**, não array: quem consome lê `.data`.
  */
 export async function getExames(token: string): Promise<Paginate<IExameRef>> {
-  const response = await fetchWrapper(exame, {
+  /**
+   * ⚠️ `limit=500` explícito. MEDIDO na Task 8: `v1/exame` do ms usa
+   * `GetAllDtoInput`, então sem parâmetro o teto é **40** e a resposta é um
+   * envelope paginado — não um array. Hoje são poucos exames, mas passando de
+   * 40 o dropdown truncaria **sem erro nenhum**. 500 é o `LIMITE_MAXIMO` do ms.
+   */
+  const response = await fetchWrapper(`${exame}?page=1&limit=500`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
