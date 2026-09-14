@@ -10,6 +10,18 @@ export class CategoriaRepository extends BaseRepository<Categoria> {
     super(model);
   }
 
+  /**
+   * A categoria VIVA com esse nome, para esse dono.
+   *
+   * ⚠️ `deleted: { $ne: true }` não é detalhe: `getByFilter` do base não filtra
+   * soft delete, então sem isso o service devolve 409 apontando para um
+   * registro que o usuário não enxerga mais — e o índice parcial (que ignora os
+   * excluídos) permitiria a criação. Service e índice discordariam.
+   */
+  async getAtivaByNomeEDono(nome: string, dono: string): Promise<Categoria> {
+    return await this.model.findOne({ nome, dono, deleted: { $ne: true } });
+  }
+
   override async getById(id: string): Promise<Categoria> {
     return await this.model
       .findById(id)
