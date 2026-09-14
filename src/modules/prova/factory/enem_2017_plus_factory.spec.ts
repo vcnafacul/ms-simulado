@@ -60,9 +60,7 @@ describe('Enem2017PlusFactory.verifyNumberProva (Regra C)', () => {
 
   it('idiomático (1-5) com 1 ocorrência → true (cabe o 2º)', async () => {
     const { factory } = makeFactory(
-      jest
-        .fn()
-        .mockResolvedValue({ questoes: [{ numero: 3, questao: {} }] }),
+      jest.fn().mockResolvedValue({ questoes: [{ numero: 3, questao: {} }] }),
     );
     expect(await factory.verifyNumberProva('p1', 3)).toBe(true);
   });
@@ -81,9 +79,7 @@ describe('Enem2017PlusFactory.verifyNumberProva (Regra C)', () => {
 
   it('não-idiomático ocupado → false', async () => {
     const { factory } = makeFactory(
-      jest
-        .fn()
-        .mockResolvedValue({ questoes: [{ numero: 10, questao: {} }] }),
+      jest.fn().mockResolvedValue({ questoes: [{ numero: 10, questao: {} }] }),
     );
     expect(await factory.verifyNumberProva('p1', 10)).toBe(false);
   });
@@ -128,7 +124,9 @@ describe('Enem2017PlusFactory.updateQuestion — numero-sync (mudança pura de n
       update: jest.fn().mockResolvedValue(undefined),
     };
     const frenteRepository: any = {
-      getByFilter: jest.fn().mockResolvedValue({ _id: { toString: () => 'fi' } }),
+      getByFilter: jest
+        .fn()
+        .mockResolvedValue({ _id: { toString: () => 'fi' } }),
     };
     const simuladoService: any = {
       addQuestionSimulados: jest.fn().mockResolvedValue(undefined),
@@ -165,7 +163,10 @@ describe('Enem2017PlusFactory.updateQuestion — numero-sync (mudança pura de n
     expect(simuladoService.removeQuestionSimulados).not.toHaveBeenCalled();
     // numero-sync reconciliou prova + simulado
     expect(prova.questoes[0].numero).toBe(11);
-    expect(provaRepository.update).toHaveBeenCalledWith(prova, expect.anything());
+    expect(provaRepository.update).toHaveBeenCalledWith(
+      prova,
+      expect.anything(),
+    );
     expect(simulado.questoes[0].numero).toBe(11);
     expect(simuladoRepository.update).toHaveBeenCalledWith(
       simulado,
@@ -203,11 +204,15 @@ describe('Enem2017PlusFactory.addQuestaoExistenteAProva', () => {
       addQuestion: jest.fn().mockResolvedValue(undefined),
     };
     const frenteRepository: any = {
-      getByFilter: jest.fn().mockImplementation(({ nome }: { nome: string }) => {
-        if (nome === 'Inglês') return Promise.resolve({ _id: { toString: () => 'f-ingles' } });
-        if (nome === 'Espanhol') return Promise.resolve({ _id: { toString: () => 'f-espanhol' } });
-        return Promise.resolve(null);
-      }),
+      getByFilter: jest
+        .fn()
+        .mockImplementation(({ nome }: { nome: string }) => {
+          if (nome === 'Inglês')
+            return Promise.resolve({ _id: { toString: () => 'f-ingles' } });
+          if (nome === 'Espanhol')
+            return Promise.resolve({ _id: { toString: () => 'f-espanhol' } });
+          return Promise.resolve(null);
+        }),
     };
     const simuladoService: any = {
       addQuestionSimulados: jest.fn().mockResolvedValue(undefined),
@@ -234,5 +239,74 @@ describe('Enem2017PlusFactory.addQuestaoExistenteAProva', () => {
       42,
       expect.anything(),
     );
+  });
+});
+
+/**
+ * A prova ENEM checa duplicata DENTRO do cursinho.
+ *
+ * ⚠️ Este describe existe porque uma mutação sobreviveu: trocar
+ * `prova.cursinhoId` por `null` na chamada deixava a suíte inteira verde. E
+ * esse é exatamente o defeito que o conserto ataca — o nome da prova ENEM é
+ * gerado (`categoria ano edicao aplicacao`), então sem o cursinho na conta o
+ * primeiro que criar "Enem Dia 1 2026 Regular 1" bloqueia todos os outros.
+ */
+describe('Enem2017PlusFactory — duplicata é por cursinho', () => {
+  function montar(getByNomeECursinho: jest.Mock) {
+    const categoriaRepository: any = {
+      getById: jest
+        .fn()
+        .mockResolvedValue({ nome: 'Enem Dia 1', exame: { nome: 'ENEM' } }),
+    };
+    return new Enem2017PlusFactory(
+      categoriaRepository,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      { getByNomeECursinho } as any,
+    );
+  }
+
+  const item = {
+    categoria: 'c1',
+    ano: 2026,
+    edicao: 'Regular',
+    aplicacao: 1,
+    criadorId: 'u1',
+  };
+
+  it('passa o cursinho da prova na checagem', async () => {
+    const getByNomeECursinho = jest.fn().mockResolvedValue(null);
+    const factory = montar(getByNomeECursinho);
+
+    await factory.createProva({ ...item, cursinhoId: 'cur-1' } as any);
+
+    expect(getByNomeECursinho).toHaveBeenCalledWith(
+      'Enem Dia 1 2026 Regular 1',
+      'cur-1',
+    );
+  });
+
+  it('prova da plataforma passa cursinho nulo', async () => {
+    const getByNomeECursinho = jest.fn().mockResolvedValue(null);
+    const factory = montar(getByNomeECursinho);
+
+    await factory.createProva({ ...item } as any);
+
+    expect(getByNomeECursinho).toHaveBeenCalledWith(
+      'Enem Dia 1 2026 Regular 1',
+      null,
+    );
+  });
+
+  it('409 quando já existe a mesma prova NO MESMO cursinho', async () => {
+    const getByNomeECursinho = jest.fn().mockResolvedValue({ _id: 'existe' });
+    const factory = montar(getByNomeECursinho);
+
+    await expect(
+      factory.createProva({ ...item, cursinhoId: 'cur-1' } as any),
+    ).rejects.toThrow('Prova já esta cadastrada');
   });
 });

@@ -13,7 +13,7 @@ function makeSession() {
 
 function makeFactory(overrides?: {
   categoria?: Partial<Categoria>;
-  getByFilter?: jest.Mock;
+  getAtivaByNomeECursinho?: jest.Mock;
   getById?: jest.Mock;
   getProvaWithQuestion?: jest.Mock;
   getByIdToUpdate?: jest.Mock;
@@ -30,7 +30,8 @@ function makeFactory(overrides?: {
     updateQuestion: jest.fn().mockResolvedValue(undefined),
   };
   const provaRepository = {
-    getByFilter: overrides?.getByFilter ?? jest.fn().mockResolvedValue(null),
+    getAtivaByNomeECursinho:
+      overrides?.getAtivaByNomeECursinho ?? jest.fn().mockResolvedValue(null),
     getById: overrides?.getById ?? jest.fn(),
     getProvaWithQuestion: overrides?.getProvaWithQuestion ?? jest.fn(),
     addQuestion: jest.fn().mockResolvedValue(undefined),
@@ -78,17 +79,19 @@ describe('CustomProvaFactory.createProva', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('lança 409 quando já existe prova com mesmo nome e criador', async () => {
+  it('lança 409 quando já existe prova com mesmo nome NO MESMO CURSINHO', async () => {
     const { factory, provaRepository } = makeFactory({
-      getByFilter: jest.fn().mockResolvedValue({ _id: 'existe' }),
+      getAtivaByNomeECursinho: jest.fn().mockResolvedValue({ _id: 'existe' }),
     });
     await expect(
       factory.createProva({ criadorId: 'u1', nome: 'Minha Prova' } as any),
     ).rejects.toBeInstanceOf(HttpException);
-    expect(provaRepository.getByFilter).toHaveBeenCalledWith({
-      nome: 'Minha Prova',
-      criadorId: 'u1',
-    });
+    // ⚠️ Por cursinho, não por criador: dois colaboradores do mesmo cursinho
+    // não podem criar provas homônimas.
+    expect(provaRepository.getAtivaByNomeECursinho).toHaveBeenCalledWith(
+      'Minha Prova',
+      null,
+    );
   });
 
   it('cria prova com nome, criadorId, totalQuestao da categoria e enemAreas vazio', async () => {
@@ -297,9 +300,20 @@ describe('CustomProvaFactory.getMissingNumbers', () => {
 
 describe('CustomProvaFactory.addQuestaoExistenteAProva', () => {
   it('adiciona questão existente à prova custom em transação (todos os simulados)', async () => {
-    const questao = { _id: 'q1', status: 'Approved', enemArea: '', frente1: null } as any;
+    const questao = {
+      _id: 'q1',
+      status: 'Approved',
+      enemArea: '',
+      frente1: null,
+    } as any;
     const prova = { _id: 'p1', simulados: [{ _id: 's1' }] } as any;
-    const { factory, questaoRepository, provaRepository, simuladoService, session } = makeFactory({
+    const {
+      factory,
+      questaoRepository,
+      provaRepository,
+      simuladoService,
+      session,
+    } = makeFactory({
       getByIdToUpdate: jest.fn().mockResolvedValue(questao),
       getById: jest.fn().mockResolvedValue(prova),
     });
@@ -354,7 +368,10 @@ describe('CustomProvaFactory.updateQuestion — numero-sync', () => {
     } as any);
 
     expect(prova.questoes[0].numero).toBe(6);
-    expect(provaRepository.update).toHaveBeenCalledWith(prova, expect.anything());
+    expect(provaRepository.update).toHaveBeenCalledWith(
+      prova,
+      expect.anything(),
+    );
     expect(simulado.questoes[0].numero).toBe(6);
     expect(simuladoRepository.update).toHaveBeenCalledWith(
       simulado,

@@ -41,13 +41,22 @@ export class CustomProvaFactory implements IProvaFactory {
       throw new BadRequestException('Nome da prova é obrigatório');
     }
 
-    const jaExiste = await this.provaRepository.getByFilter({
-      nome: item.nome,
-      criadorId: item.criadorId,
-    });
+    /**
+     * ⚠️ **Escopado por CURSINHO, não por criador.** Antes era
+     * `{ nome, criadorId }` — o usuário, não a instituição. Dois colaboradores
+     * do mesmo cursinho criavam provas homônimas sem aviso, e quando um deles
+     * saía ninguém mais do cursinho colidia com as provas dele.
+     *
+     * ⚠️ Agora é a MESMA regra das provas ENEM (`enemService.getByNomeECursinho`).
+     * As duas fábricas divergiam: uma global, outra por criador.
+     */
+    const jaExiste = await this.provaRepository.getAtivaByNomeECursinho(
+      item.nome,
+      item.cursinhoId ?? null,
+    );
     if (jaExiste) {
       throw new HttpException(
-        'Você já tem uma prova com esse nome',
+        'Já existe uma prova com esse nome',
         HttpStatus.CONFLICT,
       );
     }

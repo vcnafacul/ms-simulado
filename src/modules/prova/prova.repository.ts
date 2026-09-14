@@ -18,6 +18,29 @@ export class ProvaRepository extends BaseRepository<Prova> {
     super(model);
   }
 
+  /**
+   * A prova VIVA com esse nome, para esse cursinho.
+   *
+   * ⚠️ **`deleted: { $ne: true }` não é detalhe.** O `getByFilter` do base não
+   * filtra soft delete, então sem isto excluir uma prova e recriar com o mesmo
+   * nome devolve 409 apontando para um registro que ninguém mais enxerga.
+   *
+   * ⚠️ **`cursinhoId: null` casa também com o campo AUSENTE** no Mongo, e isso
+   * é o que se quer: prova legada, criada antes de o campo existir, conta como
+   * prova da plataforma — que é o que ela é. Por isso este escopo não precisa
+   * de migração, ao contrário do `dono` da categoria.
+   */
+  async getAtivaByNomeECursinho(
+    nome: string,
+    cursinhoId: string | null,
+  ): Promise<Prova> {
+    return await this.model.findOne({
+      nome,
+      cursinhoId: cursinhoId ?? null,
+      deleted: { $ne: true },
+    });
+  }
+
   async countByCategoria(categoriaId: string): Promise<number> {
     return this.model.countDocuments({ categoria: categoriaId });
   }

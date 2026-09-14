@@ -32,7 +32,10 @@ export class Enem2017PlusFactory implements IProvaFactory {
     const categoria = await this.categoriaRepository.getById(item.categoria);
     const prova = new Prova(item, categoria);
     prova.nome = `${categoria.nome} ${prova.ano} ${prova.edicao} ${prova.aplicacao}`;
-    const hasProva = await this.enemService.getByName(prova.nome);
+    const hasProva = await this.enemService.getByNomeECursinho(
+      prova.nome,
+      prova.cursinhoId ?? null,
+    );
     if (!!hasProva) {
       throw new HttpException('Prova já esta cadastrada', HttpStatus.CONFLICT);
     }
@@ -121,8 +124,7 @@ export class Enem2017PlusFactory implements IProvaFactory {
     if (prova.questoes.some((qc) => qc.numero === numberQuestion)) {
       if (numberQuestion < 6) {
         return (
-          prova.questoes.filter((qc) => qc.numero === numberQuestion)
-            .length < 2
+          prova.questoes.filter((qc) => qc.numero === numberQuestion).length < 2
         );
       }
       return false;
@@ -331,7 +333,13 @@ export class Enem2017PlusFactory implements IProvaFactory {
       prova: provaId,
     } as unknown as UpdateDTOInput;
 
-    await this.enemService.validate(questionLike, frenteIngles, frenteEspanhol, 1, 5);
+    await this.enemService.validate(
+      questionLike,
+      frenteIngles,
+      frenteEspanhol,
+      1,
+      5,
+    );
 
     const provaToEnter = await this.provaRepository.getById(provaId);
     const dia1 = [EnemArea.CienciasHumanas, EnemArea.Linguagens].includes(
@@ -455,8 +463,10 @@ export class Enem2017PlusFactory implements IProvaFactory {
           simulados = simulados.concat(
             prova.simulados.filter(
               (simulado) =>
-                simulado.nome === `${prova.categoria.nome} ${prova.ano} Inglês` ||
-                simulado.nome === `${prova.categoria.nome} ${prova.ano} Espanhol`,
+                simulado.nome ===
+                  `${prova.categoria.nome} ${prova.ano} Inglês` ||
+                simulado.nome ===
+                  `${prova.categoria.nome} ${prova.ano} Espanhol`,
             ),
           );
         }
@@ -465,7 +475,8 @@ export class Enem2017PlusFactory implements IProvaFactory {
           simulado.nome.includes(questao.enemArea),
         );
         const simuladoPadrao = prova.simulados.find(
-          (simulado) => simulado.nome === `${prova.categoria.nome} ${prova.ano}`,
+          (simulado) =>
+            simulado.nome === `${prova.categoria.nome} ${prova.ano}`,
         );
         if (simuladoPadrao) {
           simulados.push(simuladoPadrao);
