@@ -165,3 +165,67 @@ describe('RelatorioSimuladoEstudanteRepository.contarDoCursinho', () => {
     expect(Object.keys(filtro).sort()).toEqual(['cursinhoId', 'simulado']);
   });
 });
+
+describe('RelatorioSimuladoEstudanteRepository.agregarPorQuestao', () => {
+  const montarAgg = () => {
+    const aggregate = jest.fn().mockReturnValue({
+      exec: jest.fn().mockResolvedValue([]),
+    });
+    const repo = new RelatorioSimuladoEstudanteRepository({ aggregate } as any);
+    return { repo, aggregate };
+  };
+
+  const estagio = (pipeline: any[], chave: string) =>
+    pipeline.find((e) => Object.keys(e)[0] === chave);
+
+  it('impõe o recorte no $match, igual à consulta por linha', async () => {
+    const { repo, aggregate } = montarAgg();
+
+    await repo.agregarPorQuestao({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+    const match = estagio(aggregate.mock.calls[0][0], '$match').$match;
+    expect(match.simulado.toString()).toBe(SIM);
+    expect(match.cursinhoId).toBe('cur-1');
+    // mesma armadilha do card 02: `{turmaId: undefined}` casaria só quem não tem turma
+    expect('turmaId' in match).toBe(false);
+  });
+
+  it('com turmaId, restringe a agregação à turma', async () => {
+    const { repo, aggregate } = montarAgg();
+
+    await repo.agregarPorQuestao({
+      simuladoId: SIM,
+      cursinhoId: 'cur-1',
+      turmaId: 't-1',
+    });
+
+    expect(estagio(aggregate.mock.calls[0][0], '$match').$match.turmaId).toBe(
+      't-1',
+    );
+  });
+
+  it('junta com a coleção historicos', async () => {
+    const { repo, aggregate } = montarAgg();
+
+    await repo.agregarPorQuestao({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+    const lookup = estagio(aggregate.mock.calls[0][0], '$lookup').$lookup;
+    expect(lookup.from).toBe('historicos');
+    expect(lookup.localField).toBe('historico');
+    expect(lookup.foreignField).toBe('_id');
+  });
+
+  it('NÃO preserva vazios no $unwind — cartão sem leitura não vota', async () => {
+    // com preserveNullAndEmptyArrays, um histórico failed (sem `respostas`)
+    // entraria como respondente de todas as questões
+    const { repo, aggregate } = montarAgg();
+
+    await repo.agregarPorQuestao({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+    for (const e of aggregate.mock.calls[0][0]) {
+      if (e.$unwind) {
+        expect(e.$unwind.preserveNullAndEmptyArrays).toBeFalsy();
+      }
+    }
+  });
+});
