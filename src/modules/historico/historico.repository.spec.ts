@@ -80,4 +80,33 @@ describe('HistoricoRepository.getById (popula simulado.questoes.questao)', () =>
       status: 'pending',
     });
   });
+
+  it('marcarFalha grava status e falha na MESMA escrita', async () => {
+    const exec = jest.fn().mockResolvedValue(undefined);
+    const findByIdAndUpdate = jest.fn().mockReturnValue({ exec });
+    const repo = new HistoricoRepository({ findByIdAndUpdate } as any);
+
+    await repo.marcarFalha('h1', 'cartao_nao_detectado', 'sem CSV de Results');
+
+    // uma chamada só: em duas escritas existe uma janela mostrando o status novo
+    // com a falha velha ao lado — é o que o card 09 precisa evitar na volta
+    expect(findByIdAndUpdate).toHaveBeenCalledTimes(1);
+    expect(findByIdAndUpdate).toHaveBeenCalledWith('h1', {
+      status: 'failed',
+      falha: { codigo: 'cartao_nao_detectado', detalhe: 'sem CSV de Results' },
+    });
+  });
+
+  it('marcarFalha aceita falha sem detalhe', async () => {
+    const exec = jest.fn().mockResolvedValue(undefined);
+    const findByIdAndUpdate = jest.fn().mockReturnValue({ exec });
+    const repo = new HistoricoRepository({ findByIdAndUpdate } as any);
+
+    await repo.marcarFalha('h1', 'simulado_nao_encontrado');
+
+    expect(findByIdAndUpdate).toHaveBeenCalledWith('h1', {
+      status: 'failed',
+      falha: { codigo: 'simulado_nao_encontrado', detalhe: undefined },
+    });
+  });
 });

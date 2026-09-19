@@ -5,6 +5,7 @@ import { BaseSchema } from 'src/shared/base/base.schema';
 import { Simulado } from '../simulado/schemas/simulado.schema';
 import { HistoricoStatus } from './enums/historico-status.enum';
 import { AproveitamentoHistorico } from './types/aproveitamento';
+import { FalhaHistorico } from './types/falha';
 import { Resposta } from './types/resposta';
 
 @Schema({ timestamps: false, versionKey: false })
@@ -56,6 +57,10 @@ export class Historico extends BaseSchema {
   @Prop({ required: false })
   @ApiProperty({ required: false })
   public cartaoCode?: string;
+
+  @Prop({ type: Object, required: false })
+  @ApiProperty({ required: false })
+  public falha?: FalhaHistorico;
 }
 
 export const HistoricoSchema = SchemaFactory.createForClass(Historico);
