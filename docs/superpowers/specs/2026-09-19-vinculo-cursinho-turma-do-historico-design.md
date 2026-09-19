@@ -159,13 +159,16 @@ fechado.
 relatório de turma. O relatório geral mostra um aviso quando houver linhas sem turma — senão o
 estudante some de toda visão por turma e ninguém descobre que ele existe.
 
-**3. Cartão de quem não é do cursinho?** → Não gera linha, então não aparece. O relatório mostra a
-**contagem** da diferença: *"27 de 30 cartões deste simulado pertencem a esta turma"*. Sem isso os
-totais não fecham com o número de cartões enviados, e a leitura natural é "o sistema perdeu cartão".
+**3. Cartão de quem não é do cursinho?** → ♻️ **A pergunta ficou sem objeto.** O card `08b` fez o
+upload resolver o `cursinhoId` pelo JWT de quem envia e recusar, com **403**, estudante que não seja
+daquele cursinho (`cartao-upload.service.ts:82`). Não existe mais linha cujo cursinho o estudante não
+pertença, nem cartão de admin sem cursinho.
 
-⚠️ **Não liste os de fora, só conte.** São estudantes de outro cursinho, e o nome deles não é
-informação que este relatório deva expor. A contagem sai de um `count` de `Historico` por simulado,
-que não devolve nome nenhum.
+O que sobra é o **item 2** — aluno de outra turma ou sem turma dentro do mesmo cursinho. Para isso o
+relatório por turma mostra no rodapé *"27 dos 30 cartões deste simulado são desta turma"*, com o
+total vindo de `countDocuments({ simulado, cursinhoId })` — **escopado pelo cursinho do JWT, nunca
+global**. No relatório geral do cursinho esse número é sempre igual ao de linhas, e a tela não o
+mostra.
 
 ---
 
