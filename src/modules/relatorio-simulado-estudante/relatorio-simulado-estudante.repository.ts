@@ -11,22 +11,32 @@ export class RelatorioSimuladoEstudanteRepository {
   ) {}
 
   /**
-   * Só a escrita. As consultas do relatório são do card 02 — criá-las aqui
-   * seria adivinhar a forma delas antes de a tela existir.
+   * Uma linha por estudante por simulado por cursinho, apontando para a tentativa
+   * ATUAL. Reenviar depois de uma falha cria um `Historico` novo — sem o upsert,
+   * nasceria uma segunda linha e o estudante apareceria duas vezes no relatório.
+   *
+   * Só a escrita: as consultas do relatório são de um card posterior.
    */
-  async criar(data: {
+  async registrar(data: {
     historicoId: string;
     simuladoId: string;
     usuario: string;
     cursinhoId: string;
     turmaId?: string;
   }): Promise<void> {
-    await this.model.create({
-      historico: new Types.ObjectId(data.historicoId),
-      simulado: new Types.ObjectId(data.simuladoId),
-      usuario: data.usuario,
-      cursinhoId: data.cursinhoId,
-      turmaId: data.turmaId,
-    });
+    await this.model.updateOne(
+      {
+        simulado: new Types.ObjectId(data.simuladoId),
+        cursinhoId: data.cursinhoId,
+        usuario: data.usuario,
+      },
+      {
+        $set: {
+          historico: new Types.ObjectId(data.historicoId),
+          turmaId: data.turmaId,
+        },
+      },
+      { upsert: true },
+    );
   }
 }

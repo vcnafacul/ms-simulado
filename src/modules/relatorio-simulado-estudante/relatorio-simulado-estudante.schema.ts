@@ -15,6 +15,14 @@ import { Simulado } from '../simulado/schemas/simulado.schema';
  *
  * Só o fluxo de CARTÃO gera linha. Simulado resolvido digitalmente entra no
  * histórico pessoal e no relatório genérico, que esta série não toca.
+ *
+ * O grão é o ESTUDANTE, não a tentativa: uma linha por estudante por simulado
+ * por cursinho, sempre apontando para o `Historico` da tentativa ATUAL. Um
+ * reenvio depois de uma falha de OCR cria um `Historico` novo — se a chave
+ * fosse `{historico, cursinhoId}`, esse reenvio nasceria como uma segunda
+ * linha e o estudante apareceria duas vezes no relatório (uma falha, uma
+ * concluída). Por isso a unicidade é em `{simulado, cursinhoId, usuario}`,
+ * e a escrita é um upsert (`registrar`), não uma criação.
  */
 @Schema({ timestamps: false, versionKey: false })
 export class RelatorioSimuladoEstudante extends BaseSchema {
@@ -49,6 +57,6 @@ export const RelatorioSimuladoEstudanteSchema = SchemaFactory.createForClass(
 RelatorioSimuladoEstudanteSchema.index({ simulado: 1, cursinhoId: 1 });
 RelatorioSimuladoEstudanteSchema.index({ simulado: 1, turmaId: 1 });
 RelatorioSimuladoEstudanteSchema.index(
-  { historico: 1, cursinhoId: 1 },
+  { simulado: 1, cursinhoId: 1, usuario: 1 },
   { unique: true },
 );

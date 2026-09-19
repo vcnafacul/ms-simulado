@@ -34,9 +34,14 @@ describe('RelatorioSimuladoEstudante schema', () => {
     expect(chaves).toContain(JSON.stringify({ simulado: 1, turmaId: 1 }));
   });
 
-  it('único em historico+cursinhoId — impede linha duplicada num reprocessamento', () => {
+  it('único em simulado+cursinhoId+usuario — um estudante, uma linha', () => {
+    // O grão do relatório é o estudante, não a tentativa: reenviar depois de uma
+    // falha cria um Historico novo, e sem esta chave nasceria uma segunda linha.
     const idx = indices().find(
-      (i) => i.campos.historico === 1 && i.campos.cursinhoId === 1,
+      (i) =>
+        i.campos.simulado === 1 &&
+        i.campos.cursinhoId === 1 &&
+        i.campos.usuario === 1,
     );
     expect(idx).toBeDefined();
     expect(idx!.opts.unique).toBe(true);

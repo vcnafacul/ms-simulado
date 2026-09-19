@@ -56,10 +56,23 @@ RelatorioSimuladoEstudante {
 }
 ```
 
-Índices: `{ simulado, cursinhoId }`, `{ simulado, turmaId }`, e único em `{ historico, cursinhoId }`.
+Índices: `{ simulado, cursinhoId }`, `{ simulado, turmaId }`, e único em
+`{ simulado, cursinhoId, usuario }`.
 
-A linha é criada **junto com o histórico do cartão**, com o vínculo que a api resolve naquele
-instante. Nada a reescrever depois: o relatório vira um retrato de uma data.
+A linha é **registrada** (upsert, não `create`) junto com o histórico do cartão, com o vínculo que a
+api resolve naquele instante. Nada a reescrever depois: o relatório vira um retrato de uma data.
+
+⚠️ **Correção sobre a versão original deste documento**: a chave única foi desenhada primeiro como
+`{ historico, cursinhoId }`, supondo uma linha por *tentativa*. Uma revisão adversarial derrubou essa
+suposição: **todo** reenvio de cartão — inclusive o reenvio pedido pelo produto depois de uma falha de
+OCR (*"Refotografe"*) — cria um `Historico` novo via `createAwaitingOmr`. Com a chave por histórico,
+esse reenvio nascia como uma **segunda linha**, e o estudante aparecia duas vezes no relatório (uma
+falha, uma concluída) — o índice não protegia nada, porque a chave nunca colidia consigo mesma.
+
+O grão certo é o **estudante** dentro de um simulado e cursinho, não a tentativa: uma linha por
+`{ simulado, cursinhoId, usuario }`, sempre apontando para o `Historico` **atual**. A escrita deixou de
+ser um `create` e passou a ser um `updateOne(..., { upsert: true })` — um reenvio atualiza a linha
+existente para o histórico novo, em vez de criar outra.
 
 ### Por que uma junção, e não campos no `Historico`
 

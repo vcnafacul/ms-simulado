@@ -16,7 +16,7 @@ function setup(over: any = {}) {
     svc: new CartaoHistoricoService(
       repo as any,
       omr as any,
-      { criar: jest.fn() } as any,
+      { registrar: jest.fn() } as any,
     ),
     repo,
     omr,
@@ -75,7 +75,7 @@ it('cria a linha de junção com o vínculo recebido', async () => {
   const omrHttp = {
     enviarProcessamento: jest.fn().mockResolvedValue(undefined),
   };
-  const relatorio = { criar: jest.fn().mockResolvedValue(undefined) };
+  const relatorio = { registrar: jest.fn().mockResolvedValue(undefined) };
   const svc = new CartaoHistoricoService(
     historicoRepository as any,
     omrHttp as any,
@@ -90,7 +90,7 @@ it('cria a linha de junção com o vínculo recebido', async () => {
     turmaId: 't-1',
   });
 
-  expect(relatorio.criar).toHaveBeenCalledWith({
+  expect(relatorio.registrar).toHaveBeenCalledWith({
     historicoId: 'h1',
     simuladoId: '665f0c1a2b3c4d5e6f00abc1',
     usuario: 'u1',
@@ -109,7 +109,7 @@ it('sem cursinhoId não cria linha, e avisa no log', async () => {
   const omrHttp = {
     enviarProcessamento: jest.fn().mockResolvedValue(undefined),
   };
-  const relatorio = { criar: jest.fn() };
+  const relatorio = { registrar: jest.fn() };
   const svc = new CartaoHistoricoService(
     historicoRepository as any,
     omrHttp as any,
@@ -122,7 +122,7 @@ it('sem cursinhoId não cria linha, e avisa no log', async () => {
     cartaoCode: '7',
   });
 
-  expect(relatorio.criar).not.toHaveBeenCalled();
+  expect(relatorio.registrar).not.toHaveBeenCalled();
   expect(warn).toHaveBeenCalledWith(expect.stringContaining('h1'));
   warn.mockRestore();
 });
@@ -138,7 +138,7 @@ it('falha ao criar a linha NÃO derruba o upload, mas vai para o log com o histo
     enviarProcessamento: jest.fn().mockResolvedValue(undefined),
   };
   const relatorio = {
-    criar: jest.fn().mockRejectedValue(new Error('mongo caiu')),
+    registrar: jest.fn().mockRejectedValue(new Error('mongo caiu')),
   };
   const svc = new CartaoHistoricoService(
     historicoRepository as any,

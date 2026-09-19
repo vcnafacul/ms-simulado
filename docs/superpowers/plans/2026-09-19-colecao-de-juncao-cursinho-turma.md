@@ -19,6 +19,30 @@
 
 ---
 
+## ⚠️ Correção pós-revisão adversarial (após a execução deste plano)
+
+Este plano foi escrito e executado com a chave única `{ historico, cursinhoId }` e o método
+`RelatorioSimuladoEstudanteRepository.criar()` (um `create`). Uma revisão adversarial, verificada
+contra um MongoDB de verdade, derrubou essa premissa:
+
+**Todo reenvio de cartão cria um `Historico` novo** — inclusive o reenvio que o próprio produto pede
+depois de uma falha de OCR (*"Refotografe"*), porque `existsCartaoAtivo` exclui `status: Failed`. Com
+a chave por `historico`, esse reenvio nascia como uma **segunda linha**: o estudante aparecia duas
+vezes no relatório (uma falha, uma concluída), e o índice único nunca protegia nada — a chave nunca
+colidia consigo mesma.
+
+**A correção**: o grão é o **estudante** dentro de um simulado e cursinho, não a tentativa. A chave
+única passou a ser `{ simulado, cursinhoId, usuario }`, e a escrita deixou de ser `criar()`/`create`
+para ser `registrar()` — um `updateOne(..., { upsert: true })` que aponta a mesma linha para o
+`Historico` mais recente a cada reenvio.
+
+Os blocos de código abaixo que ainda mostram `{ historico, cursinhoId }` ou `criar()`/`.criar(` no
+repositório da junção foram corrigidos para refletir essa decisão; o método `criar()` do
+**`CartaoHistoricoService`** (a API pública do serviço, não do repositório da junção) não muda de
+nome.
+
+---
+
 ## Estrutura de arquivos
 
 ### ms-simulado (Tasks 1-2)
@@ -26,7 +50,7 @@
 | arquivo | responsabilidade | ação |
 |---|---|---|
 | `src/modules/relatorio-simulado-estudante/relatorio-simulado-estudante.schema.ts` | O documento e os três índices | **criar** |
-| `src/modules/relatorio-simulado-estudante/relatorio-simulado-estudante.repository.ts` | `criar()` — só o que o card 08b precisa; as consultas são do card 02 | **criar** |
+| `src/modules/relatorio-simulado-estudante/relatorio-simulado-estudante.repository.ts` | `registrar()` (upsert) — só o que o card 08b precisa; as consultas são do card 02 | **criar** |
 | `src/modules/relatorio-simulado-estudante/relatorio-simulado-estudante.module.ts` | Registra o schema e exporta o repositório | **criar** |
 | `src/modules/cartao-resposta/dtos/criar-historico-cartao.dto.input.ts` | Aceita `cursinhoId` e `turmaId` opcionais | modificar |
 | `src/modules/cartao-resposta/cartao-historico.service.ts` | Cria a linha depois do histórico; loga alto se falhar | modificar |
@@ -106,9 +130,14 @@ describe('RelatorioSimuladoEstudante schema', () => {
     expect(chaves).toContain(JSON.stringify({ simulado: 1, turmaId: 1 }));
   });
 
-  it('único em historico+cursinhoId — impede linha duplicada num reprocessamento', () => {
+  it('único em simulado+cursinhoId+usuario — um estudante, uma linha', () => {
+    // O grão do relatório é o estudante, não a tentativa: reenviar depois de uma
+    // falha cria um Historico novo, e sem esta chave nasceria uma segunda linha.
     const idx = indices().find(
-      (i) => i.campos.historico === 1 && i.campos.cursinhoId === 1,
+      (i) =>
+        i.campos.simulado === 1 &&
+        i.campos.cursinhoId === 1 &&
+        i.campos.usuario === 1,
     );
     expect(idx).toBeDefined();
     expect(idx!.opts.unique).toBe(true);
@@ -116,44 +145,103 @@ describe('RelatorioSimuladoEstudante schema', () => {
 });
 ```
 
+⚠️ **Corrigido pós-revisão**: o teste original chamava essa chave de `historico+cursinhoId`. Ver a
+correção no topo deste documento — a chave certa é `simulado+cursinhoId+usuario`.
+
 Criar `src/modules/relatorio-simulado-estudante/relatorio-simulado-estudante.repository.spec.ts`:
 
+⚠️ **Corrigido pós-revisão** — o bloco abaixo já reflete a chave `{ simulado, cursinhoId, usuario }` e
+o método `registrar()` (upsert via `updateOne`). A versão original deste plano tinha
+`RelatorioSimuladoEstudanteRepository.criar` gravando com `model.create`; ver a correção no topo.
+
 ```ts
+import { Types } from 'mongoose';
 import { RelatorioSimuladoEstudanteRepository } from './relatorio-simulado-estudante.repository';
 
-describe('RelatorioSimuladoEstudanteRepository.criar', () => {
-  it('grava o vínculo convertendo as refs em ObjectId', async () => {
-    const create = jest.fn().mockResolvedValue({ _id: 'r1' });
-    const repo = new RelatorioSimuladoEstudanteRepository({ create } as any);
+const HIST_1 = '665f0c1a2b3c4d5e6f00abc1';
+const HIST_2 = '665f0c1a2b3c4d5e6f00abc9';
+const SIM = '665f0c1a2b3c4d5e6f00abc2';
 
-    await repo.criar({
-      historicoId: '665f0c1a2b3c4d5e6f00abc1',
-      simuladoId: '665f0c1a2b3c4d5e6f00abc2',
+const montar = () => {
+  const updateOne = jest.fn().mockResolvedValue({ upsertedCount: 1 });
+  const repo = new RelatorioSimuladoEstudanteRepository({ updateOne } as any);
+  return { repo, updateOne };
+};
+
+describe('RelatorioSimuladoEstudanteRepository.registrar', () => {
+  it('grava o vínculo com refs de verdade, não strings', async () => {
+    const { repo, updateOne } = montar();
+
+    await repo.registrar({
+      historicoId: HIST_1,
+      simuladoId: SIM,
       usuario: 'u1',
       cursinhoId: 'cur-1',
       turmaId: 't-1',
     });
 
-    const arg = create.mock.calls[0][0];
-    expect(arg.historico.toString()).toBe('665f0c1a2b3c4d5e6f00abc1');
-    expect(arg.simulado.toString()).toBe('665f0c1a2b3c4d5e6f00abc2');
-    expect(arg.usuario).toBe('u1');
-    expect(arg.cursinhoId).toBe('cur-1');
-    expect(arg.turmaId).toBe('t-1');
+    const [filtro, update, opcoes] = updateOne.mock.calls[0];
+    expect(update.$set.historico).toBeInstanceOf(Types.ObjectId);
+    expect(update.$set.historico.toString()).toBe(HIST_1);
+    expect(filtro.simulado).toBeInstanceOf(Types.ObjectId);
+    expect(filtro.simulado.toString()).toBe(SIM);
+    expect(filtro.cursinhoId).toBe('cur-1');
+    expect(filtro.usuario).toBe('u1');
+    expect(update.$set.turmaId).toBe('t-1');
+    expect(opcoes).toEqual({ upsert: true });
   });
 
-  it('aceita estudante sem turma', async () => {
-    const create = jest.fn().mockResolvedValue({ _id: 'r1' });
-    const repo = new RelatorioSimuladoEstudanteRepository({ create } as any);
+  it('a chave do upsert é o estudante, não o histórico', async () => {
+    // senão o reenvio depois de uma falha criaria uma segunda linha
+    const { repo, updateOne } = montar();
 
-    await repo.criar({
-      historicoId: '665f0c1a2b3c4d5e6f00abc1',
-      simuladoId: '665f0c1a2b3c4d5e6f00abc2',
+    await repo.registrar({
+      historicoId: HIST_1,
+      simuladoId: SIM,
       usuario: 'u1',
       cursinhoId: 'cur-1',
     });
 
-    expect(create.mock.calls[0][0].turmaId).toBeUndefined();
+    expect(Object.keys(updateOne.mock.calls[0][0]).sort()).toEqual([
+      'cursinhoId',
+      'simulado',
+      'usuario',
+    ]);
+  });
+
+  it('reenvio aponta a MESMA linha para o histórico novo', async () => {
+    const { repo, updateOne } = montar();
+
+    await repo.registrar({
+      historicoId: HIST_1,
+      simuladoId: SIM,
+      usuario: 'u1',
+      cursinhoId: 'cur-1',
+    });
+    await repo.registrar({
+      historicoId: HIST_2,
+      simuladoId: SIM,
+      usuario: 'u1',
+      cursinhoId: 'cur-1',
+    });
+
+    const [f1] = updateOne.mock.calls[0];
+    const [f2, u2] = updateOne.mock.calls[1];
+    expect(JSON.stringify(f1)).toBe(JSON.stringify(f2)); // mesmo alvo
+    expect(u2.$set.historico.toString()).toBe(HIST_2); // tentativa atual
+  });
+
+  it('aceita estudante sem turma', async () => {
+    const { repo, updateOne } = montar();
+
+    await repo.registrar({
+      historicoId: HIST_1,
+      simuladoId: SIM,
+      usuario: 'u1',
+      cursinhoId: 'cur-1',
+    });
+
+    expect(updateOne.mock.calls[0][1].$set.turmaId).toBeUndefined();
   });
 });
 ```
@@ -219,10 +307,13 @@ export const RelatorioSimuladoEstudanteSchema = SchemaFactory.createForClass(
 RelatorioSimuladoEstudanteSchema.index({ simulado: 1, cursinhoId: 1 });
 RelatorioSimuladoEstudanteSchema.index({ simulado: 1, turmaId: 1 });
 RelatorioSimuladoEstudanteSchema.index(
-  { historico: 1, cursinhoId: 1 },
+  { simulado: 1, cursinhoId: 1, usuario: 1 },
   { unique: true },
 );
 ```
+
+⚠️ **Corrigido pós-revisão**: o índice único original era `{ historico: 1, cursinhoId: 1 }`. Ver a
+correção no topo do documento.
 
 Criar `src/modules/relatorio-simulado-estudante/relatorio-simulado-estudante.repository.ts`:
 
@@ -240,26 +331,40 @@ export class RelatorioSimuladoEstudanteRepository {
   ) {}
 
   /**
-   * Só a escrita. As consultas do relatório são do card 02 — criá-las aqui
-   * seria adivinhar a forma delas antes de a tela existir.
+   * Uma linha por estudante por simulado por cursinho, apontando para a tentativa
+   * ATUAL. Reenviar depois de uma falha cria um `Historico` novo — sem o upsert,
+   * nasceria uma segunda linha e o estudante apareceria duas vezes no relatório.
+   *
+   * Só a escrita: as consultas do relatório são do card 02.
    */
-  async criar(data: {
+  async registrar(data: {
     historicoId: string;
     simuladoId: string;
     usuario: string;
     cursinhoId: string;
     turmaId?: string;
   }): Promise<void> {
-    await this.model.create({
-      historico: new Types.ObjectId(data.historicoId),
-      simulado: new Types.ObjectId(data.simuladoId),
-      usuario: data.usuario,
-      cursinhoId: data.cursinhoId,
-      turmaId: data.turmaId,
-    });
+    await this.model.updateOne(
+      {
+        simulado: new Types.ObjectId(data.simuladoId),
+        cursinhoId: data.cursinhoId,
+        usuario: data.usuario,
+      },
+      {
+        $set: {
+          historico: new Types.ObjectId(data.historicoId),
+          turmaId: data.turmaId,
+        },
+      },
+      { upsert: true },
+    );
   }
 }
 ```
+
+⚠️ **Corrigido pós-revisão**: o método original era `criar()`, gravando com `model.create`. Ver a
+correção no topo do documento — a escrita virou um upsert porque a chave do vínculo é o estudante, não
+o histórico.
 
 Criar `src/modules/relatorio-simulado-estudante/relatorio-simulado-estudante.module.ts`:
 
@@ -290,7 +395,8 @@ export class RelatorioSimuladoEstudanteModule {}
 - [ ] **Step 5: Run tests to verify they pass**
 
 Run: `npx jest src/modules/relatorio-simulado-estudante/`
-Expected: PASS — 6 passed
+Expected: PASS — 8 passed (4 no schema.spec, 4 no repository.spec — a correção pós-revisão acrescentou
+dois testes ao repositório: a chave do upsert e o reenvio apontando para o histórico novo)
 
 - [ ] **Step 6: Commit**
 
@@ -330,7 +436,7 @@ Acrescente estes testes:
       marcarFalha: jest.fn().mockResolvedValue(undefined),
     };
     const omrHttp = { enviarProcessamento: jest.fn().mockResolvedValue(undefined) };
-    const relatorio = { criar: jest.fn().mockResolvedValue(undefined) };
+    const relatorio = { registrar: jest.fn().mockResolvedValue(undefined) };
     const svc = new CartaoHistoricoService(
       historicoRepository as any,
       omrHttp as any,
@@ -345,7 +451,7 @@ Acrescente estes testes:
       turmaId: 't-1',
     });
 
-    expect(relatorio.criar).toHaveBeenCalledWith({
+    expect(relatorio.registrar).toHaveBeenCalledWith({
       historicoId: 'h1',
       simuladoId: '665f0c1a2b3c4d5e6f00abc1',
       usuario: 'u1',
@@ -362,7 +468,7 @@ Acrescente estes testes:
       marcarFalha: jest.fn().mockResolvedValue(undefined),
     };
     const omrHttp = { enviarProcessamento: jest.fn().mockResolvedValue(undefined) };
-    const relatorio = { criar: jest.fn() };
+    const relatorio = { registrar: jest.fn() };
     const svc = new CartaoHistoricoService(
       historicoRepository as any,
       omrHttp as any,
@@ -375,7 +481,7 @@ Acrescente estes testes:
       cartaoCode: '7',
     });
 
-    expect(relatorio.criar).not.toHaveBeenCalled();
+    expect(relatorio.registrar).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('h1'));
     warn.mockRestore();
   });
@@ -389,7 +495,7 @@ Acrescente estes testes:
     };
     const omrHttp = { enviarProcessamento: jest.fn().mockResolvedValue(undefined) };
     const relatorio = {
-      criar: jest.fn().mockRejectedValue(new Error('mongo caiu')),
+      registrar: jest.fn().mockRejectedValue(new Error('mongo caiu')),
     };
     const svc = new CartaoHistoricoService(
       historicoRepository as any,
@@ -414,12 +520,12 @@ Acrescente estes testes:
 
 Acrescente `import { Logger } from '@nestjs/common';` no topo do arquivo de teste, e ajuste os
 testes que já existem para passar um terceiro argumento ao construtor —
-`{ criar: jest.fn() } as any` basta neles.
+`{ registrar: jest.fn() } as any` basta neles.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `npx jest src/modules/cartao-resposta/cartao-historico.service.spec.ts`
-Expected: FAIL — o construtor aceita dois argumentos e `relatorio.criar` nunca é chamado
+Expected: FAIL — o construtor aceita dois argumentos e `relatorio.registrar` nunca é chamado
 
 - [ ] **Step 3: Write the implementation**
 
@@ -541,7 +647,7 @@ export class CartaoHistoricoService {
       return;
     }
     try {
-      await this.relatorioRepository.criar({
+      await this.relatorioRepository.registrar({
         historicoId,
         simuladoId,
         usuario: dto.usuario,
@@ -1047,4 +1153,9 @@ produção, então não há nada de fora.
 
 - **Card `02`** consome esta coleção: `find({ simulado, cursinhoId })` e `find({ simulado, turmaId })`.
   ⚠️ E precisa chamar `descreverFalha` em cada linha — nada no código força.
-- **Card `09`** depende do único em `{ historico, cursinhoId }` para o reprocessamento não duplicar.
+- **Card `09`** depende do único em `{ simulado, cursinhoId, usuario }` para o reprocessamento não
+  duplicar o aluno no relatório. ⚠️ Isso mudou pós-revisão: a chave original deste plano era
+  `{ historico, cursinhoId }`, que **não** protegia o reprocessamento — todo reenvio (inclusive o
+  pedido pelo produto depois de uma falha de OCR) cria um `Historico` novo, então a chave antiga nunca
+  colidia consigo mesma e o card `09` teria duplicado o aluno exatamente como este item já previa. Ver
+  a correção no topo do documento.

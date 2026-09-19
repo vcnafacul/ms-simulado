@@ -7,6 +7,7 @@ import {
 import { CodigoFalhaInterno } from '../historico/falha/codigo-falha';
 import { HistoricoRepository } from '../historico/historico.repository';
 import { RelatorioSimuladoEstudanteRepository } from '../relatorio-simulado-estudante/relatorio-simulado-estudante.repository';
+import { CriarHistoricoCartaoDtoInput } from './dtos/criar-historico-cartao.dto.input';
 import { parseSimuladoId } from './imagekey.util';
 import { OmrHttpService } from './omr-http.service';
 
@@ -20,13 +21,9 @@ export class CartaoHistoricoService {
     private readonly relatorioRepository: RelatorioSimuladoEstudanteRepository,
   ) {}
 
-  async criar(dto: {
-    usuario: string;
-    imageKey: string;
-    cartaoCode: string;
-    cursinhoId?: string;
-    turmaId?: string;
-  }): Promise<{ historicoId: string }> {
+  async criar(
+    dto: CriarHistoricoCartaoDtoInput,
+  ): Promise<{ historicoId: string }> {
     const simuladoId = parseSimuladoId(dto.imageKey);
 
     if (
@@ -85,7 +82,7 @@ export class CartaoHistoricoService {
       return;
     }
     try {
-      await this.relatorioRepository.criar({
+      await this.relatorioRepository.registrar({
         historicoId,
         simuladoId,
         usuario: dto.usuario,
