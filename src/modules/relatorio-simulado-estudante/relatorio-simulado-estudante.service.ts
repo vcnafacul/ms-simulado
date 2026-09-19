@@ -1,9 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { descreverFalha } from '../historico/falha/mapa-falha';
+import { SimuladoRepository } from '../simulado/simulado.repository';
 import {
   LinhaRelatorioDtoOutput,
   RelatorioSimuladoDtoOutput,
 } from './dtos/relatorio-simulado.dto.output';
+import {
+  QuestaoDoRelatorioDtoOutput,
+  QuestoesDoRelatorioDtoOutput,
+} from './dtos/questoes-do-relatorio.dto.output';
 import {
   LinhaComHistorico,
   RelatorioSimuladoEstudanteRepository,
@@ -15,6 +20,7 @@ export class RelatorioSimuladoEstudanteService {
 
   constructor(
     private readonly repository: RelatorioSimuladoEstudanteRepository,
+    private readonly simuladoRepository: SimuladoRepository,
   ) {}
 
   async consultar(params: {
@@ -74,5 +80,43 @@ export class RelatorioSimuladoEstudanteService {
         falha: descreverFalha(h.falha),
       },
     ];
+  }
+
+  async consultarQuestoes(params: {
+    simuladoId: string;
+    cursinhoId: string;
+    turmaId?: string;
+  }): Promise<QuestoesDoRelatorioDtoOutput> {
+    const [agregados, numeros] = await Promise.all([
+      this.repository.agregarPorQuestao(params),
+      this.simuladoRepository.getNumerosDasQuestoes(params.simuladoId),
+    ]);
+
+    const numeroPorQuestao = new Map(
+      numeros.map((n) => [n.questaoId, n.numero]),
+    );
+
+    const questoes: QuestaoDoRelatorioDtoOutput[] = agregados.map((a) => ({
+      numero: numeroPorQuestao.get(a.questaoId) ?? null,
+      questaoId: a.questaoId,
+      respondentes: a.respondentes,
+      acertos: a.acertos,
+      erros: a.erros,
+      semLeitura: a.semLeitura,
+      porAlternativa: a.porAlternativa,
+    }));
+
+    // Questão sem número vai para o fim: sumir da ordenação seria pior que
+    // aparecer fora de ordem, porque o professor não saberia que ela existe.
+    // Dois nulos empatam (0) — devolver 1 nos dois sentidos não é uma ordem
+    // total, e a ordem relativa entre elas ficaria indefinida.
+    questoes.sort((a, b) => {
+      if (a.numero === null && b.numero === null) return 0;
+      if (a.numero === null) return 1;
+      if (b.numero === null) return -1;
+      return a.numero - b.numero;
+    });
+
+    return { questoes };
   }
 }

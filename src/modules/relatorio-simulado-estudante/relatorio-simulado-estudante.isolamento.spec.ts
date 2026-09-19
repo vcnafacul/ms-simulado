@@ -4,6 +4,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { Model, Types } from 'mongoose';
 import { Historico, HistoricoSchema } from '../historico/historico.schema';
+import { SimuladoRepository } from '../simulado/simulado.repository';
+import { Simulado, SimuladoSchema } from '../simulado/schemas/simulado.schema';
 import { RelatorioSimuladoEstudanteController } from './relatorio-simulado-estudante.controller';
 import { RelatorioSimuladoEstudanteRepository } from './relatorio-simulado-estudante.repository';
 import { RelatorioSimuladoEstudanteService } from './relatorio-simulado-estudante.service';
@@ -17,6 +19,9 @@ const request = require('supertest');
 
 const SIM_A = new Types.ObjectId();
 const SIM_B = new Types.ObjectId();
+// hoisteado: o bloco HTTP (describe irmão) também precisa dele para provar
+// a rota `:simuladoId/questoes` contra o MESMO seed desta suíte.
+const SIM_C = new Types.ObjectId();
 
 describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', () => {
   let mongo: MongoMemoryServer | undefined;
@@ -25,6 +30,8 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
   let repo: RelatorioSimuladoEstudanteRepository;
   let relModel: Model<RelatorioSimuladoEstudante>;
   let histModel: Model<Historico>;
+  let simuladoModel: Model<Simulado>;
+  let svc: RelatorioSimuladoEstudanteService;
 
   beforeAll(async () => {
     // O CI já sobe um `mongo:7` como service container (ci-homol.yml) — usar
@@ -42,14 +49,24 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
             schema: RelatorioSimuladoEstudanteSchema,
           },
           { name: Historico.name, schema: HistoricoSchema },
+          { name: Simulado.name, schema: SimuladoSchema },
         ]),
       ],
-      providers: [RelatorioSimuladoEstudanteRepository],
+      providers: [
+        RelatorioSimuladoEstudanteRepository,
+        SimuladoRepository,
+        RelatorioSimuladoEstudanteService,
+      ],
     }).compile();
 
     repo = mod.get(RelatorioSimuladoEstudanteRepository);
     relModel = mod.get(getModelToken(RelatorioSimuladoEstudante.name));
     histModel = mod.get(getModelToken(Historico.name));
+    simuladoModel = mod.get(getModelToken(Simulado.name));
+    // real, ligado ao mesmo repositório e ao mesmo Mongo desta suíte — é o que
+    // prova o `numero` de ponta a ponta (Fix 2 da revisão adversarial); ver o
+    // bloco "agregado por questão" abaixo.
+    svc = mod.get(RelatorioSimuladoEstudanteService);
 
     const semear = async (
       simulado: Types.ObjectId,
@@ -190,6 +207,214 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
     expect(total).toBe(3);
   });
 
+  describe('agregado por questão (Mongo real)', () => {
+    // Três estudantes do cur-1 em SIM_C: q1 → 2 acertos e 1 sem leitura;
+    // q2 → 1 acerto, 1 erro, 1 sem leitura. Mais um histórico FAILED, que não vota.
+    const Q1 = new Types.ObjectId();
+    const Q2 = new Types.ObjectId();
+
+    beforeAll(async () => {
+      const comRespostas = async (
+        usuario: string,
+        cursinhoId: string,
+        respostas: any[] | undefined,
+        status = 'completed',
+      ) => {
+        const h = await histModel.create({
+          usuario,
+          simulado: SIM_C,
+          status,
+          respostas,
+        });
+        await relModel.create({
+          historico: h._id,
+          simulado: SIM_C,
+          usuario,
+          cursinhoId,
+        });
+      };
+
+      await comRespostas('u-1', 'cur-1', [
+        { questao: Q1, alternativaEstudante: 'A', alternativaCorreta: 'A' },
+        { questao: Q2, alternativaEstudante: 'B', alternativaCorreta: 'B' },
+      ]);
+      await comRespostas('u-2', 'cur-1', [
+        { questao: Q1, alternativaEstudante: 'A', alternativaCorreta: 'A' },
+        { questao: Q2, alternativaEstudante: 'C', alternativaCorreta: 'B' },
+      ]);
+      // em branco: a chave `alternativaEstudante` simplesmente não existe
+      await comRespostas('u-3', 'cur-1', [
+        { questao: Q1, alternativaCorreta: 'A' },
+        { questao: Q2, alternativaCorreta: 'B' },
+      ]);
+      // outro cursinho, não pode entrar na conta
+      await comRespostas('u-4', 'cur-2', [
+        { questao: Q1, alternativaEstudante: 'E', alternativaCorreta: 'A' },
+      ]);
+      // failed: sem `respostas`, não vota em questão nenhuma
+      await comRespostas('u-5', 'cur-1', undefined, 'failed');
+      // reprocessou e falhou: o marcarFalha NÃO limpa `respostas`, então as
+      // respostas velhas ficam no documento
+      await comRespostas(
+        'u-6',
+        'cur-1',
+        [{ questao: Q1, alternativaEstudante: 'B', alternativaCorreta: 'A' }],
+        'failed',
+      );
+      // em reprocessamento: o prepararParaProcessamento também não limpa
+      await comRespostas(
+        'u-7',
+        'cur-1',
+        [{ questao: Q1, alternativaEstudante: 'C', alternativaCorreta: 'A' }],
+        'pending',
+      );
+
+      // cur-3, dedicado só a este seed: nem cur-1 (asserções principais) nem
+      // cur-2 (controle negativo do "não vaza entre cursinhos") o veem, então
+      // este histórico não pode mudar o número de nenhum outro teste do bloco.
+      //
+      // DOCUMENTA o comportamento atual, não o desejado: uma questão duplicada
+      // no simulado gera duas linhas de resposta no mesmo Historico, e a
+      // contagem é por LINHA, não por estudante.
+      await comRespostas('u-8', 'cur-3', [
+        { questao: Q1, alternativaEstudante: 'A', alternativaCorreta: 'A' },
+        { questao: Q1, alternativaEstudante: 'A', alternativaCorreta: 'A' },
+      ]);
+
+      // Fix 2 da revisão adversarial: a junção só guarda o id da questão — sem
+      // um Simulado real para cruzar, `getNumerosDasQuestoes` devolve `[]` e
+      // todo `numero` sai `null` "por acidente", mascarando um mutante em
+      // `qc.questao?.toString()` (troca por `qc.questao` sem `.toString()`).
+      await simuladoModel.create({
+        _id: SIM_C,
+        nome: 'Simulado C',
+        descricao: 'agregado por questão',
+        questoes: [
+          { questao: Q1, numero: 7 },
+          { questao: Q2, numero: 8 },
+        ],
+      });
+    }, 120_000);
+
+    it('conta acertos, erros e sem-leitura por questão', async () => {
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-1',
+      });
+      const q1 = r.find((q) => q.questaoId === Q1.toString())!;
+      const q2 = r.find((q) => q.questaoId === Q2.toString())!;
+
+      expect(q1).toMatchObject({
+        respondentes: 3,
+        acertos: 2,
+        erros: 0,
+        semLeitura: 1,
+      });
+      expect(q2).toMatchObject({
+        respondentes: 3,
+        acertos: 1,
+        erros: 1,
+        semLeitura: 1,
+      });
+    });
+
+    it('acertos + erros + semLeitura === respondentes, em toda questão', async () => {
+      // a invariante que pega um $cond errado — por isso os três são contados
+      // independentes, e não um derivado dos outros
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-1',
+      });
+      expect(r).toHaveLength(2);
+      for (const q of r) {
+        expect(q.acertos + q.erros + q.semLeitura).toBe(q.respondentes);
+      }
+    });
+
+    it('a distribuição por alternativa bate, e cobre A–E', async () => {
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-1',
+      });
+      const q2 = r.find((q) => q.questaoId === Q2.toString())!;
+      expect(q2.porAlternativa).toEqual({ A: 0, B: 1, C: 1, D: 0, E: 0 });
+    });
+
+    it('histórico failed não vira respondente de nada', async () => {
+      // com preserveNullAndEmptyArrays no $unwind, u-5 apareceria em toda questão
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-1',
+      });
+      for (const q of r) {
+        expect(q.respondentes).toBe(3); // u-1, u-2, u-3 — nunca 4
+      }
+    });
+
+    it('não vaza entre cursinhos', async () => {
+      // u-4 marcou E em Q1 pelo cur-2; não pode aparecer na conta do cur-1
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-1',
+      });
+      expect(
+        r.find((q) => q.questaoId === Q1.toString())!.porAlternativa.E,
+      ).toBe(0);
+    });
+
+    it('só histórico completed vota — failed e pending com respostas velhas não', async () => {
+      // marcarFalha e prepararParaProcessamento NÃO limpam `respostas`: sem um
+      // filtro de status, um cartão que falhou no reprocessamento seria contado
+      // para sempre
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-1',
+      });
+      const q1 = r.find((q) => q.questaoId === Q1.toString())!;
+
+      expect(q1.respondentes).toBe(3); // u-1, u-2, u-3 — nunca u-6 nem u-7
+      expect(q1.erros).toBe(0);
+    });
+
+    it('o número da questão vem do Simulado e chega na resposta', async () => {
+      // a junção só guarda o id da questão; sem esta ligação o relatório fala
+      // de "questão 65f3a…" em vez de "questão 7"
+      const r = await svc.consultarQuestoes({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-1',
+      });
+
+      expect(r.questoes.map((q) => q.numero)).toEqual([7, 8]);
+      expect(r.questoes[0].questaoId).toBe(Q1.toString());
+    });
+
+    it('DOCUMENTA: linha duplicada conta duas vezes — a contagem é por linha, não por estudante', async () => {
+      // Não é o comportamento desejado. A causa é uma corrida no adicionarEmProva
+      // (docs/cards/etapa-11/BUG-corrida-no-adicionar-questao-em-prova.md), que
+      // põe a mesma questão duas vezes no simulado; o processAnswer então emite
+      // duas linhas. A decisão foi consertar a causa, não blindar a agregação.
+      //
+      // Se algum dia a agregação passar a contar históricos distintos, este teste
+      // vai ficar vermelho — e aí ele é que está desatualizado, não o código.
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-3',
+      });
+      const q1 = r.find((q) => q.questaoId === Q1.toString())!;
+
+      expect(q1.respondentes).toBe(2); // um estudante só, duas linhas
+      expect(q1.acertos).toBe(2);
+    });
+
+    it('recorte sem cartão devolve lista vazia, não erro', async () => {
+      const r = await repo.agregarPorQuestao({
+        simuladoId: new Types.ObjectId().toString(),
+        cursinhoId: 'cur-1',
+      });
+      expect(r).toEqual([]);
+    });
+  });
+
   /**
    * Fix 4 da revisão adversarial: o spec do controller usa um dublê do
    * serviço, e os specs acima falam com o repositório direto. Nada até aqui
@@ -241,12 +466,14 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
               schema: RelatorioSimuladoEstudanteSchema,
             },
             { name: Historico.name, schema: HistoricoSchema },
+            { name: Simulado.name, schema: SimuladoSchema },
           ]),
         ],
         controllers: [RelatorioSimuladoEstudanteController],
         providers: [
           RelatorioSimuladoEstudanteRepository,
           RelatorioSimuladoEstudanteService,
+          SimuladoRepository,
         ],
       }).compile();
 
@@ -314,6 +541,20 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
         (l: any) => l.usuario === 'u-http-nao-lido',
       );
       expect('aproveitamentoGeral' in linhaNaoLida).toBe(false);
+    });
+
+    it('GET :simuladoId/questoes responde 200 com o agregado', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/v1/relatorio-simulado/${SIM_C.toString()}/questoes`)
+        .query({ cursinhoId: 'cur-1' })
+        .expect(200);
+
+      // não só a forma: o conteúdo, ponta a ponta — Simulado real seedado no
+      // bloco irmão (SIM_C, questão 7 = Q1, 3 respondentes)
+      expect(res.body.questoes[0]).toMatchObject({
+        numero: 7,
+        respondentes: 3,
+      });
     });
   });
 });

@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Historico } from '../historico/historico.schema';
+import { HistoricoStatus } from '../historico/enums/historico-status.enum';
+import { Alternativa } from '../questao/enums/alternativa.enum';
 import { RelatorioSimuladoEstudante } from './relatorio-simulado-estudante.schema';
 
 /**
@@ -20,6 +22,15 @@ const CAMPOS_DO_HISTORICO =
 export type LinhaComHistorico = RelatorioSimuladoEstudante & {
   historico: Historico | null;
 };
+
+export interface AgregadoDaQuestao {
+  questaoId: string;
+  respondentes: number;
+  acertos: number;
+  erros: number;
+  semLeitura: number;
+  porAlternativa: Record<string, number>;
+}
 
 @Injectable()
 export class RelatorioSimuladoEstudanteRepository {
@@ -101,5 +112,128 @@ export class RelatorioSimuladoEstudanteRepository {
       simulado: new Types.ObjectId(simuladoId),
       cursinhoId,
     });
+  }
+
+  /**
+   * Acertos, erros e distribuição por alternativa, por questão, dentro do recorte.
+   *
+   * A resposta em branco chega com a chave `alternativaEstudante` AUSENTE — não
+   * `null`, não `""` (o `processAnswer` emite uma linha por questão do simulado e
+   * deixa o campo indefinido quando o aluno não marcou). Daí o `$ifNull`.
+   *
+   * ⚠️ `acertos`, `erros` e `semLeitura` são contados INDEPENDENTES, não derivados
+   * um do outro. Derivar `erros = respondentes - acertos - semLeitura` tornaria a
+   * invariante verdadeira por construção e o teste que a afirma, vazio.
+   *
+   * ⚠️ `respondentes` conta LINHAS de resposta, e a premissa é que há uma linha
+   * por estudante por questão. Ela vale enquanto um `Simulado` não tiver a mesma
+   * questão duas vezes — hoje possível por uma corrida no `adicionarEmProva`
+   * (ver docs/cards/etapa-11/BUG-corrida-no-adicionar-questao-em-prova.md).
+   * A decisão foi fechar a corrida na origem, não contar históricos distintos
+   * aqui: blindar a consulta carregaria a complexidade para sempre, por uma
+   * corrida que vai deixar de existir. O teste que documenta isso está no
+   * `*.isolamento.spec.ts`.
+   */
+  async agregarPorQuestao(params: {
+    simuladoId: string;
+    cursinhoId: string;
+    turmaId?: string;
+  }): Promise<AgregadoDaQuestao[]> {
+    const match: Record<string, unknown> = {
+      simulado: new Types.ObjectId(params.simuladoId),
+      cursinhoId: params.cursinhoId,
+    };
+    // mesma armadilha do card 02: `{turmaId: undefined}` vira `{turmaId: null}`
+    if (params.turmaId !== undefined) {
+      match.turmaId = params.turmaId;
+    }
+
+    const marcada = { $ifNull: ['$h.respostas.alternativaEstudante', null] };
+    const porAlternativa = Object.fromEntries(
+      Object.values(Alternativa).map((alt) => [
+        alt,
+        { $sum: { $cond: [{ $eq: [marcada, alt] }, 1, 0] } },
+      ]),
+    );
+
+    const linhas = await this.model
+      .aggregate([
+        { $match: match },
+        {
+          $lookup: {
+            from: 'historicos',
+            localField: 'historico',
+            foreignField: '_id',
+            as: 'h',
+          },
+        },
+        // Só `completed` tem `respostas` VÁLIDAS. Não basta o $unwind descartar
+        // array vazio: `marcarFalha` e `prepararParaProcessamento` NÃO limpam
+        // `respostas`, então um cartão que completou, reprocessou e falhou
+        // continuaria votando com as respostas velhas — para sempre.
+        { $unwind: '$h' },
+        { $match: { 'h.status': HistoricoStatus.Completed } },
+        { $unwind: '$h.respostas' },
+        {
+          $group: {
+            _id: '$h.respostas.questao',
+            respondentes: { $sum: 1 },
+            acertos: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $ne: [marcada, null] },
+                      {
+                        $eq: [
+                          '$h.respostas.alternativaEstudante',
+                          '$h.respostas.alternativaCorreta',
+                        ],
+                      },
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+            erros: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $ne: [marcada, null] },
+                      {
+                        $ne: [
+                          '$h.respostas.alternativaEstudante',
+                          '$h.respostas.alternativaCorreta',
+                        ],
+                      },
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+            semLeitura: {
+              $sum: { $cond: [{ $eq: [marcada, null] }, 1, 0] },
+            },
+            ...porAlternativa,
+          },
+        },
+      ])
+      .exec();
+
+    return linhas.map((l: any) => ({
+      questaoId: l._id?.toString(),
+      respondentes: l.respondentes,
+      acertos: l.acertos,
+      erros: l.erros,
+      semLeitura: l.semLeitura,
+      porAlternativa: Object.fromEntries(
+        Object.values(Alternativa).map((alt) => [alt, l[alt] ?? 0]),
+      ),
+    }));
   }
 }

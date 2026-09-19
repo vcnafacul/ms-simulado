@@ -195,3 +195,58 @@ describe('SimuladoRepository.countsByCategoria', () => {
     expect(counts).toEqual({});
   });
 });
+
+describe('SimuladoRepository.getNumerosDasQuestoes', () => {
+  const montar = (doc: unknown) => {
+    const exec = jest.fn().mockResolvedValue(doc);
+    const lean = jest.fn().mockReturnValue({ exec });
+    const findById = jest.fn().mockReturnValue({ lean });
+    const repo = new SimuladoRepository({ findById } as any);
+    return { repo, findById };
+  };
+
+  it('devolve o par (questaoId, numero) de cada questão', async () => {
+    const { repo } = montar({
+      questoes: [
+        { questao: 'q1', numero: 5 },
+        { questao: 'q2', numero: 6 },
+      ],
+    });
+
+    await expect(
+      repo.getNumerosDasQuestoes('665f0c1a2b3c4d5e6f00abc2'),
+    ).resolves.toEqual([
+      { questaoId: 'q1', numero: 5 },
+      { questaoId: 'q2', numero: 6 },
+    ]);
+  });
+
+  it('projeta só o que precisa — não carrega enunciado nem matéria', async () => {
+    const { repo, findById } = montar({ questoes: [] });
+
+    await repo.getNumerosDasQuestoes('665f0c1a2b3c4d5e6f00abc2');
+
+    // o getById popula categoria/frente/matéria; aqui isso seria carga inútil
+    expect(findById).toHaveBeenCalledWith(
+      '665f0c1a2b3c4d5e6f00abc2',
+      expect.objectContaining({ 'questoes.questao': 1, 'questoes.numero': 1 }),
+    );
+  });
+
+  it('simulado inexistente devolve lista vazia, não erro', async () => {
+    const { repo } = montar(null);
+
+    await expect(
+      repo.getNumerosDasQuestoes('665f0c1a2b3c4d5e6f00abc2'),
+    ).resolves.toEqual([]);
+  });
+
+  it('questão sem número vem com numero null, não some', async () => {
+    // numero é nullable: questão vinculada à prova sem posição definida
+    const { repo } = montar({ questoes: [{ questao: 'q1', numero: null }] });
+
+    await expect(
+      repo.getNumerosDasQuestoes('665f0c1a2b3c4d5e6f00abc2'),
+    ).resolves.toEqual([{ questaoId: 'q1', numero: null }]);
+  });
+});

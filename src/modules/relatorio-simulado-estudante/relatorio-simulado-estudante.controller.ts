@@ -8,6 +8,7 @@ import {
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { ConsultarRelatorioDtoInput } from './dtos/consultar-relatorio.dto.input';
+import { QuestoesDoRelatorioDtoOutput } from './dtos/questoes-do-relatorio.dto.output';
 import { RelatorioSimuladoDtoOutput } from './dtos/relatorio-simulado.dto.output';
 import { RelatorioSimuladoEstudanteService } from './relatorio-simulado-estudante.service';
 
@@ -15,6 +16,27 @@ import { RelatorioSimuladoEstudanteService } from './relatorio-simulado-estudant
 @Controller('v1/relatorio-simulado')
 export class RelatorioSimuladoEstudanteController {
   constructor(private readonly service: RelatorioSimuladoEstudanteService) {}
+
+  @Get(':simuladoId/questoes')
+  @ApiResponse({
+    status: 200,
+    description: 'agregado por questão no recorte do cursinho (ou da turma)',
+    type: QuestoesDoRelatorioDtoOutput,
+  })
+  async consultarQuestoes(
+    @Param('simuladoId') simuladoId: string,
+    @Query() query: ConsultarRelatorioDtoInput,
+  ): Promise<QuestoesDoRelatorioDtoOutput> {
+    if (!Types.ObjectId.isValid(simuladoId)) {
+      throw new BadRequestException(`simuladoId inválido: ${simuladoId}`);
+    }
+
+    return this.service.consultarQuestoes({
+      simuladoId,
+      cursinhoId: query.cursinhoId,
+      turmaId: query.turmaId,
+    });
+  }
 
   @Get(':simuladoId')
   @ApiResponse({

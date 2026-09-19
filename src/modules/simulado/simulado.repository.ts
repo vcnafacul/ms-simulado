@@ -57,6 +57,25 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
       .exec();
   }
 
+  /**
+   * Só `(questaoId, numero)`. O `getById` popula categoria, frentes e matéria —
+   * carga enorme para ler um número, que é tudo que o agregado por questão do
+   * card 03 precisa para dizer "questão 5" em vez de "questão 65f3a…".
+   */
+  async getNumerosDasQuestoes(
+    id: string,
+  ): Promise<{ questaoId: string; numero: number | null }[]> {
+    const doc = await this.model
+      .findById(id, { 'questoes.questao': 1, 'questoes.numero': 1 })
+      .lean()
+      .exec();
+    if (!doc) return [];
+    return ((doc as any).questoes ?? []).map((qc: any) => ({
+      questaoId: qc.questao?.toString(),
+      numero: qc.numero ?? null,
+    }));
+  }
+
   override async delete(id: string) {
     const existingRecord = await this.model.updateOne(
       { _id: id },
