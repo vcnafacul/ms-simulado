@@ -269,6 +269,18 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
         'pending',
       );
 
+      // cur-3, dedicado só a este seed: nem cur-1 (asserções principais) nem
+      // cur-2 (controle negativo do "não vaza entre cursinhos") o veem, então
+      // este histórico não pode mudar o número de nenhum outro teste do bloco.
+      //
+      // DOCUMENTA o comportamento atual, não o desejado: uma questão duplicada
+      // no simulado gera duas linhas de resposta no mesmo Historico, e a
+      // contagem é por LINHA, não por estudante.
+      await comRespostas('u-8', 'cur-3', [
+        { questao: Q1, alternativaEstudante: 'A', alternativaCorreta: 'A' },
+        { questao: Q1, alternativaEstudante: 'A', alternativaCorreta: 'A' },
+      ]);
+
       // Fix 2 da revisão adversarial: a junção só guarda o id da questão — sem
       // um Simulado real para cruzar, `getNumerosDasQuestoes` devolve `[]` e
       // todo `numero` sai `null` "por acidente", mascarando um mutante em
@@ -374,6 +386,24 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
 
       expect(r.questoes.map((q) => q.numero)).toEqual([7, 8]);
       expect(r.questoes[0].questaoId).toBe(Q1.toString());
+    });
+
+    it('DOCUMENTA: linha duplicada conta duas vezes — a contagem é por linha, não por estudante', async () => {
+      // Não é o comportamento desejado. A causa é uma corrida no adicionarEmProva
+      // (docs/cards/etapa-11/BUG-corrida-no-adicionar-questao-em-prova.md), que
+      // põe a mesma questão duas vezes no simulado; o processAnswer então emite
+      // duas linhas. A decisão foi consertar a causa, não blindar a agregação.
+      //
+      // Se algum dia a agregação passar a contar históricos distintos, este teste
+      // vai ficar vermelho — e aí ele é que está desatualizado, não o código.
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-3',
+      });
+      const q1 = r.find((q) => q.questaoId === Q1.toString())!;
+
+      expect(q1.respondentes).toBe(2); // um estudante só, duas linhas
+      expect(q1.acertos).toBe(2);
     });
 
     it('recorte sem cartão devolve lista vazia, não erro', async () => {

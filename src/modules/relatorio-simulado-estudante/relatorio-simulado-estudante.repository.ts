@@ -124,6 +124,15 @@ export class RelatorioSimuladoEstudanteRepository {
    * ⚠️ `acertos`, `erros` e `semLeitura` são contados INDEPENDENTES, não derivados
    * um do outro. Derivar `erros = respondentes - acertos - semLeitura` tornaria a
    * invariante verdadeira por construção e o teste que a afirma, vazio.
+   *
+   * ⚠️ `respondentes` conta LINHAS de resposta, e a premissa é que há uma linha
+   * por estudante por questão. Ela vale enquanto um `Simulado` não tiver a mesma
+   * questão duas vezes — hoje possível por uma corrida no `adicionarEmProva`
+   * (ver docs/cards/etapa-11/BUG-corrida-no-adicionar-questao-em-prova.md).
+   * A decisão foi fechar a corrida na origem, não contar históricos distintos
+   * aqui: blindar a consulta carregaria a complexidade para sempre, por uma
+   * corrida que vai deixar de existir. O teste que documenta isso está no
+   * `*.isolamento.spec.ts`.
    */
   async agregarPorQuestao(params: {
     simuladoId: string;
