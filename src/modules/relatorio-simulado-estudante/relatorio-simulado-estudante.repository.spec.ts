@@ -215,6 +215,17 @@ describe('RelatorioSimuladoEstudanteRepository.agregarPorQuestao', () => {
     expect(lookup.foreignField).toBe('_id');
   });
 
+  it('filtra por status completed — respostas velhas de um failed não votam', async () => {
+    const { repo, aggregate } = montarAgg();
+
+    await repo.agregarPorQuestao({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+    const matches = aggregate.mock.calls[0][0].filter((e: any) => e.$match);
+    expect(matches.some((e: any) => e.$match['h.status'] === 'completed')).toBe(
+      true,
+    );
+  });
+
   it('NÃO preserva vazios no $unwind — cartão sem leitura não vota', async () => {
     // com preserveNullAndEmptyArrays, um histórico failed (sem `respostas`)
     // entraria como respondente de todas as questões

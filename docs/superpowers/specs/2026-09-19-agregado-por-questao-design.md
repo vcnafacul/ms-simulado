@@ -108,19 +108,37 @@ O card `02` usa `populate` porque só precisa de campos do topo do `Historico`. 
 $match    { simulado, cursinhoId [, turmaId] }
 $lookup   historicos
 $unwind   historico
+$match    { historico.status: completed }
 $unwind   historico.respostas
 $group    por respostas.questao
-$sort     por questaoId (a ordem final por numero é aplicada no serviço)
 ```
+
+**Correção (revisão adversarial, Fix 3): a listagem original tinha um `$sort por questaoId` que
+nunca existiu no código** — a ordem final por `numero` é aplicada inteiramente no serviço, sobre o
+array já agregado; a pipeline do Mongo não ordena nada. E falta o `$match` por `status`, acrescentado
+no Fix 1 (ver Riscos abaixo) — sem ele, um histórico que completou, foi reprocessado e falhou continua
+votando com as respostas antigas.
 
 ---
 
 ## Riscos
 
-⚠️ **Histórico não concluído não tem `respostas`**, e o `$unwind` descarta o documento. Isso é o
-comportamento desejado — um cartão que falhou não vota em nenhuma questão — mas **é implícito**.
-Um teste precisa fixar isso, senão uma mudança futura no `$unwind` (um `preserveNullAndEmptyArrays`
-distraído) passaria a contar cartões falhos como respondentes de todas as questões.
+⚠️ ~~**Histórico não concluído não tem `respostas`**, e o `$unwind` descarta o documento.~~
+**Correção (revisão adversarial, Fix 3): falso — verificado em BSON real.** Um histórico não
+concluído TEM a chave `respostas`, como array vazio (`[]`): o Mongoose aplica o default de array
+mesmo quando o campo nunca foi setado. O `$unwind` descarta array vazio do mesmo jeito, então o
+comportamento observável não muda — mas a premissa ("não tem a chave") estava errada, não só
+imprecisa.
+
+⚠️ **O verdadeiro perigo não é o histórico nunca ter respondido — é ele ter respondido e depois
+mudado de status sem que ninguém limpe `respostas`.** `marcarFalha` e `prepararParaProcessamento`
+(reprocessamento) trocam o `status` mas NÃO tocam em `respostas` — um cartão que completou,
+reprocessou e falhou (ou está `pending` no meio do reprocessamento) mantém as respostas da tentativa
+anterior, e sem um filtro de `status` elas votariam **para sempre**. Corrigido no Fix 1 com
+`{ $match: { 'h.status': 'completed' } }` logo após o primeiro `$unwind` — antes dele `h` ainda é
+array (semântica de `$match` diferente); depois, é o documento do histórico, e a comparação por
+igualdade de string é inequívoca. Um teste precisa fixar isso, senão uma mudança futura no `$unwind`
+OU a remoção do `$match` por status passaria a contar cartões falhos/reprocessados como respondentes.
 
 ⚠️ **`respondentes` é por questão, não do recorte.** Como toda questão tem linha em todo histórico
 concluído, na prática os números coincidem — mas eles são conceitualmente diferentes, e o dia em que

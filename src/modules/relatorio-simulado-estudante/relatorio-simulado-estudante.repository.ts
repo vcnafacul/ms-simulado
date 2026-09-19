@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Historico } from '../historico/historico.schema';
+import { HistoricoStatus } from '../historico/enums/historico-status.enum';
 import { Alternativa } from '../questao/enums/alternativa.enum';
 import { RelatorioSimuladoEstudante } from './relatorio-simulado-estudante.schema';
 
@@ -157,9 +158,12 @@ export class RelatorioSimuladoEstudanteRepository {
             as: 'h',
           },
         },
-        // sem `preserveNullAndEmptyArrays`: um histórico failed não tem
-        // `respostas` e NÃO pode virar respondente de todas as questões
+        // Só `completed` tem `respostas` VÁLIDAS. Não basta o $unwind descartar
+        // array vazio: `marcarFalha` e `prepararParaProcessamento` NÃO limpam
+        // `respostas`, então um cartão que completou, reprocessou e falhou
+        // continuaria votando com as respostas velhas — para sempre.
         { $unwind: '$h' },
+        { $match: { 'h.status': HistoricoStatus.Completed } },
         { $unwind: '$h.respostas' },
         {
           $group: {

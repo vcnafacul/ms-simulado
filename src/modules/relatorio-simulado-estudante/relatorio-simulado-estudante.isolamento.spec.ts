@@ -30,6 +30,8 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
   let repo: RelatorioSimuladoEstudanteRepository;
   let relModel: Model<RelatorioSimuladoEstudante>;
   let histModel: Model<Historico>;
+  let simuladoModel: Model<Simulado>;
+  let svc: RelatorioSimuladoEstudanteService;
 
   beforeAll(async () => {
     // O CI já sobe um `mongo:7` como service container (ci-homol.yml) — usar
@@ -47,14 +49,24 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
             schema: RelatorioSimuladoEstudanteSchema,
           },
           { name: Historico.name, schema: HistoricoSchema },
+          { name: Simulado.name, schema: SimuladoSchema },
         ]),
       ],
-      providers: [RelatorioSimuladoEstudanteRepository],
+      providers: [
+        RelatorioSimuladoEstudanteRepository,
+        SimuladoRepository,
+        RelatorioSimuladoEstudanteService,
+      ],
     }).compile();
 
     repo = mod.get(RelatorioSimuladoEstudanteRepository);
     relModel = mod.get(getModelToken(RelatorioSimuladoEstudante.name));
     histModel = mod.get(getModelToken(Historico.name));
+    simuladoModel = mod.get(getModelToken(Simulado.name));
+    // real, ligado ao mesmo repositório e ao mesmo Mongo desta suíte — é o que
+    // prova o `numero` de ponta a ponta (Fix 2 da revisão adversarial); ver o
+    // bloco "agregado por questão" abaixo.
+    svc = mod.get(RelatorioSimuladoEstudanteService);
 
     const semear = async (
       simulado: Types.ObjectId,
@@ -241,6 +253,35 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
       ]);
       // failed: sem `respostas`, não vota em questão nenhuma
       await comRespostas('u-5', 'cur-1', undefined, 'failed');
+      // reprocessou e falhou: o marcarFalha NÃO limpa `respostas`, então as
+      // respostas velhas ficam no documento
+      await comRespostas(
+        'u-6',
+        'cur-1',
+        [{ questao: Q1, alternativaEstudante: 'B', alternativaCorreta: 'A' }],
+        'failed',
+      );
+      // em reprocessamento: o prepararParaProcessamento também não limpa
+      await comRespostas(
+        'u-7',
+        'cur-1',
+        [{ questao: Q1, alternativaEstudante: 'C', alternativaCorreta: 'A' }],
+        'pending',
+      );
+
+      // Fix 2 da revisão adversarial: a junção só guarda o id da questão — sem
+      // um Simulado real para cruzar, `getNumerosDasQuestoes` devolve `[]` e
+      // todo `numero` sai `null` "por acidente", mascarando um mutante em
+      // `qc.questao?.toString()` (troca por `qc.questao` sem `.toString()`).
+      await simuladoModel.create({
+        _id: SIM_C,
+        nome: 'Simulado C',
+        descricao: 'agregado por questão',
+        questoes: [
+          { questao: Q1, numero: 7 },
+          { questao: Q2, numero: 8 },
+        ],
+      });
     }, 120_000);
 
     it('conta acertos, erros e sem-leitura por questão', async () => {
@@ -307,6 +348,32 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
       expect(
         r.find((q) => q.questaoId === Q1.toString())!.porAlternativa.E,
       ).toBe(0);
+    });
+
+    it('só histórico completed vota — failed e pending com respostas velhas não', async () => {
+      // marcarFalha e prepararParaProcessamento NÃO limpam `respostas`: sem um
+      // filtro de status, um cartão que falhou no reprocessamento seria contado
+      // para sempre
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-1',
+      });
+      const q1 = r.find((q) => q.questaoId === Q1.toString())!;
+
+      expect(q1.respondentes).toBe(3); // u-1, u-2, u-3 — nunca u-6 nem u-7
+      expect(q1.erros).toBe(0);
+    });
+
+    it('o número da questão vem do Simulado e chega na resposta', async () => {
+      // a junção só guarda o id da questão; sem esta ligação o relatório fala
+      // de "questão 65f3a…" em vez de "questão 7"
+      const r = await svc.consultarQuestoes({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-1',
+      });
+
+      expect(r.questoes.map((q) => q.numero)).toEqual([7, 8]);
+      expect(r.questoes[0].questaoId).toBe(Q1.toString());
     });
 
     it('recorte sem cartão devolve lista vazia, não erro', async () => {
@@ -452,7 +519,12 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
         .query({ cursinhoId: 'cur-1' })
         .expect(200);
 
-      expect(Array.isArray(res.body.questoes)).toBe(true);
+      // não só a forma: o conteúdo, ponta a ponta — Simulado real seedado no
+      // bloco irmão (SIM_C, questão 7 = Q1, 3 respondentes)
+      expect(res.body.questoes[0]).toMatchObject({
+        numero: 7,
+        respondentes: 3,
+      });
     });
   });
 });
