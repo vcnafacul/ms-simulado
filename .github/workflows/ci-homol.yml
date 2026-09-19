@@ -34,6 +34,12 @@ jobs:
         env:
           NODE_ENV: test
           MONGODB: mongodb://localhost:27017/ms-simulado-test
+          # Reaproveita o `mongo:7` do service container acima em vez de o
+          # spec de isolamento baixar +141MB de `mongod` via
+          # mongodb-memory-server. Banco separado do de cima para não
+          # colidir coleções (`historicos` etc.) com os testes que já usam
+          # `MONGODB` via AppModule.
+          MONGODB_TEST_URI: mongodb://localhost:27017/ms-simulado-isolamento-test
   PUSH:
     if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
     runs-on: ubuntu-latest

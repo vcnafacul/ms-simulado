@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { RelatorioSimuladoEstudanteController } from './relatorio-simulado-estudante.controller';
 import { RelatorioSimuladoEstudanteRepository } from './relatorio-simulado-estudante.repository';
+import { RelatorioSimuladoEstudanteService } from './relatorio-simulado-estudante.service';
 import {
   RelatorioSimuladoEstudante,
   RelatorioSimuladoEstudanteSchema,
@@ -15,7 +17,11 @@ import {
       },
     ]),
   ],
-  providers: [RelatorioSimuladoEstudanteRepository],
+  controllers: [RelatorioSimuladoEstudanteController],
+  providers: [
+    RelatorioSimuladoEstudanteRepository,
+    RelatorioSimuladoEstudanteService,
+  ],
   exports: [RelatorioSimuladoEstudanteRepository],
 })
 export class RelatorioSimuladoEstudanteModule {}
