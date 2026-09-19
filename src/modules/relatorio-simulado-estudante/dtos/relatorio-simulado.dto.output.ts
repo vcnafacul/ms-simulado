@@ -30,10 +30,16 @@ export class RelatorioSimuladoDtoOutput {
   linhas: LinhaRelatorioDtoOutput[];
 
   /**
-   * Cartões deste simulado no cursinho inteiro. Denominador do rodapé do
-   * relatório por turma: "27 dos 30 cartões deste simulado são desta turma".
-   * No relatório geral do cursinho é sempre igual a `linhas.length`.
+   * Denominador do rodapé do relatório por turma: "27 dos 30 cartões deste
+   * simulado são desta turma". No relatório geral do cursinho é sempre igual
+   * a `linhas.length`.
+   *
+   * Renomeado de `totalCartoesDoCursinhoNoSimulado` (revisão adversarial,
+   * Fix 7): conta LINHAS da junção, e o índice único faz disso uma linha por
+   * ESTUDANTE — um estudante que reenvia depois de uma falha continua
+   * contando 1. A proporção é correta (numerador e denominador têm o mesmo
+   * grão), só o nome antigo dizia "cartões" quando é gente.
    */
   @ApiProperty()
-  totalCartoesDoCursinhoNoSimulado: number;
+  totalEstudantesComCartaoNoCursinho: number;
 }

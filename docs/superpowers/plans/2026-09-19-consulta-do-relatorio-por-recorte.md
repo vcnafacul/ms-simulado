@@ -72,6 +72,11 @@ describe('RelatorioSimuladoEstudanteRepository.buscarPorRecorte', () => {
   });
 
   it('sem turmaId, a chave nem aparece no filtro', async () => {
+    // ⚠️ ERRATA (revisão adversarial, Fix 2): a premissa abaixo estava
+    // invertida. Medido num Mongo de verdade, `{ turmaId: undefined }` vira
+    // `{ turmaId: null }` e casa SÓ quem NÃO tem turma — não "todos". A guarda
+    // continua necessária, só que pelo motivo oposto: sem ela, a visão do
+    // cursinho inteiro perderia todo mundo COM turma.
     // { turmaId: undefined } no Mongo casa TODOS os documentos, não os sem turma
     const { repo, find } = montarBusca();
 
@@ -165,7 +170,9 @@ const CAMPOS_DO_HISTORICO =
       simulado: new Types.ObjectId(params.simuladoId),
       cursinhoId: params.cursinhoId,
     };
-    // `{ turmaId: undefined }` casaria TODOS os documentos, não os sem turma
+    // ⚠️ ERRATA (Fix 2): `{ turmaId: undefined }` vira `{ turmaId: null }` e
+    // casa SÓ quem não tem turma — a visão do cursinho inteiro perderia todo
+    // mundo COM turma. Ver correção no código-fonte e no spec de design.
     if (params.turmaId !== undefined) {
       filtro.turmaId = params.turmaId;
     }
@@ -268,7 +275,7 @@ describe('RelatorioSimuladoEstudanteService.consultar', () => {
       aproveitamentoGeral: 0.72,
       falha: undefined,
     });
-    expect(r.totalCartoesDoCursinhoNoSimulado).toBe(30);
+    expect(r.totalEstudantesComCartaoNoCursinho).toBe(30);
   });
 
   it('traduz a falha — a tela recebe a frase, não o código', async () => {
@@ -333,7 +340,7 @@ describe('RelatorioSimuladoEstudanteService.consultar', () => {
     const r = await svc.consultar({ simuladoId: SIM, cursinhoId: 'cur-1' });
 
     expect(r.linhas).toEqual([]);
-    expect(r.totalCartoesDoCursinhoNoSimulado).toBe(0);
+    expect(r.totalEstudantesComCartaoNoCursinho).toBe(0);
   });
 });
 ```
@@ -385,7 +392,7 @@ export class RelatorioSimuladoDtoOutput {
    * No relatório geral do cursinho é sempre igual a `linhas.length`.
    */
   @ApiProperty()
-  totalCartoesDoCursinhoNoSimulado: number;
+  totalEstudantesComCartaoNoCursinho: number;
 }
 ```
 
@@ -419,7 +426,7 @@ export class RelatorioSimuladoEstudanteService {
 
     return {
       linhas: linhas.map((l) => this.montarLinha(l)),
-      totalCartoesDoCursinhoNoSimulado: total,
+      totalEstudantesComCartaoNoCursinho: total,
     };
   }
 
@@ -515,7 +522,7 @@ describe('RelatorioSimuladoEstudanteController', () => {
     const service = {
       consultar: jest
         .fn()
-        .mockResolvedValue({ linhas: [], totalCartoesDoCursinhoNoSimulado: 0 }),
+        .mockResolvedValue({ linhas: [], totalEstudantesComCartaoNoCursinho: 0 }),
     };
     const ctrl = new RelatorioSimuladoEstudanteController(service as any);
 
@@ -535,7 +542,7 @@ describe('RelatorioSimuladoEstudanteController', () => {
     const service = {
       consultar: jest
         .fn()
-        .mockResolvedValue({ linhas: [], totalCartoesDoCursinhoNoSimulado: 0 }),
+        .mockResolvedValue({ linhas: [], totalEstudantesComCartaoNoCursinho: 0 }),
     };
     const ctrl = new RelatorioSimuladoEstudanteController(service as any);
 
@@ -794,13 +801,21 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
     expect(r.map((l) => l.usuario)).toEqual(['u-a1']);
   });
 
-  it('sem turmaId, o aluno SEM turma vem junto', async () => {
-    // a prova de que `{turmaId: undefined}` não virou filtro
+  // ⚠️ ERRATA (revisão adversarial, Fix 2): este teste original só afirmava
+  // `.some(...)`, que fica verde mesmo se o filtro `{turmaId: undefined}`
+  // virar `{turmaId: null}` (o bug real). O spec corrigido no código-fonte
+  // discrimina os dois grupos:
+  it('sem turmaId, vêm TODOS: com turma e sem turma', async () => {
+    // reintroduzir o bug faz esta asserção cair: o filtro {turmaId: null}
+    // devolveria só 'u-a3'
     const r = await repo.buscarPorRecorte({
       simuladoId: SIM_A.toString(),
       cursinhoId: 'cur-1',
     });
-    expect(r.some((l) => l.turmaId === undefined)).toBe(true);
+    const comTurma = r.filter((l) => l.turmaId !== undefined);
+    const semTurma = r.filter((l) => l.turmaId === undefined);
+    expect(comTurma.map((l) => l.usuario).sort()).toEqual(['u-a1', 'u-a2']);
+    expect(semTurma.map((l) => l.usuario)).toEqual(['u-a3']);
   });
 
   it('o populate traz o histórico sem as respostas', async () => {

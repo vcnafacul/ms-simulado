@@ -1,5 +1,12 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Param,
+  Query,
+} from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Types } from 'mongoose';
 import { ConsultarRelatorioDtoInput } from './dtos/consultar-relatorio.dto.input';
 import { RelatorioSimuladoDtoOutput } from './dtos/relatorio-simulado.dto.output';
 import { RelatorioSimuladoEstudanteService } from './relatorio-simulado-estudante.service';
@@ -19,6 +26,15 @@ export class RelatorioSimuladoEstudanteController {
     @Param('simuladoId') simuladoId: string,
     @Query() query: ConsultarRelatorioDtoInput,
   ): Promise<RelatorioSimuladoDtoOutput> {
+    // Sem isto, `new Types.ObjectId(simuladoId)` no repositório lança
+    // `BSONError` para qualquer coisa que não seja 24 hex — e vira 500. Um
+    // typo de :simuladoId numa rota proxied pela api é erro do CHAMADOR, não
+    // do ms — tem que ser 400, não um 500 sem pista nos logs de um serviço
+    // que o time da api não é dono.
+    if (!Types.ObjectId.isValid(simuladoId)) {
+      throw new BadRequestException(`simuladoId inválido: ${simuladoId}`);
+    }
+
     return this.service.consultar({
       simuladoId,
       cursinhoId: query.cursinhoId,

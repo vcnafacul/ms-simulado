@@ -92,6 +92,7 @@ describe('RelatorioSimuladoEstudanteRepository.registrar', () => {
 describe('RelatorioSimuladoEstudanteRepository.buscarPorRecorte', () => {
   const montarBusca = () => {
     const chain: any = {};
+    chain.sort = jest.fn().mockReturnValue(chain);
     chain.populate = jest.fn().mockReturnValue(chain);
     chain.lean = jest.fn().mockReturnValue(chain);
     chain.exec = jest.fn().mockResolvedValue([]);

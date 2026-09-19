@@ -12,6 +12,15 @@ import { RelatorioSimuladoEstudante } from './relatorio-simulado-estudante.schem
 const CAMPOS_DO_HISTORICO =
   'status cartaoCode questoesRespondidas aproveitamento.geral falha';
 
+/**
+ * `historico` é `| null` porque o `populate` de uma ref apagada (`Historico`
+ * removido depois do vínculo) devolve `null`, não lança — quem consome isto
+ * (a service) precisa tratar a ausência, não presumir a ref viva.
+ */
+export type LinhaComHistorico = RelatorioSimuladoEstudante & {
+  historico: Historico | null;
+};
+
 @Injectable()
 export class RelatorioSimuladoEstudanteRepository {
   constructor(
@@ -58,23 +67,23 @@ export class RelatorioSimuladoEstudanteRepository {
     simuladoId: string;
     cursinhoId: string;
     turmaId?: string;
-  }): Promise<(RelatorioSimuladoEstudante & { historico: Historico })[]> {
+  }): Promise<LinhaComHistorico[]> {
     const filtro: Record<string, unknown> = {
       simulado: new Types.ObjectId(params.simuladoId),
       cursinhoId: params.cursinhoId,
     };
-    // `{ turmaId: undefined }` casaria TODOS os documentos, não os sem turma
+    // `{ turmaId: undefined }` vira `{ turmaId: null }` e casa SÓ quem não tem
+    // turma — a visão do cursinho inteiro perderia todo mundo COM turma.
     if (params.turmaId !== undefined) {
       filtro.turmaId = params.turmaId;
     }
 
     return this.model
       .find(filtro)
+      .sort({ usuario: 1 })
       .populate({ path: 'historico', select: CAMPOS_DO_HISTORICO })
       .lean()
-      .exec() as unknown as Promise<
-      (RelatorioSimuladoEstudante & { historico: Historico })[]
-    >;
+      .exec() as unknown as Promise<LinhaComHistorico[]>;
   }
 
   /**

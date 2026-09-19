@@ -11,8 +11,15 @@ export class ConsultarRelatorioDtoInput {
   @IsNotEmpty()
   cursinhoId: string;
 
+  /**
+   * `@IsNotEmpty()` além do `@IsOptional()`: sem ele, `?turmaId=` (string
+   * vazia) passa a validação e vira "restrinja à turma ''" — um seletor de
+   * turma vazio na UI devolveria um relatório silenciosamente vazio em vez
+   * do cursinho inteiro.
+   */
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   turmaId?: string;
 }

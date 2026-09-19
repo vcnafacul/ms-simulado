@@ -6,7 +6,7 @@ const montar = () => {
   const service = {
     consultar: jest
       .fn()
-      .mockResolvedValue({ linhas: [], totalCartoesDoCursinhoNoSimulado: 0 }),
+      .mockResolvedValue({ linhas: [], totalEstudantesComCartaoNoCursinho: 0 }),
   };
   return {
     ctrl: new RelatorioSimuladoEstudanteController(service as any),

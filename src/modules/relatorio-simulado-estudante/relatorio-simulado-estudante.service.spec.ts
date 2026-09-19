@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { RelatorioSimuladoEstudanteService } from './relatorio-simulado-estudante.service';
 
 const SIM = '665f0c1a2b3c4d5e6f00abc2';
@@ -45,7 +46,7 @@ describe('RelatorioSimuladoEstudanteService.consultar', () => {
       aproveitamentoGeral: 0.72,
       falha: undefined,
     });
-    expect(r.totalCartoesDoCursinhoNoSimulado).toBe(30);
+    expect(r.totalEstudantesComCartaoNoCursinho).toBe(30);
   });
 
   it('traduz a falha — a tela recebe a frase, não o código', async () => {
@@ -110,6 +111,21 @@ describe('RelatorioSimuladoEstudanteService.consultar', () => {
     const r = await svc.consultar({ simuladoId: SIM, cursinhoId: 'cur-1' });
 
     expect(r.linhas).toEqual([]);
-    expect(r.totalCartoesDoCursinhoNoSimulado).toBe(0);
+    expect(r.totalEstudantesComCartaoNoCursinho).toBe(0);
+  });
+
+  it('linha com histórico apagado não derruba o relatório inteiro', async () => {
+    const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    const { svc } = montar([
+      { usuario: 'u-orfao', turmaId: 't-1', historico: null },
+      linha(),
+    ]);
+
+    const r = await svc.consultar({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+    // a linha órfã some, as outras sobrevivem — e fica rastro para investigar
+    expect(r.linhas.map((l) => l.usuario)).toEqual(['u1']);
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('u-orfao'));
+    error.mockRestore();
   });
 });

@@ -25,4 +25,10 @@ describe('ConsultarRelatorioDtoInput', () => {
   it('recusa cursinhoId vazio', () => {
     expect(validar({ cursinhoId: '' }).length).toBeGreaterThan(0);
   });
+
+  it('recusa turmaId vazio — senão um seletor de turma vazio na UI devolve o cursinho inteiro como vazio', () => {
+    expect(
+      validar({ cursinhoId: 'cur-1', turmaId: '' }).length,
+    ).toBeGreaterThan(0);
+  });
 });

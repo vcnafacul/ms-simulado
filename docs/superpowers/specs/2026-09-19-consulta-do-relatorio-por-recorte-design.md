@@ -27,7 +27,7 @@ a leitura.
 Devolve por estudante: `usuario`, `turmaId`, `historicoId`, `status`, `cartaoCode`,
 `aproveitamentoGeral`, `questoesRespondidas`, e `falha` **descrita** quando houver.
 
-Mais, ao lado das linhas, `totalCartoesDoCursinhoNoSimulado`.
+Mais, ao lado das linhas, `totalEstudantesComCartaoNoCursinho`.
 
 ## Decisões
 
@@ -52,7 +52,7 @@ O recorte é um cursinho: algumas centenas de linhas pequenas. O custo é irrele
 
 ### O contador é escopado no cursinho, não global
 
-`totalCartoesDoCursinhoNoSimulado = countDocuments({ simulado, cursinhoId })`.
+`totalEstudantesComCartaoNoCursinho = countDocuments({ simulado, cursinhoId })`.
 
 ⚠️ **E não "cartões fora do cursinho" — esse caso não existe mais.** O card `08b` fez o upload
 resolver o `cursinhoId` pelo JWT de quem envia e recusar, com **403**, estudante que não seja daquele
@@ -111,9 +111,13 @@ service; hoje só tem schema, repositório e módulo.
 transporta dados alheios pela rede interna e não escala. O teste de isolamento precisa provar isso
 com dois cursinhos de verdade na consulta, não só conferir o retorno.
 
-⚠️ **`turmaId` ausente ≠ turma inexistente.** Um filtro `{turmaId: undefined}` em Mongo casa
-**todos** os documentos, não os sem turma. Quando `turmaId` não vier, ele tem que ficar **fora** do
-filtro — não entrar como `undefined`.
+⚠️ **`turmaId` ausente ≠ turma inexistente.** ~~Um filtro `{turmaId: undefined}` em Mongo casa
+**todos** os documentos, não os sem turma.~~ **Correção (revisão adversarial, achado Fix 2):
+medido num Mongo de verdade, é o oposto.** O Mongoose serializa `{turmaId: undefined}` para
+`{turmaId: null}`, que casa **só** quem NÃO tem turma — a visão do cursinho inteiro perderia todo
+mundo COM turma, o que é pior do que a premissa original sugeria. Quando `turmaId` não vier, ele
+tem que ficar **fora** do filtro — não entrar como `undefined` — e a guarda continua necessária,
+só que pelo motivo contrário ao descrito aqui originalmente.
 
 ⚠️ **Índices no servidor, não só no schema.** Siga a lição da migração `0003`: `autoIndex` cria
 índice novo mas não remove o que saiu do schema.
@@ -133,6 +137,6 @@ filtro — não entrar como `undefined`.
 - [ ] `turmaId` ausente não vira filtro `undefined`
 - [ ] Cada linha passa por `descreverFalha` — o teste afirma a **descrição**, não o código
 - [ ] `aproveitamentoGeral` **ausente** (não zero) quando o status não é `completed`
-- [ ] `totalCartoesDoCursinhoNoSimulado` escopado no cursinho — teste provando que outro cursinho não
+- [ ] `totalEstudantesComCartaoNoCursinho` escopado no cursinho — teste provando que outro cursinho não
       entra na conta
 - [ ] Teste com dois cursinhos e duas turmas, provando que não vaza entre eles
