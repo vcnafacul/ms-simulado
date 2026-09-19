@@ -266,3 +266,116 @@ describe('RelatorioSimuladoEstudanteService.consultarQuestoes', () => {
     expect(r.questoes).toEqual([]);
   });
 });
+
+describe('RelatorioSimuladoEstudanteService.listarSimulados', () => {
+  const montarLista = (over?: {
+    agregado?: any[];
+    nomes?: { id: string; nome: string }[];
+  }) => {
+    const repository = {
+      listarSimuladosComCartao: jest
+        .fn()
+        .mockResolvedValue(over?.agregado ?? []),
+    };
+    const simuladoRepository = {
+      getNomesPorIds: jest.fn().mockResolvedValue(over?.nomes ?? []),
+    };
+    const svc = new RelatorioSimuladoEstudanteService(
+      repository as any,
+      simuladoRepository as any,
+    );
+    return { svc, repository, simuladoRepository };
+  };
+
+  it('junta o nome ao agregado, pelo id', async () => {
+    const { svc } = montarLista({
+      agregado: [
+        {
+          simuladoId: 's1',
+          cartoes: 3,
+          comLeituraConcluida: 2,
+          ultimoEnvio: new Date('2026-05-02'),
+        },
+      ],
+      nomes: [{ id: 's1', nome: 'ENEM 2024 — 1º dia' }],
+    });
+
+    const r = await svc.listarSimulados({ cursinhoId: 'cur-1' });
+
+    expect(r.simulados[0]).toEqual({
+      simuladoId: 's1',
+      nome: 'ENEM 2024 — 1º dia',
+      cartoes: 3,
+      comLeituraConcluida: 2,
+      ultimoEnvio: new Date('2026-05-02'),
+    });
+  });
+
+  it('simulado apagado depois do vínculo vira nome nulo, e NÃO some da lista', async () => {
+    // Sumir esconderia cartões que existem — é o oposto do que esta série
+    // inteira quer. A tela decide como rotular; o número continua honesto.
+    const { svc } = montarLista({
+      agregado: [
+        {
+          simuladoId: 's-morto',
+          cartoes: 2,
+          comLeituraConcluida: 1,
+          ultimoEnvio: new Date(),
+        },
+      ],
+      nomes: [],
+    });
+
+    const r = await svc.listarSimulados({ cursinhoId: 'cur-1' });
+
+    expect(r.simulados).toHaveLength(1);
+    expect(r.simulados[0].nome).toBeNull();
+    expect(r.simulados[0].cartoes).toBe(2);
+  });
+
+  it('pede os nomes SÓ dos ids que o agregado devolveu', async () => {
+    const { svc, simuladoRepository } = montarLista({
+      agregado: [
+        {
+          simuladoId: 's1',
+          cartoes: 1,
+          comLeituraConcluida: 1,
+          ultimoEnvio: new Date(),
+        },
+        {
+          simuladoId: 's2',
+          cartoes: 1,
+          comLeituraConcluida: 0,
+          ultimoEnvio: new Date(),
+        },
+      ],
+    });
+
+    await svc.listarSimulados({ cursinhoId: 'cur-1' });
+
+    expect(simuladoRepository.getNomesPorIds).toHaveBeenCalledWith([
+      's1',
+      's2',
+    ]);
+  });
+
+  it('repassa o turmaId ao repositório', async () => {
+    const { svc, repository } = montarLista();
+
+    await svc.listarSimulados({ cursinhoId: 'cur-1', turmaId: 't-1' });
+
+    expect(repository.listarSimuladosComCartao).toHaveBeenCalledWith({
+      cursinhoId: 'cur-1',
+      turmaId: 't-1',
+    });
+  });
+
+  it('recorte vazio devolve { simulados: [] } e não consulta nome nenhum', async () => {
+    const { svc, simuladoRepository } = montarLista({ agregado: [] });
+
+    const r = await svc.listarSimulados({ cursinhoId: 'cur-vazio' });
+
+    expect(r).toEqual({ simulados: [] });
+    expect(simuladoRepository.getNomesPorIds).not.toHaveBeenCalled();
+  });
+});
