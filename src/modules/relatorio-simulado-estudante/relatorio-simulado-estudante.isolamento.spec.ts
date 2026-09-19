@@ -725,5 +725,29 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
         respondentes: 3,
       });
     });
+
+    it('GET /simulados resolve para a rota literal, não para :simuladoId', async () => {
+      // ⚠️ `simulados` e `:simuladoId` têm a MESMA contagem de segmentos.
+      // Declarada depois, a literal é capturada pelo param, `isValid` recusa
+      // e isto vira 400. Só um app de verdade pega — teste de unidade chama
+      // o método direto e passa com a ordem errada.
+      const res = await request(app.getHttpServer())
+        .get('/v1/relatorio-simulado/simulados')
+        .query({ cursinhoId: 'cur-http' })
+        .expect(200);
+
+      expect(Array.isArray(res.body.simulados)).toBe(true);
+      expect(res.body.simulados[0]).toMatchObject({
+        simuladoId: expect.any(String),
+        cartoes: expect.any(Number),
+        comLeituraConcluida: expect.any(Number),
+      });
+    });
+
+    it('GET /simulados sem cursinhoId recusa com 400', async () => {
+      await request(app.getHttpServer())
+        .get('/v1/relatorio-simulado/simulados')
+        .expect(400);
+    });
   });
 });

@@ -8,6 +8,7 @@ const montar = () => {
     consultar: jest
       .fn()
       .mockResolvedValue({ linhas: [], totalEstudantesComCartaoNoCursinho: 0 }),
+    listarSimulados: jest.fn().mockResolvedValue({ simulados: [] }),
   };
   return {
     ctrl: new RelatorioSimuladoEstudanteController(service as any),
@@ -37,6 +38,17 @@ describe('RelatorioSimuladoEstudanteController', () => {
       simuladoId: SIM,
       cursinhoId: 'cur-1',
       turmaId: undefined,
+    });
+  });
+
+  it('listarSimulados repassa cursinho e turma ao serviço', async () => {
+    const { ctrl, service } = montar();
+
+    await ctrl.listarSimulados({ cursinhoId: 'cur-1', turmaId: 't-1' } as any);
+
+    expect(service.listarSimulados).toHaveBeenCalledWith({
+      cursinhoId: 'cur-1',
+      turmaId: 't-1',
     });
   });
 });
