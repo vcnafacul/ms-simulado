@@ -1,5 +1,4 @@
 import { BadGatewayException, ConflictException } from '@nestjs/common';
-import { HistoricoStatus } from '../historico/enums/historico-status.enum';
 import { CartaoHistoricoService } from './cartao-historico.service';
 
 function setup(over: any = {}) {
@@ -7,6 +6,7 @@ function setup(over: any = {}) {
     existsCartaoAtivo: jest.fn().mockResolvedValue(false),
     createAwaitingOmr: jest.fn().mockResolvedValue({ _id: 'h1' }),
     updateStatus: jest.fn().mockResolvedValue(undefined),
+    marcarFalha: jest.fn().mockResolvedValue(undefined),
     ...over.repo,
   };
   const omr = {
@@ -50,7 +50,29 @@ it('omr falha: marca Failed e 502', async () => {
     },
   });
   await expect(svc.criar(DTO)).rejects.toBeInstanceOf(BadGatewayException);
-  expect(repo.updateStatus).toHaveBeenCalledWith('h1', HistoricoStatus.Failed);
+  expect(repo.marcarFalha).toHaveBeenCalledWith(
+    'h1',
+    'omr_indisponivel',
+    'down',
+  );
+});
+
+it('OMR inacessível: grava omr_indisponivel, não só o status', async () => {
+  const { svc, repo } = setup({
+    omr: {
+      enviarProcessamento: jest
+        .fn()
+        .mockRejectedValue(new Error('ECONNREFUSED')),
+    },
+  });
+
+  await expect(svc.criar(DTO)).rejects.toThrow();
+
+  expect(repo.marcarFalha).toHaveBeenCalledWith(
+    'h1',
+    'omr_indisponivel',
+    expect.any(String),
+  );
 });
 
 it('imageKey inválido: 400 sem criar', async () => {

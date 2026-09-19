@@ -3,8 +3,8 @@ import {
   ConflictException,
   Injectable,
 } from '@nestjs/common';
+import { CodigoFalhaInterno } from '../historico/falha/codigo-falha';
 import { HistoricoRepository } from '../historico/historico.repository';
-import { HistoricoStatus } from '../historico/enums/historico-status.enum';
 import { parseSimuladoId } from './imagekey.util';
 import { OmrHttpService } from './omr-http.service';
 
@@ -44,10 +44,11 @@ export class CartaoHistoricoService {
 
     try {
       await this.omrHttp.enviarProcessamento(dto.imageKey);
-    } catch {
-      await this.historicoRepository.updateStatus(
+    } catch (err) {
+      await this.historicoRepository.marcarFalha(
         historicoId,
-        HistoricoStatus.Failed,
+        CodigoFalhaInterno.OmrIndisponivel,
+        err instanceof Error ? err.message : String(err),
       );
       throw new BadGatewayException('falha ao acionar o OMR');
     }
