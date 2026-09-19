@@ -53,9 +53,13 @@ entra.
 |---|---|
 | `simuladoId` | o id |
 | `nome` | o nome do simulado |
-| `cartoes` | quantos cartões foram enviados no recorte |
+| `cartoes` | quantos **estudantes** enviaram cartão no recorte |
 | `comLeituraConcluida` | quantos desses têm `status: completed` |
-| `ultimoEnvio` | data do cartão mais recente daquele simulado no recorte |
+| `ultimoEnvio` | quando o estudante mais recente daquele simulado entrou no recorte |
+
+⚠️ **O grão é o estudante, não a tentativa.** A unicidade da junção é
+`{simulado, cursinhoId, usuario}` e a escrita é upsert, então `cartoes` é "quantas pessoas
+enviaram", não "quantas fotos chegaram". Um reenvio depois de falha não soma.
 
 Ordenado por `ultimoEnvio` **decrescente**.
 
@@ -81,11 +85,15 @@ contaria zero, a ação do `06` ficaria desabilitada, e ninguém veria as falhas
 O coordenador quase sempre quer o último simulado aplicado. `$max` do `createdAt` das linhas daquele
 simulado.
 
-⚠️ **Ressalva medida:** o schema da junção é `@Schema({ timestamps: false })`, mas o `BaseSchema` dá
-`createdAt` com `default: () => now()`. E o `registrar` é **upsert** — um reenvio depois de falha
-atualiza a linha existente e **não rebumba a data**. Então `ultimoEnvio` é *"quando o primeiro cartão
-daquele simulado chegou"*, não *"a última atividade"*. Para ordenar uma lista de simulados é o que
-interessa; o nome do campo não deve prometer mais do que isso.
+⚠️ **Ressalva medida, e o nome do campo não pode prometer mais do que isso.** O schema da junção é
+`@Schema({ timestamps: false })`, mas o `BaseSchema` dá `createdAt` com `default: () => now()`. E o
+`registrar` é **upsert**: um reenvio depois de falha atualiza a linha existente e **não rebumba a
+data**.
+
+Então, exatamente: cada linha guarda quando **aquele estudante** entrou, e `ultimoEnvio` é o `$max`
+disso — *"quando o estudante mais recente daquele simulado entrou no recorte"*. Um aluno novo enviando
+move a data; o mesmo aluno reenviando não move. Para ordenar simulados por recência de aplicação é o
+que interessa, mas não é "a última atividade" e não deve ser exibido como tal.
 
 ### O nome sai de um `Map`, não de um `$lookup`
 
