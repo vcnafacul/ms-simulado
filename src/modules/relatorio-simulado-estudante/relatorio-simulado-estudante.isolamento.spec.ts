@@ -4,6 +4,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { Model, Types } from 'mongoose';
 import { Historico, HistoricoSchema } from '../historico/historico.schema';
+import { SimuladoRepository } from '../simulado/simulado.repository';
+import { Simulado, SimuladoSchema } from '../simulado/schemas/simulado.schema';
 import { RelatorioSimuladoEstudanteController } from './relatorio-simulado-estudante.controller';
 import { RelatorioSimuladoEstudanteRepository } from './relatorio-simulado-estudante.repository';
 import { RelatorioSimuladoEstudanteService } from './relatorio-simulado-estudante.service';
@@ -241,12 +243,14 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
               schema: RelatorioSimuladoEstudanteSchema,
             },
             { name: Historico.name, schema: HistoricoSchema },
+            { name: Simulado.name, schema: SimuladoSchema },
           ]),
         ],
         controllers: [RelatorioSimuladoEstudanteController],
         providers: [
           RelatorioSimuladoEstudanteRepository,
           RelatorioSimuladoEstudanteService,
+          SimuladoRepository,
         ],
       }).compile();
 
