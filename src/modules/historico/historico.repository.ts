@@ -245,8 +245,24 @@ export class HistoricoRepository extends BaseRepository<Historico> {
     return this.model.find({ status: { $in: statuses } }).exec();
   }
 
-  async updateStatus(id: string, status: HistoricoStatus): Promise<void> {
-    await this.model.findByIdAndUpdate(id, { status }).exec();
+  /**
+   * Marca o histórico como falho E registra o motivo numa ÚNICA escrita.
+   *
+   * A atomicidade não é detalhe: o card 09 precisa da operação inversa (voltar o
+   * status e `$unset` a falha), e em duas escritas existe uma janela em que a tela
+   * mostra "processando" com a mensagem de erro anterior ao lado.
+   */
+  async marcarFalha(
+    id: string,
+    codigo: string,
+    detalhe?: string,
+  ): Promise<void> {
+    await this.model
+      .findByIdAndUpdate(id, {
+        status: HistoricoStatus.Failed,
+        falha: { codigo, detalhe },
+      })
+      .exec();
   }
 
   async findByImageKey(imageKey: string): Promise<Historico | null> {

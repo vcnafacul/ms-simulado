@@ -1,11 +1,25 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsArray,
   IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
+  ValidateNested,
 } from 'class-validator';
+
+export class CartaoCallbackFalhaDtoInput {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  motivo: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  detalhe?: string;
+}
 
 export class CartaoCallbackDtoInput {
   @ApiProperty()
@@ -18,8 +32,10 @@ export class CartaoCallbackDtoInput {
   @IsArray()
   respostas?: { questao: string; alternativaEstudante: string }[];
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, type: CartaoCallbackFalhaDtoInput })
   @IsOptional()
   @IsObject()
-  falha?: { motivo: string; detalhe?: string };
+  @ValidateNested()
+  @Type(() => CartaoCallbackFalhaDtoInput)
+  falha?: CartaoCallbackFalhaDtoInput;
 }

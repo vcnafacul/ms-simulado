@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { QueueProducer } from '../../shared/modules/queue/queue.producer';
-import { HistoricoStatus } from '../historico/enums/historico-status.enum';
+import { CodigoFalhaInterno } from '../historico/falha/codigo-falha';
 import { HistoricoRepository } from '../historico/historico.repository';
 import { SimuladoRepository } from '../simulado/simulado.repository';
 
@@ -35,9 +35,12 @@ export class CartaoCallbackService {
     )._id.toString();
 
     if (input.falha) {
-      await this.historicoRepository.updateStatus(
+      // o código vem cru do ms-omr de propósito: validar contra uma lista fechada
+      // faria todo código novo daquele repo exigir deploy coordenado
+      await this.historicoRepository.marcarFalha(
         histId,
-        HistoricoStatus.Failed,
+        input.falha.motivo,
+        input.falha.detalhe,
       );
       return;
     }
@@ -50,9 +53,10 @@ export class CartaoCallbackService {
       this.logger.warn(
         `callback: simulado ${simuladoId} não encontrado (histórico ${histId}) → Failed`,
       );
-      await this.historicoRepository.updateStatus(
+      await this.historicoRepository.marcarFalha(
         histId,
-        HistoricoStatus.Failed,
+        CodigoFalhaInterno.SimuladoNaoEncontrado,
+        `simulado ${simuladoId} não encontrado`,
       );
       return;
     }

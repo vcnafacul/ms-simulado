@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AggregatePeriodDtoInput } from 'src/shared/dtos/aggregate-period.dto.input';
 import { GetHistoricoDTOInput } from './dtos/get-historico.dto';
 import { GetPerformanceHistories } from './dtos/get-perfomance-histories.dto';
+import { descreverFalha } from './falha/mapa-falha';
 import { HistoricoRepository } from './historico.repository';
 import {
   AproveitamentoGeral,
@@ -9,20 +10,31 @@ import {
   SubAproveitamento,
 } from './types/aproveitamento';
 
+/** Mongoose doc ou objeto puro → objeto puro. O repositório devolve documentos
+ *  hidratados em produção e objetos simples nos testes. */
+function toPlain(doc: unknown): any {
+  return (doc as any)?.toObject ? (doc as any).toObject() : doc;
+}
+
 @Injectable()
 export class HistoricoService {
   constructor(private repository: HistoricoRepository) {}
 
   async getAllbyUser(dto: GetHistoricoDTOInput) {
-    return await this.repository.getAllByUser(dto);
+    const resultado = await this.repository.getAllByUser(dto);
+    return {
+      ...resultado,
+      data: resultado.data.map((historico) => {
+        const obj: any = toPlain(historico);
+        return { ...obj, falha: descreverFalha(obj.falha) };
+      }),
+    };
   }
 
   async getById(id: string) {
     const historico = await this.repository.getById(id);
     if (!historico) return historico;
-    const obj: any = (historico as any).toObject
-      ? (historico as any).toObject()
-      : historico;
+    const obj: any = toPlain(historico);
     if (obj.simulado && Array.isArray(obj.simulado.questoes)) {
       // Achata pro shape antigo do client, preservando o numero do relacionamento
       // (numero vive em QuestaoNaContainer, não mais na Questao).
@@ -31,6 +43,7 @@ export class HistoricoService {
         numero: qc.numero,
       }));
     }
+    obj.falha = descreverFalha(obj.falha);
     return obj;
   }
 

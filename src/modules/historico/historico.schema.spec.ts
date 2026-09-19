@@ -18,3 +18,9 @@ describe('Historico schema — campos de cartão (A2)', () => {
     });
   });
 });
+
+describe('Historico schema — campo de falha (card 01)', () => {
+  it('tem o path falha', () => {
+    expect(HistoricoSchema.path('falha')).toBeDefined();
+  });
+});

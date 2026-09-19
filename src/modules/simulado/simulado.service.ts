@@ -10,7 +10,7 @@ import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { QueueProducer } from 'src/shared/modules/queue/queue.producer';
 import { HistoricoRepository } from '../historico/historico.repository';
-import { HistoricoStatus } from '../historico/enums/historico-status.enum';
+import { CodigoFalhaInterno } from '../historico/falha/codigo-falha';
 import {
   AproveitamentoHistorico,
   MateriaAproveitamento,
@@ -188,9 +188,10 @@ export class SimuladoService {
       const historico = await this.historicoRepository.getById(histId);
 
       if (!historico?.rawRespostas) {
-        await this.historicoRepository.updateStatus(
+        await this.historicoRepository.marcarFalha(
           histId,
-          HistoricoStatus.Failed,
+          CodigoFalhaInterno.RespostasAusentes,
+          'histórico sem rawRespostas para processar',
         );
         return;
       }
@@ -203,9 +204,10 @@ export class SimuladoService {
       // Guard: simulado sem questões não tem o que processar — evita
       // TypeError no acesso a questoes[0] abaixo.
       if (!simulado.questoes.length) {
-        await this.historicoRepository.updateStatus(
+        await this.historicoRepository.marcarFalha(
           histId,
-          HistoricoStatus.Failed,
+          CodigoFalhaInterno.SimuladoSemQuestoes,
+          `simulado ${simuladoId} sem questões`,
         );
         return;
       }
@@ -247,9 +249,10 @@ export class SimuladoService {
         aproveitamento,
       });
     } catch (err) {
-      await this.historicoRepository.updateStatus(
+      await this.historicoRepository.marcarFalha(
         histId,
-        HistoricoStatus.Failed,
+        CodigoFalhaInterno.ErroNoProcessamento,
+        err instanceof Error ? err.message : String(err),
       );
       throw err;
     }

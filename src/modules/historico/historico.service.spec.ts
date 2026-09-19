@@ -104,3 +104,50 @@ describe('HistoricoService.getById (achata simulado.questoes)', () => {
     expect(await service.getById('x')).toBeNull();
   });
 });
+
+describe('HistoricoService — descrição da falha (card 01)', () => {
+  it('getAllbyUser descreve a falha de cada histórico', async () => {
+    const repository = {
+      getAllByUser: jest.fn().mockResolvedValue({
+        data: [
+          {
+            _id: 'h1',
+            falha: { codigo: 'cartao_nao_detectado', detalhe: 'x' },
+          },
+          { _id: 'h2' },
+        ],
+        page: 1,
+        limit: 10,
+        totalItems: 2,
+      }),
+    };
+    const svc = new HistoricoService(repository as any);
+
+    const r: any = await svc.getAllbyUser({ page: 1, limit: 10 } as any);
+
+    expect(r.data[0].falha).toEqual({
+      codigo: 'cartao_nao_detectado',
+      detalhe: 'x',
+      descricao: expect.stringContaining('Não foi possível localizar o cartão'),
+      acaoSugerida: 'reenviar_foto',
+    });
+    // histórico sem falha continua sem falha — não se inventa uma
+    expect(r.data[1].falha).toBeUndefined();
+    // e a paginação sobrevive
+    expect(r.totalItems).toBe(2);
+  });
+
+  it('getById descreve a falha', async () => {
+    const repository = {
+      getById: jest.fn().mockResolvedValue({
+        _id: 'h1',
+        falha: { codigo: 'motor_timeout' },
+      }),
+    };
+    const svc = new HistoricoService(repository as any);
+
+    const r: any = await svc.getById('h1');
+
+    expect(r.falha.acaoSugerida).toBe('reprocessar');
+  });
+});

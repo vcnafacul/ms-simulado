@@ -1,4 +1,3 @@
-import { HistoricoStatus } from '../historico/enums/historico-status.enum';
 import { CartaoCallbackService } from './cartao-callback.service';
 
 function setup(over: any = {}) {
@@ -6,7 +5,7 @@ function setup(over: any = {}) {
     findByImageKey: jest
       .fn()
       .mockResolvedValue({ _id: 'h1', simulado: { _id: 's1' } }),
-    updateStatus: jest.fn().mockResolvedValue(undefined),
+    marcarFalha: jest.fn().mockResolvedValue(undefined),
     prepararParaProcessamento: jest.fn().mockResolvedValue(undefined),
     ...over.historicoRepository,
   };
@@ -43,21 +42,52 @@ describe('CartaoCallbackService', () => {
       },
     });
     await svc.processar({ imageKey: 'k' });
-    expect(historicoRepository.updateStatus).not.toHaveBeenCalled();
+    expect(historicoRepository.marcarFalha).not.toHaveBeenCalled();
     expect(queueProducer.publish).not.toHaveBeenCalled();
   });
 
-  it('falha: marca Failed, sem publish', async () => {
+  it('falha: grava o código recebido e o detalhe, sem publish', async () => {
     const { svc, historicoRepository, queueProducer } = setup();
+
     await svc.processar({
       imageKey: 'k',
-      falha: { motivo: 'cartao_ilegivel' },
+      falha: { motivo: 'cartao_nao_detectado', detalhe: 'sem CSV' },
     });
-    expect(historicoRepository.updateStatus).toHaveBeenCalledWith(
+
+    expect(historicoRepository.marcarFalha).toHaveBeenCalledWith(
       'h1',
-      HistoricoStatus.Failed,
+      'cartao_nao_detectado',
+      'sem CSV',
     );
     expect(queueProducer.publish).not.toHaveBeenCalled();
+  });
+
+  it('falha: repassa código desconhecido cru, sem validar contra lista fechada', async () => {
+    // validar aqui faria todo código novo do ms-omr exigir deploy coordenado;
+    // quem absorve o desconhecido é o fallback do mapa, na leitura
+    const { svc, historicoRepository } = setup();
+
+    await svc.processar({
+      imageKey: 'k',
+      falha: { motivo: 'codigo_futuro_do_ms_omr' },
+    });
+
+    expect(historicoRepository.marcarFalha).toHaveBeenCalledWith(
+      'h1',
+      'codigo_futuro_do_ms_omr',
+      undefined,
+    );
+  });
+
+  it('callback sem falha não inventa uma', async () => {
+    const { svc, historicoRepository } = setup();
+
+    await svc.processar({
+      imageKey: 'k',
+      respostas: [{ questao: '1', alternativaEstudante: 'A' }],
+    });
+
+    expect(historicoRepository.marcarFalha).not.toHaveBeenCalled();
   });
 
   it('sucesso: mapeia número→_id, prepara e enfileira', async () => {
@@ -91,9 +121,10 @@ describe('CartaoCallbackService', () => {
       imageKey: 'k',
       respostas: [{ questao: '1', alternativaEstudante: 'A' }],
     });
-    expect(historicoRepository.updateStatus).toHaveBeenCalledWith(
+    expect(historicoRepository.marcarFalha).toHaveBeenCalledWith(
       'h1',
-      HistoricoStatus.Failed,
+      'simulado_nao_encontrado',
+      expect.any(String),
     );
     expect(
       historicoRepository.prepararParaProcessamento,
