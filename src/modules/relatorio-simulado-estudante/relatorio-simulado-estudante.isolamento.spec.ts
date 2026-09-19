@@ -19,6 +19,9 @@ const request = require('supertest');
 
 const SIM_A = new Types.ObjectId();
 const SIM_B = new Types.ObjectId();
+// hoisteado: o bloco HTTP (describe irmão) também precisa dele para provar
+// a rota `:simuladoId/questoes` contra o MESMO seed desta suíte.
+const SIM_C = new Types.ObjectId();
 
 describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', () => {
   let mongo: MongoMemoryServer | undefined;
@@ -192,6 +195,129 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
     expect(total).toBe(3);
   });
 
+  describe('agregado por questão (Mongo real)', () => {
+    // Três estudantes do cur-1 em SIM_C: q1 → 2 acertos e 1 sem leitura;
+    // q2 → 1 acerto, 1 erro, 1 sem leitura. Mais um histórico FAILED, que não vota.
+    const Q1 = new Types.ObjectId();
+    const Q2 = new Types.ObjectId();
+
+    beforeAll(async () => {
+      const comRespostas = async (
+        usuario: string,
+        cursinhoId: string,
+        respostas: any[] | undefined,
+        status = 'completed',
+      ) => {
+        const h = await histModel.create({
+          usuario,
+          simulado: SIM_C,
+          status,
+          respostas,
+        });
+        await relModel.create({
+          historico: h._id,
+          simulado: SIM_C,
+          usuario,
+          cursinhoId,
+        });
+      };
+
+      await comRespostas('u-1', 'cur-1', [
+        { questao: Q1, alternativaEstudante: 'A', alternativaCorreta: 'A' },
+        { questao: Q2, alternativaEstudante: 'B', alternativaCorreta: 'B' },
+      ]);
+      await comRespostas('u-2', 'cur-1', [
+        { questao: Q1, alternativaEstudante: 'A', alternativaCorreta: 'A' },
+        { questao: Q2, alternativaEstudante: 'C', alternativaCorreta: 'B' },
+      ]);
+      // em branco: a chave `alternativaEstudante` simplesmente não existe
+      await comRespostas('u-3', 'cur-1', [
+        { questao: Q1, alternativaCorreta: 'A' },
+        { questao: Q2, alternativaCorreta: 'B' },
+      ]);
+      // outro cursinho, não pode entrar na conta
+      await comRespostas('u-4', 'cur-2', [
+        { questao: Q1, alternativaEstudante: 'E', alternativaCorreta: 'A' },
+      ]);
+      // failed: sem `respostas`, não vota em questão nenhuma
+      await comRespostas('u-5', 'cur-1', undefined, 'failed');
+    }, 120_000);
+
+    it('conta acertos, erros e sem-leitura por questão', async () => {
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-1',
+      });
+      const q1 = r.find((q) => q.questaoId === Q1.toString())!;
+      const q2 = r.find((q) => q.questaoId === Q2.toString())!;
+
+      expect(q1).toMatchObject({
+        respondentes: 3,
+        acertos: 2,
+        erros: 0,
+        semLeitura: 1,
+      });
+      expect(q2).toMatchObject({
+        respondentes: 3,
+        acertos: 1,
+        erros: 1,
+        semLeitura: 1,
+      });
+    });
+
+    it('acertos + erros + semLeitura === respondentes, em toda questão', async () => {
+      // a invariante que pega um $cond errado — por isso os três são contados
+      // independentes, e não um derivado dos outros
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-1',
+      });
+      expect(r).toHaveLength(2);
+      for (const q of r) {
+        expect(q.acertos + q.erros + q.semLeitura).toBe(q.respondentes);
+      }
+    });
+
+    it('a distribuição por alternativa bate, e cobre A–E', async () => {
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-1',
+      });
+      const q2 = r.find((q) => q.questaoId === Q2.toString())!;
+      expect(q2.porAlternativa).toEqual({ A: 0, B: 1, C: 1, D: 0, E: 0 });
+    });
+
+    it('histórico failed não vira respondente de nada', async () => {
+      // com preserveNullAndEmptyArrays no $unwind, u-5 apareceria em toda questão
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-1',
+      });
+      for (const q of r) {
+        expect(q.respondentes).toBe(3); // u-1, u-2, u-3 — nunca 4
+      }
+    });
+
+    it('não vaza entre cursinhos', async () => {
+      // u-4 marcou E em Q1 pelo cur-2; não pode aparecer na conta do cur-1
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-1',
+      });
+      expect(
+        r.find((q) => q.questaoId === Q1.toString())!.porAlternativa.E,
+      ).toBe(0);
+    });
+
+    it('recorte sem cartão devolve lista vazia, não erro', async () => {
+      const r = await repo.agregarPorQuestao({
+        simuladoId: new Types.ObjectId().toString(),
+        cursinhoId: 'cur-1',
+      });
+      expect(r).toEqual([]);
+    });
+  });
+
   /**
    * Fix 4 da revisão adversarial: o spec do controller usa um dublê do
    * serviço, e os specs acima falam com o repositório direto. Nada até aqui
@@ -318,6 +444,15 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
         (l: any) => l.usuario === 'u-http-nao-lido',
       );
       expect('aproveitamentoGeral' in linhaNaoLida).toBe(false);
+    });
+
+    it('GET :simuladoId/questoes responde 200 com o agregado', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/v1/relatorio-simulado/${SIM_C.toString()}/questoes`)
+        .query({ cursinhoId: 'cur-1' })
+        .expect(200);
+
+      expect(Array.isArray(res.body.questoes)).toBe(true);
     });
   });
 });
