@@ -1,0 +1,115 @@
+import { RelatorioSimuladoEstudanteService } from './relatorio-simulado-estudante.service';
+
+const SIM = '665f0c1a2b3c4d5e6f00abc2';
+
+const linha = (over: any = {}) => ({
+  usuario: 'u1',
+  turmaId: 't-1',
+  ...over,
+  // depois de `...over`: senão um `over.historico` parcial (como nos testes
+  // de falha/awaiting_omr) apagaria os defaults acima, incluindo o `_id`.
+  historico: {
+    _id: 'h1',
+    status: 'completed',
+    cartaoCode: '7',
+    questoesRespondidas: 90,
+    aproveitamento: { geral: 0.72 },
+    ...over.historico,
+  },
+});
+
+const montar = (linhas: any[], total = 30) => {
+  const repository = {
+    buscarPorRecorte: jest.fn().mockResolvedValue(linhas),
+    contarDoCursinho: jest.fn().mockResolvedValue(total),
+  };
+  return {
+    svc: new RelatorioSimuladoEstudanteService(repository as any),
+    repository,
+  };
+};
+
+describe('RelatorioSimuladoEstudanteService.consultar', () => {
+  it('monta a linha do estudante com o que as telas usam', async () => {
+    const { svc } = montar([linha()]);
+
+    const r = await svc.consultar({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+    expect(r.linhas[0]).toEqual({
+      usuario: 'u1',
+      turmaId: 't-1',
+      historicoId: 'h1',
+      status: 'completed',
+      cartaoCode: '7',
+      questoesRespondidas: 90,
+      aproveitamentoGeral: 0.72,
+      falha: undefined,
+    });
+    expect(r.totalCartoesDoCursinhoNoSimulado).toBe(30);
+  });
+
+  it('traduz a falha — a tela recebe a frase, não o código', async () => {
+    const { svc } = montar([
+      linha({
+        historico: {
+          status: 'failed',
+          falha: { codigo: 'cartao_nao_detectado', detalhe: 'sem CSV' },
+        },
+      }),
+    ]);
+
+    const r = await svc.consultar({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+    expect(r.linhas[0].falha).toEqual({
+      codigo: 'cartao_nao_detectado',
+      detalhe: 'sem CSV',
+      descricao: expect.stringContaining('Não foi possível localizar o cartão'),
+      acaoSugerida: 'reenviar_foto',
+    });
+  });
+
+  it('cartão que ainda não foi lido vem SEM aproveitamento, não com zero', async () => {
+    // zero é uma nota; ausência de leitura não é. Iguais, a média do card 04 mente.
+    const { svc } = montar([
+      linha({
+        historico: {
+          status: 'awaiting_omr',
+          questoesRespondidas: undefined,
+          aproveitamento: undefined,
+        },
+      }),
+    ]);
+
+    const r = await svc.consultar({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+    expect(r.linhas[0].aproveitamentoGeral).toBeUndefined();
+    expect(r.linhas[0].status).toBe('awaiting_omr');
+  });
+
+  it('repassa o recorte ao repositório, incluindo a turma', async () => {
+    const { svc, repository } = montar([]);
+
+    await svc.consultar({
+      simuladoId: SIM,
+      cursinhoId: 'cur-1',
+      turmaId: 't-9',
+    });
+
+    expect(repository.buscarPorRecorte).toHaveBeenCalledWith({
+      simuladoId: SIM,
+      cursinhoId: 'cur-1',
+      turmaId: 't-9',
+    });
+    // a contagem é do CURSINHO, não da turma — é o denominador do rodapé
+    expect(repository.contarDoCursinho).toHaveBeenCalledWith(SIM, 'cur-1');
+  });
+
+  it('recorte sem cartão nenhum devolve lista vazia, não erro', async () => {
+    const { svc } = montar([], 0);
+
+    const r = await svc.consultar({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+    expect(r.linhas).toEqual([]);
+    expect(r.totalCartoesDoCursinhoNoSimulado).toBe(0);
+  });
+});
