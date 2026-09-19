@@ -165,6 +165,9 @@ export class SimuladoService {
   public async answer(
     answer: AnswerSimuladoDto,
   ): Promise<{ histId: string; status: string }> {
+    // Não gera linha em RelatorioSimuladoEstudante: por decisão do card 08, só o
+    // fluxo de cartão vincula a resposta a cursinho/turma. O online já aparece no
+    // relatório genérico. A omissão é deliberada — ver simulado.module.spec.ts.
     const pending = await this.historicoRepository.createPending({
       usuario: answer.idEstudante,
       simuladoId: answer.idSimulado,

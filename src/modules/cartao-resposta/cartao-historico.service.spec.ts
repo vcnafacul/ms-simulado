@@ -1,4 +1,4 @@
-import { BadGatewayException, ConflictException } from '@nestjs/common';
+import { BadGatewayException, ConflictException, Logger } from '@nestjs/common';
 import { CartaoHistoricoService } from './cartao-historico.service';
 
 function setup(over: any = {}) {
@@ -13,7 +13,11 @@ function setup(over: any = {}) {
     ...over.omr,
   };
   return {
-    svc: new CartaoHistoricoService(repo as any, omr as any),
+    svc: new CartaoHistoricoService(
+      repo as any,
+      omr as any,
+      { registrar: jest.fn() } as any,
+    ),
     repo,
     omr,
   };
@@ -60,4 +64,98 @@ it('imageKey inválido: 400 sem criar', async () => {
   const { svc, repo } = setup();
   await expect(svc.criar({ ...DTO, imageKey: 'invalido' })).rejects.toThrow();
   expect(repo.createAwaitingOmr).not.toHaveBeenCalled();
+});
+
+it('cria a linha de junção com o vínculo recebido', async () => {
+  const historicoRepository = {
+    existsCartaoAtivo: jest.fn().mockResolvedValue(false),
+    createAwaitingOmr: jest.fn().mockResolvedValue({ _id: 'h1' }),
+    marcarFalha: jest.fn().mockResolvedValue(undefined),
+  };
+  const omrHttp = {
+    enviarProcessamento: jest.fn().mockResolvedValue(undefined),
+  };
+  const relatorio = { registrar: jest.fn().mockResolvedValue(undefined) };
+  const svc = new CartaoHistoricoService(
+    historicoRepository as any,
+    omrHttp as any,
+    relatorio as any,
+  );
+
+  await svc.criar({
+    usuario: 'u1',
+    imageKey: 'cartoes/665f0c1a2b3c4d5e6f00abc1/i.jpg',
+    cartaoCode: '7',
+    cursinhoId: 'cur-1',
+    turmaId: 't-1',
+  });
+
+  expect(relatorio.registrar).toHaveBeenCalledWith({
+    historicoId: 'h1',
+    simuladoId: '665f0c1a2b3c4d5e6f00abc1',
+    usuario: 'u1',
+    cursinhoId: 'cur-1',
+    turmaId: 't-1',
+  });
+});
+
+it('sem cursinhoId não cria linha, e avisa no log', async () => {
+  const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+  const historicoRepository = {
+    existsCartaoAtivo: jest.fn().mockResolvedValue(false),
+    createAwaitingOmr: jest.fn().mockResolvedValue({ _id: 'h1' }),
+    marcarFalha: jest.fn().mockResolvedValue(undefined),
+  };
+  const omrHttp = {
+    enviarProcessamento: jest.fn().mockResolvedValue(undefined),
+  };
+  const relatorio = { registrar: jest.fn() };
+  const svc = new CartaoHistoricoService(
+    historicoRepository as any,
+    omrHttp as any,
+    relatorio as any,
+  );
+
+  await svc.criar({
+    usuario: 'u1',
+    imageKey: 'cartoes/665f0c1a2b3c4d5e6f00abc1/i.jpg',
+    cartaoCode: '7',
+  });
+
+  expect(relatorio.registrar).not.toHaveBeenCalled();
+  expect(warn).toHaveBeenCalledWith(expect.stringContaining('h1'));
+  warn.mockRestore();
+});
+
+it('falha ao criar a linha NÃO derruba o upload, mas vai para o log com o historicoId', async () => {
+  const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+  const historicoRepository = {
+    existsCartaoAtivo: jest.fn().mockResolvedValue(false),
+    createAwaitingOmr: jest.fn().mockResolvedValue({ _id: 'h1' }),
+    marcarFalha: jest.fn().mockResolvedValue(undefined),
+  };
+  const omrHttp = {
+    enviarProcessamento: jest.fn().mockResolvedValue(undefined),
+  };
+  const relatorio = {
+    registrar: jest.fn().mockRejectedValue(new Error('mongo caiu')),
+  };
+  const svc = new CartaoHistoricoService(
+    historicoRepository as any,
+    omrHttp as any,
+    relatorio as any,
+  );
+
+  // o cartão é lido normalmente; só fica fora do relatório até alguém reconciliar
+  const r = await svc.criar({
+    usuario: 'u1',
+    imageKey: 'cartoes/665f0c1a2b3c4d5e6f00abc1/i.jpg',
+    cartaoCode: '7',
+    cursinhoId: 'cur-1',
+  });
+
+  expect(r).toEqual({ historicoId: 'h1' });
+  expect(omrHttp.enviarProcessamento).toHaveBeenCalled();
+  expect(error).toHaveBeenCalledWith(expect.stringContaining('h1'));
+  error.mockRestore();
 });
