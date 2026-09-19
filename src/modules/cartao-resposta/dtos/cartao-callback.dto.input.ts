@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   ValidateNested,
@@ -33,6 +34,7 @@ export class CartaoCallbackDtoInput {
 
   @ApiProperty({ required: false, type: CartaoCallbackFalhaDtoInput })
   @IsOptional()
+  @IsObject()
   @ValidateNested()
   @Type(() => CartaoCallbackFalhaDtoInput)
   falha?: CartaoCallbackFalhaDtoInput;

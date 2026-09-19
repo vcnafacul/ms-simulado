@@ -10,6 +10,12 @@ import {
   SubAproveitamento,
 } from './types/aproveitamento';
 
+/** Mongoose doc ou objeto puro → objeto puro. O repositório devolve documentos
+ *  hidratados em produção e objetos simples nos testes. */
+function toPlain(doc: unknown): any {
+  return (doc as any)?.toObject ? (doc as any).toObject() : doc;
+}
+
 @Injectable()
 export class HistoricoService {
   constructor(private repository: HistoricoRepository) {}
@@ -19,9 +25,7 @@ export class HistoricoService {
     return {
       ...resultado,
       data: resultado.data.map((historico) => {
-        const obj: any = (historico as any).toObject
-          ? (historico as any).toObject()
-          : historico;
+        const obj: any = toPlain(historico);
         return { ...obj, falha: descreverFalha(obj.falha) };
       }),
     };
@@ -30,9 +34,7 @@ export class HistoricoService {
   async getById(id: string) {
     const historico = await this.repository.getById(id);
     if (!historico) return historico;
-    const obj: any = (historico as any).toObject
-      ? (historico as any).toObject()
-      : historico;
+    const obj: any = toPlain(historico);
     if (obj.simulado && Array.isArray(obj.simulado.questoes)) {
       // Achata pro shape antigo do client, preservando o numero do relacionamento
       // (numero vive em QuestaoNaContainer, não mais na Questao).

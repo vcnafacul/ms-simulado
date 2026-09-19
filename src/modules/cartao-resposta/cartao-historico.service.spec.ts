@@ -5,7 +5,6 @@ function setup(over: any = {}) {
   const repo = {
     existsCartaoAtivo: jest.fn().mockResolvedValue(false),
     createAwaitingOmr: jest.fn().mockResolvedValue({ _id: 'h1' }),
-    updateStatus: jest.fn().mockResolvedValue(undefined),
     marcarFalha: jest.fn().mockResolvedValue(undefined),
     ...over.repo,
   };
@@ -54,24 +53,6 @@ it('omr falha: marca Failed e 502', async () => {
     'h1',
     'omr_indisponivel',
     'down',
-  );
-});
-
-it('OMR inacessível: grava omr_indisponivel, não só o status', async () => {
-  const { svc, repo } = setup({
-    omr: {
-      enviarProcessamento: jest
-        .fn()
-        .mockRejectedValue(new Error('ECONNREFUSED')),
-    },
-  });
-
-  await expect(svc.criar(DTO)).rejects.toThrow();
-
-  expect(repo.marcarFalha).toHaveBeenCalledWith(
-    'h1',
-    'omr_indisponivel',
-    expect.any(String),
   );
 });
 

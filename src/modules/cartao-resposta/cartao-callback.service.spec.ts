@@ -5,7 +5,6 @@ function setup(over: any = {}) {
     findByImageKey: jest
       .fn()
       .mockResolvedValue({ _id: 'h1', simulado: { _id: 's1' } }),
-    updateStatus: jest.fn().mockResolvedValue(undefined),
     marcarFalha: jest.fn().mockResolvedValue(undefined),
     prepararParaProcessamento: jest.fn().mockResolvedValue(undefined),
     ...over.historicoRepository,
@@ -43,7 +42,7 @@ describe('CartaoCallbackService', () => {
       },
     });
     await svc.processar({ imageKey: 'k' });
-    expect(historicoRepository.updateStatus).not.toHaveBeenCalled();
+    expect(historicoRepository.marcarFalha).not.toHaveBeenCalled();
     expect(queueProducer.publish).not.toHaveBeenCalled();
   });
 
@@ -77,20 +76,6 @@ describe('CartaoCallbackService', () => {
       'h1',
       'codigo_futuro_do_ms_omr',
       undefined,
-    );
-  });
-
-  it('simulado não encontrado: grava o motivo, não só o status', async () => {
-    const { svc, historicoRepository } = setup({
-      simuladoRepository: { answer: jest.fn().mockResolvedValue(null) },
-    });
-
-    await svc.processar({ imageKey: 'k', respostas: [] });
-
-    expect(historicoRepository.marcarFalha).toHaveBeenCalledWith(
-      'h1',
-      'simulado_nao_encontrado',
-      expect.any(String),
     );
   });
 

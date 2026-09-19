@@ -245,10 +245,6 @@ export class HistoricoRepository extends BaseRepository<Historico> {
     return this.model.find({ status: { $in: statuses } }).exec();
   }
 
-  async updateStatus(id: string, status: HistoricoStatus): Promise<void> {
-    await this.model.findByIdAndUpdate(id, { status }).exec();
-  }
-
   /**
    * Marca o histórico como falho E registra o motivo numa ÚNICA escrita.
    *

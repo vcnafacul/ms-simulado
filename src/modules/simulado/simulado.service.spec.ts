@@ -340,7 +340,6 @@ describe('SimuladoService.processAnswer (lê questoes)', () => {
         simulado: 's1',
         rawRespostas: [{ questao: 'q1', alternativaEstudante: 'A' }],
       }),
-      updateStatus: jest.fn().mockResolvedValue(undefined),
       completeProcessing: jest.fn().mockResolvedValue(undefined),
     };
     const simuladoRepository: any = {
@@ -381,7 +380,6 @@ describe('SimuladoService.processAnswer (lê questoes)', () => {
         simulado: 's1',
         rawRespostas: [{ questao: 'q1', alternativaEstudante: 'A' }],
       }),
-      updateStatus: jest.fn().mockResolvedValue(undefined),
       completeProcessing: jest.fn().mockResolvedValue(undefined),
       marcarFalha: jest.fn().mockResolvedValue(undefined),
     };
@@ -406,8 +404,11 @@ describe('SimuladoService.processAnswer (lê questoes)', () => {
 
     expect(questoesRepository.findAnoByQuestao).not.toHaveBeenCalled();
     expect(historicoRepository.completeProcessing).not.toHaveBeenCalled();
-    expect(historicoRepository.marcarFalha).toHaveBeenCalledTimes(1);
-    expect(historicoRepository.updateStatus).not.toHaveBeenCalled();
+    expect(historicoRepository.marcarFalha).toHaveBeenCalledWith(
+      'hist1',
+      'simulado_sem_questoes',
+      expect.any(String),
+    );
   });
 });
 
@@ -467,22 +468,6 @@ describe('SimuladoService.processAnswer — motivo da falha (card 01)', () => {
     expect(historicoRepository.marcarFalha).toHaveBeenCalledWith(
       'h1',
       'respostas_ausentes',
-      expect.any(String),
-    );
-  });
-
-  it('simulado sem questões grava simulado_sem_questoes', async () => {
-    const { service, historicoRepository } = montar({
-      simuladoRepository: {
-        answer: jest.fn().mockResolvedValue({ questoes: [] }),
-      },
-    });
-
-    await service.processAnswer('h1');
-
-    expect(historicoRepository.marcarFalha).toHaveBeenCalledWith(
-      'h1',
-      'simulado_sem_questoes',
       expect.any(String),
     );
   });
