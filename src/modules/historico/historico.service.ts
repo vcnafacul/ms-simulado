@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AggregatePeriodDtoInput } from 'src/shared/dtos/aggregate-period.dto.input';
 import { GetHistoricoDTOInput } from './dtos/get-historico.dto';
 import { GetPerformanceHistories } from './dtos/get-perfomance-histories.dto';
+import { descreverFalha } from './falha/mapa-falha';
 import { HistoricoRepository } from './historico.repository';
 import {
   AproveitamentoGeral,
@@ -14,7 +15,16 @@ export class HistoricoService {
   constructor(private repository: HistoricoRepository) {}
 
   async getAllbyUser(dto: GetHistoricoDTOInput) {
-    return await this.repository.getAllByUser(dto);
+    const resultado = await this.repository.getAllByUser(dto);
+    return {
+      ...resultado,
+      data: resultado.data.map((historico) => {
+        const obj: any = (historico as any).toObject
+          ? (historico as any).toObject()
+          : historico;
+        return { ...obj, falha: descreverFalha(obj.falha) };
+      }),
+    };
   }
 
   async getById(id: string) {
@@ -31,6 +41,7 @@ export class HistoricoService {
         numero: qc.numero,
       }));
     }
+    obj.falha = descreverFalha(obj.falha);
     return obj;
   }
 
