@@ -58,8 +58,8 @@ RelatorioSimuladoEstudante {
 
 Índices: `{ simulado, cursinhoId }`, `{ simulado, turmaId }`, e único em `{ historico, cursinhoId }`.
 
-A linha é criada **junto com o histórico**, nos dois pontos onde ele nasce, com o vínculo que a api
-resolve naquele instante. Nada a reescrever depois: o relatório vira um retrato de uma data.
+A linha é criada **junto com o histórico do cartão**, com o vínculo que a api resolve naquele
+instante. Nada a reescrever depois: o relatório vira um retrato de uma data.
 
 ### Por que uma junção, e não campos no `Historico`
 
