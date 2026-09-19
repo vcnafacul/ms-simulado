@@ -415,6 +415,175 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
     });
   });
 
+  describe('listarSimuladosComCartao (Mongo real)', () => {
+    const SIM_L1 = new Types.ObjectId();
+    const SIM_L2 = new Types.ObjectId();
+    const CUR = 'cur-lista';
+
+    beforeAll(async () => {
+      // SIM_L1: três estudantes. Um completo, um falho, e um cuja ref de
+      // histórico vai ser apagada — os três ENVIARAM cartão.
+      const hOk = await histModel.create({
+        usuario: 'u-l1',
+        simulado: SIM_L1,
+        status: 'completed',
+      });
+      const hFalhou = await histModel.create({
+        usuario: 'u-l2',
+        simulado: SIM_L1,
+        status: 'failed',
+        falha: { codigo: 'cartao_nao_detectado' },
+      });
+      const hOrfao = await histModel.create({
+        usuario: 'u-l3',
+        simulado: SIM_L1,
+        status: 'completed',
+      });
+
+      await relModel.create({
+        historico: hOk._id,
+        simulado: SIM_L1,
+        usuario: 'u-l1',
+        cursinhoId: CUR,
+        turmaId: 't-A',
+      });
+      await relModel.create({
+        historico: hFalhou._id,
+        simulado: SIM_L1,
+        usuario: 'u-l2',
+        cursinhoId: CUR,
+        turmaId: 't-B',
+      });
+      await relModel.create({
+        historico: hOrfao._id,
+        simulado: SIM_L1,
+        usuario: 'u-l3',
+        cursinhoId: CUR,
+        turmaId: 't-A',
+      });
+      // a ref morre DEPOIS do vínculo — é o caso que o repositório já tipa
+      // como `historico: Historico | null`
+      await histModel.deleteOne({ _id: hOrfao._id });
+
+      // SIM_L2: um estudante só, e mais recente que o SIM_L1
+      const hOutro = await histModel.create({
+        usuario: 'u-l4',
+        simulado: SIM_L2,
+        status: 'completed',
+      });
+      await relModel.create({
+        historico: hOutro._id,
+        simulado: SIM_L2,
+        usuario: 'u-l4',
+        cursinhoId: CUR,
+        turmaId: 't-A',
+      });
+
+      // de OUTRO cursinho, no mesmo simulado — não pode aparecer
+      const hAlheio = await histModel.create({
+        usuario: 'u-alheio',
+        simulado: SIM_L1,
+        status: 'completed',
+      });
+      await relModel.create({
+        historico: hAlheio._id,
+        simulado: SIM_L1,
+        usuario: 'u-alheio',
+        cursinhoId: 'cur-outro',
+      });
+    }, 120_000);
+
+    it('conta cartões enviados e, à parte, os com leitura concluída', async () => {
+      const r = await repo.listarSimuladosComCartao({ cursinhoId: CUR });
+
+      const l1 = r.find((s) => s.simuladoId === SIM_L1.toString());
+      // três enviaram: completo, falho e órfão
+      expect(l1!.cartoes).toBe(3);
+      // só o completo conta — o falho e o órfão não
+      expect(l1!.comLeituraConcluida).toBe(1);
+    });
+
+    it('linha cuja ref de histórico morreu CONTINUA contando como cartão enviado', async () => {
+      // sem `preserveNullAndEmptyArrays`, o $unwind descarta essa linha e o
+      // total passa a ser menor que o número de cartões que chegaram — sem
+      // nada acusar. O repositório já tipa `historico: Historico | null`
+      // justamente porque essa órfã existe.
+      const r = await repo.listarSimuladosComCartao({ cursinhoId: CUR });
+
+      expect(r.find((s) => s.simuladoId === SIM_L1.toString())!.cartoes).toBe(
+        3,
+      );
+    });
+
+    it('turmaId restringe à turma', async () => {
+      const r = await repo.listarSimuladosComCartao({
+        cursinhoId: CUR,
+        turmaId: 't-A',
+      });
+
+      // u-l1 e u-l3 são da turma A; u-l2 é da B
+      expect(r.find((s) => s.simuladoId === SIM_L1.toString())!.cartoes).toBe(
+        2,
+      );
+    });
+
+    it('simulado de outro cursinho não aparece, e o alheio não soma no meu', async () => {
+      const r = await repo.listarSimuladosComCartao({
+        cursinhoId: 'cur-outro',
+      });
+
+      expect(r).toHaveLength(1);
+      expect(r[0].cartoes).toBe(1);
+    });
+
+    it('ordena por ultimoEnvio decrescente', async () => {
+      const r = await repo.listarSimuladosComCartao({ cursinhoId: CUR });
+
+      expect(r[0].simuladoId).toBe(SIM_L2.toString());
+      expect(r[1].simuladoId).toBe(SIM_L1.toString());
+    });
+
+    it('ultimoEnvio é preenchido mesmo quando a linha nasce pelo upsert do registrar', async () => {
+      // ⚠️ O schema da junção é `timestamps: false`; `createdAt` vem do
+      // `BaseSchema` com default. O `registrar` escreve por UPSERT, e se o
+      // default não fosse aplicado no insert a ordenação inteira viraria nula
+      // em produção — e passaria nos testes acima, que usam `create`.
+      const SIM_UP = new Types.ObjectId();
+      const h = await histModel.create({
+        usuario: 'u-up',
+        simulado: SIM_UP,
+        status: 'completed',
+      });
+      await repo.registrar({
+        historicoId: h._id.toString(),
+        simuladoId: SIM_UP.toString(),
+        usuario: 'u-up',
+        cursinhoId: 'cur-upsert',
+      });
+
+      const r = await repo.listarSimuladosComCartao({
+        cursinhoId: 'cur-upsert',
+      });
+
+      expect(r[0].ultimoEnvio).toBeInstanceOf(Date);
+    });
+
+    it('recorte sem nenhum cartão devolve lista vazia, não erro', async () => {
+      await expect(
+        repo.listarSimuladosComCartao({ cursinhoId: 'cur-que-nao-existe' }),
+      ).resolves.toEqual([]);
+    });
+
+    it('turmaId ausente NÃO vira filtro por turma nula', async () => {
+      // `{turmaId: undefined}` serializa para `{turmaId: null}` e casaria só
+      // quem não tem turma — lição medida no card 02. Todos os do CUR têm
+      // turma, então um filtro indevido devolveria lista vazia.
+      const r = await repo.listarSimuladosComCartao({ cursinhoId: CUR });
+
+      expect(r.length).toBeGreaterThan(0);
+    });
+  });
+
   /**
    * Fix 4 da revisão adversarial: o spec do controller usa um dublê do
    * serviço, e os specs acima falam com o repositório direto. Nada até aqui
