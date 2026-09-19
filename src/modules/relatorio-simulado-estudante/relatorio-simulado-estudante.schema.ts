@@ -60,3 +60,11 @@ RelatorioSimuladoEstudanteSchema.index(
   { simulado: 1, cursinhoId: 1, usuario: 1 },
   { unique: true },
 );
+
+/**
+ * O card 04b agrupa por simulado filtrando só por `cursinhoId` (e opcionalmente
+ * `turmaId`). Os três índices acima começam por `simulado`, e prefixo de índice
+ * composto não serve a quem não filtra o prefixo. Este serve aos DOIS recortes:
+ * o Mongo usa `{cursinhoId}` sozinho como prefixo deste.
+ */
+RelatorioSimuladoEstudanteSchema.index({ cursinhoId: 1, turmaId: 1 });
