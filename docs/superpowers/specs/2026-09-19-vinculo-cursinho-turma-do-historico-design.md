@@ -109,13 +109,30 @@ o conserto tem precedente na casa: `cache.wrap` na api, como já fazem `getSumma
 `aggregate-by-Period`. **Cache com TTL erra por um minuto; agregado guardado erra até alguém
 perceber.**
 
+### Só o fluxo de cartão gera linha
+
+⚠️ **Decisão explícita.** O simulado resolvido **digitalmente** pelo estudante logado **não** gera
+linha. Ele entra no histórico pessoal e aparece no relatório genérico que já existe — e **esse
+relatório não é tocado por nenhum card desta série**.
+
+Consequência: há **um** ponto de escrita, `createAwaitingOmr` (`cartao-historico.service.ts:35`), e
+não dois. O `createPending` do fluxo online fica intacto.
+
+⚠️ O preço é que, se um dia alguém quiser resultados online no relatório do cursinho, as linhas do
+passado não existirão. Aceito: o online já tem relatório próprio, e resolver `StudentCourse` a cada
+resposta online seria custo num caminho quente para gravar dado que ninguém lê.
+
 ### Sem backfill
 
 Nenhuma linha é criada para históricos anteriores. O relatório vale dos novos em diante.
 
-⚠️ **Consequência aceita: a tela nasce vazia**, inclusive para os cartões já enviados em produção. A
-mitigação é de copy, não de dado — o estado vazio precisa dizer *"nenhum cartão registrado neste
-recorte ainda"*, e não parecer uma tela quebrada. Sem isso, vira chamado.
+⚠️ **E isso quase não custa nada**, porque o cartão-resposta **ainda não subiu para produção** — está
+só em homologação, e a série inteira sobe junto como feature nova. Não há cartão em produção para
+ficar de fora. Em homol, o que existir de teste some do relatório; se incomodar, é mais barato
+reenviar os cartões de teste do que escrever um script.
+
+Ainda assim, o estado vazio precisa de copy honesta — *"nenhum cartão registrado neste recorte
+ainda"* — e não uma tela que pareça quebrada.
 
 ---
 
@@ -159,18 +176,17 @@ a impor o recorte sozinho, em vez de confiar numa lista que o chamador monta.
 
 ## Riscos
 
-⚠️ **São dois pontos de criação, não um.** `createPending` (`simulado.service.ts:168`, fluxo online)
-e `createAwaitingOmr` (`cartao-historico.service.ts:35`, cartão). Esquecer um faz aquele fluxo inteiro
-sumir dos relatórios em silêncio. **Ambos gravam a linha**, e a origem vira filtro de consulta em vez
-de decisão de escrita — recortar depois é barato, recuperar o que não foi gravado não é.
+⚠️ **Um ponto de criação: `createAwaitingOmr`** (`cartao-historico.service.ts:35`). O
+`createPending` (`simulado.service.ts:168`, online) **não** grava linha — ver a decisão acima. Quem
+mexer nesse arquivo depois precisa saber que a omissão é deliberada, e não esquecimento.
 
 ⚠️ **A falha da segunda escrita não pode ser engolida.** Se a criação da linha falhar depois de o
 histórico existir, registre em log com o `historicoId`, para a reconciliação ter por onde começar.
 É a mesma lição dos cards `01b`/`01`: escrita que morre calada vira chamado que ninguém reproduz.
 
-⚠️ **A api precisa resolver o vínculo nos dois fluxos.** No cartão é inequívoco — é o cursinho de
-quem enviou. No online, sai do `StudentCourse` do próprio estudante; usuário sem `StudentCourse`
-(público da plataforma) simplesmente não gera linha, que é o comportamento correto.
+⚠️ **A api resolve o vínculo no upload do cartão**, onde ele é inequívoco: é o cursinho de quem
+enviou, que a api já resolve pelo JWT (`CursinhoResolverService`) no `cartao-resposta-resultados`
+logo ao lado. A turma sai do `StudentCourse` do estudante naquele instante.
 
 ## Fora de escopo
 
@@ -183,6 +199,7 @@ quem enviou. No online, sai do `StudentCourse` do próprio estudante; usuário s
 
 - [x] Turma no momento da resposta: **sim**, via `turmaId` na junção
 - [x] Campo criado **antes** dos cards `02` e `04` — é o card novo que este documento origina
-- [x] Linhas do passado: não existem (sem backfill); o estado vazio precisa de copy honesta
+- [x] Linhas do passado: não existem (sem backfill) — e não custa, porque o cartão ainda não está
+      em produção; o estado vazio precisa de copy honesta
 - [x] Estudante sem turma: `turmaId` nulo, aparece no geral, com aviso
 - [x] Contagem de "fora do recorte" no rodapé do relatório
