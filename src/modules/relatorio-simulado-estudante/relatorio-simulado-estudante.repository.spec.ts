@@ -88,3 +88,79 @@ describe('RelatorioSimuladoEstudanteRepository.registrar', () => {
     expect(updateOne.mock.calls[0][1].$set.turmaId).toBeUndefined();
   });
 });
+
+describe('RelatorioSimuladoEstudanteRepository.buscarPorRecorte', () => {
+  const montarBusca = () => {
+    const chain: any = {};
+    chain.populate = jest.fn().mockReturnValue(chain);
+    chain.lean = jest.fn().mockReturnValue(chain);
+    chain.exec = jest.fn().mockResolvedValue([]);
+    const find = jest.fn().mockReturnValue(chain);
+    const repo = new RelatorioSimuladoEstudanteRepository({ find } as any);
+    return { repo, find, chain };
+  };
+
+  it('filtra por simulado e cursinho', async () => {
+    const { repo, find } = montarBusca();
+
+    await repo.buscarPorRecorte({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+    const filtro = find.mock.calls[0][0];
+    expect(filtro.simulado).toBeInstanceOf(Types.ObjectId);
+    expect(filtro.simulado.toString()).toBe(SIM);
+    expect(filtro.cursinhoId).toBe('cur-1');
+  });
+
+  it('sem turmaId, a chave nem aparece no filtro', async () => {
+    // { turmaId: undefined } no Mongo casa TODOS os documentos, não os sem turma
+    const { repo, find } = montarBusca();
+
+    await repo.buscarPorRecorte({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+    expect('turmaId' in find.mock.calls[0][0]).toBe(false);
+  });
+
+  it('com turmaId, restringe à turma', async () => {
+    const { repo, find } = montarBusca();
+
+    await repo.buscarPorRecorte({
+      simuladoId: SIM,
+      cursinhoId: 'cur-1',
+      turmaId: 't-1',
+    });
+
+    expect(find.mock.calls[0][0].turmaId).toBe('t-1');
+  });
+
+  it('popula o histórico com select explícito, não o documento inteiro', async () => {
+    // respostas de 90 questões × 500 estudantes é carga que nenhuma tela desta série usa
+    const { repo, chain } = montarBusca();
+
+    await repo.buscarPorRecorte({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+    const populate = chain.populate.mock.calls[0][0];
+    expect(populate.path).toBe('historico');
+    expect(populate.select).toEqual(
+      expect.stringContaining('aproveitamento.geral'),
+    );
+    expect(populate.select).not.toContain('respostas');
+  });
+});
+
+describe('RelatorioSimuladoEstudanteRepository.contarDoCursinho', () => {
+  it('conta escopado no cursinho, nunca global', async () => {
+    const countDocuments = jest.fn().mockResolvedValue(30);
+    const repo = new RelatorioSimuladoEstudanteRepository({
+      countDocuments,
+    } as any);
+
+    const total = await repo.contarDoCursinho(SIM, 'cur-1');
+
+    expect(total).toBe(30);
+    const filtro = countDocuments.mock.calls[0][0];
+    expect(filtro.cursinhoId).toBe('cur-1');
+    expect(filtro.simulado.toString()).toBe(SIM);
+    // sem o cursinho, o número diria a um cursinho quantos cartões os outros enviaram
+    expect(Object.keys(filtro).sort()).toEqual(['cursinhoId', 'simulado']);
+  });
+});
