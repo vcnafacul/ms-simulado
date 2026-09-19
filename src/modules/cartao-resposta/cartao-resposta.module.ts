@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { SimuladoModule } from '../simulado/simulado.module';
 import { StorageModule } from '../../shared/storage/storage.module';
 import { HistoricoModule } from '../historico/historico.module';
+import { RelatorioSimuladoEstudanteModule } from '../relatorio-simulado-estudante/relatorio-simulado-estudante.module';
 import { EnvModule } from '../../shared/modules/env/env.module';
 import { QueueModule } from '../../shared/modules/queue/queue.module';
 import { CartaoRespostaService } from './cartao-resposta.service';
@@ -16,6 +17,7 @@ import { CartaoRespostaController } from './cartao-resposta.controller';
     SimuladoModule,
     StorageModule,
     HistoricoModule,
+    RelatorioSimuladoEstudanteModule,
     EnvModule,
     QueueModule,
   ],
