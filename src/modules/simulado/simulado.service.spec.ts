@@ -383,6 +383,7 @@ describe('SimuladoService.processAnswer (lê questoes)', () => {
       }),
       updateStatus: jest.fn().mockResolvedValue(undefined),
       completeProcessing: jest.fn().mockResolvedValue(undefined),
+      marcarFalha: jest.fn().mockResolvedValue(undefined),
     };
     const simuladoRepository: any = {
       answer: jest.fn().mockResolvedValue({ _id: 's1', questoes: [] }),
@@ -405,6 +406,109 @@ describe('SimuladoService.processAnswer (lê questoes)', () => {
 
     expect(questoesRepository.findAnoByQuestao).not.toHaveBeenCalled();
     expect(historicoRepository.completeProcessing).not.toHaveBeenCalled();
-    expect(historicoRepository.updateStatus).toHaveBeenCalledTimes(1);
+    expect(historicoRepository.marcarFalha).toHaveBeenCalledTimes(1);
+    expect(historicoRepository.updateStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe('SimuladoService.processAnswer — motivo da falha (card 01)', () => {
+  const montar = (over: any = {}) => {
+    const historicoRepository = {
+      claimForProcessing: jest.fn().mockResolvedValue(true),
+      getById: jest.fn().mockResolvedValue({
+        rawRespostas: [{ questao: 'q1', alternativaEstudante: 'A' }],
+        simulado: { _id: 's1' },
+      }),
+      completeProcessing: jest.fn().mockResolvedValue(undefined),
+      marcarFalha: jest.fn().mockResolvedValue(undefined),
+      ...over.historicoRepository,
+    };
+    const simuladoRepository = {
+      answer: jest.fn().mockResolvedValue({
+        questoes: [
+          {
+            numero: 1,
+            questao: {
+              _id: 'q1',
+              alternativa: 'A',
+              materia: { _id: 'm1', nome: 'Mat' },
+              frente1: { _id: 'f1', nome: 'Fr' },
+            },
+          },
+        ],
+      }),
+      ...over.simuladoRepository,
+    };
+    const questoesRepository = {
+      findAnoByQuestao: jest.fn().mockResolvedValue(2025),
+      updateQuestionAnswered: jest.fn().mockResolvedValue(undefined),
+      ...over.questoesRepository,
+    };
+    const service = new SimuladoService(
+      simuladoRepository as any, // simuladoRepository
+      questoesRepository as any, // questoesRepository
+      {} as any, // categoriaRepository
+      historicoRepository as any, // historicoRepository
+      {} as any, // materiaRepository
+      {} as any, // queueProducer
+    );
+    return { service, historicoRepository, simuladoRepository };
+  };
+
+  it('sem rawRespostas grava respostas_ausentes', async () => {
+    const { service, historicoRepository } = montar({
+      historicoRepository: {
+        getById: jest.fn().mockResolvedValue({ simulado: { _id: 's1' } }),
+      },
+    });
+
+    await service.processAnswer('h1');
+
+    expect(historicoRepository.marcarFalha).toHaveBeenCalledWith(
+      'h1',
+      'respostas_ausentes',
+      expect.any(String),
+    );
+  });
+
+  it('simulado sem questões grava simulado_sem_questoes', async () => {
+    const { service, historicoRepository } = montar({
+      simuladoRepository: {
+        answer: jest.fn().mockResolvedValue({ questoes: [] }),
+      },
+    });
+
+    await service.processAnswer('h1');
+
+    expect(historicoRepository.marcarFalha).toHaveBeenCalledWith(
+      'h1',
+      'simulado_sem_questoes',
+      expect.any(String),
+    );
+  });
+
+  it('erro inesperado grava erro_no_processamento com a mensagem no detalhe', async () => {
+    const { service, historicoRepository } = montar({
+      simuladoRepository: {
+        answer: jest.fn().mockRejectedValue(new Error('mongo caiu')),
+      },
+    });
+
+    await expect(service.processAnswer('h1')).rejects.toThrow('mongo caiu');
+
+    expect(historicoRepository.marcarFalha).toHaveBeenCalledWith(
+      'h1',
+      'erro_no_processamento',
+      'mongo caiu',
+    );
+  });
+
+  it('caminho feliz não grava falha nenhuma', async () => {
+    const { service, historicoRepository } = montar();
+
+    await service.processAnswer('h1');
+
+    expect(historicoRepository.marcarFalha).not.toHaveBeenCalled();
+    expect(historicoRepository.completeProcessing).toHaveBeenCalled();
   });
 });
