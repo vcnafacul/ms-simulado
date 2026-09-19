@@ -308,7 +308,7 @@ export class RelatorioSimuladoEstudanteRepository {
       simuladoId: l._id.toString(),
       cartoes: l.cartoes,
       comLeituraConcluida: l.comLeituraConcluida,
-      ultimoEnvio: l.ultimoEnvio ?? null,
+      ultimoEnvio: l.ultimoEnvio ?? null, // $max já devolve null; isto é cinto e suspensório
     }));
   }
 }

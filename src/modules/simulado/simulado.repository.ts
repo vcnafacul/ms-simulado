@@ -80,6 +80,10 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
    * Só `(id, nome)`. O `getById` popula categoria, frentes e matéria — carga
    * enorme para ler um nome, que é tudo que a lista de simulados com cartão
    * (card 04b) precisa.
+   *
+   * ⚠️ NÃO filtra `deleted`, ao contrário de `countByCategoria` e
+   * `countsByCategoria` neste mesmo arquivo. É deliberado: um simulado
+   * arquivado que tem cartão precisa continuar aparecendo com nome.
    */
   async getNomesPorIds(ids: string[]): Promise<{ id: string; nome: string }[]> {
     if (ids.length === 0) return [];

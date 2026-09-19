@@ -5,9 +5,9 @@ export class SimuladoComCartaoDtoOutput {
   simuladoId: string;
 
   /**
-   * `null` quando o `Simulado` foi apagado depois do vínculo. A entrada
-   * **não** some da lista: os cartões existem, e escondê-los seria o oposto
-   * do que o relatório serve para fazer.
+   * `null` só se o documento do `Simulado` sumir da coleção. O delete da
+   * aplicação é **soft** (`deleted: true`), e o nome continua vindo — de
+   * propósito: esconder cartões que existem é pior que rotulá-los.
    */
   @ApiProperty({ nullable: true })
   nome: string | null;
