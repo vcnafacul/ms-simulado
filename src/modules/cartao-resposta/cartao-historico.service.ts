@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { CodigoFalhaInterno } from '../historico/falha/codigo-falha';
 import { HistoricoRepository } from '../historico/historico.repository';
 import { RelatorioSimuladoEstudanteRepository } from '../relatorio-simulado-estudante/relatorio-simulado-estudante.repository';
@@ -36,11 +37,17 @@ export class CartaoHistoricoService {
       throw new ConflictException('cartão já enviado para este usuário');
     }
 
+    // ⚠️ Cunhado e GRAVADO antes do POST: se o token fosse gravado depois, um
+    // callback rápido chegaria antes da escrita e seria descartado por não
+    // bater com nada.
+    const tentativaId = randomUUID();
+
     const historico = await this.historicoRepository.createAwaitingOmr({
       usuario: dto.usuario,
       simuladoId,
       imageKey: dto.imageKey,
       cartaoCode: dto.cartaoCode,
+      tentativaId,
     });
     const historicoId = (
       historico as unknown as { _id: { toString(): string } }
@@ -49,7 +56,7 @@ export class CartaoHistoricoService {
     await this.vincularAoCursinho(historicoId, simuladoId, dto);
 
     try {
-      await this.omrHttp.enviarProcessamento(dto.imageKey);
+      await this.omrHttp.enviarProcessamento(dto.imageKey, tentativaId);
     } catch (err) {
       await this.historicoRepository.marcarFalha(
         historicoId,
