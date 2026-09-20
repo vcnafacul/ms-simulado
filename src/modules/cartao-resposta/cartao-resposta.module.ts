@@ -11,6 +11,7 @@ import { OmrHttpService } from './omr-http.service';
 import { CartaoHistoricoService } from './cartao-historico.service';
 import { CartaoCallbackService } from './cartao-callback.service';
 import { CartaoReprocessoService } from './cartao-reprocesso.service';
+import { CartaoVarreduraService } from './cartao-varredura.service';
 import { CartaoRespostaController } from './cartao-resposta.controller';
 
 @Module({
@@ -30,6 +31,7 @@ import { CartaoRespostaController } from './cartao-resposta.controller';
     CartaoHistoricoService,
     CartaoCallbackService,
     CartaoReprocessoService,
+    CartaoVarreduraService,
   ],
   exports: [CartaoRespostaService],
 })
