@@ -61,6 +61,20 @@ export class Historico extends BaseSchema {
   @Prop({ type: Object, required: false })
   @ApiProperty({ required: false })
   public falha?: FalhaHistorico;
+
+  /**
+   * Quando o cartão foi (re)enviado ao OMR pela última vez. Base do rate limit
+   * do reprocessamento.
+   *
+   * ⚠️ Campo próprio porque **não há de onde derivar**: este schema é
+   * `@Schema({ timestamps: false })` e não tem `createdAt` nem `updatedAt`.
+   *
+   * ⚠️ Ausente = nunca tentou. Documento antigo passa direto na primeira
+   * tentativa, sem migração.
+   */
+  @Prop({ required: false })
+  @ApiProperty({ required: false })
+  public ultimaTentativaEm?: Date;
 }
 
 export const HistoricoSchema = SchemaFactory.createForClass(Historico);

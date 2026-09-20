@@ -110,3 +110,47 @@ describe('HistoricoRepository.getById (popula simulado.questoes.questao)', () =>
     });
   });
 });
+
+describe('HistoricoRepository.reabrirParaOmr', () => {
+  // dublê local do bloco, no mesmo formato dos testes acima (findByIdAndUpdate
+  // encadeando um `exec`); só fica num helper porque os dois testes daqui
+  // precisam inspecionar o `update` que chegou.
+  const montar = () => {
+    const exec = jest.fn().mockResolvedValue(undefined);
+    const findByIdAndUpdate = jest.fn().mockReturnValue({ exec });
+    const repo = new HistoricoRepository({ findByIdAndUpdate } as any);
+    return { repo, findByIdAndUpdate };
+  };
+
+  it('⚠️ muda status, chave e tentativa E apaga a falha na MESMA escrita', async () => {
+    // Em duas escritas existe uma janela em que a tela mostra "processando"
+    // com a mensagem de erro anterior ao lado. O docblock do `marcarFalha`
+    // registra isso desde o card 01.
+    const { repo, findByIdAndUpdate } = montar();
+
+    await repo.reabrirParaOmr('h1', {
+      imageKey: 'cartoes/abc/nova.jpg',
+      quando: new Date('2026-09-20T10:00:00Z'),
+    });
+
+    expect(findByIdAndUpdate).toHaveBeenCalledTimes(1);
+    const [, update] = findByIdAndUpdate.mock.calls[0];
+    expect(update.$set).toMatchObject({
+      status: 'awaiting_omr',
+      imageKey: 'cartoes/abc/nova.jpg',
+      ultimaTentativaEm: new Date('2026-09-20T10:00:00Z'),
+    });
+    expect(update.$unset).toHaveProperty('falha');
+  });
+
+  it('sem imageKey nova, a chave atual é preservada', async () => {
+    // é o caminho do `reprocessar`: a foto serve, quem falhou foi a infra
+    const { repo, findByIdAndUpdate } = montar();
+
+    await repo.reabrirParaOmr('h1', { quando: new Date() });
+
+    const [, update] = findByIdAndUpdate.mock.calls[0];
+    expect(update.$set).not.toHaveProperty('imageKey');
+    expect(update.$unset).toHaveProperty('falha');
+  });
+});

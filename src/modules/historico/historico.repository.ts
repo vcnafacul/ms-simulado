@@ -265,6 +265,35 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       .exec();
   }
 
+  /**
+   * A operação inversa do `marcarFalha`: devolve o histórico para a fila do OMR.
+   *
+   * ⚠️ **Uma escrita, e isso é o ponto.** O `$set` e o `$unset` vão juntos: em
+   * duas operações existe uma janela em que a tela mostra "processando" com a
+   * mensagem de erro anterior ao lado. É o que o docblock do `marcarFalha` já
+   * antecipava para este card.
+   *
+   * ⚠️ `imageKey` só entra no `$set` quando há foto nova. Omitido, a chave
+   * atual fica — é o caminho do `reprocessar`, em que a infra falhou e a foto
+   * serve.
+   */
+  async reabrirParaOmr(
+    id: string,
+    dados: { imageKey?: string; quando: Date },
+  ): Promise<void> {
+    const set: Record<string, unknown> = {
+      status: HistoricoStatus.AwaitingOmr,
+      ultimaTentativaEm: dados.quando,
+    };
+    if (dados.imageKey !== undefined) {
+      set.imageKey = dados.imageKey;
+    }
+
+    await this.model
+      .findByIdAndUpdate(id, { $set: set, $unset: { falha: '' } })
+      .exec();
+  }
+
   async findByImageKey(imageKey: string): Promise<Historico | null> {
     return this.model.findOne({ imageKey }).exec();
   }
