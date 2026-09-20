@@ -321,6 +321,7 @@ const montar = (over: any = {}) => {
             status: 'failed',
             cartaoCode: '7',
             simulado: SIM,
+            imageKey: 'cartoes/665f0c1a2b3c4d5e6f00abc2/velha.jpg',
             ultimaTentativaEm: undefined,
           }
         : over.historico,
@@ -402,7 +403,7 @@ describe('CartaoReprocessoService', () => {
 
   it('sem foto nova, não confere QR nenhum e mantém a chave', async () => {
     // é o caminho do `reprocessar`: a foto não mudou
-    const { svc, historicoRepository } = montar();
+    const { svc, historicoRepository, omrHttp } = montar();
 
     await svc.reprocessar({
       historicoId: 'h1',
@@ -413,6 +414,10 @@ describe('CartaoReprocessoService', () => {
     expect(historicoRepository.reabrirParaOmr).toHaveBeenCalledWith('h1', {
       quando: AGORA,
     });
+    // e o OMR é acionado com a chave que já estava lá
+    expect(omrHttp.enviarProcessamento).toHaveBeenCalledWith(
+      'cartoes/665f0c1a2b3c4d5e6f00abc2/velha.jpg',
+    );
   });
 
   it('⚠️ dentro da janela, recusa dizendo QUANTO falta', async () => {
@@ -805,6 +810,18 @@ cd ../api-vcnafacul && git checkout develop && git pull origin develop && git ch
 **(b)** No spec novo do serviço da api:
 
 ```ts
+jest.mock('./qr-decoder');
+// ⚠️ **Contador, não constante.** O spec do `cartao-upload.service` mocka
+// `v4: () => 'IMGID'` — com ele, o teste de "duas chamadas geram chaves
+// diferentes" passaria a ser impossível de satisfazer. Aqui a chave PRECISA
+// mudar a cada tentativa, que é a decisão central do card.
+jest.mock('uuid', () => {
+  let n = 0;
+  return { v4: () => `uuid-${++n}` };
+});
+import { decodeCartaoQr } from './qr-decoder';
+import { CartaoReprocessoService } from './cartao-reprocesso.service';
+
 const montar = (over: any = {}) => {
   const blobService = { putObjectAtKey: jest.fn() };
   const omrCache = { primeImagem: jest.fn() };
@@ -824,7 +841,11 @@ const arquivo = { buffer: Buffer.from('foto'), mimetype: 'image/jpeg' } as any;
 
 describe('CartaoReprocessoService (api)', () => {
   beforeEach(() => {
-    vi_ou_jest_mock_do_qr.mockResolvedValue({ simuladoId: 'sim-1', cartaoCode: '7' });
+    jest.clearAllMocks();
+    (decodeCartaoQr as jest.Mock).mockResolvedValue({
+      simuladoId: 'sim-1',
+      cartaoCode: '7',
+    });
   });
 
   it('⚠️ cunha uma imageKey NOVA — nunca reusa a do histórico', async () => {
@@ -835,7 +856,7 @@ describe('CartaoReprocessoService (api)', () => {
     await svc.processar('colab-1', 'h1', arquivo);
 
     const [, , key] = blobService.putObjectAtKey.mock.calls[0];
-    expect(key).toMatch(/^cartoes\/sim-1\/[0-9a-f-]{36}\.jpg$/);
+    expect(key).toMatch(/^cartoes\/sim-1\/uuid-\d+\.jpg$/);
   });
 
   it('⚠️ duas chamadas geram chaves DIFERENTES', async () => {
@@ -899,7 +920,7 @@ describe('CartaoReprocessoService (api)', () => {
 });
 ```
 
-⚠️ **Leia o spec do `CartaoUploadService`** antes — ele já mocka `decodeCartaoQr` e o `BlobService`, e você deve usar o mesmo mecanismo (`jest.mock` do módulo do qr-decoder). Adapte os nomes ao que estiver lá; o esqueleto acima usa um placeholder de nome (`vi_ou_jest_mock_do_qr`) **que você deve substituir pelo mock real**.
+⚠️ **Leia o `cartao-upload.service.spec.ts`** antes — ele é o vizinho e o molde. Só **não copie o mock de `uuid` dele**, que devolve `'IMGID'` fixo: aqui a chave precisa variar, e é exatamente isso que dois dos testes afirmam.
 
 - [ ] **Step 2: Rodar e confirmar que falham**
 
