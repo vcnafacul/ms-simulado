@@ -20,7 +20,16 @@ export enum ResultadoDaQuestao {
 }
 
 export class RespostaDoEstudanteDtoOutput {
-  /** `null` quando a questão está no simulado sem posição. Vai para o fim. */
+  /**
+   * `null` tem DOIS significados, e os dois vão para o fim da lista:
+   * a questão está no simulado **sem posição**, ou o vínculo dela com o
+   * simulado foi **desfeito depois** de o estudante responder — o `numero` vem
+   * do simulado de hoje, a resposta ficou gravada no histórico. Não dá para
+   * distinguir os dois aqui, e para a leitura em tela tanto faz: nos dois
+   * casos a questão existe, não tem lugar na ordem, e sumir com ela seria pior
+   * que mostrá-la fora de ordem. Mesma regra de
+   * `QuestaoDoRelatorioDtoOutput.numero`.
+   */
   @ApiProperty({ required: true, nullable: true })
   numero: number | null;
 

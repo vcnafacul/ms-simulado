@@ -238,6 +238,50 @@ describe('RelatorioSimuladoEstudanteService.consultarQuestoes', () => {
     ]);
   });
 
+  it('⚠️ dois nulos EMPATAM (0): a ordem entre eles é estável', async () => {
+    // O `.sort()` do teste acima joga fora justamente o que este braço do
+    // comparador decide: qual das sem número vem primeiro.
+    //
+    // ⚠️ **`return 1` aqui é mutante EQUIVALENTE, medido.** O TimSort do V8
+    // só olha `ordem < 0` (tanto na inserção binária quanto no merge), então
+    // `0` e `1` são indistinguíveis em runtime e nenhum teste de caixa-preta
+    // pode matar essa mutação. O `0` continua sendo o certo porque `1` nos
+    // dois sentidos não é uma ordem total — é correção de contrato, não de
+    // comportamento observável.
+    //
+    // O que este teste MATA é `return -1`, que inverte a ordem das sem
+    // número (verificado), e qualquer mudança que as faça sumir ou sair do
+    // fim da lista.
+    const { svc } = montarQ(
+      [
+        agregado({ questaoId: 'q-sem-a' }),
+        agregado({ questaoId: 'q-sem-b' }),
+        agregado({ questaoId: 'q-sem-c' }),
+        agregado({ questaoId: 'q1' }),
+      ],
+      [
+        { questaoId: 'q-sem-a', numero: null },
+        { questaoId: 'q-sem-b', numero: null },
+        { questaoId: 'q-sem-c', numero: null },
+        { questaoId: 'q1', numero: 3 },
+      ],
+    );
+
+    const r = await svc.consultarQuestoes({
+      simuladoId: SIM,
+      cursinhoId: 'cur-1',
+    });
+
+    // as três sem número sobrevivem, no fim, NA ORDEM EM QUE ENTRARAM
+    expect(r.questoes.map((q) => q.questaoId)).toEqual([
+      'q1',
+      'q-sem-a',
+      'q-sem-b',
+      'q-sem-c',
+    ]);
+    expect(r.questoes.map((q) => q.numero)).toEqual([3, null, null, null]);
+  });
+
   it('repassa o recorte, incluindo a turma', async () => {
     const { svc, repository, simuladoRepository } = montarQ([], []);
 
@@ -392,6 +436,47 @@ describe('RelatorioSimuladoEstudanteService.consultarDetalhe', () => {
 
     expect(r.respostas.map((x) => x.numero)).toEqual([1, null]);
     expect(r.respostas.map((x) => x.questaoId)).toEqual(['q1', 'q-sem']);
+  });
+
+  it('⚠️ duas questões sem número EMPATAM (0): a ordem entre elas é estável', async () => {
+    // Mesmo braço não testado do `consultarQuestoes` — ver o comentário
+    // longo lá: `return 1` é mutante equivalente no V8, `return -1` é morto
+    // por este teste.
+    const { svc } = montarDetalhe({
+      linha: comRespostas([
+        {
+          questao: 'q-sem-a',
+          alternativaEstudante: 'A',
+          alternativaCorreta: 'A',
+        },
+        {
+          questao: 'q-sem-b',
+          alternativaEstudante: 'B',
+          alternativaCorreta: 'C',
+        },
+        {
+          questao: 'q-sem-c',
+          alternativaCorreta: 'D',
+        },
+        { questao: 'q1', alternativaEstudante: 'A', alternativaCorreta: 'A' },
+      ]),
+      numeros: [{ questaoId: 'q1', numero: 1 }],
+    });
+
+    const r = await svc.consultarDetalhe({
+      simuladoId: SIM,
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    // as três sem número sobrevivem, no fim, NA ORDEM EM QUE ENTRARAM
+    expect(r.respostas.map((x) => x.questaoId)).toEqual([
+      'q1',
+      'q-sem-a',
+      'q-sem-b',
+      'q-sem-c',
+    ]);
+    expect(r.respostas.map((x) => x.numero)).toEqual([1, null, null, null]);
   });
 
   it('linha inexistente vira NotFoundException, não lista vazia', async () => {
