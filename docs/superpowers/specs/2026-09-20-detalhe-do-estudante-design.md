@@ -45,10 +45,29 @@ depende dele: constrói rota própria, como o card original propôs.
 
 `GET /v1/relatorio-simulado/:simuladoId/estudante/:usuario?cursinhoId=X`
 
-⚠️ **O gate é o próprio filtro, e isso não é economia — é o desenho.** A junção tem índice **único**
-em `{simulado, cursinhoId, usuario}`. Buscar pelos três é uma leitura indexada que **já não encontra
-nada** para estudante de outro cursinho. Não há checagem separada que alguém possa esquecer de
-escrever, nem um caminho em que o dado alheio entra no processo antes de ser recusado.
+⚠️ **O gate é o próprio filtro.** A junção tem índice **único** em `{simulado, cursinhoId, usuario}`.
+Buscar pelos três é uma leitura indexada que **já não encontra nada** para estudante de outro
+cursinho, sem checagem separada que alguém possa esquecer de escrever.
+
+⚠️ **CORREÇÃO (revisão adversarial): a segunda metade desta afirmação era falsa, e cara.** Este spec
+dizia que não havia *"caminho em que o dado alheio entra no processo antes de ser recusado"*.
+**Havia.** O filtro é sólido; o **encanamento até ele** não era.
+
+A api montava a URL do ms concatenando os path params crus. O Express decodifica os `%XX` dos
+parâmetros: um `%3F` vira `?`, tudo depois dele vira **query string** no ms, e o `cursinhoId` que a api
+acabou de resolver do JWT cai num parâmetro duplicado descartado. Medido ponta a ponta, contra Nest e
+Mongo de verdade — a chamada injetada devolveu **200 com as respostas completas de um aluno de outro
+cursinho**.
+
+Pior: `%2F` vira `/`, o `URL` do Node normaliza `..`, e `..%2F..%2F..%2Fhistorico%2F<id>` alcançava
+`GET /v1/historico/:id` — a rota **sem checagem de dono nenhuma** que o card `11` existe para
+consertar. O proxy entregava um GET arbitrário no ms.
+
+⚠️ **E não era só desta rota.** `buscarLinhas` e `buscarQuestoes` interpolavam `simuladoId` do mesmo
+jeito, e **já estavam mergeados**.
+
+**A lição, para o próximo que ler isto:** "o gate é o filtro" é verdade sobre o filtro, e não diz nada
+sobre quem escolhe o valor que chega nele. **Um gate cujo argumento o chamador controla não é gate.**
 
 Sem linha → **404**, não lista vazia: a tela pediu um estudante específico e ele não está neste
 recorte.
@@ -142,6 +161,8 @@ aparecer fora de ordem: o professor não saberia que ela existe.
 - [ ] Histórico `awaiting_omr` diz que está processando
 - [ ] `completed` com `falha` residual **não** mostra o motivo
 - [ ] Estudante de outro cursinho dá **404**, e a leitura já não o encontra — teste de isolamento
+- [ ] **Nenhum path param reescreve a URL que a api manda ao ms** — nem troca o `cursinhoId` por um
+      `?` embutido, nem alcança outra rota por `/` e `..`
 - [ ] `cursinhoId` obrigatório no ms; na api vem do JWT e nenhum parâmetro o troca
 - [ ] Questão sem número vai para o fim, não some
 - [ ] **Teste que sobe o app** nos dois backends, cobrindo a rota nova junto das existentes
