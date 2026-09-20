@@ -77,6 +77,11 @@ const MAPA: Record<string, EntradaMapa> = {
     descricao: 'Erro ao calcular o resultado do cartão.',
     acaoSugerida: AcaoSugerida.FalarComSuporte,
   },
+  [CodigoFalhaInterno.LeituraNaoRetornou]: {
+    descricao:
+      'A leitura do cartão não retornou a tempo. Tente processar novamente.',
+    acaoSugerida: AcaoSugerida.Reprocessar,
+  },
 };
 
 export const CODIGOS_MAPEADOS = Object.keys(MAPA);

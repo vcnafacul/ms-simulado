@@ -3,7 +3,7 @@ import { AcaoSugerida, CodigoFalhaInterno } from './codigo-falha';
 import { CODIGOS_MAPEADOS, descreverFalha } from './mapa-falha';
 
 describe('mapa de falhas', () => {
-  it('cobre os oito códigos do ms-omr e os cinco próprios', () => {
+  it('cobre os oito códigos do ms-omr e os seis próprios', () => {
     expect(CODIGOS_MAPEADOS).toEqual(
       expect.arrayContaining([
         // vindos do ms-omr (o README daquele repo é o contrato)
@@ -21,9 +21,10 @@ describe('mapa de falhas', () => {
         'respostas_ausentes',
         'simulado_sem_questoes',
         'erro_no_processamento',
+        'leitura_nao_retornou',
       ]),
     );
-    expect(CODIGOS_MAPEADOS).toHaveLength(13);
+    expect(CODIGOS_MAPEADOS).toHaveLength(14);
   });
 
   it('todo código que este serviço produz está mapeado', () => {
@@ -86,5 +87,28 @@ describe('mapa de falhas', () => {
 
   it('sem falha, não inventa uma', () => {
     expect(descreverFalha(undefined)).toBeUndefined();
+  });
+});
+
+describe('mapa-falha — leitura_nao_retornou (card 13)', () => {
+  it('⚠️ mapeia para Reprocessar, NAO para FalarComSuporte', () => {
+    // A foto esta boa: quem falhou foi a infraestrutura, e o coordenador
+    // resolve sozinho apertando "tentar de novo". Com `FalarComSuporte` a
+    // varredura trocaria "preso em processando" por "falha sem saida", que
+    // nao e progresso — e a acao do card 09 nem apareceria na tela.
+    const d = descreverFalha({
+      codigo: CodigoFalhaInterno.LeituraNaoRetornou,
+    } as any);
+
+    expect(d?.acaoSugerida).toBe(AcaoSugerida.Reprocessar);
+  });
+
+  it('tem descricao propria, e nao cai no fallback', () => {
+    const d = descreverFalha({
+      codigo: CodigoFalhaInterno.LeituraNaoRetornou,
+    } as any);
+
+    expect(d?.descricao).toContain('não retornou');
+    expect(d?.descricao).not.toBe('Não foi possível ler o cartão.');
   });
 });
