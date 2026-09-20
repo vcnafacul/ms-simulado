@@ -415,6 +415,96 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
     });
   });
 
+  describe('buscarDetalheDoEstudante (Mongo real)', () => {
+    const SIM_D = new Types.ObjectId();
+    const Q1 = new Types.ObjectId();
+    const Q2 = new Types.ObjectId();
+    const Q3 = new Types.ObjectId();
+
+    beforeAll(async () => {
+      const h = await histModel.create({
+        usuario: 'u-det',
+        simulado: SIM_D,
+        status: 'completed',
+        respostas: [
+          { questao: Q1, alternativaEstudante: 'A', alternativaCorreta: 'A' },
+          { questao: Q2, alternativaEstudante: 'B', alternativaCorreta: 'C' },
+          // ⚠️ sem `alternativaEstudante`: é assim que "sem leitura" chega —
+          // a CHAVE não existe. Não é null, não é string vazia. Medido no 03.
+          { questao: Q3, alternativaCorreta: 'D' },
+        ],
+      });
+      await relModel.create({
+        historico: h._id,
+        simulado: SIM_D,
+        usuario: 'u-det',
+        cursinhoId: 'cur-det',
+        turmaId: 't-det',
+      });
+    }, 120_000);
+
+    it('devolve as respostas do estudante, com o gabarito junto', async () => {
+      const r = await repo.buscarDetalheDoEstudante({
+        simuladoId: SIM_D.toString(),
+        cursinhoId: 'cur-det',
+        usuario: 'u-det',
+      });
+
+      expect(r!.historico!.respostas).toHaveLength(3);
+      expect(r!.historico!.respostas[0].alternativaCorreta).toBe('A');
+      expect(r!.historico!.respostas[0].alternativaEstudante).toBe('A');
+      // o `select` é uma string: sem `status` no CAMPOS_DO_DETALHE a service
+      // não sabe distinguir cartão lido de cartão falho
+      expect(r!.historico!.status).toBe('completed');
+    });
+
+    it('⚠️ estudante de OUTRO cursinho não é encontrado — o filtro é o gate', async () => {
+      // não há checagem separada a esquecer: a leitura indexada já não acha
+      const r = await repo.buscarDetalheDoEstudante({
+        simuladoId: SIM_D.toString(),
+        cursinhoId: 'cur-alheio',
+        usuario: 'u-det',
+      });
+
+      expect(r).toBeNull();
+    });
+
+    it('usuário que não está no recorte devolve null', async () => {
+      const r = await repo.buscarDetalheDoEstudante({
+        simuladoId: SIM_D.toString(),
+        cursinhoId: 'cur-det',
+        usuario: 'u-que-nao-existe',
+      });
+
+      expect(r).toBeNull();
+    });
+
+    it('outro simulado do mesmo estudante não é encontrado', async () => {
+      const r = await repo.buscarDetalheDoEstudante({
+        simuladoId: new Types.ObjectId().toString(),
+        cursinhoId: 'cur-det',
+        usuario: 'u-det',
+      });
+
+      expect(r).toBeNull();
+    });
+
+    it('⚠️ a resposta sem leitura NÃO tem a chave alternativaEstudante', async () => {
+      // é o que distingue "não marcou / OMR não leu" de "marcou errado", e a
+      // classificação do serviço depende disso
+      const r = await repo.buscarDetalheDoEstudante({
+        simuladoId: SIM_D.toString(),
+        cursinhoId: 'cur-det',
+        usuario: 'u-det',
+      });
+
+      const semLeitura = r!.historico!.respostas[2];
+      expect('alternativaEstudante' in semLeitura).toBe(false);
+      expect(semLeitura.alternativaEstudante).toBeUndefined();
+      expect(semLeitura.alternativaCorreta).toBe('D');
+    });
+  });
+
   /**
    * Fix 4 da revisão adversarial: o spec do controller usa um dublê do
    * serviço, e os specs acima falam com o repositório direto. Nada até aqui

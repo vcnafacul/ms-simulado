@@ -15,6 +15,13 @@ const CAMPOS_DO_HISTORICO =
   'status cartaoCode questoesRespondidas aproveitamento.geral falha';
 
 /**
+ * ⚠️ O oposto do `CAMPOS_DO_HISTORICO`: aqui as `respostas` ENTRAM. Lá elas
+ * ficam de fora porque o relatório lê centenas de linhas e nenhuma tela usa o
+ * detalhe; aqui é UM estudante, e o detalhe é exatamente o que se pediu.
+ */
+const CAMPOS_DO_DETALHE = 'status falha respostas';
+
+/**
  * `historico` é `| null` porque o `populate` de uma ref apagada (`Historico`
  * removido depois do vínculo) devolve `null`, não lança — quem consome isto
  * (a service) precisa tratar a ausência, não presumir a ref viva.
@@ -235,5 +242,33 @@ export class RelatorioSimuladoEstudanteRepository {
         Object.values(Alternativa).map((alt) => [alt, l[alt] ?? 0]),
       ),
     }));
+  }
+
+  /**
+   * O detalhe de UM estudante no recorte.
+   *
+   * ⚠️ **O filtro é o gate.** O índice único desta coleção é
+   * `{simulado, cursinhoId, usuario}` — buscar pelos três é uma leitura
+   * indexada que **já não encontra** estudante de outro cursinho. Não existe
+   * checagem separada que alguém possa esquecer de escrever, nem um caminho em
+   * que as respostas alheias entram no processo antes de serem recusadas.
+   *
+   * `historico` pode vir `null` (ref apagada depois do vínculo) — quem consome
+   * trata, como no `buscarPorRecorte`.
+   */
+  async buscarDetalheDoEstudante(params: {
+    simuladoId: string;
+    cursinhoId: string;
+    usuario: string;
+  }): Promise<LinhaComHistorico | null> {
+    return this.model
+      .findOne({
+        simulado: new Types.ObjectId(params.simuladoId),
+        cursinhoId: params.cursinhoId,
+        usuario: params.usuario,
+      })
+      .populate({ path: 'historico', select: CAMPOS_DO_DETALHE })
+      .lean()
+      .exec() as unknown as Promise<LinhaComHistorico | null>;
   }
 }
