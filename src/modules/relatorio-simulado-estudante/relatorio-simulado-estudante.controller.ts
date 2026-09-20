@@ -1,12 +1,16 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
+  HttpCode,
   Param,
+  Post,
   Query,
 } from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Types } from 'mongoose';
+import { ConsultarRelatorioDtoBody } from './dtos/consultar-relatorio.dto.body';
 import { ConsultarRelatorioDtoInput } from './dtos/consultar-relatorio.dto.input';
 import { DetalheDoEstudanteDtoOutput } from './dtos/detalhe-do-estudante.dto.output';
 import { QuestoesDoRelatorioDtoOutput } from './dtos/questoes-do-relatorio.dto.output';
@@ -25,6 +29,82 @@ export class RelatorioSimuladoEstudanteController {
    * a captura, `Types.ObjectId.isValid('simulados')` recusa, e a rota
    * responde 400. Nenhum teste de unidade pega — só um que suba o app.
    */
+  /**
+   * ⚠️ **POST para CONSULTA, e por um motivo só: o corpo.** A lista de
+   * usuários do recorte não cabe numa query string — um UUID ocupa 36
+   * caracteres e uma turma de 50 já passa de 2.300, acima do limite seguro de
+   * URL. Rota interna (o ms não é público), então o método importa menos que
+   * o recorte estar certo.
+   *
+   * ⚠️ **As rotas GET continuam existindo**, e isso não é indecisão: durante o
+   * deploy a api ainda chama as antigas, e removê-las agora derrubaria o
+   * relatório na janela entre subir o ms e subir a api. Elas saem num card
+   * próprio, depois que os logs mostrarem que ninguém mais as chama.
+   *
+   * ⚠️ **Declarada antes de `@Post(':simuladoId')`** pelo mesmo motivo que a
+   * `@Get('simulados')`: mesma contagem de segmentos, e o param captura.
+   */
+  @Post('simulados')
+  @HttpCode(200)
+  @ApiResponse({
+    status: 200,
+    description:
+      'simulados com cartão no recorte (cursinho ou lista de usuários)',
+    type: SimuladosComCartaoDtoOutput,
+  })
+  async listarSimuladosPorRecorte(
+    @Body() body: ConsultarRelatorioDtoBody,
+  ): Promise<SimuladosComCartaoDtoOutput> {
+    return this.service.listarSimulados({
+      cursinhoId: body.cursinhoId,
+      usuarios: body.usuarios,
+    });
+  }
+
+  @Post(':simuladoId/questoes')
+  @HttpCode(200)
+  @ApiResponse({
+    status: 200,
+    description: 'agregado por questão no recorte',
+    type: QuestoesDoRelatorioDtoOutput,
+  })
+  async consultarQuestoesPorRecorte(
+    @Param('simuladoId') simuladoId: string,
+    @Body() body: ConsultarRelatorioDtoBody,
+  ): Promise<QuestoesDoRelatorioDtoOutput> {
+    if (!Types.ObjectId.isValid(simuladoId)) {
+      throw new BadRequestException(`simuladoId inválido: ${simuladoId}`);
+    }
+
+    return this.service.consultarQuestoes({
+      simuladoId,
+      cursinhoId: body.cursinhoId,
+      usuarios: body.usuarios,
+    });
+  }
+
+  @Post(':simuladoId')
+  @HttpCode(200)
+  @ApiResponse({
+    status: 200,
+    description: 'linhas do simulado no recorte',
+    type: RelatorioSimuladoDtoOutput,
+  })
+  async consultarPorRecorte(
+    @Param('simuladoId') simuladoId: string,
+    @Body() body: ConsultarRelatorioDtoBody,
+  ): Promise<RelatorioSimuladoDtoOutput> {
+    if (!Types.ObjectId.isValid(simuladoId)) {
+      throw new BadRequestException(`simuladoId inválido: ${simuladoId}`);
+    }
+
+    return this.service.consultar({
+      simuladoId,
+      cursinhoId: body.cursinhoId,
+      usuarios: body.usuarios,
+    });
+  }
+
   @Get('simulados')
   @ApiResponse({
     status: 200,
