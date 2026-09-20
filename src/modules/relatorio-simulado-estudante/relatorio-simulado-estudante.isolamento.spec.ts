@@ -415,6 +415,252 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
     });
   });
 
+  describe('listarSimuladosComCartao (Mongo real)', () => {
+    const SIM_L1 = new Types.ObjectId();
+    const SIM_L2 = new Types.ObjectId();
+    // terceiro simulado, com `createdAt` ENTRE os outros dois: com apenas dois,
+    // a ordem natural do `$group` coincidia com a esperada e apagar o `$sort`
+    // inteiro não deixava nada vermelho.
+    const SIM_L3 = new Types.ObjectId();
+    const CUR = 'cur-lista';
+    const NOME_L1 = 'Simulado L1 — ENEM 2026';
+
+    // `createdAt` explícito, e não a ordem de inserção: o default do
+    // `BaseSchema` é `now()`, e três `create` seguidos podem cair no MESMO
+    // milissegundo — aí a ordenação vira sorte e o teste, flaky.
+    const T_L1 = new Date('2026-01-10T12:00:00.000Z');
+    const T_L3 = new Date('2026-02-10T12:00:00.000Z');
+    const T_L2 = new Date('2026-03-10T12:00:00.000Z');
+
+    beforeAll(async () => {
+      // SIM_L1: três estudantes. Um completo, um falho, e um cuja ref de
+      // histórico vai ser apagada — os três ENVIARAM cartão.
+      const hOk = await histModel.create({
+        usuario: 'u-l1',
+        simulado: SIM_L1,
+        status: 'completed',
+      });
+      const hFalhou = await histModel.create({
+        usuario: 'u-l2',
+        simulado: SIM_L1,
+        status: 'failed',
+        falha: { codigo: 'cartao_nao_detectado' },
+      });
+      const hOrfao = await histModel.create({
+        usuario: 'u-l3',
+        simulado: SIM_L1,
+        status: 'completed',
+      });
+
+      await relModel.create({
+        historico: hOk._id,
+        simulado: SIM_L1,
+        usuario: 'u-l1',
+        cursinhoId: CUR,
+        turmaId: 't-A',
+        createdAt: T_L1,
+      });
+      await relModel.create({
+        historico: hFalhou._id,
+        simulado: SIM_L1,
+        usuario: 'u-l2',
+        cursinhoId: CUR,
+        turmaId: 't-B',
+        createdAt: T_L1,
+      });
+      await relModel.create({
+        historico: hOrfao._id,
+        simulado: SIM_L1,
+        usuario: 'u-l3',
+        cursinhoId: CUR,
+        turmaId: 't-A',
+        createdAt: T_L1,
+      });
+      // a ref morre DEPOIS do vínculo — é o caso que o repositório já tipa
+      // como `historico: Historico | null`
+      await histModel.deleteOne({ _id: hOrfao._id });
+
+      // SIM_L2: um estudante só, e mais recente que o SIM_L1
+      const hOutro = await histModel.create({
+        usuario: 'u-l4',
+        simulado: SIM_L2,
+        status: 'completed',
+      });
+      await relModel.create({
+        historico: hOutro._id,
+        simulado: SIM_L2,
+        usuario: 'u-l4',
+        cursinhoId: CUR,
+        turmaId: 't-A',
+        createdAt: T_L2,
+      });
+
+      // SIM_L3: no MEIO da ordenação. Existe só para que o `$sort` tenha três
+      // posições para acertar — com duas, a ordem natural do `$group` acertava
+      // por acaso.
+      const hMeio = await histModel.create({
+        usuario: 'u-l5',
+        simulado: SIM_L3,
+        status: 'completed',
+      });
+      await relModel.create({
+        historico: hMeio._id,
+        simulado: SIM_L3,
+        usuario: 'u-l5',
+        cursinhoId: CUR,
+        turmaId: 't-A',
+        createdAt: T_L3,
+      });
+
+      // de OUTRO cursinho, no mesmo simulado — não pode aparecer
+      const hAlheio = await histModel.create({
+        usuario: 'u-alheio',
+        simulado: SIM_L1,
+        status: 'completed',
+      });
+      await relModel.create({
+        historico: hAlheio._id,
+        simulado: SIM_L1,
+        usuario: 'u-alheio',
+        cursinhoId: 'cur-outro',
+      });
+
+      // ⚠️ SÓ o SIM_L1 vira documento de `Simulado`. O SIM_L2 fica de fora de
+      // propósito: é ele que prova que um simulado sem documento continua na
+      // lista, com `nome: null`. Não seedar o SIM_L2.
+      await simuladoModel.create({
+        _id: SIM_L1,
+        nome: NOME_L1,
+        descricao: 'lista de simulados com cartão',
+        questoes: [],
+      });
+    }, 120_000);
+
+    it('conta cartões enviados e, à parte, os com leitura concluída', async () => {
+      const r = await repo.listarSimuladosComCartao({ cursinhoId: CUR });
+
+      const l1 = r.find((s) => s.simuladoId === SIM_L1.toString());
+      // três enviaram: completo, falho e órfão
+      expect(l1!.cartoes).toBe(3);
+      // só o completo conta — o falho e o órfão não
+      expect(l1!.comLeituraConcluida).toBe(1);
+
+      // ⚠️ SIM_L1 tem exatamente 1 completo e 1 falho, então `completed` e
+      // `failed` dão a MESMA resposta ali — a asserção acima não distingue os
+      // dois predicados. SIM_L2 tem 1 completo e 0 falhos, e distingue.
+      const l2 = r.find((s) => s.simuladoId === SIM_L2.toString());
+      expect(l2!.comLeituraConcluida).toBe(1);
+    });
+
+    it('o nome vem do Simulado, por Map — e não de um $lookup', async () => {
+      // ⚠️ Sem isto, `getNomesPorIds` inteiro pode virar `return []` e nada
+      // fica vermelho: o único outro teste dele mocka o SimuladoRepository.
+      // O que se prova aqui é a conversão de `$in` para ObjectId, a projeção
+      // e a chave de junção `_id.toString()` — tudo contra Mongo de verdade.
+      const r = await svc.listarSimulados({ cursinhoId: CUR });
+
+      const l1 = r.simulados.find((s) => s.simuladoId === SIM_L1.toString());
+      expect(l1!.nome).toBe(NOME_L1);
+    });
+
+    it('simulado sem documento continua na lista, com nome nulo', async () => {
+      // SIM_L2 não foi seedado como Simulado — os cartões existem e não podem
+      // sumir por causa disso.
+      const r = await svc.listarSimulados({ cursinhoId: CUR });
+
+      const l2 = r.simulados.find((s) => s.simuladoId === SIM_L2.toString());
+      expect(l2).toBeDefined();
+      expect(l2!.nome).toBeNull();
+    });
+
+    it('linha cuja ref de histórico morreu CONTINUA contando como cartão enviado', async () => {
+      // sem `preserveNullAndEmptyArrays`, o $unwind descarta essa linha e o
+      // total passa a ser menor que o número de cartões que chegaram — sem
+      // nada acusar. O repositório já tipa `historico: Historico | null`
+      // justamente porque essa órfã existe.
+      const r = await repo.listarSimuladosComCartao({ cursinhoId: CUR });
+
+      expect(r.find((s) => s.simuladoId === SIM_L1.toString())!.cartoes).toBe(
+        3,
+      );
+    });
+
+    it('turmaId restringe à turma', async () => {
+      const r = await repo.listarSimuladosComCartao({
+        cursinhoId: CUR,
+        turmaId: 't-A',
+      });
+
+      // u-l1 e u-l3 são da turma A; u-l2 é da B
+      expect(r.find((s) => s.simuladoId === SIM_L1.toString())!.cartoes).toBe(
+        2,
+      );
+    });
+
+    it('simulado de outro cursinho não aparece, e o alheio não soma no meu', async () => {
+      const r = await repo.listarSimuladosComCartao({
+        cursinhoId: 'cur-outro',
+      });
+
+      expect(r).toHaveLength(1);
+      expect(r[0].cartoes).toBe(1);
+    });
+
+    it('ordena por ultimoEnvio decrescente', async () => {
+      // ⚠️ TRÊS simulados, não dois. Com dois, a ordem natural do `$group`
+      // coincidia com a esperada e apagar o estágio `$sort` inteiro passava.
+      // Os `createdAt` são explícitos justamente para que a posição do meio
+      // seja uma afirmação, e não sorte.
+      const r = await repo.listarSimuladosComCartao({ cursinhoId: CUR });
+
+      expect(r.map((s) => s.simuladoId)).toEqual([
+        SIM_L2.toString(),
+        SIM_L3.toString(),
+        SIM_L1.toString(),
+      ]);
+    });
+
+    it('ultimoEnvio é preenchido mesmo quando a linha nasce pelo upsert do registrar', async () => {
+      // ⚠️ O schema da junção é `timestamps: false`; `createdAt` vem do
+      // `BaseSchema` com default. O `registrar` escreve por UPSERT, e se o
+      // default não fosse aplicado no insert a ordenação inteira viraria nula
+      // em produção — e passaria nos testes acima, que usam `create`.
+      const SIM_UP = new Types.ObjectId();
+      const h = await histModel.create({
+        usuario: 'u-up',
+        simulado: SIM_UP,
+        status: 'completed',
+      });
+      await repo.registrar({
+        historicoId: h._id.toString(),
+        simuladoId: SIM_UP.toString(),
+        usuario: 'u-up',
+        cursinhoId: 'cur-upsert',
+      });
+
+      const r = await repo.listarSimuladosComCartao({
+        cursinhoId: 'cur-upsert',
+      });
+
+      expect(r[0].ultimoEnvio).toBeInstanceOf(Date);
+    });
+
+    it('recorte sem nenhum cartão devolve lista vazia, não erro', async () => {
+      await expect(
+        repo.listarSimuladosComCartao({ cursinhoId: 'cur-que-nao-existe' }),
+      ).resolves.toEqual([]);
+    });
+
+    it('turmaId ausente NÃO vira filtro por turma nula', async () => {
+      // `{turmaId: undefined}` serializa para `{turmaId: null}` e casaria só
+      // quem não tem turma — lição medida no card 02. Todos os do CUR têm
+      // turma, então um filtro indevido devolveria lista vazia.
+      const r = await repo.listarSimuladosComCartao({ cursinhoId: CUR });
+
+      expect(r.length).toBeGreaterThan(0);
+    });
+  });
+
   /**
    * Fix 4 da revisão adversarial: o spec do controller usa um dublê do
    * serviço, e os specs acima falam com o repositório direto. Nada até aqui
@@ -555,6 +801,30 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
         numero: 7,
         respondentes: 3,
       });
+    });
+
+    it('GET /simulados resolve para a rota literal, não para :simuladoId', async () => {
+      // ⚠️ `simulados` e `:simuladoId` têm a MESMA contagem de segmentos.
+      // Declarada depois, a literal é capturada pelo param, `isValid` recusa
+      // e isto vira 400. Só um app de verdade pega — teste de unidade chama
+      // o método direto e passa com a ordem errada.
+      const res = await request(app.getHttpServer())
+        .get('/v1/relatorio-simulado/simulados')
+        .query({ cursinhoId: 'cur-http' })
+        .expect(200);
+
+      expect(Array.isArray(res.body.simulados)).toBe(true);
+      expect(res.body.simulados[0]).toMatchObject({
+        simuladoId: expect.any(String),
+        cartoes: expect.any(Number),
+        comLeituraConcluida: expect.any(Number),
+      });
+    });
+
+    it('GET /simulados sem cursinhoId recusa com 400', async () => {
+      await request(app.getHttpServer())
+        .get('/v1/relatorio-simulado/simulados')
+        .expect(400);
     });
   });
 });

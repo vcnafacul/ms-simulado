@@ -32,6 +32,13 @@ export interface AgregadoDaQuestao {
   porAlternativa: Record<string, number>;
 }
 
+export interface SimuladoComCartao {
+  simuladoId: string;
+  cartoes: number;
+  comLeituraConcluida: number;
+  ultimoEnvio: Date | null;
+}
+
 @Injectable()
 export class RelatorioSimuladoEstudanteRepository {
   constructor(
@@ -234,6 +241,74 @@ export class RelatorioSimuladoEstudanteRepository {
       porAlternativa: Object.fromEntries(
         Object.values(Alternativa).map((alt) => [alt, l[alt] ?? 0]),
       ),
+    }));
+  }
+
+  /**
+   * Quais simulados têm cartão neste recorte, e quantos.
+   *
+   * ⚠️ **Parece irmã da `agregarPorQuestao` e não é.** Lá o `$unwind` é
+   * estrito e seguido de `$match: { 'h.status': completed }`, porque o
+   * objetivo é DESCARTAR quem não completou. Aqui o objetivo é o oposto:
+   * contar todo mundo que enviou e classificar por status. Por isso
+   * `preserveNullAndEmptyArrays: true` — sem ele, a linha cuja ref de
+   * `Historico` morreu (o mesmo caso que faz `LinhaComHistorico.historico`
+   * ser `| null`) some da contagem, e `cartoes` fica menor que o número de
+   * cartões que realmente chegaram, sem nada acusar.
+   *
+   * ⚠️ `ultimoEnvio` é o `$max` do `createdAt` das LINHAS, e `registrar` é
+   * upsert: um reenvio do mesmo estudante não rebumba a data. Logo isto é
+   * "quando o estudante mais recente entrou no recorte", não "última
+   * atividade" — o consumidor não deve exibi-lo como tal.
+   */
+  async listarSimuladosComCartao(params: {
+    cursinhoId: string;
+    turmaId?: string;
+  }): Promise<SimuladoComCartao[]> {
+    // `{turmaId: undefined}` serializa para `{turmaId: null}` e casaria só
+    // quem NÃO tem turma — a chave precisa estar ausente. Lição do card 02.
+    const match: Record<string, unknown> = { cursinhoId: params.cursinhoId };
+    if (params.turmaId !== undefined) {
+      match.turmaId = params.turmaId;
+    }
+
+    const linhas = await this.model
+      .aggregate([
+        { $match: match },
+        {
+          $lookup: {
+            from: 'historicos',
+            localField: 'historico',
+            foreignField: '_id',
+            as: 'h',
+          },
+        },
+        { $unwind: { path: '$h', preserveNullAndEmptyArrays: true } },
+        {
+          $group: {
+            _id: '$simulado',
+            cartoes: { $sum: 1 },
+            comLeituraConcluida: {
+              $sum: {
+                $cond: [
+                  { $eq: ['$h.status', HistoricoStatus.Completed] },
+                  1,
+                  0,
+                ],
+              },
+            },
+            ultimoEnvio: { $max: '$createdAt' },
+          },
+        },
+        { $sort: { ultimoEnvio: -1 } },
+      ])
+      .exec();
+
+    return linhas.map((l) => ({
+      simuladoId: l._id.toString(),
+      cartoes: l.cartoes,
+      comLeituraConcluida: l.comLeituraConcluida,
+      ultimoEnvio: l.ultimoEnvio ?? null, // $max já devolve null; isto é cinto e suspensório
     }));
   }
 }
