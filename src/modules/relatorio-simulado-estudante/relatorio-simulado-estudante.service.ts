@@ -1,10 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { HistoricoStatus } from '../historico/enums/historico-status.enum';
 import { descreverFalha } from '../historico/falha/mapa-falha';
 import { SimuladoRepository } from '../simulado/simulado.repository';
 import {
   LinhaRelatorioDtoOutput,
   RelatorioSimuladoDtoOutput,
 } from './dtos/relatorio-simulado.dto.output';
+import {
+  DetalheDoEstudanteDtoOutput,
+  ResultadoDaQuestao,
+} from './dtos/detalhe-do-estudante.dto.output';
 import {
   QuestaoDoRelatorioDtoOutput,
   QuestoesDoRelatorioDtoOutput,
@@ -118,5 +123,82 @@ export class RelatorioSimuladoEstudanteService {
     });
 
     return { questoes };
+  }
+
+  /**
+   * O que UM estudante marcou, questão a questão, já classificado.
+   *
+   * ⚠️ Quem classifica é o ms, não a tela: a regra de "sem leitura" é a
+   * AUSÊNCIA da chave `alternativaEstudante`, sutil o bastante para duas
+   * implementações dela divergirem. Mesmo motivo pelo qual o card 01 derivou a
+   * descrição da falha no servidor.
+   */
+  async consultarDetalhe(params: {
+    simuladoId: string;
+    cursinhoId: string;
+    usuario: string;
+  }): Promise<DetalheDoEstudanteDtoOutput> {
+    const linha = await this.repository.buscarDetalheDoEstudante(params);
+
+    // ⚠️ 404, não lista vazia: a tela pediu UM estudante. Vazio diria "ele não
+    // respondeu nada", que é outra coisa. E a linha órfã (histórico apagado
+    // depois do vínculo) cai aqui pelo mesmo motivo.
+    if (!linha?.historico) {
+      throw new NotFoundException(
+        `estudante ${params.usuario} não tem cartão neste simulado`,
+      );
+    }
+
+    const h = linha.historico;
+    const numeros = await this.simuladoRepository.getNumerosDasQuestoes(
+      params.simuladoId,
+    );
+    const numeroPorQuestao = new Map(
+      numeros.map((n) => [n.questaoId, n.numero]),
+    );
+
+    const respostas = (h.respostas ?? []).map((r: any) => {
+      const questaoId = r.questao?.toString();
+      // ⚠️ AUSÊNCIA da chave. Trocar por `=== null` ou `=== ''` faz a questão
+      // não marcada virar ERRO — e o professor revisa a aula errada.
+      const marcada = r.alternativaEstudante;
+      const resultado =
+        marcada === undefined
+          ? ResultadoDaQuestao.SemLeitura
+          : marcada === r.alternativaCorreta
+            ? ResultadoDaQuestao.Acerto
+            : ResultadoDaQuestao.Erro;
+
+      return {
+        numero: numeroPorQuestao.get(questaoId) ?? null,
+        questaoId,
+        alternativaEstudante: marcada,
+        alternativaCorreta: r.alternativaCorreta,
+        resultado,
+      };
+    });
+
+    // Questão sem número vai para o fim — sumir seria pior que aparecer fora
+    // de ordem. Dois nulos empatam (0): devolver 1 nos dois sentidos não é uma
+    // ordem total. Mesma regra do `consultarQuestoes`.
+    respostas.sort((a, b) => {
+      if (a.numero === null && b.numero === null) return 0;
+      if (a.numero === null) return 1;
+      if (b.numero === null) return -1;
+      return a.numero - b.numero;
+    });
+
+    return {
+      status: h.status,
+      // ⚠️ Só em `failed`: `marcarFalha` é o único escritor de `falha` e nada
+      // nunca a desfaz (o `completeProcessing` não toca nela), então um cartão
+      // reprocessado carrega o motivo antigo. Mesma armadilha que o card 06
+      // fechou na tela.
+      falha:
+        h.status === HistoricoStatus.Failed
+          ? descreverFalha(h.falha)
+          : undefined,
+      respostas,
+    };
   }
 }

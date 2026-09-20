@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, NotFoundException } from '@nestjs/common';
 import { RelatorioSimuladoEstudanteService } from './relatorio-simulado-estudante.service';
 
 const SIM = '665f0c1a2b3c4d5e6f00abc2';
@@ -264,5 +264,228 @@ describe('RelatorioSimuladoEstudanteService.consultarQuestoes', () => {
     });
 
     expect(r.questoes).toEqual([]);
+  });
+});
+
+describe('RelatorioSimuladoEstudanteService.consultarDetalhe', () => {
+  const montarDetalhe = (over?: { linha?: any; numeros?: any[] }) => {
+    const repository = {
+      buscarDetalheDoEstudante: jest
+        .fn()
+        .mockResolvedValue(over?.linha ?? null),
+    };
+    const simuladoRepository = {
+      getNumerosDasQuestoes: jest.fn().mockResolvedValue(over?.numeros ?? []),
+    };
+    const svc = new RelatorioSimuladoEstudanteService(
+      repository as any,
+      simuladoRepository as any,
+    );
+    return { svc, repository, simuladoRepository };
+  };
+
+  const comRespostas = (respostas: any[], over: any = {}) => ({
+    usuario: 'u1',
+    historico: { status: 'completed', respostas, ...over },
+  });
+
+  it('classifica acerto, erro e sem leitura', async () => {
+    const { svc } = montarDetalhe({
+      linha: comRespostas([
+        { questao: 'q1', alternativaEstudante: 'A', alternativaCorreta: 'A' },
+        { questao: 'q2', alternativaEstudante: 'B', alternativaCorreta: 'C' },
+        { questao: 'q3', alternativaCorreta: 'D' },
+      ]),
+      numeros: [
+        { questaoId: 'q1', numero: 1 },
+        { questaoId: 'q2', numero: 2 },
+        { questaoId: 'q3', numero: 3 },
+      ],
+    });
+
+    const r = await svc.consultarDetalhe({
+      simuladoId: SIM,
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    expect(r.respostas.map((x) => x.resultado)).toEqual([
+      'acerto',
+      'erro',
+      'sem_leitura',
+    ]);
+  });
+
+  it('repassa o recorte ao repositório — simulado, cursinho e usuário', async () => {
+    const { svc, repository, simuladoRepository } = montarDetalhe({
+      linha: comRespostas([]),
+    });
+
+    await svc.consultarDetalhe({
+      simuladoId: SIM,
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    expect(repository.buscarDetalheDoEstudante).toHaveBeenCalledWith({
+      simuladoId: SIM,
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+    expect(simuladoRepository.getNumerosDasQuestoes).toHaveBeenCalledWith(SIM);
+  });
+
+  it('⚠️ sem leitura é a AUSÊNCIA da chave, não uma alternativa vazia', async () => {
+    // se alguém trocar por `=== null` ou `=== ''`, a questão não marcada passa
+    // a contar como erro e o professor revisa a aula errada
+    const { svc } = montarDetalhe({
+      linha: comRespostas([{ questao: 'q1', alternativaCorreta: 'D' }]),
+      numeros: [{ questaoId: 'q1', numero: 1 }],
+    });
+
+    const r = await svc.consultarDetalhe({
+      simuladoId: SIM,
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    expect(r.respostas[0].resultado).toBe('sem_leitura');
+    expect(r.respostas[0].alternativaEstudante).toBeUndefined();
+  });
+
+  it('junta o número vindo do simulado', async () => {
+    const { svc } = montarDetalhe({
+      linha: comRespostas([
+        { questao: 'q7', alternativaEstudante: 'A', alternativaCorreta: 'A' },
+      ]),
+      numeros: [{ questaoId: 'q7', numero: 7 }],
+    });
+
+    const r = await svc.consultarDetalhe({
+      simuladoId: SIM,
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    expect(r.respostas[0].numero).toBe(7);
+    expect(r.respostas[0].questaoId).toBe('q7');
+  });
+
+  it('questão sem número vai para o FIM, não some', async () => {
+    const { svc } = montarDetalhe({
+      linha: comRespostas([
+        {
+          questao: 'q-sem',
+          alternativaEstudante: 'A',
+          alternativaCorreta: 'A',
+        },
+        { questao: 'q1', alternativaEstudante: 'A', alternativaCorreta: 'A' },
+      ]),
+      numeros: [{ questaoId: 'q1', numero: 1 }],
+    });
+
+    const r = await svc.consultarDetalhe({
+      simuladoId: SIM,
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    expect(r.respostas.map((x) => x.numero)).toEqual([1, null]);
+    expect(r.respostas.map((x) => x.questaoId)).toEqual(['q1', 'q-sem']);
+  });
+
+  it('linha inexistente vira NotFoundException, não lista vazia', async () => {
+    // a tela pediu UM estudante; devolver vazio diria "ele não respondeu nada",
+    // que é outra coisa
+    const { svc } = montarDetalhe({ linha: null });
+
+    await expect(
+      svc.consultarDetalhe({
+        simuladoId: SIM,
+        cursinhoId: 'cur-1',
+        usuario: 'u1',
+      }),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('histórico falho devolve a falha DESCRITA e nenhuma resposta', async () => {
+    const { svc } = montarDetalhe({
+      linha: {
+        usuario: 'u1',
+        historico: {
+          status: 'failed',
+          respostas: [],
+          falha: { codigo: 'cartao_nao_detectado' },
+        },
+      },
+    });
+
+    const r = await svc.consultarDetalhe({
+      simuladoId: SIM,
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    expect(r.status).toBe('failed');
+    expect(r.falha).toEqual(
+      expect.objectContaining({
+        codigo: 'cartao_nao_detectado',
+        descricao: expect.stringContaining(
+          'Não foi possível localizar o cartão',
+        ),
+        acaoSugerida: 'reenviar_foto',
+      }),
+    );
+    expect(r.respostas).toHaveLength(0);
+  });
+
+  it('⚠️ completed que ainda carrega falha antiga NÃO devolve a falha', async () => {
+    // `marcarFalha` é o único escritor de `falha` e nada nunca a desfaz — o
+    // `completeProcessing` não toca nela. Sem este gate a tela diria "lido" e
+    // mostraria o motivo do erro ao lado.
+    const { svc } = montarDetalhe({
+      linha: comRespostas([], {
+        status: 'completed',
+        falha: { codigo: 'cartao_nao_detectado' },
+      }),
+    });
+
+    const r = await svc.consultarDetalhe({
+      simuladoId: SIM,
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    expect(r.falha).toBeUndefined();
+  });
+
+  it('linha órfã (histórico apagado) vira NotFoundException', async () => {
+    const { svc } = montarDetalhe({
+      linha: { usuario: 'u1', historico: null },
+    });
+
+    await expect(
+      svc.consultarDetalhe({
+        simuladoId: SIM,
+        cursinhoId: 'cur-1',
+        usuario: 'u1',
+      }),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('histórico sem a chave respostas devolve lista vazia, não estoura', async () => {
+    // `awaiting_omr` nunca teve `respostas` — o documento não tem a chave
+    const { svc } = montarDetalhe({
+      linha: { usuario: 'u1', historico: { status: 'awaiting_omr' } },
+    });
+
+    const r = await svc.consultarDetalhe({
+      simuladoId: SIM,
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    expect(r.status).toBe('awaiting_omr');
+    expect(r.respostas).toEqual([]);
   });
 });
