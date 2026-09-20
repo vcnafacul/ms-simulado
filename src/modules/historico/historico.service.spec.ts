@@ -65,13 +65,30 @@ describe('HistoricoService.calcularMediaAproveitamento', () => {
     const result = await makeService().getPerformance('user-1');
 
     const expected = (0.5 + 0.8 + 1.0) / 3; // ≈ 0.7667
-    expect(result.performanceMateriaFrente.materias[0].aproveitamento).toBeCloseTo(expected, 5);
-    expect(result.performanceMateriaFrente.frentes[0].aproveitamento).toBeCloseTo(expected, 5);
+    expect(
+      result.performanceMateriaFrente.materias[0].aproveitamento,
+    ).toBeCloseTo(expected, 5);
+    expect(
+      result.performanceMateriaFrente.frentes[0].aproveitamento,
+    ).toBeCloseTo(expected, 5);
     expect(result.historicos[0].totalQuestionsTest).toBe(2);
   });
 });
 
 describe('HistoricoService.getById (achata simulado.questoes)', () => {
+  it('⚠️ repassa o DONO ao repositório — é o gate inteiro', async () => {
+    // Sem isto, o service podia ignorar o `usuario` e chamar uma leitura por
+    // id, e todos os outros testes deste bloco continuariam verdes.
+    const repository: any = {
+      getByIdAndUsuario: jest.fn().mockResolvedValue(null),
+    };
+    const svc = new HistoricoService(repository);
+
+    await svc.getById('h1', 'u-dono');
+
+    expect(repository.getByIdAndUsuario).toHaveBeenCalledWith('h1', 'u-dono');
+  });
+
   it('achata questoes.questao em simulado.questoes (subdoc → questao)', async () => {
     const historico = {
       toObject: () => ({
@@ -86,10 +103,12 @@ describe('HistoricoService.getById (achata simulado.questoes)', () => {
         },
       }),
     };
-    const repository: any = { getById: jest.fn().mockResolvedValue(historico) };
+    const repository: any = {
+      getByIdAndUsuario: jest.fn().mockResolvedValue(historico),
+    };
     const service = new HistoricoService(repository);
 
-    const result: any = await service.getById('h1');
+    const result: any = await service.getById('h1', 'u1');
 
     // Achata pro shape do client preservando o numero do relacionamento (qc.numero).
     expect(result.simulado.questoes).toEqual([
@@ -99,9 +118,11 @@ describe('HistoricoService.getById (achata simulado.questoes)', () => {
   });
 
   it('retorna null quando não encontra', async () => {
-    const repository: any = { getById: jest.fn().mockResolvedValue(null) };
+    const repository: any = {
+      getByIdAndUsuario: jest.fn().mockResolvedValue(null),
+    };
     const service = new HistoricoService(repository);
-    expect(await service.getById('x')).toBeNull();
+    expect(await service.getById('x', 'u1')).toBeNull();
   });
 });
 
@@ -139,14 +160,14 @@ describe('HistoricoService — descrição da falha (card 01)', () => {
 
   it('getById descreve a falha', async () => {
     const repository = {
-      getById: jest.fn().mockResolvedValue({
+      getByIdAndUsuario: jest.fn().mockResolvedValue({
         _id: 'h1',
         falha: { codigo: 'motor_timeout' },
       }),
     };
     const svc = new HistoricoService(repository as any);
 
-    const r: any = await svc.getById('h1');
+    const r: any = await svc.getById('h1', 'u1');
 
     expect(r.falha.acaoSugerida).toBe('reprocessar');
   });

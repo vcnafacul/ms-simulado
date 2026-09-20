@@ -31,8 +31,17 @@ export class HistoricoService {
     };
   }
 
-  async getById(id: string) {
-    const historico = await this.repository.getById(id);
+  /**
+   * ⚠️ `usuario` obrigatório: esta rota serve o estudante vendo o PRÓPRIO
+   * histórico. Sem ele, qualquer usuário autenticado lia o de qualquer outro
+   * pelo id — respostas marcadas, gabarito e aproveitamento por matéria.
+   *
+   * ⚠️ E a recusa é `null` (que vira 404 na ponta), não um erro de autorização:
+   * `findOne` sem resultado já é indistinguível de "não existe", e um 403
+   * confirmaria a existência do histórico alheio a quem perguntou.
+   */
+  async getById(id: string, usuario: string) {
+    const historico = await this.repository.getByIdAndUsuario(id, usuario);
     if (!historico) return historico;
     const obj: any = toPlain(historico);
     if (obj.simulado && Array.isArray(obj.simulado.questoes)) {
