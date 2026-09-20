@@ -1172,15 +1172,201 @@ export function rotuloDoResultado(r: ResultadoDaQuestao): {
 }
 ```
 
-O corpo: quando `status === 'failed'`, mostra `falha.descricao` em vez da tabela. Quando é `awaiting_omr`/`pending`/`processing`, uma frase dizendo que está processando. Caso contrário, a tabela.
+E o componente:
 
-⚠️ **Busca só quando `isOpen`** — o modal é renderizado pela tela do relatório, e buscar sempre seria uma chamada por linha.
+```tsx
+const VAZIO = "—";
+
+const colunas: DashColumn<RespostaDoEstudante>[] = [
+  {
+    id: "numero",
+    header: "Questão",
+    width: "6rem",
+    primary: true,
+    // Questão sem número já vem no fim, ordenada pelo ms.
+    cell: (r) => r.numero ?? VAZIO,
+  },
+  {
+    id: "marcada",
+    header: "Marcou",
+    width: "6rem",
+    align: "center",
+    cell: (r) => r.alternativaEstudante ?? VAZIO,
+  },
+  {
+    id: "correta",
+    header: "Correta",
+    width: "6rem",
+    align: "center",
+    cell: (r) => r.alternativaCorreta ?? VAZIO,
+  },
+  {
+    id: "resultado",
+    header: "Resultado",
+    width: "9rem",
+    cell: (r) => {
+      const { texto, tone } = rotuloDoResultado(r.resultado);
+      return <StatusBadge tone={tone} label={texto} />;
+    },
+  },
+];
+
+export interface EstudanteDoDetalhe {
+  usuario: string;
+  nome: string;
+  matricula: string;
+}
+
+export function DetalheDoEstudante({
+  token,
+  simuladoId,
+  estudante,
+  isOpen,
+  onClose,
+}: {
+  token: string;
+  simuladoId: string;
+  estudante: EstudanteDoDetalhe;
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const [detalhe, setDetalhe] = useState<Detalhe | null>(null);
+  const [estado, setEstado] = useState<"idle" | "loading" | "error">("loading");
+
+  const carregar = useCallback(() => {
+    // ⚠️ Só com o modal aberto. Ele é renderizado pela tela do relatório junto
+    // da linha; buscar sempre seria uma chamada por linha da tabela.
+    if (!isOpen) return;
+    setEstado("loading");
+    buscarDetalheDoEstudante(token, simuladoId, estudante.usuario)
+      .then((d) => {
+        setDetalhe(d);
+        setEstado("idle");
+      })
+      .catch(() => setEstado("error"));
+  }, [isOpen, token, simuladoId, estudante.usuario]);
+
+  useEffect(carregar, [carregar]);
+
+  const processando =
+    detalhe?.status === "awaiting_omr" ||
+    detalhe?.status === "pending" ||
+    detalhe?.status === "processing";
+
+  return (
+    <ModalTemplate isOpen={isOpen} handleClose={onClose}>
+      <div className="flex flex-col gap-4 p-4">
+        <header>
+          <h2 className={cn("text-lg font-semibold", dashV2.text.primary)}>
+            {estudante.nome}
+          </h2>
+          <p className={cn("text-xs", dashV2.text.muted)}>
+            {estudante.matricula}
+          </p>
+        </header>
+
+        {estado === "error" && (
+          <div className="flex flex-col items-start gap-2">
+            <p className={cn("text-sm", dashV2.text.secondary)}>
+              Erro ao carregar o detalhe.
+            </p>
+            <button type="button" onClick={carregar} className="text-sm underline">
+              Tentar novamente
+            </button>
+          </div>
+        )}
+
+        {/*
+          ⚠️ Cartão falho mostra o MOTIVO, não uma tabela vazia. É a única
+          informação acionável da tela neste caso — diz o que fazer com a folha.
+        */}
+        {estado === "idle" && detalhe?.status === "failed" && (
+          <p className={cn("text-sm", dashV2.text.secondary)}>
+            {detalhe.falha?.descricao ?? "A leitura deste cartão falhou."}
+          </p>
+        )}
+
+        {estado === "idle" && processando && (
+          <p className={cn("text-sm", dashV2.text.secondary)}>
+            A leitura deste cartão ainda está processando. Volte em alguns
+            minutos.
+          </p>
+        )}
+
+        {estado !== "error" && !processando && detalhe?.status !== "failed" && (
+          <DashTable<RespostaDoEstudante>
+            rows={detalhe?.respostas ?? []}
+            columns={colunas}
+            rowKey={(r) => r.questaoId}
+            state={estado}
+            onRetry={carregar}
+            stickyHeader
+          />
+        )}
+      </div>
+    </ModalTemplate>
+  );
+}
+```
+
+⚠️ **Confira a prop real do `ModalTemplate`** — pode ser `handleClose` ou `onClose`, e pode exigir mais. Use o que o arquivo tem; o `editDisponibilidadeModal.tsx` é o exemplo vivo.
+
+⚠️ **Não passe `onSortChange`**: a ordem é a do ms (por número), e deixar o professor reordenar por "resultado" numa prova não acrescenta nada que ele não veja de relance.
 
 - [ ] **Step 4: Ligar na tela do relatório**
 
-Em `src/pages/relatorioSimulado/index.tsx`, acrescente estado para a linha selecionada, passe `onRowClick` ao `DashTable` de estudantes, e renderize o modal.
+Em `src/pages/relatorioSimulado/index.tsx`:
 
-⚠️ **Só abre para quem enviou cartão.** Linha com `enviouCartao: false` não tem o que detalhar, e a rota devolveria 404 — não faça o clique abrir um modal que só sabe dar erro.
+```tsx
+  const [aberto, setAberto] = useState<LinhaDoRelatorio | null>(null);
+```
+
+No `DashTable` de estudantes, acrescente:
+
+```tsx
+              // ⚠️ Só abre para quem ENVIOU. Linha sem cartão não tem o que
+              // detalhar, e a rota devolveria 404 — um clique que só sabe dar
+              // erro é pior que um clique que não faz nada.
+              onRowClick={(l) => l.enviouCartao && setAberto(l)}
+```
+
+E, ao lado do `Tabs`:
+
+```tsx
+        {aberto && simuladoId && (
+          <DetalheDoEstudante
+            token={data.token}
+            simuladoId={simuladoId}
+            estudante={{
+              usuario: aberto.usuario,
+              nome: aberto.nome,
+              matricula: aberto.matricula,
+            }}
+            isOpen
+            onClose={() => setAberto(null)}
+          />
+        )}
+```
+
+⚠️ **`print:hidden` não é necessário aqui** — o modal fechado não existe no DOM, e imprimir com ele aberto é escolha de quem imprime.
+
+**Teste na própria tela** (`index.test.tsx`), aditivo:
+
+```tsx
+  it("⚠️ clicar numa linha de quem NÃO enviou não abre nada", async () => {
+    buscarRelatorio.mockResolvedValue({
+      linhas: [{ ...RESPOSTA.linhas[0], enviouCartao: false, status: undefined }],
+      resumo: RESPOSTA.resumo,
+    });
+    montar();
+
+    fireEvent.click(await screen.findByText("Ana Silva"));
+
+    expect(buscarDetalheDoEstudante).not.toHaveBeenCalled();
+  });
+```
+
+⚠️ Você precisará mockar `buscarDetalheDoEstudante` nesse arquivo também.
 
 - [ ] **Step 5: Rodar e confirmar que passa**
 
