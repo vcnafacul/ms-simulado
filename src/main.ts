@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SwaggerModule } from '@nestjs/swagger';
+import { VALIDATION_PIPE_OPTIONS } from './config/validation-pipe.config';
 import { document } from './config/swagger.config';
 import { ValidationPipe } from '@nestjs/common';
 import { useContainer } from 'class-validator';
@@ -30,15 +31,12 @@ async function bootstrap() {
    */
   app.use(json({ limit: '30mb' }));
   app.use(urlencoded({ limit: '30mb', extended: true }));
-  app.useGlobalPipes(
-    new ValidationPipe({
-      transform: true,
-      whitelist: true,
-      forbidNonWhitelisted: false,
-    }),
-  );
+  // ⚠️ UM pipe global, e só um. Havia um `new ValidationPipe()` sem opções
+  // registrado logo abaixo deste: `useGlobalPipes` acumula, então os dois
+  // rodavam por requisição. O que depende desta configuração está no docblock
+  // de `VALIDATION_PIPE_OPTIONS`.
+  app.useGlobalPipes(new ValidationPipe(VALIDATION_PIPE_OPTIONS));
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
-  app.useGlobalPipes(new ValidationPipe());
   SwaggerModule.setup('api', app, document(app));
   const port = process.env.MS_PORT ?? process.env.PORT ?? 3000;
   await app.listen(port);
