@@ -646,5 +646,41 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
         respondentes: 3,
       });
     });
+
+    it('GET :simuladoId/estudante/:usuario responde 200 com as respostas', async () => {
+      const res = await request(app.getHttpServer())
+        .get(
+          `/v1/relatorio-simulado/${SIM_HTTP.toString()}/estudante/u-http-falha`,
+        )
+        .query({ cursinhoId: 'cur-http' })
+        .expect(200);
+
+      expect(res.body.status).toBe('failed');
+      expect(res.body.falha).toEqual(
+        expect.objectContaining({ descricao: expect.any(String) }),
+      );
+    });
+
+    it('⚠️ estudante de outro cursinho dá 404, não 200 com vazio', async () => {
+      const res = await request(app.getHttpServer())
+        .get(
+          `/v1/relatorio-simulado/${SIM_HTTP.toString()}/estudante/u-http-falha`,
+        )
+        .query({ cursinhoId: 'cur-alheio' })
+        .expect(404);
+
+      // ⚠️ a mensagem, não só o código: o 404 de rota inexistente do Nest
+      // ('Cannot GET /v1/…') também é 404, e deixaria este teste verde por
+      // vacuidade — sem a rota montada, e sem gate nenhum.
+      expect(res.body.message).toContain('não tem cartão neste simulado');
+    });
+
+    it('sem cursinhoId recusa com 400', async () => {
+      await request(app.getHttpServer())
+        .get(
+          `/v1/relatorio-simulado/${SIM_HTTP.toString()}/estudante/u-http-falha`,
+        )
+        .expect(400);
+    });
   });
 });
