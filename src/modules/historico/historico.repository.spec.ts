@@ -181,3 +181,56 @@ describe('HistoricoRepository.reabrirParaOmr', () => {
     expect(update.$unset).toHaveProperty('falha');
   });
 });
+
+describe('HistoricoRepository.findAwaitingOmrAntigos (card 13)', () => {
+  const CORTE = new Date('2026-09-20T10:00:00Z');
+
+  const montar = () => {
+    const exec = jest.fn().mockResolvedValue([]);
+    const find = jest.fn().mockReturnValue({ exec });
+    const repo = new HistoricoRepository({ find } as any);
+    return { repo, find };
+  };
+
+  it('filtra por status awaiting_omr', async () => {
+    const { repo, find } = montar();
+    await repo.findAwaitingOmrAntigos(CORTE);
+    expect(find.mock.calls[0][0]).toMatchObject({ status: 'awaiting_omr' });
+  });
+
+  it('⚠️ o primeiro ramo usa ultimaTentativaEm — respeita o reprocesso', async () => {
+    // Cartao criado ha 3 dias mas REENVIADO ha 1 minuto esta esperando ha 1
+    // minuto, nao ha 3 dias. Sem este ramo a varredura mataria toda tentativa
+    // de reprocessamento de um cartao antigo, no instante seguinte ao clique.
+    const { repo, find } = montar();
+    await repo.findAwaitingOmrAntigos(CORTE);
+
+    const filtro = find.mock.calls[0][0];
+    expect(filtro.$or[0]).toEqual({ ultimaTentativaEm: { $lt: CORTE } });
+  });
+
+  it('⚠️ o segundo ramo usa o _id para quem nao tem ultimaTentativaEm', async () => {
+    // `createAwaitingOmr` NAO grava `ultimaTentativaEm` — so o `reabrirParaOmr`
+    // grava. Sem este ramo, o cartao de primeira viagem (que e a maioria, e sao
+    // justamente os presos hoje) jamais seria varrido. O ObjectId do Mongo
+    // embute o timestamp de criacao, o que evita migracao.
+    const { repo, find } = montar();
+    await repo.findAwaitingOmrAntigos(CORTE);
+
+    const ramo = find.mock.calls[0][0].$or[1];
+    expect(ramo.ultimaTentativaEm).toEqual({ $exists: false });
+    expect(ramo._id.$lt).toBeDefined();
+    // o ObjectId de corte tem de representar o MESMO instante
+    expect(ramo._id.$lt.getTimestamp().getTime()).toBe(CORTE.getTime());
+  });
+
+  it('devolve o que o find retornou', async () => {
+    const exec = jest.fn().mockResolvedValue([{ _id: 'h1' }]);
+    const find = jest.fn().mockReturnValue({ exec });
+    const repo = new HistoricoRepository({ find } as any);
+
+    const r = await repo.findAwaitingOmrAntigos(CORTE);
+
+    expect(r).toEqual([{ _id: 'h1' }]);
+  });
+});

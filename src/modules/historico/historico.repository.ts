@@ -270,6 +270,42 @@ export class HistoricoRepository extends BaseRepository<Historico> {
   }
 
   /**
+   * Históricos parados em `awaiting_omr` desde antes de `corte`.
+   *
+   * ⚠️ **O `$or` não é enfeite — cada ramo cobre um caso que o outro não
+   * alcança**, e isto vem de dois fatos medidos:
+   *
+   * 1. Este schema é `@Schema({ timestamps: false })`: **não há `createdAt`**.
+   * 2. `createAwaitingOmr` não grava `ultimaTentativaEm`; só o
+   *    `reabrirParaOmr` (card 09) grava.
+   *
+   * O primeiro ramo respeita o reprocesso: um cartão criado há três dias mas
+   * reenviado há um minuto está esperando há um minuto, e não pode ser varrido.
+   *
+   * O segundo alcança quem nunca foi reprocessado — a maioria, e justamente os
+   * que já estão presos hoje — pelo timestamp que o ObjectId do Mongo embute.
+   * **Sem migração**, que é o ponto: são esses documentos que motivaram o card.
+   */
+  async findAwaitingOmrAntigos(corte: Date): Promise<Historico[]> {
+    return this.model
+      .find({
+        status: HistoricoStatus.AwaitingOmr,
+        $or: [
+          { ultimaTentativaEm: { $lt: corte } },
+          {
+            ultimaTentativaEm: { $exists: false },
+            _id: {
+              $lt: Types.ObjectId.createFromTime(
+                Math.floor(corte.getTime() / 1000),
+              ),
+            },
+          },
+        ],
+      })
+      .exec();
+  }
+
+  /**
    * Marca o histórico como falho E registra o motivo numa ÚNICA escrita.
    *
    * A atomicidade não é detalhe: o card 09 precisa da operação inversa (voltar o
