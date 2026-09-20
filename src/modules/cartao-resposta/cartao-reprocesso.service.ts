@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { HistoricoStatus } from '../historico/enums/historico-status.enum';
 import { CodigoFalhaInterno } from '../historico/falha/codigo-falha';
 import { HistoricoRepository } from '../historico/historico.repository';
@@ -77,14 +78,24 @@ export class CartaoReprocessoService {
       this.recusarSeOutroCartao(historico, params);
     }
 
+    // ⚠️ **Token NOVO a cada reprocesso, gravado antes do POST.** É o coração
+    // do card 14: aqui a `imageKey` é reusada de propósito (a foto não mudou),
+    // então ela não distingue a tentativa 2 da tentativa 1 — e o `arq` do
+    // ms-omr reentrega a tentativa 1 até três vezes. Sem trocar o token, o
+    // callback velho chegaria depois e devolveria o histórico a `failed` com o
+    // motivo antigo, desfazendo em silêncio este pedido.
+    const tentativaId = randomUUID();
+
     await this.historicoRepository.reabrirParaOmr(params.historicoId, {
       ...(params.imageKey !== undefined ? { imageKey: params.imageKey } : {}),
       quando: params.agora,
+      tentativaId,
     });
 
     try {
       await this.omrHttp.enviarProcessamento(
         params.imageKey ?? historico.imageKey,
+        tentativaId,
       );
     } catch (err) {
       // ⚠️ Sem isto o histórico fica em `awaiting_omr` para sempre e some do

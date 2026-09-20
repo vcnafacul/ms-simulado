@@ -188,3 +188,174 @@ describe('CartaoCallbackService', () => {
     );
   });
 });
+
+describe('guarda por tentativaId (card 14)', () => {
+  const RESPOSTAS = [{ questao: '1', alternativaEstudante: 'A' }];
+
+  // historico com o token corrente `token`; `over` deixa cada teste acrescentar
+  // campos (status/falha) sem repetir o dublê inteiro.
+  const comToken = (token?: string | undefined, over: any = {}) =>
+    setup({
+      historicoRepository: {
+        findByImageKey: jest.fn().mockResolvedValue({
+          _id: 'h1',
+          simulado: { _id: 's1' },
+          ...(token !== undefined ? { tentativaId: token } : {}),
+          ...over,
+        }),
+      },
+    });
+
+  it('token que bate: aplica normalmente', async () => {
+    const { svc, historicoRepository, queueProducer } = comToken('T1');
+
+    await svc.processar({
+      imageKey: 'k',
+      tentativaId: 'T1',
+      respostas: RESPOSTAS,
+    });
+
+    expect(historicoRepository.prepararParaProcessamento).toHaveBeenCalledWith(
+      'h1',
+      [{ questao: 'idq1', alternativaEstudante: 'A' }],
+    );
+    expect(queueProducer.publish).toHaveBeenCalled();
+  });
+
+  it('⚠️ token que NAO bate: descarta e nao escreve NADA', async () => {
+    // reentrega do arq da tentativa 1 depois do reprocesso ter cunhado T2
+    const { svc, historicoRepository, queueProducer } = comToken('T2');
+
+    await svc.processar({
+      imageKey: 'k',
+      tentativaId: 'T1',
+      falha: { motivo: 'cartao_nao_detectado' },
+    });
+
+    expect(historicoRepository.marcarFalha).not.toHaveBeenCalled();
+    expect(
+      historicoRepository.prepararParaProcessamento,
+    ).not.toHaveBeenCalled();
+    expect(queueProducer.publish).not.toHaveBeenCalled();
+  });
+
+  it('⚠️ token que NAO bate tambem descarta um callback de SUCESSO', async () => {
+    // a reentrega pode chegar com respostas, e gravá-las sobrescreveria a
+    // leitura da tentativa corrente
+    const { svc, historicoRepository, queueProducer } = comToken('T2');
+
+    await svc.processar({
+      imageKey: 'k',
+      tentativaId: 'T1',
+      respostas: RESPOSTAS,
+    });
+
+    expect(
+      historicoRepository.prepararParaProcessamento,
+    ).not.toHaveBeenCalled();
+    expect(queueProducer.publish).not.toHaveBeenCalled();
+  });
+
+  it('⚠️ callback SEM token: aplica, com log', async () => {
+    // ms-omr ainda velho, ou job enfileirado antes do deploy. Recusar aqui
+    // prenderia TODO cartao do periodo em awaiting_omr.
+    const { svc, historicoRepository, queueProducer } = comToken('T1');
+
+    await svc.processar({ imageKey: 'k', respostas: RESPOSTAS });
+
+    expect(historicoRepository.prepararParaProcessamento).toHaveBeenCalled();
+    expect(queueProducer.publish).toHaveBeenCalled();
+  });
+
+  it('⚠️ callback com token NULL: aplica — e o que o ms-omr novo manda sem token', async () => {
+    // O `callback.py` do ms-omr poe `"tentativaId": None` no payload quando o
+    // job nao tem token (job serializado antes do deploy). Em JSON isso chega
+    // como `null`, e `null !== undefined` — tratar null como "token presente"
+    // descartaria justamente o callback que o card promete aceitar.
+    const { svc, historicoRepository, queueProducer } = comToken('T1');
+
+    await svc.processar({
+      imageKey: 'k',
+      tentativaId: null as any,
+      respostas: RESPOSTAS,
+    });
+
+    expect(historicoRepository.prepararParaProcessamento).toHaveBeenCalled();
+    expect(queueProducer.publish).toHaveBeenCalled();
+  });
+
+  it('⚠️ historico SEM token: aplica, com log', async () => {
+    // documento criado antes deste card
+    const { svc, historicoRepository, queueProducer } = comToken(undefined);
+
+    await svc.processar({
+      imageKey: 'k',
+      tentativaId: 'T1',
+      respostas: RESPOSTAS,
+    });
+
+    expect(historicoRepository.prepararParaProcessamento).toHaveBeenCalled();
+    expect(queueProducer.publish).toHaveBeenCalled();
+  });
+
+  it('⚠️ O CENARIO DO CARD, ponta a ponta', async () => {
+    // 1. tentativa 1 falha: o callback T1 marca failed
+    const primeira = comToken('T1');
+    await primeira.svc.processar({
+      imageKey: 'k',
+      tentativaId: 'T1',
+      falha: { motivo: 'cartao_nao_detectado', detalhe: 'sem markers' },
+    });
+    expect(primeira.historicoRepository.marcarFalha).toHaveBeenCalledWith(
+      'h1',
+      'cartao_nao_detectado',
+      'sem markers',
+    );
+
+    // 2. o coordenador reprocessa: o historico volta a awaiting_omr com T2 e a
+    //    MESMA imageKey (a foto nao mudou — e' por isso que a chave nao
+    //    distingue as tentativas)
+    const depois = comToken('T2', { status: 'awaiting_omr' });
+
+    // 3. o arq reentrega a tentativa 1 e o callback VELHO chega
+    await depois.svc.processar({
+      imageKey: 'k',
+      tentativaId: 'T1',
+      falha: { motivo: 'cartao_nao_detectado', detalhe: 'sem markers' },
+    });
+
+    // → o historico NAO pode voltar a failed com o motivo velho
+    expect(depois.historicoRepository.marcarFalha).not.toHaveBeenCalled();
+    expect(
+      depois.historicoRepository.prepararParaProcessamento,
+    ).not.toHaveBeenCalled();
+    expect(depois.queueProducer.publish).not.toHaveBeenCalled();
+  });
+
+  it('⚠️ O CENARIO DO CARD 13: a rede de seguranca sobrevive', async () => {
+    // A varredura do card 13 marca `failed`/`leitura_nao_retornou` SEM acionar
+    // o OMR — logo NAO troca o tentativaId, que continua T1. O callback
+    // legitimo de T1 chega depois (o ms-omr so demorou mais que a janela de 1h)
+    // e precisa ser APLICADO, desfazendo o falso positivo.
+    //
+    // ⚠️ E' por isso que a guarda e' por TOKEN e nao por STATUS: uma guarda de
+    // status recusaria exatamente este callback ("ja esta failed, ignore") e o
+    // cartao ficaria errado para sempre.
+    const { svc, historicoRepository, queueProducer } = comToken('T1', {
+      status: 'failed',
+      falha: { motivo: 'leitura_nao_retornou' },
+    });
+
+    await svc.processar({
+      imageKey: 'k',
+      tentativaId: 'T1',
+      respostas: RESPOSTAS,
+    });
+
+    expect(historicoRepository.prepararParaProcessamento).toHaveBeenCalledWith(
+      'h1',
+      [{ questao: 'idq1', alternativaEstudante: 'A' }],
+    );
+    expect(queueProducer.publish).toHaveBeenCalled();
+  });
+});

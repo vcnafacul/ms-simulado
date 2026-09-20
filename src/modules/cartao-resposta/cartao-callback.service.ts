@@ -13,6 +13,9 @@ interface CartaoCallbackInput {
   imageKey: string;
   respostas?: { questao: string; alternativaEstudante: string }[];
   falha?: { motivo: string; detalhe?: string };
+  /** ⚠️ `null` é um valor REAL aqui: o ms-omr manda `"tentativaId": null`
+   * quando o job não tem token. Ver a guarda em `processar`. */
+  tentativaId?: string | null;
 }
 
 @Injectable()
@@ -38,6 +41,47 @@ export class CartaoCallbackService {
     const histId = (
       historico as unknown as { _id: { toString(): string } }
     )._id.toString();
+
+    // ⚠️ `?? undefined` normaliza `null` para ausente nas DUAS pontas, e não é
+    // detalhe de estilo: o `callback.py` do ms-omr põe `"tentativaId": None` no
+    // payload quando o job não tem token (job serializado antes do deploy), o
+    // que chega aqui como `null`. Como `null !== undefined`, sem a
+    // normalização esse callback seria lido como "tem token, e é diferente" e
+    // DESCARTADO — exatamente o cartão preso em `awaiting_omr` que este card
+    // promete evitar.
+    const tokenDoHistorico =
+      (historico as { tentativaId?: string }).tentativaId ?? undefined;
+    const tokenDoCallback = input.tentativaId ?? undefined;
+
+    // ⚠️ A guarda é por TOKEN, e não por status — e essa escolha é o que
+    // preserva a varredura do card 13. Ela marca `failed` sem acionar o OMR,
+    // logo NÃO muda o `tentativaId`: o callback legítimo que chegue depois
+    // ainda bate e é aplicado, desfazendo o falso positivo. Uma guarda de
+    // status recusaria exatamente esse callback, e o cartão ficaria errado
+    // para sempre.
+    if (
+      tokenDoHistorico !== undefined &&
+      tokenDoCallback !== undefined &&
+      tokenDoCallback !== tokenDoHistorico
+    ) {
+      this.logger.warn(
+        `callback de tentativa antiga descartado para ${input.imageKey}: ` +
+          `recebido ${tokenDoCallback}, corrente ${tokenDoHistorico}`,
+      );
+      return;
+    }
+
+    // ⚠️ Token ausente de um lado ou do outro NÃO descarta, e isto é o que faz
+    // o deploy sobreviver: ms-omr ainda velho, job enfileirado antes da
+    // mudança, ou histórico criado antes deste card. O log é o sinal de quando
+    // a transição terminou — quando ele parar de aparecer, o token pode virar
+    // obrigatório.
+    if (tokenDoHistorico === undefined || tokenDoCallback === undefined) {
+      this.logger.log(
+        `callback sem token para ${input.imageKey} ` +
+          `(histórico: ${tokenDoHistorico ?? 'ausente'}, callback: ${tokenDoCallback ?? 'ausente'}) — aceito`,
+      );
+    }
 
     if (input.falha) {
       // o código vem cru do ms-omr de propósito: validar contra uma lista fechada

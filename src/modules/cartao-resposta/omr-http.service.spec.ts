@@ -27,3 +27,25 @@ it('≠2xx levanta', async () => {
     new OmrHttpService(env).enviarProcessamento('k'),
   ).rejects.toThrow();
 });
+
+it('⚠️ manda o tentativaId no corpo', async () => {
+  // Sem isto o token nunca sai daqui, o ms-omr devolve `null`, e a guarda do
+  // callback aceita tudo — o card inteiro vira no-op silencioso.
+  const fetchMock = jest.fn().mockResolvedValue({ ok: true, status: 202 });
+  (global as any).fetch = fetchMock;
+
+  await new OmrHttpService(env).enviarProcessamento('cartoes/1/a.jpg', 'T1');
+
+  const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+  expect(body).toEqual({ imageKey: 'cartoes/1/a.jpg', tentativaId: 'T1' });
+});
+
+it('sem token, o corpo continua o de antes (ms-omr aceita)', async () => {
+  const fetchMock = jest.fn().mockResolvedValue({ ok: true, status: 202 });
+  (global as any).fetch = fetchMock;
+
+  await new OmrHttpService(env).enviarProcessamento('cartoes/1/a.jpg');
+
+  const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+  expect(body).toEqual({ imageKey: 'cartoes/1/a.jpg' });
+});

@@ -35,7 +35,10 @@ it('happy: cria e chama o omr', async () => {
   expect(repo.createAwaitingOmr).toHaveBeenCalledWith(
     expect.objectContaining({ simuladoId: '665f0c1a2b3c4d5e6f00abc1' }),
   );
-  expect(omr.enviarProcessamento).toHaveBeenCalledWith(DTO.imageKey);
+  expect(omr.enviarProcessamento).toHaveBeenCalledWith(
+    DTO.imageKey,
+    expect.any(String),
+  );
 });
 
 it('dedup: 409 e não cria', async () => {
@@ -158,4 +161,43 @@ it('falha ao criar a linha NÃO derruba o upload, mas vai para o log com o histo
   expect(omrHttp.enviarProcessamento).toHaveBeenCalled();
   expect(error).toHaveBeenCalledWith(expect.stringContaining('h1'));
   error.mockRestore();
+});
+
+describe('tentativaId (card 14)', () => {
+  it('⚠️ cunha um token NOVO e o grava ANTES de acionar o OMR', async () => {
+    // A ordem importa: se o token fosse gravado depois do POST, um callback
+    // rapido chegaria antes da escrita e seria descartado por nao bater com
+    // nada.
+    const { svc, repo, omr } = setup();
+
+    await svc.criar(DTO);
+
+    const tentativaId = repo.createAwaitingOmr.mock.calls[0][0].tentativaId;
+    expect(typeof tentativaId).toBe('string');
+    expect(tentativaId.length).toBeGreaterThan(0);
+
+    // o MESMO token que foi gravado e' o que viaja ao ms-omr
+    expect(omr.enviarProcessamento).toHaveBeenCalledWith(
+      DTO.imageKey,
+      tentativaId,
+    );
+
+    // e a escrita aconteceu ANTES do POST
+    expect(repo.createAwaitingOmr.mock.invocationCallOrder[0]).toBeLessThan(
+      omr.enviarProcessamento.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('⚠️ dois acionamentos produzem tokens DIFERENTES', async () => {
+    // um token fixo nao distingue tentativa nenhuma — a guarda do callback
+    // voltaria a aceitar a reentrega velha.
+    const a = setup();
+    await a.svc.criar(DTO);
+    const b = setup();
+    await b.svc.criar(DTO);
+
+    expect(a.repo.createAwaitingOmr.mock.calls[0][0].tentativaId).not.toBe(
+      b.repo.createAwaitingOmr.mock.calls[0][0].tentativaId,
+    );
+  });
 });

@@ -255,12 +255,14 @@ export class HistoricoRepository extends BaseRepository<Historico> {
     simuladoId: string;
     imageKey: string;
     cartaoCode: string;
+    tentativaId: string;
   }): Promise<Historico> {
     return this.model.create({
       usuario: data.usuario,
       simulado: new Types.ObjectId(data.simuladoId),
       imageKey: data.imageKey,
       cartaoCode: data.cartaoCode,
+      tentativaId: data.tentativaId,
       status: HistoricoStatus.AwaitingOmr,
     });
   }
@@ -339,11 +341,12 @@ export class HistoricoRepository extends BaseRepository<Historico> {
    */
   async reabrirParaOmr(
     id: string,
-    dados: { imageKey?: string; quando: Date },
+    dados: { imageKey?: string; quando: Date; tentativaId: string },
   ): Promise<void> {
     const set: Record<string, unknown> = {
       status: HistoricoStatus.AwaitingOmr,
       ultimaTentativaEm: dados.quando,
+      tentativaId: dados.tentativaId,
     };
     if (dados.imageKey !== undefined) {
       set.imageKey = dados.imageKey;

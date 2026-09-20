@@ -64,9 +64,11 @@ describe('CartaoReprocessoService', () => {
     expect(historicoRepository.reabrirParaOmr).toHaveBeenCalledWith('h1', {
       imageKey: 'cartoes/665f0c1a2b3c4d5e6f00abc2/nova.jpg',
       quando: AGORA,
+      tentativaId: expect.any(String),
     });
     expect(omrHttp.enviarProcessamento).toHaveBeenCalledWith(
       'cartoes/665f0c1a2b3c4d5e6f00abc2/nova.jpg',
+      expect.any(String),
     );
   });
 
@@ -152,10 +154,12 @@ describe('CartaoReprocessoService', () => {
 
     expect(historicoRepository.reabrirParaOmr).toHaveBeenCalledWith('h1', {
       quando: AGORA,
+      tentativaId: expect.any(String),
     });
     // e o OMR é acionado com a chave que já estava lá
     expect(omrHttp.enviarProcessamento).toHaveBeenCalledWith(
       'cartoes/665f0c1a2b3c4d5e6f00abc2/velha.jpg',
+      expect.any(String),
     );
   });
 
@@ -203,6 +207,46 @@ describe('CartaoReprocessoService', () => {
       'h1',
       'omr_indisponivel',
       expect.any(String),
+    );
+  });
+});
+
+describe('tentativaId no reprocesso (card 14)', () => {
+  it('⚠️ cunha um token NOVO e o grava ANTES de acionar o OMR', async () => {
+    // A ordem importa: se o token fosse gravado depois do POST, um callback
+    // rapido chegaria antes da escrita e seria descartado por nao bater com
+    // nada.
+    const { svc, historicoRepository, omrHttp } = montar();
+
+    await svc.reprocessar(pedido());
+
+    const tentativaId =
+      historicoRepository.reabrirParaOmr.mock.calls[0][1].tentativaId;
+    expect(typeof tentativaId).toBe('string');
+    expect(tentativaId.length).toBeGreaterThan(0);
+
+    expect(omrHttp.enviarProcessamento).toHaveBeenCalledWith(
+      'cartoes/665f0c1a2b3c4d5e6f00abc2/nova.jpg',
+      tentativaId,
+    );
+
+    expect(
+      historicoRepository.reabrirParaOmr.mock.invocationCallOrder[0],
+    ).toBeLessThan(omrHttp.enviarProcessamento.mock.invocationCallOrder[0]);
+  });
+
+  it('⚠️ dois reprocessos produzem tokens DIFERENTES', async () => {
+    // ESTE e' o caso do card: a `imageKey` e' reusada de proposito no
+    // `reprocessar`, entao so o token distingue a tentativa 2 da tentativa 1.
+    const a = montar();
+    await a.svc.reprocessar(pedido());
+    const b = montar();
+    await b.svc.reprocessar(pedido());
+
+    expect(
+      a.historicoRepository.reabrirParaOmr.mock.calls[0][1].tentativaId,
+    ).not.toBe(
+      b.historicoRepository.reabrirParaOmr.mock.calls[0][1].tentativaId,
     );
   });
 });

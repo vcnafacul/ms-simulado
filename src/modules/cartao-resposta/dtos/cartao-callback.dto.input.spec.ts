@@ -49,4 +49,22 @@ describe('CartaoCallbackDtoInput', () => {
       validar({ imageKey: 'k', falha: { detalhe: 'só detalhe' } }).length,
     ).toBeGreaterThan(0);
   });
+
+  it('aceita o tentativaId (card 14)', () => {
+    expect(
+      validar({ imageKey: 'k', respostas: [], tentativaId: 'T1' }),
+    ).toHaveLength(0);
+  });
+
+  it('⚠️ aceita tentativaId null — e o que o ms-omr manda quando o job nao tem token', () => {
+    // Recusar aqui faria o ValidationPipe devolver 400 e o ms-omr desistir
+    // depois de tres tentativas: o cartao ficaria preso em awaiting_omr.
+    expect(
+      validar({ imageKey: 'k', respostas: [], tentativaId: null }),
+    ).toHaveLength(0);
+  });
+
+  it('⚠️ aceita callback SEM tentativaId — ms-omr ainda nao implantado', () => {
+    expect(validar({ imageKey: 'k', respostas: [] })).toHaveLength(0);
+  });
 });
