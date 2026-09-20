@@ -320,6 +320,27 @@ export class RelatorioSimuladoEstudanteRepository {
   }
 
   /**
+   * A linha da junção de um histórico, dentro de um cursinho.
+   *
+   * ⚠️ **O filtro é o gate**: `cursinhoId` no próprio `findOne` já não encontra
+   * histórico de outro cursinho, sem checagem separada que alguém possa
+   * esquecer. Mas isso vale para o FILTRO — o valor tem que vir do JWT, no
+   * corpo da requisição, nunca de um segmento de caminho.
+   */
+  async buscarPorHistorico(
+    historicoId: string,
+    cursinhoId: string,
+  ): Promise<RelatorioSimuladoEstudante | null> {
+    return this.model
+      .findOne({
+        historico: new Types.ObjectId(historicoId),
+        cursinhoId,
+      })
+      .lean()
+      .exec() as unknown as Promise<RelatorioSimuladoEstudante | null>;
+  }
+
+  /**
    * O detalhe de UM estudante no recorte.
    *
    * ⚠️ **O filtro é o gate.** O índice único desta coleção é

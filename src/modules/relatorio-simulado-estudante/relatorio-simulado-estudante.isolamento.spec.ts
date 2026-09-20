@@ -751,6 +751,48 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
     });
   });
 
+  describe('buscarPorHistorico (Mongo real)', () => {
+    const SIM_R = new Types.ObjectId();
+    let histId: string;
+
+    beforeAll(async () => {
+      const h = await histModel.create({
+        usuario: 'u-rep',
+        simulado: SIM_R,
+        status: 'failed',
+        falha: { codigo: 'cartao_nao_detectado' },
+      });
+      histId = h._id.toString();
+      await relModel.create({
+        historico: h._id,
+        simulado: SIM_R,
+        usuario: 'u-rep',
+        cursinhoId: 'cur-rep',
+      });
+    }, 120_000);
+
+    it('acha a linha pelo histórico, dentro do cursinho', async () => {
+      const r = await repo.buscarPorHistorico(histId, 'cur-rep');
+
+      expect(r!.usuario).toBe('u-rep');
+    });
+
+    it('⚠️ histórico de OUTRO cursinho não é encontrado — o filtro é o gate', async () => {
+      const r = await repo.buscarPorHistorico(histId, 'cur-alheio');
+
+      expect(r).toBeNull();
+    });
+
+    it('histórico que não existe devolve null', async () => {
+      const r = await repo.buscarPorHistorico(
+        new Types.ObjectId().toString(),
+        'cur-rep',
+      );
+
+      expect(r).toBeNull();
+    });
+  });
+
   /**
    * Fix 4 da revisão adversarial: o spec do controller usa um dublê do
    * serviço, e os specs acima falam com o repositório direto. Nada até aqui

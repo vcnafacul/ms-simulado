@@ -10,6 +10,7 @@ import { TemplateProvisionService } from './template-provision.service';
 import { OmrHttpService } from './omr-http.service';
 import { CartaoHistoricoService } from './cartao-historico.service';
 import { CartaoCallbackService } from './cartao-callback.service';
+import { CartaoReprocessoService } from './cartao-reprocesso.service';
 import { CartaoRespostaController } from './cartao-resposta.controller';
 
 @Module({
@@ -28,6 +29,7 @@ import { CartaoRespostaController } from './cartao-resposta.controller';
     OmrHttpService,
     CartaoHistoricoService,
     CartaoCallbackService,
+    CartaoReprocessoService,
   ],
   exports: [CartaoRespostaService],
 })
