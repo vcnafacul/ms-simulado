@@ -13,7 +13,9 @@ export enum AcaoSugerida {
 }
 
 /**
- * Códigos que ESTE serviço produz.
+ * Códigos que ESTE serviço produz — os que ele **observa** numa falha sua e,
+ * desde o card 13, um que ele **infere do silêncio** (`LeituraNaoRetornou`,
+ * sintetizado pela varredura quando nenhum callback chegou).
  *
  * Os outros oito chegam do ms-omr e NÃO são enumerados aqui de propósito: validar
  * contra uma lista fechada faria todo código novo daquele repo exigir deploy
