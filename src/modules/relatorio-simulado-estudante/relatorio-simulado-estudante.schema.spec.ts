@@ -34,6 +34,17 @@ describe('RelatorioSimuladoEstudante schema', () => {
     expect(chaves).toContain(JSON.stringify({ simulado: 1, turmaId: 1 }));
   });
 
+  it('indexa o recorte SEM simulado no prefixo — é o da lista de simulados', () => {
+    // A consulta do card 04b agrupa POR simulado, filtrando só por `cursinhoId`
+    // (e talvez `turmaId`). Os dois índices acima começam por `simulado`, e
+    // prefixo de índice composto não serve a quem não filtra o prefixo: seria
+    // varredura de coleção — invisível numa coleção nova e pequena, cara
+    // depois.
+    const chaves = indices().map((i) => JSON.stringify(i.campos));
+
+    expect(chaves).toContain(JSON.stringify({ cursinhoId: 1, turmaId: 1 }));
+  });
+
   it('único em simulado+cursinhoId+usuario — um estudante, uma linha', () => {
     // O grão do relatório é o estudante, não a tentativa: reenviar depois de uma
     // falha cria um Historico novo, e sem esta chave nasceria uma segunda linha.

@@ -11,12 +11,34 @@ import { ConsultarRelatorioDtoInput } from './dtos/consultar-relatorio.dto.input
 import { DetalheDoEstudanteDtoOutput } from './dtos/detalhe-do-estudante.dto.output';
 import { QuestoesDoRelatorioDtoOutput } from './dtos/questoes-do-relatorio.dto.output';
 import { RelatorioSimuladoDtoOutput } from './dtos/relatorio-simulado.dto.output';
+import { SimuladosComCartaoDtoOutput } from './dtos/simulados-com-cartao.dto.output';
 import { RelatorioSimuladoEstudanteService } from './relatorio-simulado-estudante.service';
 
 @ApiTags('Relatório de Simulado')
 @Controller('v1/relatorio-simulado')
 export class RelatorioSimuladoEstudanteController {
   constructor(private readonly service: RelatorioSimuladoEstudanteService) {}
+
+  /**
+   * ⚠️ **PRIMEIRA rota da classe, e isso não é estilo.** `simulados` tem a
+   * mesma contagem de segmentos que `:simuladoId`; declarada depois, o param
+   * a captura, `Types.ObjectId.isValid('simulados')` recusa, e a rota
+   * responde 400. Nenhum teste de unidade pega — só um que suba o app.
+   */
+  @Get('simulados')
+  @ApiResponse({
+    status: 200,
+    description: 'simulados com cartão no recorte do cursinho (ou da turma)',
+    type: SimuladosComCartaoDtoOutput,
+  })
+  async listarSimulados(
+    @Query() query: ConsultarRelatorioDtoInput,
+  ): Promise<SimuladosComCartaoDtoOutput> {
+    return this.service.listarSimulados({
+      cursinhoId: query.cursinhoId,
+      turmaId: query.turmaId,
+    });
+  }
 
   @Get(':simuladoId/questoes')
   @ApiResponse({

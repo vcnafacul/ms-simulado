@@ -76,6 +76,27 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
     }));
   }
 
+  /**
+   * Só `(id, nome)`. O `getById` popula categoria, frentes e matéria — carga
+   * enorme para ler um nome, que é tudo que a lista de simulados com cartão
+   * (card 04b) precisa.
+   *
+   * ⚠️ NÃO filtra `deleted`, ao contrário de `countByCategoria` e
+   * `countsByCategoria` neste mesmo arquivo. É deliberado: um simulado
+   * arquivado que tem cartão precisa continuar aparecendo com nome.
+   */
+  async getNomesPorIds(ids: string[]): Promise<{ id: string; nome: string }[]> {
+    if (ids.length === 0) return [];
+    const docs = await this.model
+      .find(
+        { _id: { $in: ids.map((i) => new Types.ObjectId(i)) } },
+        { nome: 1 },
+      )
+      .lean()
+      .exec();
+    return docs.map((d: any) => ({ id: d._id.toString(), nome: d.nome }));
+  }
+
   override async delete(id: string) {
     const existingRecord = await this.model.updateOne(
       { _id: id },

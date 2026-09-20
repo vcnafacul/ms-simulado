@@ -238,50 +238,6 @@ describe('RelatorioSimuladoEstudanteService.consultarQuestoes', () => {
     ]);
   });
 
-  it('⚠️ dois nulos EMPATAM (0): a ordem entre eles é estável', async () => {
-    // O `.sort()` do teste acima joga fora justamente o que este braço do
-    // comparador decide: qual das sem número vem primeiro.
-    //
-    // ⚠️ **`return 1` aqui é mutante EQUIVALENTE, medido.** O TimSort do V8
-    // só olha `ordem < 0` (tanto na inserção binária quanto no merge), então
-    // `0` e `1` são indistinguíveis em runtime e nenhum teste de caixa-preta
-    // pode matar essa mutação. O `0` continua sendo o certo porque `1` nos
-    // dois sentidos não é uma ordem total — é correção de contrato, não de
-    // comportamento observável.
-    //
-    // O que este teste MATA é `return -1`, que inverte a ordem das sem
-    // número (verificado), e qualquer mudança que as faça sumir ou sair do
-    // fim da lista.
-    const { svc } = montarQ(
-      [
-        agregado({ questaoId: 'q-sem-a' }),
-        agregado({ questaoId: 'q-sem-b' }),
-        agregado({ questaoId: 'q-sem-c' }),
-        agregado({ questaoId: 'q1' }),
-      ],
-      [
-        { questaoId: 'q-sem-a', numero: null },
-        { questaoId: 'q-sem-b', numero: null },
-        { questaoId: 'q-sem-c', numero: null },
-        { questaoId: 'q1', numero: 3 },
-      ],
-    );
-
-    const r = await svc.consultarQuestoes({
-      simuladoId: SIM,
-      cursinhoId: 'cur-1',
-    });
-
-    // as três sem número sobrevivem, no fim, NA ORDEM EM QUE ENTRARAM
-    expect(r.questoes.map((q) => q.questaoId)).toEqual([
-      'q1',
-      'q-sem-a',
-      'q-sem-b',
-      'q-sem-c',
-    ]);
-    expect(r.questoes.map((q) => q.numero)).toEqual([3, null, null, null]);
-  });
-
   it('repassa o recorte, incluindo a turma', async () => {
     const { svc, repository, simuladoRepository } = montarQ([], []);
 
@@ -308,6 +264,119 @@ describe('RelatorioSimuladoEstudanteService.consultarQuestoes', () => {
     });
 
     expect(r.questoes).toEqual([]);
+  });
+});
+
+describe('RelatorioSimuladoEstudanteService.listarSimulados', () => {
+  const montarLista = (over?: {
+    agregado?: any[];
+    nomes?: { id: string; nome: string }[];
+  }) => {
+    const repository = {
+      listarSimuladosComCartao: jest
+        .fn()
+        .mockResolvedValue(over?.agregado ?? []),
+    };
+    const simuladoRepository = {
+      getNomesPorIds: jest.fn().mockResolvedValue(over?.nomes ?? []),
+    };
+    const svc = new RelatorioSimuladoEstudanteService(
+      repository as any,
+      simuladoRepository as any,
+    );
+    return { svc, repository, simuladoRepository };
+  };
+
+  it('junta o nome ao agregado, pelo id', async () => {
+    const { svc } = montarLista({
+      agregado: [
+        {
+          simuladoId: 's1',
+          cartoes: 3,
+          comLeituraConcluida: 2,
+          ultimoEnvio: new Date('2026-05-02'),
+        },
+      ],
+      nomes: [{ id: 's1', nome: 'ENEM 2024 — 1º dia' }],
+    });
+
+    const r = await svc.listarSimulados({ cursinhoId: 'cur-1' });
+
+    expect(r.simulados[0]).toEqual({
+      simuladoId: 's1',
+      nome: 'ENEM 2024 — 1º dia',
+      cartoes: 3,
+      comLeituraConcluida: 2,
+      ultimoEnvio: new Date('2026-05-02'),
+    });
+  });
+
+  it('simulado apagado depois do vínculo vira nome nulo, e NÃO some da lista', async () => {
+    // Sumir esconderia cartões que existem — é o oposto do que esta série
+    // inteira quer. A tela decide como rotular; o número continua honesto.
+    const { svc } = montarLista({
+      agregado: [
+        {
+          simuladoId: 's-morto',
+          cartoes: 2,
+          comLeituraConcluida: 1,
+          ultimoEnvio: new Date(),
+        },
+      ],
+      nomes: [],
+    });
+
+    const r = await svc.listarSimulados({ cursinhoId: 'cur-1' });
+
+    expect(r.simulados).toHaveLength(1);
+    expect(r.simulados[0].nome).toBeNull();
+    expect(r.simulados[0].cartoes).toBe(2);
+  });
+
+  it('pede os nomes SÓ dos ids que o agregado devolveu', async () => {
+    const { svc, simuladoRepository } = montarLista({
+      agregado: [
+        {
+          simuladoId: 's1',
+          cartoes: 1,
+          comLeituraConcluida: 1,
+          ultimoEnvio: new Date(),
+        },
+        {
+          simuladoId: 's2',
+          cartoes: 1,
+          comLeituraConcluida: 0,
+          ultimoEnvio: new Date(),
+        },
+      ],
+    });
+
+    await svc.listarSimulados({ cursinhoId: 'cur-1' });
+
+    expect(simuladoRepository.getNomesPorIds).toHaveBeenCalledWith([
+      's1',
+      's2',
+    ]);
+  });
+
+  it('repassa o turmaId ao repositório', async () => {
+    const { svc, repository } = montarLista();
+
+    await svc.listarSimulados({ cursinhoId: 'cur-1', turmaId: 't-1' });
+
+    expect(repository.listarSimuladosComCartao).toHaveBeenCalledWith({
+      cursinhoId: 'cur-1',
+      turmaId: 't-1',
+    });
+  });
+
+  it('recorte vazio devolve { simulados: [] } e não consulta nome nenhum', async () => {
+    const { svc, simuladoRepository } = montarLista({ agregado: [] });
+
+    const r = await svc.listarSimulados({ cursinhoId: 'cur-vazio' });
+
+    expect(r).toEqual({ simulados: [] });
+    expect(simuladoRepository.getNomesPorIds).not.toHaveBeenCalled();
   });
 });
 

@@ -14,6 +14,7 @@ import {
   QuestaoDoRelatorioDtoOutput,
   QuestoesDoRelatorioDtoOutput,
 } from './dtos/questoes-do-relatorio.dto.output';
+import { SimuladosComCartaoDtoOutput } from './dtos/simulados-com-cartao.dto.output';
 import {
   LinhaComHistorico,
   RelatorioSimuladoEstudanteRepository,
@@ -216,6 +217,33 @@ export class RelatorioSimuladoEstudanteService {
           ? descreverFalha(h.falha)
           : undefined,
       respostas,
+    };
+  }
+
+  async listarSimulados(params: {
+    cursinhoId: string;
+    turmaId?: string;
+  }): Promise<SimuladosComCartaoDtoOutput> {
+    const agregado = await this.repository.listarSimuladosComCartao(params);
+    if (agregado.length === 0) return { simulados: [] };
+
+    const nomes = await this.simuladoRepository.getNomesPorIds(
+      agregado.map((a) => a.simuladoId),
+    );
+    const nomePorId = new Map(nomes.map((n) => [n.id, n.nome]));
+
+    // A ordem vem do repositório (ultimoEnvio desc) e é preservada: o `map`
+    // não reordena, e não há `sort` aqui de propósito.
+    return {
+      simulados: agregado.map((a) => ({
+        simuladoId: a.simuladoId,
+        // `?? null`: simulado apagado depois do vínculo não some da lista —
+        // os cartões existem e escondê-los é pior que rotulá-los.
+        nome: nomePorId.get(a.simuladoId) ?? null,
+        cartoes: a.cartoes,
+        comLeituraConcluida: a.comLeituraConcluida,
+        ultimoEnvio: a.ultimoEnvio,
+      })),
     };
   }
 }
