@@ -123,11 +123,12 @@ afirma o que ninguém verificou — e é o número que o professor usa para deci
 
 ## Riscos
 
-⚠️ **Duplicata de questão no simulado dobra a linha.** O `processAnswer` mapeia `simulado.questoes`
-uma linha por entrada, e a corrida do `adicionarEmProva` (bug registrado da Etapa 11) pode ter deixado
-a mesma questão duas vezes. Aqui o sintoma é visível — a questão aparece duas vezes na tabela — em vez
-de silencioso como no agregado do `03`. **Não compensar aqui:** a decisão da série foi consertar a
-causa, não carregar a complexidade em toda consulta. Vale um comentário registrando.
+**Duplicata de questão: não é preocupação aqui.** A corrida do `adicionarEmProva` (bug da Etapa 11)
+pode em tese deixar a mesma questão duas vezes num simulado, e aí ela apareceria duas vezes nesta
+tabela. **Risco tratado como desprezível, por decisão:** criar simulado passa por validação e
+diagramação, com gente trabalhando sobre a prova pronta — uma questão repetida seria vista antes de o
+simulado existir. Não é zero, mas as validações humanas o deixam baixo o bastante para não pagarmos
+complexidade em toda consulta. Nada a compensar na tela; a causa se conserta no card da Etapa 11.
 
 ⚠️ **Questão sem número não some da lista** — vai para o fim, como no `03`. Sumir seria pior que
 aparecer fora de ordem: o professor não saberia que ela existe.
