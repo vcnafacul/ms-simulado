@@ -145,6 +145,16 @@ divergiu.
 Sem essa checagem, as respostas de um aluno entram no histórico de outro — e o relatório fica
 convincentemente errado.
 
+⚠️ **A comparação mora no ms, não na api** — é lá que o histórico está, e pedir os valores esperados
+antes só para comparar na api seria uma ida a mais para chegar à mesma conclusão. A api decodifica o
+QR e manda `simuladoId` e `cartaoCode` junto; o ms confere contra o documento.
+
+⚠️ **O preço, assumido: uma imagem órfã no bucket quando o QR diverge.** A api grava o bucket antes de
+chamar o ms, então uma recusa deixa o arquivo lá. O `CartaoUploadService` tem um comentário dizendo
+que resolve o vínculo *"ANTES de tocar no bucket"* justamente para não criar órfãs — aqui não dá, sem
+uma ida extra ou uma escrita em duas fases, e as duas custam mais do que uma imagem perdida quando um
+humano escolhe o arquivo errado. **Logar quando acontecer**, para não virar crescimento silencioso.
+
 #### ⚠️ E um limite de tamanho, que hoje não existe
 
 O `FileInterceptor('file')` da rota de upload **não passa `limits`**, e o `json({ limit: '30mb' })`
@@ -172,6 +182,10 @@ instâncias.
 
 **No modal de detalhe do estudante** (`DetalheDoEstudante`, do card `07`). Ele já abre pela linha do
 relatório, já renderiza a descrição da falha, e tem espaço para o seletor e para o aviso de espera.
+
+⚠️ **Ele não recebe o `historicoId` hoje** — as props são `{token, simuladoId, estudante, isOpen,
+onClose}`, e o id vive na linha do relatório (`LinhaDoRelatorio.historicoId`). Passar adiante é
+trabalho deste card.
 
 ⚠️ **Não na coluna Motivo.** Ela é **deliberadamente** uma string crua: o `DashTable` só pendura
 `title` em texto, e embrulhar num elemento perde o tooltip e trunca o motivo em ~245px. A decisão está
