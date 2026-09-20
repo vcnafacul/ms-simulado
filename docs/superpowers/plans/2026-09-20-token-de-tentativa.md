@@ -71,27 +71,53 @@ async def test_sem_tentativa_id_o_campo_vai_nulo(monkeypatch):
     assert body["tentativaId"] is None
 ```
 
-Para o router, rode antes `ls tests/` e veja qual arquivo testa `/omr/process`. Acrescente lá:
+Em `tests/test_omr_router.py` (existe, e usa `TestClient(app)` com `app.state.arq_pool = FakePool()`
+— **não** fixtures `client`/`fake_pool`):
+
+⚠️ **PRIMEIRO conserte o dublê, senão os testes que hoje passam quebram.** O `FakePool` do arquivo
+declara `async def enqueue_job(self, func, image_key)` — **dois** parâmetros. Quando `enfileirar`
+passar o token, essa assinatura estoura com `TypeError`, e o `_isolar_worker_e_pool` é `autouse`:
+o estrago aparece em testes que nada têm a ver com este card.
 
 ```python
-async def test_process_aceita_tentativa_id(client, fake_pool):
-    # ajuste os nomes das fixtures ao que o arquivo ja usa
-    r = await client.post(
-        "/omr/process", json={"imageKey": "cartoes/1/a.jpg", "tentativaId": "T1"}
-    )
-    assert r.status_code == 202
-    assert fake_pool.jobs[-1] == ("process_cartao", "cartoes/1/a.jpg", "T1")
+class FakePool:
+    def __init__(self):
+        self.jobs = []
 
-
-async def test_process_sem_tentativa_id_continua_aceito(client, fake_pool):
-    # ⚠️ Compatibilidade: o ms-simulado velho nao manda o campo.
-    r = await client.post("/omr/process", json={"imageKey": "cartoes/1/a.jpg"})
-    assert r.status_code == 202
+    # ⚠️ `tentativa_id=None` com default: o enfileirar passa 3 argumentos agora,
+    # e o default mantem legivel qualquer chamada antiga que sobre no arquivo.
+    async def enqueue_job(self, func, image_key, tentativa_id=None):
+        self.jobs.append((func, image_key, tentativa_id))
+        return object()
 ```
 
-⚠️ **Se as fixtures do arquivo tiverem outros nomes ou forma**, adapte ao que já existe — não invente
-fixture nova. Se não houver teste de router, crie `tests/test_omr_router.py` seguindo o estilo de
-`tests/test_callback.py` (dublê simples, `monkeypatch`). **Diga no relatório o que encontrou.**
+⚠️ **Isso muda a forma das tuplas em `self.jobs`** — os testes existentes que asseram
+`jobs[-1] == ("process_cartao", "...")` passam a precisar do terceiro item. Rode a suíte e ajuste os
+que quebrarem: é mudança de dublê, não de comportamento.
+
+Depois acrescente:
+
+```python
+def test_process_aceita_tentativa_id():
+    app.state.arq_pool = FakePool()
+    with TestClient(app) as c:
+        r = c.post(
+            "/omr/process",
+            json={"imageKey": "cartoes/665/a.jpg", "tentativaId": "T1"},
+        )
+    assert r.status_code == 202
+    assert app.state.arq_pool.jobs[-1] == ("process_cartao", "cartoes/665/a.jpg", "T1")
+
+
+def test_process_sem_tentativa_id_continua_aceito():
+    # ⚠️ Compatibilidade: o ms-simulado velho nao manda o campo, e recusar aqui
+    # prenderia todo cartao do periodo em `awaiting_omr`.
+    app.state.arq_pool = FakePool()
+    with TestClient(app) as c:
+        r = c.post("/omr/process", json={"imageKey": "cartoes/665/a.jpg"})
+    assert r.status_code == 202
+    assert app.state.arq_pool.jobs[-1][2] is None
+```
 
 - [ ] **Step 2: Rodar e ver falhar**
 
@@ -606,29 +632,14 @@ git commit -m "fix: callback de tentativa antiga nao sobrescreve a corrente"
 
 ---
 
-## Task 6 [ms-simulado]: o controller repassa o campo
+## Task 6 [ms-simulado]: o controller — JÁ VERIFICADO, nada a fazer
 
-**Files:** `src/modules/cartao-resposta/cartao-resposta.controller.ts` e seu `.spec.ts`
+✅ **Medido antes de escrever este plano:** `cartao-resposta.controller.ts:51` faz
+`await this.cartaoCallback.processar(dto)` — repassa o **DTO inteiro**. O campo novo chega ao serviço
+sozinho assim que entra no DTO (Task 5).
 
-- [ ] **Step 1: Verificar se é preciso**
-
-Rode: `grep -n -A12 'callback' src/modules/cartao-resposta/cartao-resposta.controller.ts`
-
-**Se o controller repassa o DTO inteiro** (ex.: `this.service.processar(dto)`), **não há o que
-fazer** — pule para a Task 7 e diga isso no relatório.
-
-**Se ele monta o objeto campo a campo**, acrescente `tentativaId: dto.tentativaId` e um teste no
-`.spec.ts` provando que o campo chega ao serviço. Sem isso o token morre no controller e o card vira
-no-op.
-
-- [ ] **Step 2: Commit, se houve mudança**
-
-```bash
-git add src/modules/cartao-resposta/cartao-resposta.controller.ts src/modules/cartao-resposta/cartao-resposta.controller.spec.ts
-git commit -m "feat: o controller repassa o tentativaId ao servico"
-```
-
----
+**Não há nada a implementar aqui.** A task existe para registrar que a verificação foi feita: se o
+controller montasse o objeto campo a campo, o token morreria nele e o card viraria no-op silencioso.
 
 ## Task 7: verificação dos dois repos
 
