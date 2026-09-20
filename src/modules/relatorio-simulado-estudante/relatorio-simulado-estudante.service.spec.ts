@@ -409,15 +409,25 @@ describe('RelatorioSimuladoEstudanteService.consultarDetalhe', () => {
   });
 
   it('histórico falho devolve a falha DESCRITA e nenhuma resposta', async () => {
+    // as respostas do fixture são as da tentativa ANTERIOR (que completou):
+    // com `respostas: []` o `toHaveLength(0)` passaria para qualquer
+    // implementação, e o teste não diria nada.
     const { svc } = montarDetalhe({
       linha: {
         usuario: 'u1',
         historico: {
           status: 'failed',
-          respostas: [],
+          respostas: [
+            {
+              questao: 'q1',
+              alternativaEstudante: 'A',
+              alternativaCorreta: 'A',
+            },
+          ],
           falha: { codigo: 'cartao_nao_detectado' },
         },
       },
+      numeros: [{ questaoId: 'q1', numero: 1 }],
     });
 
     const r = await svc.consultarDetalhe({
@@ -488,4 +498,53 @@ describe('RelatorioSimuladoEstudanteService.consultarDetalhe', () => {
     expect(r.status).toBe('awaiting_omr');
     expect(r.respostas).toEqual([]);
   });
+
+  it('⚠️ cartão que falhou NÃO devolve as respostas da tentativa anterior', async () => {
+    // `completeProcessing` é o único escritor de `respostas`; `marcarFalha` e
+    // `prepararParaProcessamento` não as limpam. Um cartão que completou,
+    // reprocessou e falhou carrega as respostas velhas — devolvê-las diz que
+    // a leitura atual produziu o que ela não produziu.
+    const { svc } = montarDetalhe({
+      linha: comRespostas(
+        [{ questao: 'q1', alternativaEstudante: 'A', alternativaCorreta: 'A' }],
+        { status: 'failed', falha: { codigo: 'cartao_nao_detectado' } },
+      ),
+      numeros: [{ questaoId: 'q1', numero: 1 }],
+    });
+
+    const r = await svc.consultarDetalhe({
+      simuladoId: SIM,
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    expect(r.respostas).toHaveLength(0);
+  });
+
+  it.each([['pending'], ['processing'], ['awaiting_omr']])(
+    '⚠️ status %s também não devolve respostas',
+    async (status) => {
+      const { svc } = montarDetalhe({
+        linha: comRespostas(
+          [
+            {
+              questao: 'q1',
+              alternativaEstudante: 'A',
+              alternativaCorreta: 'A',
+            },
+          ],
+          { status },
+        ),
+        numeros: [{ questaoId: 'q1', numero: 1 }],
+      });
+
+      const r = await svc.consultarDetalhe({
+        simuladoId: SIM,
+        cursinhoId: 'cur-1',
+        usuario: 'u1',
+      });
+
+      expect(r.respostas).toHaveLength(0);
+    },
+  );
 });
