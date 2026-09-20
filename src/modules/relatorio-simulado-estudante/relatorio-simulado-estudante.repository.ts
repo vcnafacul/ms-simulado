@@ -46,6 +46,37 @@ export interface SimuladoComCartao {
   ultimoEnvio: Date | null;
 }
 
+/**
+ * Monta o filtro de recorte comum às três consultas do relatório.
+ *
+ * ⚠️ **`usuarios` tem precedência sobre `turmaId`**, e não é preferência de
+ * estilo: o `turmaId` da junção é uma FOTO do momento do upload e nunca é
+ * atualizado (ver card 18). Quem manda a lista de usuários está mandando a
+ * turma ATUAL, resolvida no MySQL — essa é a verdade, e a outra é cache velho.
+ *
+ * ⚠️ `{ turmaId: undefined }` serializa para `{ turmaId: null }` e casaria só
+ * quem NÃO tem turma. A chave precisa estar AUSENTE. Lição do card 02, e vale
+ * igual para `usuarios`.
+ */
+function filtroDoRecorte(params: {
+  cursinhoId: string;
+  turmaId?: string;
+  usuarios?: string[];
+}): Record<string, unknown> {
+  const filtro: Record<string, unknown> = { cursinhoId: params.cursinhoId };
+
+  if (params.usuarios !== undefined) {
+    filtro.usuario = { $in: params.usuarios };
+    return filtro;
+  }
+
+  if (params.turmaId !== undefined) {
+    filtro.turmaId = params.turmaId;
+  }
+
+  return filtro;
+}
+
 @Injectable()
 export class RelatorioSimuladoEstudanteRepository {
   constructor(
@@ -92,16 +123,12 @@ export class RelatorioSimuladoEstudanteRepository {
     simuladoId: string;
     cursinhoId: string;
     turmaId?: string;
+    usuarios?: string[];
   }): Promise<LinhaComHistorico[]> {
-    const filtro: Record<string, unknown> = {
+    const filtro = {
+      ...filtroDoRecorte(params),
       simulado: new Types.ObjectId(params.simuladoId),
-      cursinhoId: params.cursinhoId,
     };
-    // `{ turmaId: undefined }` vira `{ turmaId: null }` e casa SÓ quem não tem
-    // turma — a visão do cursinho inteiro perderia todo mundo COM turma.
-    if (params.turmaId !== undefined) {
-      filtro.turmaId = params.turmaId;
-    }
 
     return this.model
       .find(filtro)
@@ -152,15 +179,12 @@ export class RelatorioSimuladoEstudanteRepository {
     simuladoId: string;
     cursinhoId: string;
     turmaId?: string;
+    usuarios?: string[];
   }): Promise<AgregadoDaQuestao[]> {
-    const match: Record<string, unknown> = {
+    const match = {
+      ...filtroDoRecorte(params),
       simulado: new Types.ObjectId(params.simuladoId),
-      cursinhoId: params.cursinhoId,
     };
-    // mesma armadilha do card 02: `{turmaId: undefined}` vira `{turmaId: null}`
-    if (params.turmaId !== undefined) {
-      match.turmaId = params.turmaId;
-    }
 
     const marcada = { $ifNull: ['$h.respostas.alternativaEstudante', null] };
     const porAlternativa = Object.fromEntries(
@@ -271,13 +295,9 @@ export class RelatorioSimuladoEstudanteRepository {
   async listarSimuladosComCartao(params: {
     cursinhoId: string;
     turmaId?: string;
+    usuarios?: string[];
   }): Promise<SimuladoComCartao[]> {
-    // `{turmaId: undefined}` serializa para `{turmaId: null}` e casaria só
-    // quem NÃO tem turma — a chave precisa estar ausente. Lição do card 02.
-    const match: Record<string, unknown> = { cursinhoId: params.cursinhoId };
-    if (params.turmaId !== undefined) {
-      match.turmaId = params.turmaId;
-    }
+    const match = filtroDoRecorte(params);
 
     const linhas = await this.model
       .aggregate([

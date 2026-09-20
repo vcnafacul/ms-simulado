@@ -33,6 +33,8 @@ export class RelatorioSimuladoEstudanteService {
     simuladoId: string;
     cursinhoId: string;
     turmaId?: string;
+    /** A turma ATUAL, quando o chamador a resolve. Ver card 18. */
+    usuarios?: string[];
   }): Promise<RelatorioSimuladoDtoOutput> {
     const [linhas, total] = await Promise.all([
       this.repository.buscarPorRecorte(params),
@@ -92,6 +94,7 @@ export class RelatorioSimuladoEstudanteService {
     simuladoId: string;
     cursinhoId: string;
     turmaId?: string;
+    usuarios?: string[];
   }): Promise<QuestoesDoRelatorioDtoOutput> {
     const [agregados, numeros] = await Promise.all([
       this.repository.agregarPorQuestao(params),
@@ -223,6 +226,7 @@ export class RelatorioSimuladoEstudanteService {
   async listarSimulados(params: {
     cursinhoId: string;
     turmaId?: string;
+    usuarios?: string[];
   }): Promise<SimuladosComCartaoDtoOutput> {
     const agregado = await this.repository.listarSimuladosComCartao(params);
     if (agregado.length === 0) return { simulados: [] };
