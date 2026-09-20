@@ -1,10 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { HistoricoStatus } from '../historico/enums/historico-status.enum';
 import { descreverFalha } from '../historico/falha/mapa-falha';
 import { SimuladoRepository } from '../simulado/simulado.repository';
 import {
   LinhaRelatorioDtoOutput,
   RelatorioSimuladoDtoOutput,
 } from './dtos/relatorio-simulado.dto.output';
+import {
+  DetalheDoEstudanteDtoOutput,
+  ResultadoDaQuestao,
+} from './dtos/detalhe-do-estudante.dto.output';
 import {
   QuestaoDoRelatorioDtoOutput,
   QuestoesDoRelatorioDtoOutput,
@@ -119,6 +124,100 @@ export class RelatorioSimuladoEstudanteService {
     });
 
     return { questoes };
+  }
+
+  /**
+   * O que UM estudante marcou, questão a questão, já classificado.
+   *
+   * ⚠️ Quem classifica é o ms, não a tela: a regra de "sem leitura" é a
+   * AUSÊNCIA da chave `alternativaEstudante`, sutil o bastante para duas
+   * implementações dela divergirem. Mesmo motivo pelo qual o card 01 derivou a
+   * descrição da falha no servidor.
+   *
+   * ⚠️ `falha` E `respostas` são o mesmo tipo de campo VELHO, e por isso os
+   * dois são filtrados pelo `status`: cada um tem um único escritor
+   * (`marcarFalha` e `completeProcessing`) e ninguém nunca os desfaz —
+   * `marcarFalha` e `prepararParaProcessamento` não tocam nas `respostas`,
+   * `completeProcessing` não toca na `falha`. Um cartão que completou,
+   * reprocessou e falhou carrega as duas coisas da rodada anterior. O
+   * `agregarPorQuestao` já filtra `Completed` pelo mesmo motivo; aqui o filtro
+   * é campo a campo porque o estado atual (`status`) é justamente o que a tela
+   * precisa ver.
+   */
+  async consultarDetalhe(params: {
+    simuladoId: string;
+    cursinhoId: string;
+    usuario: string;
+  }): Promise<DetalheDoEstudanteDtoOutput> {
+    const linha = await this.repository.buscarDetalheDoEstudante(params);
+
+    // ⚠️ 404, não lista vazia: a tela pediu UM estudante. Vazio diria "ele não
+    // respondeu nada", que é outra coisa. E a linha órfã (histórico apagado
+    // depois do vínculo) cai aqui pelo mesmo motivo.
+    if (!linha?.historico) {
+      throw new NotFoundException(
+        `estudante ${params.usuario} não tem cartão neste simulado`,
+      );
+    }
+
+    const h = linha.historico;
+    const numeros = await this.simuladoRepository.getNumerosDasQuestoes(
+      params.simuladoId,
+    );
+    const numeroPorQuestao = new Map(
+      numeros.map((n) => [n.questaoId, n.numero]),
+    );
+
+    // ⚠️ Só em `completed`. Em qualquer outro status as `respostas` gravadas
+    // são as da tentativa ANTERIOR (ver o docblock): devolvê-las afirmaria que
+    // a leitura de agora produziu o que ela não produziu. Lista vazia: o join
+    // do `numero` e a ordenação abaixo simplesmente não têm o que fazer.
+    const respostasDaLeituraAtual =
+      h.status === HistoricoStatus.Completed ? h.respostas ?? [] : [];
+
+    const respostas = respostasDaLeituraAtual.map((r: any) => {
+      const questaoId = r.questao?.toString();
+      // ⚠️ AUSÊNCIA da chave. Trocar por `=== null` ou `=== ''` faz a questão
+      // não marcada virar ERRO — e o professor revisa a aula errada.
+      const marcada = r.alternativaEstudante;
+      const resultado =
+        marcada === undefined
+          ? ResultadoDaQuestao.SemLeitura
+          : marcada === r.alternativaCorreta
+            ? ResultadoDaQuestao.Acerto
+            : ResultadoDaQuestao.Erro;
+
+      return {
+        numero: numeroPorQuestao.get(questaoId) ?? null,
+        questaoId,
+        alternativaEstudante: marcada,
+        alternativaCorreta: r.alternativaCorreta,
+        resultado,
+      };
+    });
+
+    // Questão sem número vai para o fim — sumir seria pior que aparecer fora
+    // de ordem. Dois nulos empatam (0): devolver 1 nos dois sentidos não é uma
+    // ordem total. Mesma regra do `consultarQuestoes`.
+    respostas.sort((a, b) => {
+      if (a.numero === null && b.numero === null) return 0;
+      if (a.numero === null) return 1;
+      if (b.numero === null) return -1;
+      return a.numero - b.numero;
+    });
+
+    return {
+      status: h.status,
+      // ⚠️ Só em `failed`: `marcarFalha` é o único escritor de `falha` e nada
+      // nunca a desfaz (o `completeProcessing` não toca nela), então um cartão
+      // reprocessado carrega o motivo antigo. Mesma armadilha que o card 06
+      // fechou na tela — e a mesma que o gate das `respostas` acima fecha.
+      falha:
+        h.status === HistoricoStatus.Failed
+          ? descreverFalha(h.falha)
+          : undefined,
+      respostas,
+    };
   }
 
   async listarSimulados(params: {

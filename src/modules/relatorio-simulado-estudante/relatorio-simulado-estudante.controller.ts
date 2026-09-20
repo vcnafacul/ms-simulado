@@ -8,6 +8,7 @@ import {
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { ConsultarRelatorioDtoInput } from './dtos/consultar-relatorio.dto.input';
+import { DetalheDoEstudanteDtoOutput } from './dtos/detalhe-do-estudante.dto.output';
 import { QuestoesDoRelatorioDtoOutput } from './dtos/questoes-do-relatorio.dto.output';
 import { RelatorioSimuladoDtoOutput } from './dtos/relatorio-simulado.dto.output';
 import { SimuladosComCartaoDtoOutput } from './dtos/simulados-com-cartao.dto.output';
@@ -57,6 +58,35 @@ export class RelatorioSimuladoEstudanteController {
       simuladoId,
       cursinhoId: query.cursinhoId,
       turmaId: query.turmaId,
+    });
+  }
+
+  @Get(':simuladoId/estudante/:usuario')
+  @ApiResponse({
+    status: 200,
+    description: 'o que o estudante marcou e o que era correto',
+    type: DetalheDoEstudanteDtoOutput,
+  })
+  @ApiResponse({
+    status: 404,
+    description:
+      'estudante não tem cartão neste simulado, ou é de outro cursinho',
+  })
+  async consultarDetalhe(
+    @Param('simuladoId') simuladoId: string,
+    @Param('usuario') usuario: string,
+    @Query() query: ConsultarRelatorioDtoInput,
+  ): Promise<DetalheDoEstudanteDtoOutput> {
+    // Sem isto, `new Types.ObjectId(simuladoId)` lança BSONError e vira 500 —
+    // erro do CHAMADOR virando 500 sem pista, como nas rotas vizinhas.
+    if (!Types.ObjectId.isValid(simuladoId)) {
+      throw new BadRequestException(`simuladoId inválido: ${simuladoId}`);
+    }
+
+    return this.service.consultarDetalhe({
+      simuladoId,
+      usuario,
+      cursinhoId: query.cursinhoId,
     });
   }
 
