@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   INestApplication,
   StreamableFile,
   ValidationPipe,
@@ -52,6 +53,25 @@ describe('CartaoRespostaController', () => {
     expect(cartaoHistorico.criar).toHaveBeenCalled();
   });
 
+  it('⚠️ historicoId que não é ObjectId dá 400, não 500', async () => {
+    // Sem a guarda, `new Types.ObjectId(historicoId)` no repositório lança
+    // `BSONError` e a rota responde 500 — erro do CHAMADOR virando falha de um
+    // serviço que o time da api não é dono, sem pista nos logs. O controller
+    // irmão (`relatorio-simulado-estudante`) já guarda isso pelo mesmo motivo.
+    const reprocesso = { reprocessar: jest.fn() };
+    const controller = new CartaoRespostaController(
+      { obterPdf: jest.fn() } as any,
+      { criar: jest.fn() } as any,
+      { processar: jest.fn() } as any,
+      reprocesso as any,
+    );
+
+    await expect(
+      controller.reprocessar('nao-e-objectid', { cursinhoId: 'cur-1' } as any),
+    ).rejects.toThrow(BadRequestException);
+    expect(reprocesso.reprocessar).not.toHaveBeenCalled();
+  });
+
   it('POST callback delega ao CartaoCallbackService e responde ok', async () => {
     const provision = { obterPdf: jest.fn() };
     const cartaoHistorico = { criar: jest.fn() };
@@ -81,7 +101,7 @@ describe('CartaoRespostaController', () => {
       service as any,
     );
 
-    await ctrl.reprocessar('h1', {
+    await ctrl.reprocessar('665f0c1a2b3c4d5e6f00ab09', {
       cursinhoId: 'cur-1',
       imageKey: 'cartoes/abc/nova.jpg',
       simuladoId: 'abc',
@@ -90,7 +110,7 @@ describe('CartaoRespostaController', () => {
 
     expect(service.reprocessar).toHaveBeenCalledWith(
       expect.objectContaining({
-        historicoId: 'h1',
+        historicoId: '665f0c1a2b3c4d5e6f00ab09',
         cursinhoId: 'cur-1',
         imageKey: 'cartoes/abc/nova.jpg',
         cartaoCode: '7',
@@ -139,18 +159,21 @@ describe('CartaoRespostaController — roteamento HTTP', () => {
 
   it('POST :historicoId/reprocessar responde 202 e chega ao serviço', async () => {
     await request(app.getHttpServer())
-      .post('/v1/cartao-resposta/h1/reprocessar')
+      .post('/v1/cartao-resposta/665f0c1a2b3c4d5e6f00ab09/reprocessar')
       .send({ cursinhoId: 'cur-1' })
       .expect(202);
 
     expect(cartaoReprocesso.reprocessar).toHaveBeenCalledWith(
-      expect.objectContaining({ historicoId: 'h1', cursinhoId: 'cur-1' }),
+      expect.objectContaining({
+        historicoId: '665f0c1a2b3c4d5e6f00ab09',
+        cursinhoId: 'cur-1',
+      }),
     );
   });
 
   it('⚠️ sem cursinhoId no corpo é 400 — o gate não tem valor padrão', async () => {
     await request(app.getHttpServer())
-      .post('/v1/cartao-resposta/h1/reprocessar')
+      .post('/v1/cartao-resposta/665f0c1a2b3c4d5e6f00ab09/reprocessar')
       .send({})
       .expect(400);
 

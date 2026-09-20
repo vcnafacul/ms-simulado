@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -9,6 +10,7 @@ import {
   StreamableFile,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Types } from 'mongoose';
 import { CartaoCallbackService } from './cartao-callback.service';
 import { CartaoHistoricoService } from './cartao-historico.service';
 import { CartaoReprocessoService } from './cartao-reprocesso.service';
@@ -63,6 +65,14 @@ export class CartaoRespostaController {
     @Param('historicoId') historicoId: string,
     @Body() dto: ReprocessarCartaoDtoInput,
   ): Promise<{ status: string }> {
+    // ⚠️ Sem isto, `new Types.ObjectId(historicoId)` no repositório lança
+    // `BSONError` e a rota responde **500**: erro do CHAMADOR virando falha de
+    // um serviço que o time da api não é dono, sem pista nos logs. O controller
+    // do relatório guarda o `:simuladoId` pelo mesmo motivo.
+    if (!Types.ObjectId.isValid(historicoId)) {
+      throw new BadRequestException(`historicoId inválido: ${historicoId}`);
+    }
+
     await this.cartaoReprocesso.reprocessar({
       historicoId,
       cursinhoId: dto.cursinhoId,
