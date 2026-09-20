@@ -26,4 +26,14 @@ export enum CodigoFalhaInterno {
   RespostasAusentes = 'respostas_ausentes',
   SimuladoSemQuestoes = 'simulado_sem_questoes',
   ErroNoProcessamento = 'erro_no_processamento',
+  /**
+   * ⚠️ Produzido pela VARREDURA (card 13), não por uma falha observada.
+   *
+   * Significa "o ms-omr aceitou a requisição e o callback nunca chegou". As
+   * duas saídas que produzem isto estão nomeadas em
+   * `ms-omr/app/services/omr_pipeline.py:100-119`: o `job_timeout` do arq
+   * (que chega como `CancelledError`, um `BaseException` não capturável) e o
+   * POST do callback falhando nas três tentativas.
+   */
+  LeituraNaoRetornou = 'leitura_nao_retornou',
 }
