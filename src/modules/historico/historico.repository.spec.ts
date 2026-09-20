@@ -69,6 +69,7 @@ describe('HistoricoRepository.getById (popula simulado.questoes.questao)', () =>
       simuladoId: '665f0c1a2b3c4d5e6f00abc1',
       imageKey: 'cartoes/665abc/i.jpg',
       cartaoCode: '7',
+      tentativaId: 'T1',
     });
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -158,6 +159,7 @@ describe('HistoricoRepository.reabrirParaOmr', () => {
     await repo.reabrirParaOmr('h1', {
       imageKey: 'cartoes/abc/nova.jpg',
       quando: new Date('2026-09-20T10:00:00Z'),
+      tentativaId: 'T2',
     });
 
     expect(findByIdAndUpdate).toHaveBeenCalledTimes(1);
@@ -174,7 +176,7 @@ describe('HistoricoRepository.reabrirParaOmr', () => {
     // é o caminho do `reprocessar`: a foto serve, quem falhou foi a infra
     const { repo, findByIdAndUpdate } = montar();
 
-    await repo.reabrirParaOmr('h1', { quando: new Date() });
+    await repo.reabrirParaOmr('h1', { quando: new Date(), tentativaId: 'T2' });
 
     const [, update] = findByIdAndUpdate.mock.calls[0];
     expect(update.$set).not.toHaveProperty('imageKey');
@@ -232,5 +234,38 @@ describe('HistoricoRepository.findAwaitingOmrAntigos (card 13)', () => {
     const r = await repo.findAwaitingOmrAntigos(CORTE);
 
     expect(r).toEqual([{ _id: 'h1' }]);
+  });
+});
+
+describe('tentativaId (card 14)', () => {
+  it('createAwaitingOmr grava um tentativaId', async () => {
+    const create = jest.fn().mockResolvedValue({ _id: 'h1' });
+    const repo = new HistoricoRepository({ create } as any);
+
+    await repo.createAwaitingOmr({
+      usuario: 'u1',
+      simuladoId: '665f0c1a2b3c4d5e6f00abc1',
+      imageKey: 'cartoes/665abc/i.jpg',
+      cartaoCode: '7',
+      tentativaId: 'T1',
+    });
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ tentativaId: 'T1' }),
+    );
+  });
+
+  it('⚠️ reabrirParaOmr TROCA o tentativaId', async () => {
+    // E' o que faz o callback da tentativa anterior deixar de bater. Sem isto,
+    // o reprocesso continua aceitando o callback velho e o card nao conserta
+    // nada.
+    const exec = jest.fn().mockResolvedValue(undefined);
+    const findByIdAndUpdate = jest.fn().mockReturnValue({ exec });
+    const repo = new HistoricoRepository({ findByIdAndUpdate } as any);
+
+    await repo.reabrirParaOmr('h1', { quando: new Date(), tentativaId: 'T2' });
+
+    const [, update] = findByIdAndUpdate.mock.calls[0];
+    expect(update.$set.tentativaId).toBe('T2');
   });
 });

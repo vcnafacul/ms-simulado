@@ -75,6 +75,21 @@ export class Historico extends BaseSchema {
   @Prop({ required: false })
   @ApiProperty({ required: false })
   public ultimaTentativaEm?: Date;
+
+  /**
+   * Identifica o acionamento do OMR que está em voo.
+   *
+   * ⚠️ Muda a cada acionamento, e é o que permite descartar o callback de uma
+   * tentativa que não é mais a corrente: no caminho `reprocessar` a `imageKey`
+   * é reusada de propósito (a foto não mudou), então ela não distingue as
+   * tentativas — e o `arq` do ms-omr reentrega até três vezes.
+   *
+   * ⚠️ **Opcional.** Histórico criado antes deste card não tem, e o callback
+   * correspondente precisa continuar sendo aceito.
+   */
+  @Prop({ required: false })
+  @ApiProperty({ required: false })
+  public tentativaId?: string;
 }
 
 export const HistoricoSchema = SchemaFactory.createForClass(Historico);
