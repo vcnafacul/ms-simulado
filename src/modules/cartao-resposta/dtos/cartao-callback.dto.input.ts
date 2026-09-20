@@ -50,4 +50,19 @@ export class CartaoCallbackDtoInput {
   @ValidateNested()
   @Type(() => CartaoCallbackFalhaDtoInput)
   falha?: CartaoCallbackFalhaDtoInput;
+
+  /**
+   * ⚠️ **Opcional de propósito.** O ms-omr pode ainda não mandá-lo (deploy em
+   * andamento), e há jobs enfileirados no Redis de antes da mudança. Exigir
+   * aqui faria o `ValidationPipe` recusar o callback inteiro, e todo cartão do
+   * período ficaria preso em `awaiting_omr`.
+   *
+   * ⚠️ E o ms-omr manda `null` — e não a ausência do campo — quando o job não
+   * tem token. `@IsOptional()` também deixa `null` passar; quem trata `null` e
+   * ausente como a mesma coisa é o `CartaoCallbackService`.
+   */
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  tentativaId?: string;
 }
