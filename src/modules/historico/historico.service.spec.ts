@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { HistoricoService } from './historico.service';
 import { AproveitamentoHistorico } from './types/aproveitamento';
 
@@ -84,7 +85,9 @@ describe('HistoricoService.getById (achata simulado.questoes)', () => {
     };
     const svc = new HistoricoService(repository);
 
-    await svc.getById('h1', 'u-dono');
+    await expect(svc.getById('h1', 'u-dono')).rejects.toThrow(
+      NotFoundException,
+    );
 
     expect(repository.getByIdAndUsuario).toHaveBeenCalledWith('h1', 'u-dono');
   });
@@ -117,12 +120,42 @@ describe('HistoricoService.getById (achata simulado.questoes)', () => {
     ]);
   });
 
-  it('retorna null quando não encontra', async () => {
+  it('⚠️ a recusa é 404 LANÇADO, não um `null` devolvido', async () => {
+    // Devolver o nil do repositório não virava 404: o Nest serializa `null`
+    // como 200 com corpo vazio, a api repassava `''`, e o client rebentava
+    // com `SyntaxError: Unexpected end of JSON input` num toast. Um 404 de
+    // verdade é o que mantém o raciocínio "404, não 403" de pé na PONTA, e
+    // não só neste arquivo.
     const repository: any = {
       getByIdAndUsuario: jest.fn().mockResolvedValue(null),
     };
     const service = new HistoricoService(repository);
-    expect(await service.getById('x', 'u1')).toBeNull();
+
+    await expect(service.getById('x', 'u1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('⚠️ "não é seu" e "não existe" dão a MESMA resposta', async () => {
+    // Um 403 num dos casos confirmaria a existência do histórico alheio a
+    // quem perguntou — que é exatamente o que este card fecha.
+    const naoExiste: any = {
+      getByIdAndUsuario: jest.fn().mockResolvedValue(null),
+    };
+    const naoEhSeu: any = {
+      getByIdAndUsuario: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const erroA = await new HistoricoService(naoExiste)
+      .getById('inexistente', 'u1')
+      .catch((e) => e);
+    const erroB = await new HistoricoService(naoEhSeu)
+      .getById('h-alheio', 'u1')
+      .catch((e) => e);
+
+    expect(erroA.getStatus()).toBe(404);
+    expect(erroB.getStatus()).toBe(404);
+    expect(erroA.getResponse()).toEqual(erroB.getResponse());
   });
 });
 

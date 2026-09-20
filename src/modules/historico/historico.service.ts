@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { AggregatePeriodDtoInput } from 'src/shared/dtos/aggregate-period.dto.input';
 import { GetHistoricoDTOInput } from './dtos/get-historico.dto';
 import { GetPerformanceHistories } from './dtos/get-perfomance-histories.dto';
@@ -36,13 +36,22 @@ export class HistoricoService {
    * histórico. Sem ele, qualquer usuário autenticado lia o de qualquer outro
    * pelo id — respostas marcadas, gabarito e aproveitamento por matéria.
    *
-   * ⚠️ E a recusa é `null` (que vira 404 na ponta), não um erro de autorização:
-   * `findOne` sem resultado já é indistinguível de "não existe", e um 403
-   * confirmaria a existência do histórico alheio a quem perguntou.
+   * ⚠️ A recusa é **404**, não 403, e não é economia de código: `findOne` sem
+   * resultado já é indistinguível de "não existe", e um 403 confirmaria a
+   * existência do histórico alheio a quem perguntou. Mesma resposta para
+   * "não é seu" e para "não existe" — é esse o ponto.
+   *
+   * ⚠️ E o 404 é LANÇADO aqui. Devolver o `null` do repositório não virava 404
+   * coisa nenhuma: o Nest serializa `null` como **200 com corpo vazio**, a api
+   * repassava `''`, e o client — que só checa `status !== 200` — chamava
+   * `response.json()` num corpo vazio e mostrava `SyntaxError: Unexpected end
+   * of JSON input` cru num toast. Com o `NotFoundException`, o axios da api
+   * rejeita, o `HttpServiceAxios.handleError` reergue como `HttpException` com
+   * o status da origem, e a negativa chega na ponta como 404 de verdade.
    */
   async getById(id: string, usuario: string) {
     const historico = await this.repository.getByIdAndUsuario(id, usuario);
-    if (!historico) return historico;
+    if (!historico) throw new NotFoundException('historico nao encontrado');
     const obj: any = toPlain(historico);
     if (obj.simulado && Array.isArray(obj.simulado.questoes)) {
       // Achata pro shape antigo do client, preservando o numero do relacionamento
