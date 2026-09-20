@@ -16,6 +16,33 @@ describe('HistoricoRepository.getById (popula simulado.questoes.questao)', () =>
     });
   });
 
+  it('⚠️ getByIdAndUsuario filtra pelo DONO, não só pelo id', async () => {
+    // Sem o `usuario` no filtro, qualquer usuário autenticado lê o histórico
+    // de qualquer outro pelo id: respostas marcadas, gabarito, aproveitamento.
+    const exec = jest.fn().mockResolvedValue({ _id: 'h1' });
+    const populate = jest.fn().mockReturnValue({ exec });
+    const findOne = jest.fn().mockReturnValue({ populate });
+    const repo = new HistoricoRepository({ findOne } as any);
+
+    await repo.getByIdAndUsuario('h1', 'u1');
+
+    expect(findOne).toHaveBeenCalledWith({ _id: 'h1', usuario: 'u1' });
+  });
+
+  it('getByIdAndUsuario popula o simulado igual ao getById', async () => {
+    const exec = jest.fn().mockResolvedValue({ _id: 'h1' });
+    const populate = jest.fn().mockReturnValue({ exec });
+    const findOne = jest.fn().mockReturnValue({ populate });
+    const repo = new HistoricoRepository({ findOne } as any);
+
+    await repo.getByIdAndUsuario('h1', 'u1');
+
+    expect(populate).toHaveBeenCalledWith({
+      path: 'simulado',
+      populate: [{ path: 'questoes.questao' }],
+    });
+  });
+
   it('existsCartaoAtivo consulta status ≠ Failed', async () => {
     const exists = jest.fn().mockResolvedValue({ _id: 'x' });
     const repo = new HistoricoRepository({ exists } as any);

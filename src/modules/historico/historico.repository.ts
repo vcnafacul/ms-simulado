@@ -45,6 +45,30 @@ export class HistoricoRepository extends BaseRepository<Historico> {
     };
   }
 
+  /**
+   * O histórico de UM dono. É o gate de `GET /mssimulado/historico/:id`.
+   *
+   * ⚠️ **Método novo, e não uma assinatura mais larga no `getById`.** Aquele é
+   * um `override` do `BaseRepository` e tem dois chamadores internos
+   * (`simulado.service.ts` e `answer-processor.service.ts`) que leem por id sem
+   * contexto de usuário, legitimamente. Alargá-lo quebraria os dois e brigaria
+   * com a classe base.
+   *
+   * ⚠️ **O filtro é o gate.** `usuario` dentro do `findOne` já não encontra
+   * histórico alheio — não existe checagem separada que alguém possa esquecer
+   * de escrever. Mas isso vale para o FILTRO: o valor precisa vir do JWT, na
+   * api, e não de algo que o chamador escolhe.
+   */
+  async getByIdAndUsuario(id: string, usuario: string): Promise<Historico> {
+    return this.model
+      .findOne({ _id: id, usuario })
+      .populate({
+        path: 'simulado',
+        populate: [{ path: 'questoes.questao' }],
+      })
+      .exec();
+  }
+
   override async getById(id: string): Promise<Historico> {
     return this.model
       .findById(id)
