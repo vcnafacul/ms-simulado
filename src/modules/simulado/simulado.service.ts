@@ -362,6 +362,42 @@ export class SimuladoService {
    * ⚠️ `geral` continua sobre `respostas.length`, e **não** sobre os vínculos:
    * ele é a nota da prova, não a soma das partes. Contar interdisciplinar duas
    * vezes ali faria o aluno passar de 100%.
+   *
+   * ---
+   *
+   * ⚠️ **QUESTÃO NÃO LIDA CONTA COMO ERRO, e isso é decisão — não default**
+   * (card 13). `respostas` é o mapa sobre TODAS as questões do simulado, então
+   * a não lida entra no denominador e não no numerador.
+   *
+   * A fórmula era assim antes do card e continua assim depois dele; o que
+   * mudou é que agora está escrito por quê. Três definições eram defensáveis:
+   *
+   * | | fórmula | |
+   * |---|---|---|
+   * | **A** | `acertos / total` | o aluno é responsável por marcar; alinhado com o ENEM |
+   * | **B** | `acertos / lidas` | mede conhecimento, não preenchimento |
+   * | **C** | A, **com a contagem de não lidas sempre ao lado** | ← **escolhida** |
+   *
+   * ⚠️ **B foi recusada por dois motivos, e o segundo é o que fecha:**
+   *
+   * 1. A nota do aluno **melhoraria quando a leitura do cartão dele piorasse**
+   *    — o incentivo exatamente invertido. E dois alunos com 90 e 60 lidas
+   *    teriam notas em bases diferentes, com a média da turma somando coisas
+   *    incomparáveis.
+   * 2. **O valor é GRAVADO aqui, no histórico.** Mudar a fórmula só afetaria
+   *    históricos novos: o radar do `classSimuladoAnalytics` passaria a ter
+   *    meses calculados de dois jeitos, e nada na tela diria isso. Só um
+   *    recálculo retroativo de toda a base resolveria, e ele não se paga.
+   *
+   * ⚠️ E o que decidiria entre A e B — separar "deixou em branco" de "o OMR não
+   * leu" — **não existe nos dados**: o `ms-omr` descarta os dois igualmente
+   * (`cartao_reader.py:_estruturar_respostas`). Enquanto isso for verdade,
+   * nenhuma fórmula separa os dois casos. C é a única honesta: não tenta
+   * separar, mostra a ambiguidade.
+   *
+   * ⚠️ **Quem mostra é o client** (`resultadoDoEstudante.naoLidas`), derivando
+   * de `questoesRespondidas` (card 01) e `totalDeQuestoes` (card 08) — sem
+   * campo novo no contrato. **Não mexer nesta fórmula sem reabrir o card 13.**
    */
   private async criaAproveitamento(
     respostas: RespostaAproveitamento[],
