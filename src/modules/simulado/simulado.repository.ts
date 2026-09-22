@@ -110,9 +110,24 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
   async answer(id: string): Promise<Simulado> {
     return await this.model
       .findById(id)
+      /*
+        ⚠️ **`frente2` e `frente3` entram aqui** (card 14): 1.413 das 2.640
+        questões de homol têm uma frente secundária, e sem populá-las o
+        `criaAproveitamento` não tem como contá-las.
+
+        ⚠️ **E a `materia` DENTRO de cada frente**, não só a da questão: 928 das
+        1.616 frentes secundárias são de matéria diferente da questão
+        (História→Sociologia, Língua Estrangeira→Português). Uma frente de
+        Sociologia tem de morar sob Sociologia — ver `vinculosDaQuestao`.
+      */
       .populate({
         path: 'questoes.questao',
-        populate: ['frente1', 'materia'],
+        populate: [
+          { path: 'frente1', populate: { path: 'materia' } },
+          { path: 'frente2', populate: { path: 'materia' } },
+          { path: 'frente3', populate: { path: 'materia' } },
+          { path: 'materia' },
+        ],
         select: 'alternativa',
       })
       .exec();

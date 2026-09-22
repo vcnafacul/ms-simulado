@@ -93,7 +93,17 @@ describe('SimuladoRepository.getAvailabilityById', () => {
 });
 
 describe('SimuladoRepository.answer (popula questoes.questao)', () => {
-  it('popula questoes.questao com frente1/materia e alternativa', async () => {
+  it('⚠️ popula as TRÊS frentes, com a matéria de cada uma', async () => {
+    /*
+      Card 14: `frente2`/`frente3` entraram porque 1.413 das 2.640 questões de
+      homol têm uma secundária, e sem o populate o `criaAproveitamento` não
+      tinha o que contar.
+
+      ⚠️ E a `materia` DENTRO de cada frente: 928 das 1.616 secundárias são de
+      matéria diferente da questão. Sem o populate aninhado, o
+      `vinculosDaQuestao` cai para a matéria da questão e uma frente de
+      Sociologia apareceria sob História.
+    */
     const exec = jest.fn().mockResolvedValue({ _id: 's1', questoes: [] });
     const populate = jest.fn().mockReturnValue({ exec });
     const findById = jest.fn().mockReturnValue({ populate });
@@ -104,7 +114,12 @@ describe('SimuladoRepository.answer (popula questoes.questao)', () => {
     expect(findById).toHaveBeenCalledWith('s1');
     expect(populate).toHaveBeenCalledWith({
       path: 'questoes.questao',
-      populate: ['frente1', 'materia'],
+      populate: [
+        { path: 'frente1', populate: { path: 'materia' } },
+        { path: 'frente2', populate: { path: 'materia' } },
+        { path: 'frente3', populate: { path: 'materia' } },
+        { path: 'materia' },
+      ],
       select: 'alternativa',
     });
   });
