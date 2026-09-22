@@ -54,6 +54,28 @@ function enxugarMaterias(
   }));
 }
 
+/**
+ * Quando o cartão mais recente entrou neste recorte.
+ *
+ * ⚠️ **Não é "data da prova"** — ela não existe no modelo: `disponivelDe` está
+ * preenchida em 0 dos 131 simulados de homologação. E não é "última atividade":
+ * `registrar` é upsert, então um reenvio do mesmo estudante não move a data.
+ *
+ * É exatamente "quando o cartão mais recente entrou", e o rótulo na tela diz
+ * isso. Mesma ressalva que o docblock do `ultimoEnvio` no
+ * `listarSimuladosComCartao` já registra.
+ */
+function ultimoCartao(linhas: LinhaComHistorico[]): Date | null {
+  let maior: Date | null = null;
+  for (const l of linhas) {
+    const d = (l as { createdAt?: Date }).createdAt;
+    if (d === undefined || d === null) continue;
+    const data = new Date(d);
+    if (maior === null || data > maior) maior = data;
+  }
+  return maior;
+}
+
 @Injectable()
 export class RelatorioSimuladoEstudanteService {
   private readonly logger = new Logger(RelatorioSimuladoEstudanteService.name);
@@ -70,7 +92,7 @@ export class RelatorioSimuladoEstudanteService {
     /** A turma ATUAL, quando o chamador a resolve. Ver card 18. */
     usuarios?: string[];
   }): Promise<RelatorioSimuladoDtoOutput> {
-    const [linhas, total, numeros] = await Promise.all([
+    const [linhas, total, numeros, nomes] = await Promise.all([
       this.repository.buscarPorRecorte(params),
       // do CURSINHO, não da turma: é o denominador do rodapé
       this.repository.contarDoCursinho(params.simuladoId, params.cursinhoId),
@@ -89,6 +111,15 @@ export class RelatorioSimuladoEstudanteService {
         ⚠️ Em paralelo com as outras duas: não depende de nenhuma delas.
       */
       this.simuladoRepository.getNumerosDasQuestoes(params.simuladoId),
+      /*
+        ⚠️ **Reusa o `getNomesPorIds`** (card 18), que já existe para a lista de
+        simulados com cartão e traz só `(id, nome)`. O `getById` popularia
+        categoria, frentes e matéria — carga enorme para ler um nome.
+
+        ⚠️ E ele NÃO filtra `deleted`, de propósito: um simulado arquivado que
+        tem cartão precisa continuar aparecendo com nome.
+      */
+      this.simuladoRepository.getNomesPorIds([params.simuladoId]),
     ]);
 
     return {
@@ -98,6 +129,27 @@ export class RelatorioSimuladoEstudanteService {
       totalEstudantesComCartaoNoCursinho: total,
       // ⚠️ `0` quando o simulado não existe mais: a tela mostra só o percentual.
       totalDeQuestoes: numeros.length,
+      /*
+        ⚠️ **`null` quando o simulado foi apagado depois do vínculo** — o mesmo
+        caso que o `listarSimuladosComCartao` já trata, e pelo mesmo motivo: os
+        cartões existem, e escondê-los é pior que rotulá-los. A tela mostra a
+        constante `SEM_NOME` que ela já usa no seletor da aba da turma.
+      */
+      simuladoNome: nomes[0]?.nome ?? null,
+      /*
+        ⚠️ **O `createdAt` da LINHA mais recente do recorte**, e o rótulo tem de
+        dizer isso: "último cartão". NÃO é "data da prova" nem "última
+        atividade".
+
+        Medido: `disponivelDe` está preenchida em **0 dos 131 simulados** — não
+        existe data de aplicação no modelo, e inventar uma seria rotular de
+        "data da prova" o que não é (o card 18 proíbe explicitamente).
+
+        ⚠️ E `registrar` é upsert: um estudante que REENVIA não move esta data.
+        Ela é "quando o cartão mais recente entrou no recorte" — por isso o
+        rótulo na tela é "último cartão", não "última atividade".
+      */
+      ultimoCartaoEm: ultimoCartao(linhas),
     };
   }
 
