@@ -775,3 +775,200 @@ describe('SimuladoService.processAnswer — acertos absolutos (card 08)', () => 
     expect(p.questoesRespondidas).toBeLessThanOrEqual(p.respostas.length);
   });
 });
+
+describe('SimuladoService.criaAproveitamento — frentes secundárias (card 14)', () => {
+  /**
+   * O card 14: só `frente1` entrava na conta, e **1.413 das 2.640 questões** de
+   * homol têm uma frente secundária. O drill-down por frente subcontava mais da
+   * metade da base, sem nada acusar — o radar desenha o que tem, não o que
+   * faltou.
+   *
+   * ⚠️ Decisão de produto: **peso inteiro em cada frente e em cada matéria**.
+   * A questão interdisciplinar conta 1 para as duas, e cada percentual passa a
+   * ser "% de acerto nas questões que TOCAM isto".
+   */
+  const materia = (id: string, nome: string) => ({ _id: id, nome }) as any;
+  const frente = (id: string, nome: string, mat: any) =>
+    ({ _id: id, nome, materia: mat }) as any;
+
+  const HIST = materia('m-hist', 'História');
+  const SOC = materia('m-soc', 'Sociologia');
+
+  function resposta(over: any = {}) {
+    const q = {
+      _id: over.id ?? 'q1',
+      materia: over.materia ?? HIST,
+      frente1: over.frente1 ?? frente('f-rep', 'República', HIST),
+      frente2: over.frente2,
+      frente3: over.frente3,
+    };
+    return {
+      questao: q,
+      alternativaEstudante: over.acertou === false ? 'B' : 'A',
+      alternativaCorreta: 'A',
+      materia: q.materia,
+      frente: q.frente1,
+    } as any;
+  }
+
+  /** Chama o método privado — é onde a regra vive. */
+  const calcular = (respostas: any[]) => {
+    const svc = new SimuladoService(
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+    return (svc as any).criaAproveitamento(respostas);
+  };
+
+  it('⚠️ questão interdisciplinar conta INTEIRA nas duas matérias', async () => {
+    const a = await calcular([
+      resposta({ frente2: frente('f-cid', 'Cidadania', SOC) }),
+    ]);
+
+    expect(a.materias.map((m: any) => m.nome).sort()).toEqual([
+      'História',
+      'Sociologia',
+    ]);
+    expect(a.materias.every((m: any) => m.aproveitamento === 1)).toBe(true);
+  });
+
+  it('⚠️ a frente secundária mora sob a matéria DELA', async () => {
+    // Pô-la sob História faria o drill-down mostrar "História › Cidadania",
+    // que é falso.
+    const a = await calcular([
+      resposta({ frente2: frente('f-cid', 'Cidadania', SOC) }),
+    ]);
+
+    const soc = a.materias.find((m: any) => m.nome === 'Sociologia');
+    expect(soc.frentes.map((f: any) => f.nome)).toEqual(['Cidadania']);
+    const hist = a.materias.find((m: any) => m.nome === 'História');
+    expect(hist.frentes.map((f: any) => f.nome)).toEqual(['República']);
+  });
+
+  it('⚠️ o denominador de cada frente são as questões que a TOCAM', async () => {
+    // 3 questões: duas só de República (1 acerto), uma que toca República e
+    // Cidadania (acerto). República = 2/3; Cidadania = 1/1.
+    const a = await calcular([
+      resposta({ id: 'q1' }),
+      resposta({ id: 'q2', acertou: false }),
+      resposta({ id: 'q3', frente2: frente('f-cid', 'Cidadania', SOC) }),
+    ]);
+
+    const rep = a.materias
+      .find((m: any) => m.nome === 'História')
+      .frentes.find((f: any) => f.nome === 'República');
+    expect(rep.aproveitamento).toBeCloseTo(2 / 3, 10);
+
+    const cid = a.materias
+      .find((m: any) => m.nome === 'Sociologia')
+      .frentes.find((f: any) => f.nome === 'Cidadania');
+    expect(cid.aproveitamento).toBe(1);
+  });
+
+  it('⚠️ `geral` continua sobre as RESPOSTAS, não sobre os vínculos', async () => {
+    // Duas questões, uma interdisciplinar: 3 vínculos, 2 respostas. Se `geral`
+    // contasse vínculos, o aluno passaria de 100%.
+    const a = await calcular([
+      resposta({ id: 'q1' }),
+      resposta({ id: 'q2', frente2: frente('f-cid', 'Cidadania', SOC) }),
+    ]);
+
+    expect(a.geral).toBe(1);
+  });
+
+  it('⚠️ as bases das matérias NÃO somam o total do simulado', async () => {
+    // É a consequência aceita do peso inteiro, e a razão de a base ter de
+    // aparecer junto do percentual nas telas: 2 questões, 3 vínculos.
+    const a = await calcular([
+      resposta({ id: 'q1' }),
+      resposta({ id: 'q2', frente2: frente('f-cid', 'Cidadania', SOC) }),
+    ]);
+
+    expect(a.materias).toHaveLength(2);
+    // História tocada por 2 questões, Sociologia por 1 — total 3 > 2 respostas
+    const hist = a.materias.find((m: any) => m.nome === 'História');
+    const soc = a.materias.find((m: any) => m.nome === 'Sociologia');
+    expect(hist.frentes[0].aproveitamento).toBe(1);
+    expect(soc.frentes[0].aproveitamento).toBe(1);
+  });
+
+  it('⚠️ `frente2: ""` não cria matéria nem frente fantasma', async () => {
+    // 125 questões de homol guardam string vazia no lugar do id.
+    const a = await calcular([resposta({ frente2: '' })]);
+
+    expect(a.materias).toHaveLength(1);
+    expect(a.materias[0].frentes).toHaveLength(1);
+  });
+
+  it('questão errada não soma acerto em nenhum dos vínculos', async () => {
+    const a = await calcular([
+      resposta({ acertou: false, frente2: frente('f-cid', 'Cidadania', SOC) }),
+    ]);
+
+    expect(a.geral).toBe(0);
+    expect(a.materias.every((m: any) => m.aproveitamento === 0)).toBe(true);
+  });
+
+  it('⚠️ questão NÃO LIDA não conta como acerto', async () => {
+    const r = resposta();
+    r.alternativaEstudante = undefined;
+    const a = await calcular([r]);
+
+    expect(a.geral).toBe(0);
+    // mas a questão segue no denominador da frente — ela foi cobrada
+    expect(a.materias[0].frentes[0].aproveitamento).toBe(0);
+  });
+
+  it('lista vazia não estoura nem divide por zero', async () => {
+    const a = await calcular([]);
+
+    expect(a.geral).toBe(0);
+    expect(a.materias).toEqual([]);
+  });
+
+  describe('⚠️ o que o cálculo ANTIGO derrubava', () => {
+    it('questão com `frente1: null` não estoura o processamento', async () => {
+      /*
+        São **2 questões reais** em homol. O código antigo fazia
+        `res.frente._id.toString()` — `TypeError` com frente nula, que caía no
+        catch do `processAnswer` e marcava o cartão inteiro como
+        `erro_no_processamento`. Um cartão perdido por causa de uma questão.
+
+        Agora ela simplesmente não entra no drill-down; o `geral` conta.
+      */
+      const semFrente = resposta({ id: 'q-ruim' });
+      semFrente.questao.frente1 = null;
+
+      const a = await calcular([semFrente, resposta({ id: 'q-boa' })]);
+
+      expect(a.geral).toBe(1);
+      // só a questão boa aparece no drill-down
+      expect(a.materias).toHaveLength(1);
+      expect(a.materias[0].frentes).toHaveLength(1);
+    });
+
+    it('⚠️ um simulado SÓ com questões sem frente não estoura', async () => {
+      const semFrente = resposta({ id: 'q1' });
+      semFrente.questao.frente1 = null;
+
+      const a = await calcular([semFrente]);
+
+      expect(a.geral).toBe(1);
+      expect(a.materias).toEqual([]);
+    });
+
+    it.each([null, undefined, ''])(
+      'frente2 = %p convive com frente1 boa, sem erro',
+      async (valor) => {
+        const a = await calcular([resposta({ frente2: valor })]);
+
+        expect(a.materias).toHaveLength(1);
+        expect(a.materias[0].frentes).toHaveLength(1);
+      },
+    );
+  });
+});

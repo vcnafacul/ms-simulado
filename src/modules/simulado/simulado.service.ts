@@ -36,6 +36,7 @@ import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
 import { Simulado } from './schemas/simulado.schema';
 import { SimuladoRepository } from './simulado.repository';
 import { RespostaAproveitamento } from './valueObject/resposta-aproveitamento';
+import { vinculosDaQuestao } from './vinculosDaQuestao';
 
 @Injectable()
 export class SimuladoService {
@@ -345,75 +346,95 @@ export class SimuladoService {
     return await this.simuladoRepository.getAvailable(categoria._id);
   }
 
+  /**
+   * A nota do estudante: geral, por matéria e por frente.
+   *
+   * ⚠️ **Questão interdisciplinar conta INTEIRA em cada frente e em cada
+   * matéria que ela toca** (card 14). Antes só `frente1` era considerada, e
+   * 1.413 das 2.640 questões de homol têm uma secundária — o drill-down
+   * subcontava metade da base.
+   *
+   * ⚠️ **As bases deixam de somar o total do simulado**, e isso é esperado: uma
+   * prova de 10 questões pode ter 13 vínculos. Cada percentual passa a ser
+   * "% de acerto nas questões que TOCAM isto", que é como o coordenador pensa —
+   * e é por isso que a base tem de aparecer junto do número nas telas.
+   *
+   * ⚠️ `geral` continua sobre `respostas.length`, e **não** sobre os vínculos:
+   * ele é a nota da prova, não a soma das partes. Contar interdisciplinar duas
+   * vezes ali faria o aluno passar de 100%.
+   */
   private async criaAproveitamento(
     respostas: RespostaAproveitamento[],
   ): Promise<AproveitamentoHistorico> {
-    let aproveitamentoGeral = 0;
-
-    // Extrai matérias únicas presentes nas respostas
-    const materiasUnicas = new Map<string, MateriaAproveitamento>();
-
-    respostas.forEach((res) => {
-      const materiaId = res.materia._id.toString();
-
-      // Inicializa a matéria se ainda não existir
-      if (!materiasUnicas.has(materiaId)) {
-        materiasUnicas.set(materiaId, {
-          id: res.materia._id,
-          nome: res.materia.nome,
-          aproveitamento: 0,
-          frentes: [],
-        });
+    /*
+      Uma passada só: para cada resposta, cada vínculo (matéria, frente) ganha
+      um acerto e um total. O código antigo fazia três varreduras e um
+      `find`/`filter` aninhado por matéria e por frente — O(n²) sobre 90
+      questões, e impossível de ler.
+    */
+    const porMateria = new Map<
+      string,
+      {
+        id: unknown;
+        nome: string;
+        acertos: number;
+        total: number;
+        frentes: Map<
+          string,
+          { id: unknown; nome: string; acertos: number; total: number }
+        >;
       }
+    >();
 
-      const materia = materiasUnicas.get(materiaId);
+    let acertosGerais = 0;
 
-      // Adiciona a frente se ainda não existir nesta matéria
-      const frenteId = res.frente._id.toString();
-      if (!materia.frentes.some((f) => f.id.toString() === frenteId)) {
-        materia.frentes.push({
-          id: res.frente._id,
-          nome: res.frente.nome,
-          aproveitamento: 0,
-          materia: res.materia.nome,
-        });
+    for (const res of respostas) {
+      const acertou =
+        res.alternativaEstudante !== undefined &&
+        res.alternativaEstudante === res.alternativaCorreta;
+      if (acertou) acertosGerais++;
+
+      for (const v of vinculosDaQuestao(res.questao)) {
+        const mid = String(v.materia._id);
+        const m = porMateria.get(mid) ?? {
+          id: v.materia._id,
+          nome: v.materia.nome,
+          acertos: 0,
+          total: 0,
+          frentes: new Map(),
+        };
+        m.total++;
+        if (acertou) m.acertos++;
+
+        const fid = String(v.frente._id);
+        const f = m.frentes.get(fid) ?? {
+          id: v.frente._id,
+          nome: v.frente.nome,
+          acertos: 0,
+          total: 0,
+        };
+        f.total++;
+        if (acertou) f.acertos++;
+        m.frentes.set(fid, f);
+
+        porMateria.set(mid, m);
       }
-    });
-
-    // Converte o Map para array
-    const materias = Array.from(materiasUnicas.values());
-
-    // Calcula o aproveitamento
-    respostas.forEach((res) => {
-      if (res.alternativaCorreta === res.alternativaEstudante) {
-        aproveitamentoGeral++;
-        this.increasePerformance(
-          res,
-          materias.find((m) => m.id.toString() === res.materia._id.toString()),
-        );
-      }
-    });
-
-    // Calcula o aproveitamento de cada matéria e frente
-    materias.forEach((m) => {
-      const quantidade = respostas.filter(
-        (elem) => elem.materia._id.toString() === m.id.toString(),
-      ).length;
-
-      m.aproveitamento = quantidade > 0 ? m.aproveitamento / quantidade : 0;
-
-      m.frentes.forEach((f) => {
-        const quantidade = respostas.filter(
-          (elem) => elem.frente._id.toString() === f.id.toString(),
-        ).length;
-
-        f.aproveitamento = quantidade > 0 ? f.aproveitamento / quantidade : 0;
-      });
-    });
+    }
 
     return {
-      geral: aproveitamentoGeral / respostas.length,
-      materias: materias,
+      // ⚠️ Sobre as RESPOSTAS, não sobre os vínculos — ver o docblock acima.
+      geral: respostas.length > 0 ? acertosGerais / respostas.length : 0,
+      materias: [...porMateria.values()].map((m) => ({
+        id: m.id as never,
+        nome: m.nome,
+        aproveitamento: m.total > 0 ? m.acertos / m.total : 0,
+        frentes: [...m.frentes.values()].map((f) => ({
+          id: f.id as never,
+          nome: f.nome,
+          aproveitamento: f.total > 0 ? f.acertos / f.total : 0,
+          materia: m.nome,
+        })),
+      })),
     };
   }
 
