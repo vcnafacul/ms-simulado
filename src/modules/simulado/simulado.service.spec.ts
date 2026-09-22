@@ -972,3 +972,73 @@ describe('SimuladoService.criaAproveitamento — frentes secundárias (card 14)'
     );
   });
 });
+
+describe('SimuladoService.processAnswer — contadores globais (card 21)', () => {
+  const questao: any = {
+    _id: { toString: () => 'q1' },
+    alternativa: 'A',
+    materia: { _id: { toString: () => 'm1' }, nome: 'Mat' },
+    frente1: {
+      _id: { toString: () => 'f1' },
+      nome: 'Fr',
+      materia: { _id: { toString: () => 'm1' }, nome: 'Mat' },
+    },
+  };
+
+  const montar = (respostasAnteriores?: unknown[]) => {
+    const updateQuestionAnswered = jest.fn().mockResolvedValue(undefined);
+    const service = new SimuladoService(
+      {
+        answer: jest
+          .fn()
+          .mockResolvedValue({ _id: 's1', questoes: [{ questao, numero: 1 }] }),
+      } as any,
+      {
+        findAnoByQuestao: jest.fn().mockResolvedValue(2023),
+        updateQuestionAnswered,
+      } as any,
+      {} as any,
+      {
+        claimForProcessing: jest.fn().mockResolvedValue(true),
+        getById: jest.fn().mockResolvedValue({
+          simulado: 's1',
+          rawRespostas: [{ questao: 'q1', alternativaEstudante: 'A' }],
+          respostas: respostasAnteriores,
+        }),
+        completeProcessing: jest.fn().mockResolvedValue(undefined),
+      } as any,
+      {} as any,
+      {} as any,
+    );
+    return { service, updateQuestionAnswered };
+  };
+
+  it('⚠️ passa as respostas ANTERIORES para serem descontadas', async () => {
+    /*
+      `processAnswer` roda mais de uma vez no mesmo histórico: o reenvio de foto
+      e o callback do OMR passam por `prepararParaProcessamento`, que devolve o
+      status a `Pending` e republica na fila.
+
+      ⚠️ E `prepararParaProcessamento` NÃO limpa `respostas` — é por isso que a
+      contagem antiga ainda está no documento para ser desfeita.
+    */
+    const anteriores = [
+      { questao: 'q1', alternativaEstudante: 'B', alternativaCorreta: 'A' },
+    ];
+    const { service, updateQuestionAnswered } = montar(anteriores);
+
+    await service.processAnswer('hist1');
+
+    expect(updateQuestionAnswered.mock.calls[0][1]).toBe(anteriores);
+  });
+
+  it('primeira passada manda lista vazia, e não `undefined`', async () => {
+    // Histórico novo não tem `respostas`. O repositório trata `[]`; deixar
+    // `undefined` chegar lá seria confiar no default de outro arquivo.
+    const { service, updateQuestionAnswered } = montar(undefined);
+
+    await service.processAnswer('hist1');
+
+    expect(updateQuestionAnswered.mock.calls[0][1]).toEqual([]);
+  });
+});
