@@ -99,6 +99,29 @@ describe('contadores de plataforma × cartão-resposta (card 01) — Mongo real'
     });
   });
 
+  describe('completeProcessing', () => {
+    it('⚠️ grava `questoesRespondidas` — o fluxo do cartão não gravava', async () => {
+      // O campo deixou de ser gate dos agregados, mas é ele que responde
+      // "leu 87 de 90" na tela. Aqui contra Mongo real porque o `findByIdAndUpdate`
+      // ignora em silêncio campo que não está no schema.
+      const criado = await histModel.create(
+        historico({ status: HistoricoStatus.AwaitingOmr }),
+      );
+
+      await repo.completeProcessing(String(criado._id), {
+        ano: 2026,
+        simulado: new Types.ObjectId(),
+        respostas: [{}, {}, {}],
+        aproveitamento: { geral: 0.5, materias: [] },
+        questoesRespondidas: 2,
+      });
+
+      const salvo = await histModel.findById(criado._id).lean();
+      expect(salvo?.questoesRespondidas).toBe(2);
+      expect(salvo?.status).toBe(HistoricoStatus.Completed);
+    });
+  });
+
   describe('aggregateByPeriod', () => {
     async function completosDoMes() {
       const serie = await repo.aggregateByPeriod({ groupBy: 'month' } as any);
