@@ -238,8 +238,26 @@ export class SimuladoService {
       const aproveitamento = await this.criaAproveitamento(
         respostasAproveitamento,
       );
+      /*
+        ⚠️ **As respostas ANTERIORES entram para serem descontadas** (card 21).
+
+        `processAnswer` roda mais de uma vez no mesmo histórico: o reenvio de
+        foto e o callback do OMR passam por `prepararParaProcessamento`, que
+        devolve o status a `Pending` e republica na fila. A guarda
+        `status === Completed` do `AnswerProcessorService` protege só a entrega
+        duplicada — não o reprocessamento, que é o caminho que existe para
+        reprocessar.
+
+        ⚠️ **E `prepararParaProcessamento` NÃO limpa `respostas`** — o mesmo fato
+        que os cards 12, 13 e 15 já usam. É por isso que a contagem antiga ainda
+        está aqui para ser desfeita.
+
+        ⚠️ Descontar, e não pular: na foto nova as respostas MUDARAM. Ignorar a
+        segunda passada congelaria a leitura ruim que motivou o reenvio.
+      */
       await this.questoesRepository.updateQuestionAnswered(
         respostasAproveitamento,
+        historico.respostas ?? [],
       );
 
       /*

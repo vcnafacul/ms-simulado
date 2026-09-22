@@ -123,6 +123,20 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       .populate(['frente1', 'materia']);
   }
 
+  /**
+   * ⚠️ **A ordenação por `quantidadeSimulado` é INERTE hoje, e sempre foi.**
+   *
+   * O único escritor do campo era o `IncrementaSimulado`, que **nenhum caminho
+   * chamava** — removido no card 21 justamente para não parecer em uso. Medido
+   * em homologação: `quantidadeSimulado` é `0` nas 2.640 questões, então o
+   * `sort` empata tudo e o Mongo devolve na ordem que quiser.
+   *
+   * ⚠️ **Quem escrever o sync do card 22 precisa saber disto:** ao materializar
+   * o campo, esta ordenação passa a funcionar pela primeira vez, e a geração
+   * automática de simulado **muda de comportamento** — ela começa de fato a
+   * preferir as questões menos usadas, que é o que sempre quis fazer. É melhoria,
+   * mas não é no-op, e ninguém deve descobrir isso em produção.
+   */
   async getQuestaoByFiltro(filtro: object, quant: number): Promise<Questao[]> {
     const questoes = await this.model
       .find(filtro)
@@ -133,15 +147,6 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       .exec();
 
     return questoes;
-  }
-
-  async IncrementaSimulado(questoesId: string[]) {
-    await this.model.updateMany(
-      { _id: { $in: questoesId } }, // Correção aqui
-      {
-        $inc: { quantidadeSimulado: 1 },
-      },
-    );
   }
 
   async UpdateStatus(_id: string, status: Status) {
@@ -228,25 +233,119 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     await this.model.updateOne({ _id: id }, updateData);
   }
 
-  public async updateQuestionAnswered(respostas: Resposta[]) {
-    const bulkOperations = respostas.map((resposta) => {
-      const update: any = {
-        $inc: {
-          quantidadeResposta: 1,
-        },
-      };
+  /**
+   * Os contadores globais da questão: quantas vezes foi respondida e quantas
+   * vezes acertaram — somando todos os cursinhos, todas as aplicações e os dois
+   * fluxos (digital e cartão).
+   *
+   * ⚠️ **Três defeitos foram consertados aqui no card 21, e vale saber quais**,
+   * porque os números em produção ainda carregam o efeito deles até o sync do
+   * card 22 rodar.
+   *
+   * ---
+   *
+   * ⚠️ **1. Só conta quem RESPONDEU.** O chamador monta a lista mapeando sobre
+   * TODAS as questões do simulado, com `alternativaEstudante` indefinido para
+   * quem não marcou — antes, toda questão da prova levava `+1` em
+   * `quantidadeResposta`, inclusive em branco e não lida.
+   *
+   * O campo virava contagem de APRESENTAÇÕES com nome de contagem de respostas.
+   * Medido em homologação: dos 17 históricos completos, 205 linhas de resposta e
+   * apenas 100 com marcação — qualquer `acertos / quantidadeResposta` sairia com
+   * o denominador inflado em ~2×.
+   *
+   * ⚠️ **2. Gabarito ausente não é acerto** — e esta guarda é **redundante
+   * hoje**, dito assim porque a mutação que a remove SOBREVIVE a todos os
+   * testes, e vale saber por quê antes de alguém "simplificar".
+   *
+   * O caso perigoso é `undefined === undefined`, que o card 08 encontrou do
+   * outro lado e que aqui teria caminho: `Questao.alternativa` é
+   * `@Prop({ select: false })`. Só que ele exige `alternativaEstudante`
+   * indefinido, e o item 1 acima já descartou essas respostas antes de chegar
+   * aqui. Com o estudante tendo marcado, `undefined === 'A'` é `false` sem
+   * ajuda nenhuma.
+   *
+   * Fica porque é a intenção escrita — "só conto acerto se sei o gabarito" — e
+   * porque ela deixa de ser redundante no instante em que alguém mexer na
+   * guarda do item 1. É defesa em profundidade declarada, não cobertura que os
+   * testes garantem. Mesma postura (e mesmo motivo) do `!= null` em
+   * `flagsDaQuestao` no client.
+   *
+   * ⚠️ **3. Reprocessar DESCONTA o que já tinha sido contado.** `$inc` puro não
+   * é idempotente, e `prepararParaProcessamento` devolve o histórico a `Pending`
+   * — é o caminho do reenvio de foto e do callback do OMR. Sem isto, o mesmo
+   * cartão contava duas vezes.
+   *
+   * ⚠️ **E descontar é diferente de pular.** No reenvio as respostas MUDARAM: a
+   * foto nova pode ter lido uma questão que a anterior não leu. Ignorar a
+   * segunda passada congelaria a leitura ruim; o certo é remover a contagem
+   * antiga e aplicar a nova.
+   *
+   * ⚠️ Tudo num `bulkWrite` só: a mesma questão pode aparecer dos dois lados, e
+   * duas chamadas deixariam uma janela em que o contador está negativo.
+   */
+  public async updateQuestionAnswered(
+    respostas: Resposta[],
+    /**
+     * As respostas do processamento ANTERIOR deste mesmo histórico, a serem
+     * descontadas. Vazio na primeira passada.
+     *
+     * ⚠️ Vêm relidas do documento, e ali `questao` é um **ObjectId cru**, não o
+     * objeto populado — medido: `objectId` nas 2.230 linhas de homologação. É
+     * por isso que o id passa pelo `resolveQuestaoId`; `resposta.questao._id`
+     * daria `undefined` e o filtro casaria com nada.
+     */
+    anteriores: Resposta[] = [],
+  ) {
+    const contagem = new Map<
+      string,
+      { quantidadeResposta: number; acertos: number }
+    >();
 
-      if (resposta.alternativaCorreta === resposta.alternativaEstudante) {
-        update.$inc.acertos = 1;
+    const acumular = (lista: Resposta[], sinal: 1 | -1) => {
+      for (const resposta of lista) {
+        // ⚠️ Em branco e não lida ficam de fora — ver o item 1 do docblock.
+        if (resposta.alternativaEstudante === undefined) continue;
+
+        const id = resolveQuestaoId(resposta as never);
+        const atual = contagem.get(id) ?? { quantidadeResposta: 0, acertos: 0 };
+        atual.quantidadeResposta += sinal;
+
+        /*
+          ⚠️ `!== undefined` antes da comparação: redundante hoje porque a
+          guarda acima já removeu as respostas em branco — ver o item 2 do
+          docblock, que explica por que ela fica mesmo assim.
+        */
+        if (
+          resposta.alternativaCorreta !== undefined &&
+          resposta.alternativaCorreta === resposta.alternativaEstudante
+        ) {
+          atual.acertos += sinal;
+        }
+        contagem.set(id, atual);
       }
+    };
 
-      return {
-        updateOne: {
-          filter: { _id: resposta.questao._id },
-          update,
-        },
-      };
-    });
+    acumular(anteriores, -1);
+    acumular(respostas, 1);
+
+    const bulkOperations = [...contagem.entries()]
+      /*
+        ⚠️ Delta zero não vira escrita. É o caso comum do reprocessamento: a
+        maior parte das questões foi lida igual das duas vezes, e um `$inc: 0`
+        em 90 questões por cartão é I/O puro num caminho quente.
+      */
+      .filter(([, d]) => d.quantidadeResposta !== 0 || d.acertos !== 0)
+      .map(([id, d]) => {
+        const inc: Record<string, number> = {};
+        if (d.quantidadeResposta !== 0)
+          inc.quantidadeResposta = d.quantidadeResposta;
+        if (d.acertos !== 0) inc.acertos = d.acertos;
+        return { updateOne: { filter: { _id: id }, update: { $inc: inc } } };
+      });
+
+    // ⚠️ `bulkWrite([])` estoura no driver do Mongo.
+    if (bulkOperations.length === 0) return;
     await this.model.bulkWrite(bulkOperations);
   }
 

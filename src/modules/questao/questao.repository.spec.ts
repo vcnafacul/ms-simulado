@@ -53,3 +53,195 @@ describe('QuestaoRepository.canInsertQuestion (reverse-lookup em Prova.questoes)
     expect(await repo.canInsertQuestion('p1', 5, 'f1')).toBe(true);
   });
 });
+
+describe('QuestaoRepository.updateQuestionAnswered (contadores globais — card 21)', () => {
+  const montar = () => {
+    const bulkWrite = jest.fn().mockResolvedValue({});
+    return {
+      repo: new QuestaoRepository({ bulkWrite } as any, {} as any),
+      bulkWrite,
+    };
+  };
+
+  /** O `$inc` de uma questão, ou `undefined` se ela não foi escrita. */
+  const incDe = (bulkWrite: jest.Mock, id: string) =>
+    (bulkWrite.mock.calls[0]?.[0] ?? []).find(
+      (op: any) => op.updateOne.filter._id === id,
+    )?.updateOne.update.$inc;
+
+  /*
+    ⚠️ **Sem valor padrão no gabarito, de propósito.** Com `= 'A'`, passar
+    `undefined` explicitamente cai no default — o teste de "questão sem
+    gabarito" passava a exercitar uma questão COM gabarito e falhava por um
+    motivo que não era o testado. Os dois últimos argumentos são sempre
+    escritos à mão.
+  */
+  const resposta = (
+    id: string,
+    alternativaEstudante: string | undefined,
+    alternativaCorreta: string | undefined,
+  ) =>
+    ({
+      questao: { _id: id },
+      alternativaEstudante,
+      alternativaCorreta,
+    }) as never;
+
+  it('conta a resposta e o acerto de quem marcou a correta', async () => {
+    const { repo, bulkWrite } = montar();
+
+    await repo.updateQuestionAnswered([resposta('q1', 'A', 'A')]);
+
+    expect(incDe(bulkWrite, 'q1')).toEqual({
+      quantidadeResposta: 1,
+      acertos: 1,
+    });
+  });
+
+  it('quem marcou errado conta resposta e não conta acerto', async () => {
+    const { repo, bulkWrite } = montar();
+
+    await repo.updateQuestionAnswered([resposta('q1', 'B', 'A')]);
+
+    expect(incDe(bulkWrite, 'q1')).toEqual({ quantidadeResposta: 1 });
+  });
+
+  it('⚠️ questão EM BRANCO não entra na contagem', async () => {
+    /*
+      Era o defeito nº 1. O chamador monta a lista sobre TODAS as questões do
+      simulado, com `alternativaEstudante` indefinido para quem não marcou —
+      antes, toda questão da prova levava +1 e o campo virava contagem de
+      APRESENTAÇÕES com nome de contagem de respostas.
+    */
+    const { repo, bulkWrite } = montar();
+
+    await repo.updateQuestionAnswered([
+      resposta('q1', 'A', 'A'),
+      resposta('q2', undefined, 'A'),
+    ]);
+
+    expect(incDe(bulkWrite, 'q1')).toEqual({
+      quantidadeResposta: 1,
+      acertos: 1,
+    });
+    expect(incDe(bulkWrite, 'q2')).toBeUndefined();
+  });
+
+  it('questão sem gabarito E sem marcação não escreve nada', async () => {
+    /*
+      ⚠️ **Este teste NÃO cobre a guarda de gabarito, e é importante dizer.** O
+      caso `undefined === undefined` — que o card 08 encontrou do outro lado —
+      exige `alternativaEstudante` indefinido, e aí a guarda de "em branco" já
+      descartou a resposta antes. A mutação que remove
+      `alternativaCorreta !== undefined` SOBREVIVE, e o docblock do repositório
+      explica por que a guarda fica mesmo assim.
+
+      O que este teste afirma é o que ele alcança: nada é escrito.
+    */
+    const { repo, bulkWrite } = montar();
+
+    await repo.updateQuestionAnswered([resposta('q1', undefined, undefined)]);
+
+    expect(bulkWrite).not.toHaveBeenCalled();
+  });
+
+  it('⚠️ resposta marcada em questão sem gabarito conta resposta, não acerto', async () => {
+    const { repo, bulkWrite } = montar();
+
+    await repo.updateQuestionAnswered([resposta('q1', 'A', undefined)]);
+
+    expect(incDe(bulkWrite, 'q1')).toEqual({ quantidadeResposta: 1 });
+  });
+
+  it('⚠️ reprocessar DESCONTA a contagem anterior', async () => {
+    /*
+      Era o defeito nº 3. `$inc` puro não é idempotente, e
+      `prepararParaProcessamento` devolve o histórico a `Pending` — o caminho do
+      reenvio de foto. Sem o desconto, o mesmo cartão contava duas vezes.
+    */
+    const { repo, bulkWrite } = montar();
+
+    // A leitura anterior acertou q1; a nova também. Saldo: nada muda.
+    await repo.updateQuestionAnswered(
+      [resposta('q1', 'A', 'A')],
+      [resposta('q1', 'A', 'A')],
+    );
+
+    expect(bulkWrite).not.toHaveBeenCalled();
+  });
+
+  it('⚠️ reprocessar com resposta DIFERENTE aplica só a diferença', async () => {
+    /*
+      É o que distingue descontar de pular. A foto nova leu 'A' onde a anterior
+      leu 'B': a contagem de respostas não muda, mas o acerto passa a existir.
+    */
+    const { repo, bulkWrite } = montar();
+
+    await repo.updateQuestionAnswered(
+      [resposta('q1', 'A', 'A')],
+      [resposta('q1', 'B', 'A')],
+    );
+
+    expect(incDe(bulkWrite, 'q1')).toEqual({ acertos: 1 });
+  });
+
+  it('⚠️ questão que a foto nova NÃO leu perde a contagem antiga', async () => {
+    // A leitura anterior tinha lido q2; a nova não leu. O contador tem de voltar.
+    const { repo, bulkWrite } = montar();
+
+    await repo.updateQuestionAnswered(
+      [resposta('q1', 'A', 'A'), resposta('q2', undefined, 'A')],
+      [resposta('q1', 'A', 'A'), resposta('q2', 'A', 'A')],
+    );
+
+    expect(incDe(bulkWrite, 'q2')).toEqual({
+      quantidadeResposta: -1,
+      acertos: -1,
+    });
+  });
+
+  it('⚠️ aceita `questao` como ObjectId cru, e não só como objeto populado', async () => {
+    /*
+      **Medido no Mongo de homologação:** `historico.respostas[].questao` é
+      `objectId` nas 2.230 linhas — o documento relido não traz o objeto
+      populado. `resposta.questao._id` daria `undefined` e o filtro casaria com
+      nada, o que faria o desconto sumir em silêncio.
+    */
+    const { repo, bulkWrite } = montar();
+    const cru = { toString: () => 'q9' };
+
+    await repo.updateQuestionAnswered([
+      {
+        questao: cru,
+        alternativaEstudante: 'A',
+        alternativaCorreta: 'A',
+      } as never,
+    ]);
+
+    expect(incDe(bulkWrite, 'q9')).toEqual({
+      quantidadeResposta: 1,
+      acertos: 1,
+    });
+  });
+
+  it('⚠️ nada a escrever não chama bulkWrite — o driver estoura com lista vazia', async () => {
+    const { repo, bulkWrite } = montar();
+
+    await repo.updateQuestionAnswered([]);
+
+    expect(bulkWrite).not.toHaveBeenCalled();
+  });
+
+  it('um único bulkWrite cobre desconto e aplicação', async () => {
+    // Duas chamadas deixariam uma janela em que o contador está negativo.
+    const { repo, bulkWrite } = montar();
+
+    await repo.updateQuestionAnswered(
+      [resposta('q1', 'A', 'A')],
+      [resposta('q2', 'A', 'A')],
+    );
+
+    expect(bulkWrite).toHaveBeenCalledTimes(1);
+    expect(bulkWrite.mock.calls[0][0]).toHaveLength(2);
+  });
+});
