@@ -9,11 +9,29 @@ export interface VinculoDaQuestao {
 }
 
 /**
- * ⚠️ **`frente2: ""` é o caso que a base tem de verdade.** MEDIDO em homol:
- * **125 das 1.413** questões com frente secundária guardam uma STRING VAZIA no
- * lugar do id. Ela passa por `!= null`, por `$ne: null` e por `!!f` só falha
- * porque `""` é falsy — mas basta alguém escrever `f !== null` para 125
- * questões ganharem uma frente fantasma sem nome e sem matéria.
+ * Uma frente só vale se chegou POPULADA — objeto com `_id`.
+ *
+ * ⚠️ **As quatro formas que o campo assume na base foram MEDIDAS em homol**, e
+ * o que o Mongoose entrega em cada uma foi verificado com o populate real:
+ *
+ * | no banco                  | quantas | chega como   |
+ * |---------------------------|---------|--------------|
+ * | id como **string**        | 1.288   | **populada** |
+ * | `null`                    | 2.633   | `null`       |
+ * | string **vazia** `""`     | 125     | `undefined`  |
+ * | campo **ausente**         | 7       | `undefined`  |
+ *
+ * ⚠️ **Os ids estão gravados como STRING, não ObjectId** — `objectId: 0` em
+ * toda a coleção. O Mongoose faz o cast porque o schema declara
+ * `type: Types.ObjectId`, e por isso o populate funciona. Se o schema perder
+ * esse tipo, o populate para de resolver e o campo chega como string crua —
+ * que é justamente o que este teste de FORMA rejeita, em vez de deixar passar
+ * um "objeto" que é só o id.
+ *
+ * ⚠️ O `""` nunca chega aqui **por este caminho** (o cast do Mongoose já o
+ * converte em `undefined`), mas chega por `lean()`, pelo driver cru e por
+ * qualquer consulta sem schema. A guarda é defesa em profundidade, e não o
+ * conserto de um caso que passaria hoje.
  */
 function frenteValida(f: unknown): f is Frente {
   return typeof f === 'object' && f !== null && (f as Frente)._id !== undefined;
@@ -46,6 +64,12 @@ function frenteValida(f: unknown): f is Frente {
  *
  * ⚠️ **Sem duplicar o mesmo par.** Se `frente1` e `frente2` forem a mesma
  * frente (dado sujo), a questão contaria duas vezes na mesma conta.
+ *
+ * ⚠️ **Questão sem frente nenhuma devolve `[]`, e NÃO estoura.** São 2 questões
+ * reais em homol com `frente1: null` — e o cálculo ANTIGO fazia
+ * `res.frente._id.toString()` nelas, um `TypeError` que derrubava o
+ * `processAnswer` inteiro e marcava o cartão como `erro_no_processamento`.
+ * Aqui elas só ficam fora do drill-down; o `geral` continua contando.
  */
 export function vinculosDaQuestao(questao: Questao): VinculoDaQuestao[] {
   const candidatas = [questao.frente1, questao.frente2, questao.frente3];

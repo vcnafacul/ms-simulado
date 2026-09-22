@@ -112,3 +112,77 @@ describe('vinculosDaQuestao (card 14)', () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * As formas que o campo assume na base REAL de homologação, e o que o Mongoose
+ * entrega em cada uma — ambos medidos, não presumidos.
+ *
+ * | no banco              | quantas | chega como   |
+ * |-----------------------|---------|--------------|
+ * | id como string        | 1.288   | **populada** |
+ * | `null`                | 2.633   | `null`       |
+ * | string vazia `""`     | 125     | `undefined`  |
+ * | campo ausente         | 7       | `undefined`  |
+ *
+ * Rodar `vinculosDaQuestao` contra as **2.640 questões reais** deu **zero
+ * erros** — 1.350 com um vínculo, 960 com dois, 328 com três e 2 sem nenhum.
+ */
+describe('vinculosDaQuestao — as formas REAIS da base (card 14)', () => {
+  const MAT = { _id: 'm1', nome: 'Matemática' } as any;
+  const F1 = { _id: 'f1', nome: 'Aritmética', materia: MAT } as any;
+
+  const q = (over: any = {}) =>
+    ({ _id: 'q', materia: MAT, frente1: F1, ...over }) as any;
+
+  it.each([
+    ['null — 2.633 questões', null],
+    ['undefined (string vazia, que o cast converte) — 125', undefined],
+    ['undefined (campo ausente) — 7', undefined],
+  ])('frente2 = %s não gera vínculo nem erro', (_nome, valor) => {
+    expect(() => vinculosDaQuestao(q({ frente2: valor }))).not.toThrow();
+    expect(vinculosDaQuestao(q({ frente2: valor }))).toHaveLength(1);
+  });
+
+  it('⚠️ frente que NÃO foi populada (chega como string) é rejeitada', () => {
+    // Os ids estão gravados como STRING na base (`objectId: 0` na coleção
+    // inteira). O populate só resolve porque o schema declara
+    // `type: Types.ObjectId` e o Mongoose faz o cast. Se esse tipo sumir, o
+    // campo chega como string crua — e um `f !== null` a trataria como frente,
+    // produzindo `f.nome === undefined` no drill-down.
+    const v = vinculosDaQuestao(q({ frente2: '64cae70a573a2b3d03e58dfa' }));
+
+    expect(v).toHaveLength(1);
+  });
+
+  it('⚠️ ObjectId cru (populate que não resolveu) também é rejeitado', () => {
+    // Um ObjectId é `typeof "object"` e passaria por um teste de nulidade —
+    // mas não tem `_id`, e viraria uma frente sem nome na tela.
+    const objectIdCru = { toString: () => 'f2', buffer: new Uint8Array(12) };
+    const v = vinculosDaQuestao(q({ frente2: objectIdCru }));
+
+    expect(v).toHaveLength(1);
+  });
+
+  it('⚠️ questão com `frente1: null` devolve [] — e NÃO estoura', () => {
+    // São 2 questões reais em homol. O cálculo ANTIGO fazia
+    // `res.frente._id.toString()` nelas: TypeError, `processAnswer` no catch, e
+    // o cartão inteiro marcado como `erro_no_processamento`.
+    expect(() =>
+      vinculosDaQuestao(q({ frente1: null, frente2: null, frente3: null })),
+    ).not.toThrow();
+    expect(
+      vinculosDaQuestao(q({ frente1: null, frente2: null, frente3: null })),
+    ).toEqual([]);
+  });
+
+  it('as três frentes populadas dão três vínculos — o caso de 328 questões', () => {
+    const v = vinculosDaQuestao(
+      q({
+        frente2: { _id: 'f2', nome: 'Gramática', materia: MAT },
+        frente3: { _id: 'f3', nome: 'Leitura', materia: MAT },
+      }),
+    );
+
+    expect(v).toHaveLength(3);
+  });
+});

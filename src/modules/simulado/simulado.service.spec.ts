@@ -929,4 +929,46 @@ describe('SimuladoService.criaAproveitamento — frentes secundárias (card 14)'
     expect(a.geral).toBe(0);
     expect(a.materias).toEqual([]);
   });
+
+  describe('⚠️ o que o cálculo ANTIGO derrubava', () => {
+    it('questão com `frente1: null` não estoura o processamento', async () => {
+      /*
+        São **2 questões reais** em homol. O código antigo fazia
+        `res.frente._id.toString()` — `TypeError` com frente nula, que caía no
+        catch do `processAnswer` e marcava o cartão inteiro como
+        `erro_no_processamento`. Um cartão perdido por causa de uma questão.
+
+        Agora ela simplesmente não entra no drill-down; o `geral` conta.
+      */
+      const semFrente = resposta({ id: 'q-ruim' });
+      semFrente.questao.frente1 = null;
+
+      const a = await calcular([semFrente, resposta({ id: 'q-boa' })]);
+
+      expect(a.geral).toBe(1);
+      // só a questão boa aparece no drill-down
+      expect(a.materias).toHaveLength(1);
+      expect(a.materias[0].frentes).toHaveLength(1);
+    });
+
+    it('⚠️ um simulado SÓ com questões sem frente não estoura', async () => {
+      const semFrente = resposta({ id: 'q1' });
+      semFrente.questao.frente1 = null;
+
+      const a = await calcular([semFrente]);
+
+      expect(a.geral).toBe(1);
+      expect(a.materias).toEqual([]);
+    });
+
+    it.each([null, undefined, ''])(
+      'frente2 = %p convive com frente1 boa, sem erro',
+      async (valor) => {
+        const a = await calcular([resposta({ frente2: valor })]);
+
+        expect(a.materias).toHaveLength(1);
+        expect(a.materias[0].frentes).toHaveLength(1);
+      },
+    );
+  });
 });
