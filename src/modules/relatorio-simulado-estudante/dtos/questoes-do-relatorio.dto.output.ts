@@ -57,6 +57,29 @@ export class QuestaoDoRelatorioDtoOutput {
       'Contagem por alternativa. Chaves A, B, C, D, E — cada uma sempre presente, mesmo com 0.',
   })
   porAlternativa: Record<string, number>;
+
+  /**
+   * O gabarito, sem o qual as cinco contagens acima não são interpretáveis:
+   * "51% marcaram B" é a turma acertando em peso ou meia turma caindo no mesmo
+   * distrator, e são leituras opostas.
+   *
+   * Vem da cópia gravada em cada `Resposta` — o gabarito que VALEU naquela
+   * aplicação, não o de `Questao.alternativa` hoje (que é `select: false` e
+   * pode ter mudado desde então).
+   *
+   * ⚠️ **`null` em DOIS casos, e a tela não pode presumir qual:**
+   *
+   * 1. Nenhum histórico completo no recorte — não há gabarito para afirmar.
+   * 2. Os históricos DISCORDAM: a questão foi editada entre duas aplicações do
+   *    mesmo simulado, ou está duplicada nele (a corrida do `adicionarEmProva`,
+   *    docs/cards/etapa-11/). O servidor loga o caso; devolver uma das letras
+   *    faria o professor ler um gabarito errado como se fosse certo.
+   *
+   * ⚠️ Quando não é nulo, vale a invariante
+   * `porAlternativa[alternativaCorreta] === acertos`.
+   */
+  @ApiProperty({ required: true, nullable: true })
+  alternativaCorreta: string | null;
 }
 
 export class QuestoesDoRelatorioDtoOutput {

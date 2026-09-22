@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Historico } from '../historico/historico.schema';
@@ -65,6 +65,15 @@ export interface AgregadoDaQuestao {
   erros: number;
   semLeitura: number;
   porAlternativa: Record<string, number>;
+
+  /**
+   * O gabarito que VALEU nesta aplicação — a cópia gravada em cada `Resposta`,
+   * nunca `Questao.alternativa`.
+   *
+   * ⚠️ **`null` quando os históricos do recorte discordam**, e não um dos dois
+   * valores escolhido à sorte. Ver o docblock de `agregarPorQuestao`.
+   */
+  alternativaCorreta: string | null;
 }
 
 export interface SimuladoComCartao {
@@ -105,8 +114,55 @@ function filtroDoRecorte(params: {
   return filtro;
 }
 
+/**
+ * A única letra do conjunto, ou `null` quando há mais de uma.
+ *
+ * ⚠️ **Discordância vira `null` + log, e nunca um dos valores.** Devolver um
+ * deles faria o professor ler um gabarito errado como se fosse certo — e as
+ * cinco colunas de alternativa da aba de Questões existem justamente para
+ * decidir "a turma acertou" contra "a turma caiu no distrator". Um gabarito
+ * chutado inverte a conclusão em vez de faltar.
+ *
+ * ⚠️ Conjunto VAZIO também é `null`: questão sem nenhum histórico completo não
+ * é erro (o `$match` de status pode ter descartado todos), só não há gabarito
+ * para afirmar.
+ *
+ * ⚠️ Nada aqui olha `Questao.alternativa` — o campo é `select: false`, e o
+ * histórico já guarda a cópia do gabarito que valeu naquela aplicação, que é a
+ * pergunta certa quando a questão foi editada depois.
+ */
+function gabaritoUnico(
+  gabaritos: unknown,
+  questaoId: string | undefined,
+  simuladoId: string,
+  logger: Logger,
+): string | null {
+  // ⚠️ `filter(Boolean)`: o `$addToSet` inclui `null` quando alguma resposta
+  // não tem o campo (histórico antigo), e isso NÃO é divergência de gabarito —
+  // contá-lo como tal apagaria o gabarito bom de toda a questão.
+  const letras = Array.isArray(gabaritos)
+    ? Array.from(new Set(gabaritos.filter((g): g is string => Boolean(g))))
+    : [];
+
+  if (letras.length === 1) return letras[0];
+
+  if (letras.length > 1) {
+    logger.error(
+      `gabaritos divergentes na questão ${questaoId} do simulado ${simuladoId}: ` +
+        `${letras.sort().join(', ')} — a questão provavelmente foi editada entre ` +
+        `duas aplicações, ou está duplicada no simulado`,
+    );
+  }
+
+  return null;
+}
+
 @Injectable()
 export class RelatorioSimuladoEstudanteRepository {
+  private readonly logger = new Logger(
+    RelatorioSimuladoEstudanteRepository.name,
+  );
+
   constructor(
     @InjectModel(RelatorioSimuladoEstudante.name)
     private readonly model: Model<RelatorioSimuladoEstudante>,
@@ -285,6 +341,22 @@ export class RelatorioSimuladoEstudanteRepository {
             semLeitura: {
               $sum: { $cond: [{ $eq: [marcada, null] }, 1, 0] },
             },
+            /*
+              ⚠️ **`$addToSet`, e não `$first`.**
+
+              Por construção o valor é o mesmo em todas as linhas do grupo:
+              todo histórico do mesmo simulado copiou o mesmo gabarito. Mas
+              "por construção" aqui depende de duas coisas que podem falhar —
+              a questão pode ser editada entre duas aplicações do mesmo
+              simulado, e a corrida do `adicionarEmProva` (ver
+              docs/cards/etapa-11/) permite a mesma questão entrar duas vezes.
+
+              `$first` escolheria um dos dois em silêncio e o professor leria
+              um gabarito errado como se fosse certo. `$addToSet` traz os dois
+              e deixa o `map` de saída decidir — e um conjunto de tamanho 2 é
+              um SINTOMA, não um defeito desta consulta.
+            */
+            gabaritos: { $addToSet: '$h.respostas.alternativaCorreta' },
             ...porAlternativa,
           },
         },
@@ -299,6 +371,12 @@ export class RelatorioSimuladoEstudanteRepository {
       semLeitura: l.semLeitura,
       porAlternativa: Object.fromEntries(
         Object.values(Alternativa).map((alt) => [alt, l[alt] ?? 0]),
+      ),
+      alternativaCorreta: gabaritoUnico(
+        l.gabaritos,
+        l._id?.toString(),
+        params.simuladoId,
+        this.logger,
       ),
     }));
   }
