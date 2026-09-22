@@ -10,9 +10,37 @@ import { RelatorioSimuladoEstudante } from './relatorio-simulado-estudante.schem
  * Só o que as telas dos cards 04–07 usam. `respostas` fica de fora de propósito:
  * 90 questões × centenas de estudantes é carga que nenhuma delas lê. O card 07
  * busca o histórico por id quando precisar do detalhe.
+ *
+ * ⚠️ **`aproveitamento` vem INTEIRO** (card 02), e não mais só o `.geral`: a
+ * nota por matéria e frente já está gravada por estudante, e era só isto que
+ * faltava para o relatório responder "em quê o aluno foi mal".
+ *
+ * O custo foi MEDIDO antes de aceitar, e não presumido — é o que o parágrafo
+ * acima obriga para todo campo novo. Em 100 estudantes com 9 matérias × 3
+ * frentes e nomes reais do domínio (`scripts/medir-payload-relatorio.ts`):
+ *
+ * | payload de 100 linhas         | total    | por linha |
+ * |-------------------------------|----------|-----------|
+ * | só `aproveitamento.geral`     |  23,2 KB |    238 B  |
+ * | `aproveitamento` cru          | 417,9 KB |   4,3 KB  |
+ * | **como ficou** (sem o eco de `materia`) | **320,3 KB** | **3,3 KB** |
+ * | nomes num dicionário à parte  | 251,7 KB |   2,6 KB  |
+ * | com `respostas` (referência)  | 824,4 KB |   8,4 KB  |
+ *
+ * ⚠️ Cresce **14×**, não "uma ordem de grandeza a menos" como se presumia
+ * antes de medir. O que domina não são os nomes: são os ids — 63 ObjectIds por
+ * estudante. Cortar o `materia` repetido dentro de cada frente (ver
+ * `enxugarMaterias` na service) tirou 23% de graça.
+ *
+ * O dicionário de nomes tiraria mais 68 KB e foi RECUSADO: obriga toda tela a
+ * remontar o nome a partir de duas estruturas, e 68 KB não paga esse contrato.
+ *
+ * 320 KB numa consulta que o coordenador faz uma vez por simulado é troca boa
+ * pela única pergunta que o relatório não respondia. Mas o teto não é infinito:
+ * **o próximo campo tem de ser medido de novo**, e `respostas` segue barrado.
  */
 const CAMPOS_DO_HISTORICO =
-  'status cartaoCode questoesRespondidas aproveitamento.geral falha';
+  'status cartaoCode questoesRespondidas aproveitamento falha';
 
 /**
  * ⚠️ O oposto do `CAMPOS_DO_HISTORICO`: aqui as `respostas` ENTRAM. Lá elas

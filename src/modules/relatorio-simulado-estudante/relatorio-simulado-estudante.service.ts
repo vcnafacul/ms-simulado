@@ -1,10 +1,12 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { HistoricoStatus } from '../historico/enums/historico-status.enum';
+import { MateriaAproveitamento } from '../historico/types/aproveitamento';
 import { descreverFalha } from '../historico/falha/mapa-falha';
 import { SimuladoRepository } from '../simulado/simulado.repository';
 import {
   LinhaRelatorioDtoOutput,
   RelatorioSimuladoDtoOutput,
+  MateriaDoEstudanteDtoOutput,
 } from './dtos/relatorio-simulado.dto.output';
 import {
   DetalheDoEstudanteDtoOutput,
@@ -19,6 +21,38 @@ import {
   LinhaComHistorico,
   RelatorioSimuladoEstudanteRepository,
 } from './relatorio-simulado-estudante.repository';
+
+/**
+ * Copia matéria/frente para o formato do DTO, **sem o `materia` de dentro de
+ * cada frente**.
+ *
+ * ⚠️ Mapear, e não devolver o subdocumento cru. Duas razões, e a segunda foi
+ * medida:
+ *
+ * 1. O cru traz `materia` em cada frente — um id que é puro eco, porque a
+ *    frente já está ANINHADA na matéria dona. São 27 ObjectIds por estudante
+ *    dizendo o que a posição no objeto já diz.
+ * 2. Em 100 estudantes × 9 matérias × 3 frentes isso são **418 KB contra
+ *    320 KB** — 23% do payload, de graça, só por não repetir o óbvio.
+ *
+ * ⚠️ E é o mapa que faz o contrato ser o DTO: `@ApiProperty` é documentação,
+ * não filtro. Sem este `map` o Swagger anunciaria um formato e a rota
+ * devolveria outro.
+ */
+function enxugarMaterias(
+  materias: MateriaAproveitamento[],
+): MateriaDoEstudanteDtoOutput[] {
+  return materias.map((m) => ({
+    id: m.id,
+    nome: m.nome,
+    aproveitamento: m.aproveitamento,
+    frentes: (m.frentes ?? []).map((f) => ({
+      id: f.id,
+      nome: f.nome,
+      aproveitamento: f.aproveitamento,
+    })),
+  }));
+}
 
 @Injectable()
 export class RelatorioSimuladoEstudanteService {
@@ -75,6 +109,25 @@ export class RelatorioSimuladoEstudanteService {
       return [];
     }
 
+    /*
+      ⚠️ **A nota inteira é campo VELHO fora de `completed`**, e por isso passa
+      pelo mesmo gate que `respostas` e `falha` já têm no `consultarDetalhe`.
+
+      `completeProcessing` é o único escritor de `aproveitamento` e ninguém
+      nunca o desfaz — `marcarFalha` e `prepararParaProcessamento` não tocam
+      nele. Um cartão que completou, reprocessou e falhou carrega a nota da
+      rodada ANTERIOR, e devolvê-la afirma que a leitura de agora produziu o
+      que ela não produziu.
+
+      ⚠️ O gate é novo também para `aproveitamentoGeral`, que não tinha: o ms
+      mandava a nota velha e o client (`leituraVale`), a exportação e o resumo
+      da api compensavam cada um por sua conta. Consertar na origem não quebra
+      nenhum dos três — todos já tratam ausência —, e eles seguem valendo como
+      defesa em profundidade.
+    */
+    const leituraConcluida = h.status === HistoricoStatus.Completed;
+    const aproveitamento = leituraConcluida ? h.aproveitamento : undefined;
+
     return [
       {
         usuario: l.usuario,
@@ -84,7 +137,12 @@ export class RelatorioSimuladoEstudanteService {
         cartaoCode: h.cartaoCode,
         questoesRespondidas: h.questoesRespondidas,
         // ausente, não zero — ver o docblock do DTO
-        aproveitamentoGeral: h.aproveitamento?.geral,
+        aproveitamentoGeral: aproveitamento?.geral,
+        // ⚠️ `length ? : undefined` — lista vazia NUNCA sai daqui: ela faria a
+        // tela desenhar barra em zero em toda matéria. Ver o docblock do DTO.
+        aproveitamentoPorMateria: aproveitamento?.materias?.length
+          ? enxugarMaterias(aproveitamento.materias)
+          : undefined,
         falha: descreverFalha(h.falha),
       },
     ];

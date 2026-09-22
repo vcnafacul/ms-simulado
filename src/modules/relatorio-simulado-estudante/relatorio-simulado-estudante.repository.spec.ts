@@ -141,10 +141,25 @@ describe('RelatorioSimuladoEstudanteRepository.buscarPorRecorte', () => {
 
     const populate = chain.populate.mock.calls[0][0];
     expect(populate.path).toBe('historico');
-    expect(populate.select).toEqual(
-      expect.stringContaining('aproveitamento.geral'),
-    );
+    // ⚠️ `aproveitamento` INTEIRO desde o card 02 (antes era só `.geral`): a
+    // nota por matéria e frente já estava gravada e só faltava pedi-la.
+    expect(populate.select).toEqual(expect.stringContaining('aproveitamento'));
+    // ⚠️ Esta é a guarda que importa e que não pode afrouxar nunca — é o custo
+    // que o docblock do `CAMPOS_DO_HISTORICO` existe para barrar.
     expect(populate.select).not.toContain('respostas');
+  });
+
+  it('⚠️ o select é de campos EXPLÍCITOS, não o documento inteiro', async () => {
+    // Um select vazio (ou ausente) traria `respostas` junto e passaria no
+    // `not.toContain` acima sem que nada tivesse sido pedido — o teste ficaria
+    // verde justamente no cenário que ele existe para impedir.
+    const { repo, chain } = montarBusca();
+
+    await repo.buscarPorRecorte({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+    const { select } = chain.populate.mock.calls[0][0];
+    expect(typeof select).toBe('string');
+    expect(select.split(/\s+/).filter(Boolean).length).toBeGreaterThan(1);
   });
 });
 
