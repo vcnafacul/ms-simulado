@@ -12,6 +12,10 @@ import { RelatorioSimuladoEstudante } from './relatorio-simulado-estudante.schem
  * 90 questões × centenas de estudantes é carga que nenhuma delas lê. O card 07
  * busca o histórico por id quando precisar do detalhe.
  *
+ * ⚠️ **`acertos` entra** (card 08) — um inteiro por linha, custo desprezível
+ * perto do que ele evita: derivar o número de `aproveitamento.geral × total`
+ * produz 44 onde o aluno fez 45, e é um número que ele confere à mão.
+ *
  * ⚠️ **`aproveitamento` vem INTEIRO** (card 02), e não mais só o `.geral`: a
  * nota por matéria e frente já está gravada por estudante, e era só isto que
  * faltava para o relatório responder "em quê o aluno foi mal".
@@ -41,7 +45,7 @@ import { RelatorioSimuladoEstudante } from './relatorio-simulado-estudante.schem
  * **o próximo campo tem de ser medido de novo**, e `respostas` segue barrado.
  */
 const CAMPOS_DO_HISTORICO =
-  'status cartaoCode questoesRespondidas aproveitamento falha';
+  'status cartaoCode questoesRespondidas acertos aproveitamento falha';
 
 /**
  * ⚠️ O oposto do `CAMPOS_DO_HISTORICO`: aqui as `respostas` ENTRAM. Lá elas

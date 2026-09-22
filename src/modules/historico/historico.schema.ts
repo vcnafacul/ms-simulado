@@ -38,6 +38,21 @@ export class Historico extends BaseSchema {
   @ApiProperty()
   public questoesRespondidas: number;
 
+  /**
+   * Quantas questões o estudante acertou — o número absoluto.
+   *
+   * ⚠️ **Contado no `processAnswer`, nunca derivado de
+   * `aproveitamento.geral`** (card 08): a fração arredondada × total produz
+   * `44` onde o aluno fez `45`, e é um número que ele confere à mão contra o
+   * próprio cartão.
+   *
+   * ⚠️ **Opcional na prática**: histórico gravado ANTES do card 08 não tem o
+   * campo, e o relatório trata ausência como ausência — não como zero acertos.
+   */
+  @Prop({ required: false })
+  @ApiProperty({ required: false })
+  public acertos?: number;
+
   @Prop({
     type: String,
     enum: HistoricoStatus,

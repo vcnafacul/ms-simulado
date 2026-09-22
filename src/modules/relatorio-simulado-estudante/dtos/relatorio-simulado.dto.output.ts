@@ -32,6 +32,21 @@ export class LinhaRelatorioDtoOutput {
   @ApiProperty({ required: false }) questoesRespondidas?: number;
 
   /**
+   * Quantas questões o estudante acertou — o número absoluto.
+   *
+   * Cursinho conversa em acertos ("fiz 61 na primeira aplicação", "o corte de
+   * Medicina ficou em 78"), e o percentual sozinho esconde o denominador: 58%
+   * de 45 e 58% de 180 são confianças diferentes sobre o mesmo número.
+   *
+   * ⚠️ **Contado no servidor, nunca derivado** de `aproveitamentoGeral × total`
+   * — a fração arredondada produz 44 onde o aluno fez 45.
+   *
+   * ⚠️ **AUSENTE, não zero**, quando não há leitura concluída ou quando o
+   * histórico é anterior ao card 08. Zero é uma nota; ausência de medida não é.
+   */
+  @ApiProperty({ required: false }) acertos?: number;
+
+  /**
    * AUSENTE, não zero, quando não há leitura concluída. Zero é uma nota;
    * ausência de leitura não é — iguais, a média do card 04 mente.
    */
@@ -71,4 +86,20 @@ export class RelatorioSimuladoDtoOutput {
    */
   @ApiProperty()
   totalEstudantesComCartaoNoCursinho: number;
+
+  /**
+   * Quantas questões o simulado tem — o denominador de `acertos`.
+   *
+   * ⚠️ **No topo, e não repetido em cada linha.** É propriedade do SIMULADO,
+   * não do estudante: repeti-lo em 500 linhas seria dizer 500 vezes a mesma
+   * coisa, e abriria a porta para duas linhas discordarem.
+   *
+   * ⚠️ **Vem do `Simulado`, não de `respostas.length`.** São iguais hoje (o
+   * `processAnswer` mapeia sobre `simulado.questoes`), e "iguais hoje" é
+   * exatamente o tipo de coisa que deixa de ser verdade sem ninguém notar.
+   *
+   * ⚠️ `0` quando o simulado não existe mais — a tela mostra só o percentual.
+   */
+  @ApiProperty()
+  totalDeQuestoes: number;
 }
