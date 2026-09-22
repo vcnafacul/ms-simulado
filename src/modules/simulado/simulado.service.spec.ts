@@ -497,3 +497,131 @@ describe('SimuladoService.processAnswer — motivo da falha (card 01)', () => {
     expect(historicoRepository.completeProcessing).toHaveBeenCalled();
   });
 });
+
+describe('SimuladoService.processAnswer — questoesRespondidas (card 01)', () => {
+  /**
+   * O card 01: o fluxo do cartão (`createAwaitingOmr` →
+   * `prepararParaProcessamento` → `completeProcessing`) nunca gravava
+   * `questoesRespondidas`. O campo deixou de ser gate dos agregados, mas
+   * continua sendo o que responde "leu 87 de 90" na tela.
+   *
+   * ⚠️ Gravar no `completeProcessing` dá **um** escritor para o campo, no ponto
+   * em que a resposta é normalizada. É o que impede o próximo fluxo de entrada
+   * (importação, API pública) de nascer com o mesmo buraco.
+   */
+  function questao(id: string, alternativa = 'A') {
+    return {
+      _id: { toString: () => id },
+      alternativa,
+      materia: { _id: { toString: () => 'm1' }, nome: 'Mat' },
+      frente1: { _id: { toString: () => 'f1' }, nome: 'Fr' },
+    } as any;
+  }
+
+  function montar(opts: { questoes: any[]; rawRespostas: any[] }) {
+    const historicoRepository: any = {
+      claimForProcessing: jest.fn().mockResolvedValue(true),
+      getById: jest.fn().mockResolvedValue({
+        simulado: 's1',
+        rawRespostas: opts.rawRespostas,
+      }),
+      completeProcessing: jest.fn().mockResolvedValue(undefined),
+      marcarFalha: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new SimuladoService(
+      {
+        answer: jest.fn().mockResolvedValue({
+          _id: 's1',
+          questoes: opts.questoes.map((q, i) => ({
+            questao: q,
+            numero: i + 1,
+          })),
+        }),
+      } as any,
+      {
+        findAnoByQuestao: jest.fn().mockResolvedValue(2026),
+        updateQuestionAnswered: jest.fn().mockResolvedValue(undefined),
+      } as any,
+      {} as any,
+      historicoRepository,
+      {} as any,
+      {} as any,
+    );
+    return { service, historicoRepository };
+  }
+
+  async function respondidas(opts: { questoes: any[]; rawRespostas: any[] }) {
+    const { service, historicoRepository } = montar(opts);
+    await service.processAnswer('hist1');
+    return historicoRepository.completeProcessing.mock.calls[0][1]
+      .questoesRespondidas;
+  }
+
+  it('⚠️ cartão com 3 questões não lidas de 5 grava 2', async () => {
+    const questoes = ['q1', 'q2', 'q3', 'q4', 'q5'].map((id) => questao(id));
+
+    expect(
+      await respondidas({
+        questoes,
+        rawRespostas: [
+          { questao: 'q1', alternativaEstudante: 'A' },
+          { questao: 'q2', alternativaEstudante: 'C' },
+        ],
+      }),
+    ).toBe(2);
+  });
+
+  it('⚠️ resposta de questão que NÃO está no simulado não conta', async () => {
+    // Deriva de `respostasAproveitamento`, e não de `rawRespostas.length`. O
+    // que chega do ms-omr pode trazer questão de outra prova (template errado,
+    // foto do cartão trocada); o `map` sobre `simulado.questoes` é o gate, e a
+    // contagem tem de sair de DEPOIS dele.
+    expect(
+      await respondidas({
+        questoes: [questao('q1')],
+        rawRespostas: [
+          { questao: 'q1', alternativaEstudante: 'A' },
+          { questao: 'q-de-outra-prova', alternativaEstudante: 'B' },
+        ],
+      }),
+    ).toBe(1);
+  });
+
+  it('cartão totalmente ilegível grava 0, e não fica ausente', async () => {
+    expect(
+      await respondidas({
+        questoes: [questao('q1'), questao('q2')],
+        rawRespostas: [],
+      }),
+    ).toBe(0);
+  });
+
+  it('digital completo: o número é o total de questões do simulado', async () => {
+    const questoes = ['q1', 'q2', 'q3'].map((id) => questao(id));
+
+    expect(
+      await respondidas({
+        questoes,
+        rawRespostas: questoes.map((_, i) => ({
+          questao: `q${i + 1}`,
+          alternativaEstudante: 'A',
+        })),
+      }),
+    ).toBe(3);
+  });
+
+  it('⚠️ alternativa em branco explícita não conta como lida', async () => {
+    // O ms-omr manda a questão com `alternativaEstudante` ausente quando a
+    // marcação foi descartada (branco ou dupla marcação). O `?.` do map já
+    // produz `undefined` nos dois casos; este teste trava a distinção.
+    expect(
+      await respondidas({
+        questoes: [questao('q1'), questao('q2')],
+        rawRespostas: [
+          { questao: 'q1', alternativaEstudante: 'A' },
+          { questao: 'q2' },
+        ],
+      }),
+    ).toBe(1);
+  });
+});

@@ -241,6 +241,28 @@ export class SimuladoService {
         respostasAproveitamento,
       );
 
+      /*
+        ⚠️ Derivado de `respostasAproveitamento`, e **não** de
+        `rawRespostas.length`. Os dois deveriam bater, mas `rawRespostas` é o
+        que o ms-omr mandou — pode trazer questão que não está neste simulado
+        (template errado, foto de cartão de outra prova). O `map` sobre
+        `simulado.questoes` acima já é o gate; a contagem tem de sair de
+        depois dele.
+
+        ⚠️ Vale para os dois fluxos, de propósito. No digital o `createPending`
+        já grava o campo com `answer.respostas.length` e aqui ele é reescrito
+        com o mesmo número. Ter **um** escritor, no ponto em que a resposta é
+        normalizada, é o que impede o próximo fluxo de entrada (importação,
+        API pública) de nascer sem o campo — que foi exatamente o defeito do
+        cartão-resposta.
+
+        ⚠️ Não é mais gate de agregado nenhum (ver
+        `user-group-aggregate.repository`): é a informação "leu 87 de 90".
+      */
+      const questoesRespondidas = respostasAproveitamento.filter(
+        (r) => r.alternativaEstudante !== undefined,
+      ).length;
+
       await this.historicoRepository.completeProcessing(histId, {
         ano,
         simulado,
@@ -250,6 +272,7 @@ export class SimuladoService {
           alternativaCorreta: r.alternativaCorreta,
         })),
         aproveitamento,
+        questoesRespondidas,
       });
     } catch (err) {
       await this.historicoRepository.marcarFalha(

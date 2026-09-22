@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { HistoricoStatus } from '../historico/enums/historico-status.enum';
 import { Historico } from '../historico/historico.schema';
 import { AggregatePayload, UserGroupAggregate } from './user-group-aggregate.schema';
 
@@ -70,11 +71,29 @@ export class UserGroupAggregateRepository {
 
     const [facetResult] = await this.histModel.aggregate([
       { $match: baseMatch },
-      {
-        $match: {
-          $expr: { $eq: [{ $size: '$respostas' }, '$questoesRespondidas'] },
-        },
-      },
+      /*
+        ⚠️ **Tentativa completa é `status: completed`, e não
+        `size(respostas) == questoesRespondidas`.**
+
+        O critério antigo descartava TODO simulado respondido por cartão: o
+        campo só tem escritores do fluxo digital, e no Mongo
+        `{ $eq: [90, undefined] }` é `false`. O radar de matéria e a evolução
+        mensal ficavam cegos para a feature nova, sem erro nenhum na tela.
+
+        Trocar o campo, em vez de só passar a gravá-lo, é o que resolve o
+        problema de fundo: pelo critério antigo o cartão precisaria de **100%
+        das questões lidas** para entrar. No digital isso é escolha do aluno;
+        no cartão, uma marcação fraca ou uma dobra na folha derruba a tentativa
+        inteira sem que ninguém decida nada.
+
+        É também o critério que o `agregarPorQuestao` do relatório já usa
+        (`relatorio-simulado-estudante.repository.ts`), então duas telas do
+        mesmo domínio passam a concordar sobre o que é um simulado válido.
+
+        `questoesRespondidas` continua sendo gravado — como informação
+        exibível ("leu 87 de 90"), não como gate.
+      */
+      { $match: { status: HistoricoStatus.Completed } },
       {
         $facet: {
           completedRows: [

@@ -93,21 +93,31 @@ export class HistoricoRepository extends BaseRepository<Historico> {
     return this.model.find({ deletedAt: null }).count();
   }
 
+  /**
+   * Quantas tentativas chegaram ao fim, na plataforma inteira.
+   *
+   * ⚠️ **O critério é `status: completed`**, e não
+   * `size(respostas) == questoesRespondidas` como antes. Aquele campo só tem
+   * escritores do fluxo digital, então todo cartão-resposta era contado como
+   * incompleto — e o erro crescia junto com a adoção da feature. Mesma decisão
+   * do agregado da turma; ver o docblock em `user-group-aggregate.repository`.
+   */
   async entityCompleted() {
     const result: { total: number }[] = await this.model.aggregate([
       {
         $match: {
           deletedAt: null,
-          $expr: {
-            $eq: [{ $size: '$respostas' }, '$questoesRespondidas'],
-          },
+          status: HistoricoStatus.Completed,
         },
       },
       {
         $count: 'total',
       },
     ]);
-    return result[0].total;
+    // ⚠️ `$count` NÃO emite linha para conjunto vazio: sem o `?? 0` isto era um
+    // TypeError, e o endpoint de resumo respondia 500 numa base sem nenhuma
+    // tentativa completa.
+    return result[0]?.total ?? 0;
   }
 
   async aggregateByPeriod({ groupBy }: AggregatePeriodDtoInput) {
@@ -120,22 +130,18 @@ export class HistoricoRepository extends BaseRepository<Historico> {
         $group: {
           _id: { period: { $dateToString: { format, date: '$created_at' } } },
           total: { $sum: 1 },
+          // ⚠️ Os dois ramos usam `status`, pelo mesmo motivo do
+          // `entityCompleted` acima: pelo critério antigo o cartão-resposta
+          // caía inteiro em "incompletos". Eles têm de continuar sendo a
+          // negação um do outro — juntos fecham o `total`.
           completos: {
             $sum: {
-              $cond: [
-                { $eq: [{ $size: '$respostas' }, '$questoesRespondidas'] },
-                1,
-                0,
-              ],
+              $cond: [{ $eq: ['$status', HistoricoStatus.Completed] }, 1, 0],
             },
           },
           incompletos: {
             $sum: {
-              $cond: [
-                { $ne: [{ $size: '$respostas' }, '$questoesRespondidas'] },
-                1,
-                0,
-              ],
+              $cond: [{ $ne: ['$status', HistoricoStatus.Completed] }, 1, 0],
             },
           },
         },
@@ -392,6 +398,8 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       simulado: any;
       respostas: any[];
       aproveitamento: any;
+      /** Quantas questões saíram com marcação legível — ver `processAnswer`. */
+      questoesRespondidas: number;
     },
   ): Promise<void> {
     await this.model
@@ -401,6 +409,7 @@ export class HistoricoRepository extends BaseRepository<Historico> {
         simulado: data.simulado,
         respostas: data.respostas,
         aproveitamento: data.aproveitamento,
+        questoesRespondidas: data.questoesRespondidas,
         rawRespostas: null,
       })
       .exec();
