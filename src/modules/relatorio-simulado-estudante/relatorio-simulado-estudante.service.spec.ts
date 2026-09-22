@@ -702,3 +702,179 @@ describe('RelatorioSimuladoEstudanteService.consultarDetalhe', () => {
     },
   );
 });
+
+describe('RelatorioSimuladoEstudanteService.consultar — nota por matéria (card 02)', () => {
+  /**
+   * O card 02: `criaAproveitamento` já grava matéria e frente por estudante em
+   * todo cartão lido, e o relatório pedia só `aproveitamento.geral`. Faltava
+   * `select`, não agregação.
+   */
+  const MATERIAS = [
+    {
+      id: 'm-mat',
+      nome: 'Matemática',
+      aproveitamento: 0.3,
+      frentes: [
+        {
+          id: 'f-arit',
+          nome: 'Aritmética',
+          materia: 'm-mat',
+          aproveitamento: 0.25,
+        },
+        {
+          id: 'f-geo',
+          nome: 'Geometria',
+          materia: 'm-mat',
+          aproveitamento: 0.4,
+        },
+      ],
+    },
+    {
+      id: 'm-hum',
+      nome: 'Humanas',
+      aproveitamento: 0.82,
+      frentes: [
+        {
+          id: 'f-hist',
+          nome: 'História',
+          materia: 'm-hum',
+          aproveitamento: 0.82,
+        },
+      ],
+    },
+  ];
+
+  const comMaterias = (over: any = {}) =>
+    linha({
+      ...over,
+      historico: {
+        aproveitamento: { geral: 0.58, materias: MATERIAS },
+        ...over.historico,
+      },
+    });
+
+  async function primeira(l: any) {
+    const { svc } = montar([l]);
+    const r = await svc.consultar({ simuladoId: SIM, cursinhoId: 'cur-1' });
+    return r.linhas[0];
+  }
+
+  it('devolve matéria e frente de quem tem leitura concluída', async () => {
+    const linha0 = await primeira(comMaterias());
+
+    expect(linha0.aproveitamentoPorMateria).toEqual([
+      {
+        id: 'm-mat',
+        nome: 'Matemática',
+        aproveitamento: 0.3,
+        frentes: [
+          { id: 'f-arit', nome: 'Aritmética', aproveitamento: 0.25 },
+          { id: 'f-geo', nome: 'Geometria', aproveitamento: 0.4 },
+        ],
+      },
+      {
+        id: 'm-hum',
+        nome: 'Humanas',
+        aproveitamento: 0.82,
+        frentes: [{ id: 'f-hist', nome: 'História', aproveitamento: 0.82 }],
+      },
+    ]);
+    expect(linha0.aproveitamentoGeral).toBe(0.58);
+  });
+
+  it('⚠️ a frente sai SEM o `materia` que o subdocumento carrega', async () => {
+    // A frente já está aninhada na matéria dona: esse id é eco, e são 27 por
+    // estudante. Medido: 418 KB → 320 KB em 100 linhas. E é o `map` que faz a
+    // rota devolver o que o `@ApiProperty` anuncia — decorator é documentação,
+    // não filtro.
+    const linha0 = await primeira(comMaterias());
+
+    expect(MATERIAS[0].frentes[0]).toHaveProperty('materia');
+    expect(linha0.aproveitamentoPorMateria![0].frentes[0]).not.toHaveProperty(
+      'materia',
+    );
+  });
+
+  it('matéria sem `frentes` não estoura — sai com lista vazia', async () => {
+    const linha0 = await primeira(
+      linha({
+        historico: {
+          aproveitamento: {
+            geral: 0.5,
+            materias: [{ id: 'm', nome: 'M', aproveitamento: 0.5 }],
+          },
+        },
+      }),
+    );
+
+    expect(linha0.aproveitamentoPorMateria![0].frentes).toEqual([]);
+  });
+
+  it('⚠️ linha `failed` NÃO traz matérias, mesmo com o documento carregando as antigas', async () => {
+    // `marcarFalha` não limpa `aproveitamento`: um cartão que completou,
+    // reprocessou e falhou carrega a nota da rodada anterior. Devolvê-la
+    // afirmaria que a leitura de agora produziu o que ela não produziu.
+    const linha0 = await primeira(
+      comMaterias({
+        historico: {
+          status: 'failed',
+          aproveitamento: { geral: 0.58, materias: MATERIAS },
+        },
+      }),
+    );
+
+    expect(linha0.aproveitamentoPorMateria).toBeUndefined();
+  });
+
+  it('⚠️ linha `failed` também não traz o aproveitamento GERAL', async () => {
+    // O card presumia que este gate já existia. Não existia: o ms mandava a
+    // nota velha e o client, a exportação e o resumo da api compensavam cada
+    // um por sua conta. O gate passa a ser na origem, e os três seguem valendo
+    // como defesa em profundidade.
+    const linha0 = await primeira(
+      comMaterias({ historico: { status: 'failed' } }),
+    );
+
+    expect(linha0.aproveitamentoGeral).toBeUndefined();
+  });
+
+  it.each(['pending', 'processing', 'awaiting_omr'])(
+    'status %s não traz nota nenhuma',
+    async (status) => {
+      const linha0 = await primeira(comMaterias({ historico: { status } }));
+
+      expect(linha0.aproveitamentoGeral).toBeUndefined();
+      expect(linha0.aproveitamentoPorMateria).toBeUndefined();
+    },
+  );
+
+  it('⚠️ histórico sem `materias` devolve o campo AUSENTE, e não `[]`', async () => {
+    // Histórico de antes do `criaAproveitamento`. `[]` faria a tela desenhar
+    // barra em zero e afirmar que o aluno zerou todas as matérias.
+    const linha0 = await primeira(
+      linha({ historico: { aproveitamento: { geral: 0.72 } } }),
+    );
+
+    expect(linha0.aproveitamentoPorMateria).toBeUndefined();
+    expect('aproveitamentoPorMateria' in linha0).toBe(true);
+  });
+
+  it('histórico sem `aproveitamento` nenhum não estoura', async () => {
+    const linha0 = await primeira(
+      linha({ historico: { aproveitamento: undefined } }),
+    );
+
+    expect(linha0.aproveitamentoPorMateria).toBeUndefined();
+    expect(linha0.aproveitamentoGeral).toBeUndefined();
+  });
+
+  it('⚠️ `materias: []` gravado também vira ausente', async () => {
+    // Um cartão lido em que nenhuma questão casou com matéria produz `[]`.
+    // Passar adiante daria o mesmo desenho de "zerou tudo" que o caso acima.
+    const linha0 = await primeira(
+      linha({ historico: { aproveitamento: { geral: 0, materias: [] } } }),
+    );
+
+    expect(linha0.aproveitamentoPorMateria).toBeUndefined();
+  });
+});
