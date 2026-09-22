@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { HistoricoStatus } from '../historico/enums/historico-status.enum';
 import { MateriaAproveitamento } from '../historico/types/aproveitamento';
 import { descreverFalha } from '../historico/falha/mapa-falha';
+import { QuestaoRepository } from '../questao/questao.repository';
 import { SimuladoRepository } from '../simulado/simulado.repository';
 import {
   LinhaRelatorioDtoOutput,
@@ -83,6 +84,8 @@ export class RelatorioSimuladoEstudanteService {
   constructor(
     private readonly repository: RelatorioSimuladoEstudanteRepository,
     private readonly simuladoRepository: SimuladoRepository,
+    /** Só para os contadores globais da questão (card 16). */
+    private readonly questaoRepository: QuestaoRepository,
   ) {}
 
   async consultar(params: {
@@ -241,17 +244,43 @@ export class RelatorioSimuladoEstudanteService {
       numeros.map((n) => [n.questaoId, n.numero]),
     );
 
-    const questoes: QuestaoDoRelatorioDtoOutput[] = agregados.map((a) => ({
-      numero: numeroPorQuestao.get(a.questaoId) ?? null,
-      questaoId: a.questaoId,
-      respondentes: a.respondentes,
-      acertos: a.acertos,
-      erros: a.erros,
-      semLeitura: a.semLeitura,
-      porAlternativa: a.porAlternativa,
-      alternativaCorreta: a.alternativaCorreta,
-      discriminacao: a.discriminacao,
-    }));
+    /*
+      ⚠️ **Depois do agregado, e não em paralelo com ele** (card 16): os ids
+      saem justamente dali. Buscar as questões do simulado inteiro em paralelo
+      traria também as que ninguém respondeu, que não viram linha nenhuma.
+
+      ⚠️ Uma consulta a mais por relatório, com projeção de dois campos sobre no
+      máximo 180 ids. O agregado acima é muito mais caro.
+    */
+    const globais = await this.questaoRepository.contadoresGlobais(
+      agregados.map((a) => a.questaoId),
+    );
+
+    const questoes: QuestaoDoRelatorioDtoOutput[] = agregados.map((a) => {
+      /*
+        ⚠️ Questão que sumiu da coleção entre a aplicação e agora não tem
+        contador — e zero aqui é a leitura certa: a tela não exibe nada abaixo
+        do piso de base, então `0` some sozinho. Um `null` obrigaria todo o
+        caminho até a coluna a carregar mais um estado.
+      */
+      const g = globais.get(a.questaoId) ?? {
+        acertos: 0,
+        quantidadeResposta: 0,
+      };
+      return {
+        numero: numeroPorQuestao.get(a.questaoId) ?? null,
+        questaoId: a.questaoId,
+        respondentes: a.respondentes,
+        acertos: a.acertos,
+        erros: a.erros,
+        semLeitura: a.semLeitura,
+        porAlternativa: a.porAlternativa,
+        alternativaCorreta: a.alternativaCorreta,
+        discriminacao: a.discriminacao,
+        acertosGeral: g.acertos,
+        baseGeral: g.quantidadeResposta,
+      };
+    });
 
     // Questão sem número vai para o fim: sumir da ordenação seria pior que
     // aparecer fora de ordem, porque o professor não saberia que ela existe.
