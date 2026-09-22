@@ -612,6 +612,161 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
     });
   });
 
+  /**
+   * O card 05: a discriminação sai na MESMA passada da agregação, e não numa
+   * consulta nova — duas consultas sobre o mesmo recorte podem ver estados
+   * diferentes se um cartão terminar de processar entre elas, e o relatório
+   * mostraria dificuldade de uma foto e discriminação de outra.
+   *
+   * ⚠️ Mongo real: o que se testa aqui é se os ACUMULADORES saem certos do
+   * `$group`. A fórmula em si tem seu próprio spec, com valores conferidos à
+   * mão (`discriminacao.spec.ts`).
+   */
+  describe('discriminação por questão (card 05) — Mongo real', () => {
+    const SIM_D = new Types.ObjectId();
+    /** Só os melhores acertam: discriminação positiva alta. */
+    const Q_BOA = new Types.ObjectId();
+    /** Só os piores acertam: NEGATIVA — o sinal de gabarito trocado. */
+    const Q_TROCADA = new Types.ObjectId();
+    /** Todos acertam: variância do item zero. */
+    const Q_FACIL = new Types.ObjectId();
+    /**
+     * Metade não foi lida — e quem não foi lido NÃO entra na correlação.
+     *
+     * ⚠️ Sem esta questão no seed, a decisão de usar `comLeitura` em vez de
+     * `respondentes` não fica travada por teste nenhum: a mutação que troca o
+     * denominador sobrevive, porque nenhuma outra questão do seed tem
+     * sem-leitura.
+     */
+    const Q_MEIA_LIDA = new Types.ObjectId();
+
+    beforeAll(async () => {
+      // Dez estudantes com notas 1,0 a 0,1 — os mesmos do `discriminacao.spec`.
+      const notas = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1];
+
+      for (const [i, nota] of notas.entries()) {
+        const bom = i < 5;
+        const h = await histModel.create({
+          usuario: `d-${i}`,
+          simulado: SIM_D,
+          status: 'completed',
+          aproveitamento: { geral: nota, materias: [] },
+          respostas: [
+            {
+              questao: Q_BOA,
+              alternativaEstudante: bom ? 'A' : 'B',
+              alternativaCorreta: 'A',
+            },
+            {
+              questao: Q_TROCADA,
+              alternativaEstudante: bom ? 'B' : 'A',
+              alternativaCorreta: 'A',
+            },
+            {
+              questao: Q_FACIL,
+              alternativaEstudante: 'A',
+              alternativaCorreta: 'A',
+            },
+            /*
+              Os 10 primeiros pares de notas viram 5 lidos + 5 não lidos: quem
+              tem índice par teve leitura (e acerta se for dos melhores), quem
+              tem índice ímpar chega SEM a chave `alternativaEstudante`.
+
+              São 5 com leitura — abaixo do mínimo de 10 —, então esta questão
+              devolve `null` pela BASE. Se `respondentes` fosse o denominador,
+              seriam 10 e o número sairia.
+            */
+            i % 2 === 0
+              ? {
+                  questao: Q_MEIA_LIDA,
+                  alternativaEstudante: bom ? 'A' : 'B',
+                  alternativaCorreta: 'A',
+                }
+              : { questao: Q_MEIA_LIDA, alternativaCorreta: 'A' },
+          ],
+        });
+        await relModel.create({
+          historico: h._id,
+          simulado: SIM_D,
+          usuario: `d-${i}`,
+          cursinhoId: 'cur-disc',
+        });
+      }
+    }, 120_000);
+
+    async function doRecorte() {
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_D.toString(),
+        cursinhoId: 'cur-disc',
+      });
+      return (q: Types.ObjectId) =>
+        r.find((x) => x.questaoId === q.toString())!;
+    }
+
+    it('⚠️ questão que só os melhores acertam: 0,870388', async () => {
+      // O mesmo número do `discriminacao.spec.ts`, agora saindo do Mongo. É
+      // isto que liga a fórmula testada aos acumuladores da agregação — cada
+      // um verde sozinho não prova que estão conectados.
+      const q = await doRecorte();
+
+      expect(q(Q_BOA).discriminacao).toBeCloseTo(0.870388, 6);
+    });
+
+    it('⚠️ questão que só os PIORES acertam dá negativo — gabarito trocado', async () => {
+      const q = await doRecorte();
+
+      expect(q(Q_TROCADA).discriminacao).toBeCloseTo(-0.870388, 6);
+    });
+
+    it('⚠️ questão que todos acertam devolve `null`, e não `NaN`', async () => {
+      const q = await doRecorte();
+
+      expect(q(Q_FACIL).discriminacao).toBeNull();
+      // e os acertos seguem certos — o `null` é só da discriminação
+      expect(q(Q_FACIL).acertos).toBe(10);
+    });
+
+    it('⚠️ quem NÃO foi lido não entra na base da correlação', async () => {
+      // 10 respondentes, mas só 5 com leitura — abaixo do mínimo, então `null`.
+      // Se o denominador fosse `respondentes`, o número sairia: quem não foi
+      // lido entraria como se tivesse errado, e a questão seria punida pela
+      // qualidade da foto em vez de pela própria qualidade.
+      const q = await doRecorte();
+
+      expect(q(Q_MEIA_LIDA).respondentes).toBe(10);
+      expect(q(Q_MEIA_LIDA).semLeitura).toBe(5);
+      expect(q(Q_MEIA_LIDA).discriminacao).toBeNull();
+    });
+
+    it('⚠️ recorte pequeno devolve `null` — o seed principal tem 3 estudantes', async () => {
+      // `SIM_C` tem 3 com leitura. Correlação sobre 3 é ruído com cara de
+      // estatística, e o professor não tem como saber olhando "0,71".
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-1',
+      });
+
+      for (const questao of r) {
+        expect(questao.discriminacao).toBeNull();
+      }
+    });
+
+    it('⚠️ UMA passada de agregação — sem consulta extra', async () => {
+      // O card pede explicitamente. Se a discriminação virasse uma segunda
+      // consulta, um cartão que terminasse de processar no meio faria a tela
+      // mostrar dificuldade de uma foto e discriminação de outra.
+      const spy = jest.spyOn(relModel, 'aggregate');
+
+      await repo.agregarPorQuestao({
+        simuladoId: SIM_D.toString(),
+        cursinhoId: 'cur-disc',
+      });
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      spy.mockRestore();
+    });
+  });
+
   describe('listarSimuladosComCartao (Mongo real)', () => {
     const SIM_L1 = new Types.ObjectId();
     const SIM_L2 = new Types.ObjectId();

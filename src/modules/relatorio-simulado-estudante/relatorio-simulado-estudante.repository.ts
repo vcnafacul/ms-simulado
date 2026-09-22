@@ -4,6 +4,7 @@ import { Model, Types } from 'mongoose';
 import { Historico } from '../historico/historico.schema';
 import { HistoricoStatus } from '../historico/enums/historico-status.enum';
 import { Alternativa } from '../questao/enums/alternativa.enum';
+import { pontoBisserial } from './discriminacao';
 import { RelatorioSimuladoEstudante } from './relatorio-simulado-estudante.schema';
 
 /**
@@ -65,6 +66,17 @@ export interface AgregadoDaQuestao {
   erros: number;
   semLeitura: number;
   porAlternativa: Record<string, number>;
+
+  /**
+   * A correlação ponto-bisserial entre acertar esta questão e a nota da prova
+   * — ver `discriminacao.ts` para a fórmula e as decisões.
+   *
+   * ⚠️ **`null` não é zero.** Zero diria "a questão não separa ninguém";
+   * `null` diz que não há como medir: base abaixo de
+   * `MINIMO_PARA_DISCRIMINAR`, ou variância zero (todos acertaram, ninguém
+   * acertou, ou a turma toda com a mesma nota).
+   */
+  discriminacao: number | null;
 
   /**
    * O gabarito que VALEU nesta aplicação — a cópia gravada em cada `Resposta`,
@@ -357,6 +369,63 @@ export class RelatorioSimuladoEstudanteRepository {
               um SINTOMA, não um defeito desta consulta.
             */
             gabaritos: { $addToSet: '$h.respostas.alternativaCorreta' },
+            /*
+              ⚠️ **Os acumuladores da discriminação saem NESTA passada** (card
+              05), e não numa consulta nova. Duas consultas sobre o mesmo
+              recorte podem ver estados diferentes se um cartão terminar de
+              processar entre elas — a tela mostraria dificuldade de uma foto e
+              discriminação de outra.
+
+              ⚠️ **O denominador é `comLeitura`, e não `respondentes`.** Quem
+              não foi lido não errou o item: não há medida dele. Contá-lo como
+              "errou" é o que o relatório inteiro recusa fazer, e aqui
+              enviesaria a correlação para baixo em toda questão que caiu numa
+              folha mal fotografada — punindo o item pela qualidade da foto.
+
+              ⚠️ Só as somas saem do Mongo; a fórmula fecha em TypeScript
+              (`discriminacao.ts`), onde é legível e testável com valores
+              conferidos à mão, sem subir banco.
+            */
+            comLeitura: { $sum: { $cond: [{ $ne: [marcada, null] }, 1, 0] } },
+            somaNota: {
+              $sum: {
+                $cond: [
+                  { $ne: [marcada, null] },
+                  { $ifNull: ['$h.aproveitamento.geral', 0] },
+                  0,
+                ],
+              },
+            },
+            somaNotaQuadrado: {
+              $sum: {
+                $cond: [
+                  { $ne: [marcada, null] },
+                  {
+                    $pow: [{ $ifNull: ['$h.aproveitamento.geral', 0] }, 2],
+                  },
+                  0,
+                ],
+              },
+            },
+            somaNotaAcertou: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $ne: [marcada, null] },
+                      {
+                        $eq: [
+                          '$h.respostas.alternativaEstudante',
+                          '$h.respostas.alternativaCorreta',
+                        ],
+                      },
+                    ],
+                  },
+                  { $ifNull: ['$h.aproveitamento.geral', 0] },
+                  0,
+                ],
+              },
+            },
             ...porAlternativa,
           },
         },
@@ -372,6 +441,13 @@ export class RelatorioSimuladoEstudanteRepository {
       porAlternativa: Object.fromEntries(
         Object.values(Alternativa).map((alt) => [alt, l[alt] ?? 0]),
       ),
+      discriminacao: pontoBisserial({
+        comLeitura: l.comLeitura,
+        acertos: l.acertos,
+        somaNota: l.somaNota,
+        somaNotaQuadrado: l.somaNotaQuadrado,
+        somaNotaAcertou: l.somaNotaAcertou,
+      }),
       alternativaCorreta: gabaritoUnico(
         l.gabaritos,
         l._id?.toString(),
