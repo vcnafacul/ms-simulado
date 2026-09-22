@@ -64,9 +64,16 @@ export interface AcumuladoresDeDiscriminacao {
  * que o card 06 exibe. Se a contagem de questões por simulado cair para algo
  * como 10, isto tem de ser revisto.
  *
- * ⚠️ **Depende da definição de `aproveitamento.geral`.** Hoje "sem leitura"
- * entra nela como erro; o card 13 propõe mudar isso, e quando mudar a
- * discriminação muda junto — os testes daqui têm de ser revisitados.
+ * ⚠️ **Depende da definição de `aproveitamento.geral`, e ela FICOU como está**
+ * (card 13): "sem leitura" segue entrando como erro. A decisão foi a opção C —
+ * não mudar a fórmula e passar a mostrar a contagem de não lidas ao lado do
+ * número, no client. Portanto **nada aqui muda**, e os testes deste arquivo
+ * seguem válidos.
+ *
+ * O motivo de não mudar está escrito no docblock do `criaAproveitamento`. Em
+ * resumo: `acertos / lidas` faria a nota MELHORAR quando a leitura do cartão
+ * piorasse, e o valor é gravado — históricos velhos e novos ficariam com
+ * fórmulas diferentes sem nada na tela dizendo isso.
  *
  * ⚠️ Devolve `null`, nunca `NaN`, nos três casos degenerados: base pequena,
  * variância do item zero (todos acertaram ou ninguém acertou) e variância das
