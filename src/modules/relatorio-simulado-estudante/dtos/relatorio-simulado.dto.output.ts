@@ -102,4 +102,28 @@ export class RelatorioSimuladoDtoOutput {
    */
   @ApiProperty()
   totalDeQuestoes: number;
+
+  /**
+   * O nome do simulado — sem ele a tela não se identifica (card 18).
+   *
+   * ⚠️ **`null` quando o simulado foi apagado depois do vínculo.** Os cartões
+   * continuam existindo, e escondê-los seria pior que rotulá-los — o mesmo caso
+   * que `listarSimuladosComCartao` já trata. A tela reusa a constante que ela
+   * já tem para isso, em vez de inventar outro texto.
+   */
+  @ApiProperty({ required: true, nullable: true })
+  simuladoNome: string | null;
+
+  /**
+   * Quando o cartão mais recente entrou neste recorte.
+   *
+   * ⚠️ **NÃO é "data da prova".** Ela não existe no modelo — `disponivelDe`
+   * está preenchida em 0 dos 131 simulados de homologação. E **não é "última
+   * atividade"**: `registrar` é upsert, então reenvio do mesmo estudante não
+   * move a data. O rótulo na tela tem de ser "último cartão".
+   *
+   * `null` em recorte sem cartão nenhum.
+   */
+  @ApiProperty({ required: true, nullable: true })
+  ultimoCartaoEm: Date | null;
 }

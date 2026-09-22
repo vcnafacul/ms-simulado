@@ -37,6 +37,10 @@ const montar = (linhas: any[], total = 30, questoes = 3) => {
         numero: i + 1,
       })),
     ),
+    // ⚠️ Card 18: o `consultar` passou a buscar o nome do simulado.
+    getNomesPorIds: jest
+      .fn()
+      .mockResolvedValue([{ id: SIM, nome: 'Simulado' }]),
   };
   return {
     svc: new RelatorioSimuladoEstudanteService(
@@ -986,5 +990,122 @@ describe('RelatorioSimuladoEstudanteService.consultar — acertos absolutos (car
     const r = await primeira(linha({ historico: { acertos: 0 } }));
 
     expect(r.linhas[0].acertos).toBe(0);
+  });
+});
+
+describe('RelatorioSimuladoEstudanteService.consultar — identificação (card 18)', () => {
+  /**
+   * O card 18: o cabeçalho da rota era a string fixa "Relatório do simulado", e
+   * o payload não trazia nome nenhum. Link colado no WhatsApp, folha impressa e
+   * aba esquecida — a página não se identificava em nenhum dos três.
+   */
+  const montarCom = (opts: {
+    linhas?: any[];
+    nome?: string | null;
+    questoes?: number;
+  }) => {
+    const repository = {
+      buscarPorRecorte: jest.fn().mockResolvedValue(opts.linhas ?? [linha()]),
+      contarDoCursinho: jest.fn().mockResolvedValue(30),
+    };
+    const simuladoRepository = {
+      getNumerosDasQuestoes: jest.fn().mockResolvedValue(
+        Array.from({ length: opts.questoes ?? 90 }, (_, i) => ({
+          questaoId: `q${i}`,
+          numero: i + 1,
+        })),
+      ),
+      getNomesPorIds: jest
+        .fn()
+        .mockResolvedValue(
+          opts.nome === null
+            ? []
+            : [{ id: SIM, nome: opts.nome ?? 'ENEM 2024' }],
+        ),
+    };
+    return {
+      svc: new RelatorioSimuladoEstudanteService(
+        repository as any,
+        simuladoRepository as any,
+      ),
+      simuladoRepository,
+    };
+  };
+
+  it('devolve o nome do simulado', async () => {
+    const { svc } = montarCom({ nome: 'ENEM 2024 — 2ª aplicação' });
+
+    const r = await svc.consultar({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+    expect(r.simuladoNome).toBe('ENEM 2024 — 2ª aplicação');
+  });
+
+  it('⚠️ simulado apagado devolve `null`, e o relatório NÃO some', async () => {
+    // Os cartões continuam existindo; escondê-los é pior que rotulá-los —
+    // mesma decisão do `listarSimuladosComCartao`.
+    const { svc } = montarCom({ nome: null });
+
+    const r = await svc.consultar({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+    expect(r.simuladoNome).toBeNull();
+    expect(r.linhas).toHaveLength(1);
+  });
+
+  it('⚠️ reusa o `getNomesPorIds`, e não o `getById`', async () => {
+    // O `getById` popularia categoria, frentes e matéria — carga enorme para
+    // ler um nome.
+    const { svc, simuladoRepository } = montarCom({});
+
+    await svc.consultar({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+    expect(simuladoRepository.getNomesPorIds).toHaveBeenCalledWith([SIM]);
+  });
+
+  describe('a data do último cartão', () => {
+    const comData = (iso: string, usuario = 'u1') =>
+      ({ ...linha({ usuario }), createdAt: new Date(iso) }) as any;
+
+    it('é a MAIS RECENTE das linhas do recorte', async () => {
+      const { svc } = montarCom({
+        linhas: [
+          comData('2026-09-10T10:00:00Z', 'u1'),
+          comData('2026-09-21T15:30:00Z', 'u2'),
+          comData('2026-09-14T08:00:00Z', 'u3'),
+        ],
+      });
+
+      const r = await svc.consultar({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+      expect(r.ultimoCartaoEm).toEqual(new Date('2026-09-21T15:30:00Z'));
+    });
+
+    it('⚠️ recorte sem cartão devolve `null`, não a data de hoje', async () => {
+      const { svc } = montarCom({ linhas: [] });
+
+      const r = await svc.consultar({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+      expect(r.ultimoCartaoEm).toBeNull();
+    });
+
+    it('linha sem `createdAt` não estoura nem vira data inválida', async () => {
+      const { svc } = montarCom({ linhas: [linha()] });
+
+      const r = await svc.consultar({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+      expect(r.ultimoCartaoEm).toBeNull();
+    });
+
+    it('mistura de linhas com e sem data devolve a que tem', async () => {
+      const { svc } = montarCom({
+        linhas: [
+          linha({ usuario: 'u1' }),
+          comData('2026-09-21T15:30:00Z', 'u2'),
+        ],
+      });
+
+      const r = await svc.consultar({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+      expect(r.ultimoCartaoEm).toEqual(new Date('2026-09-21T15:30:00Z'));
+    });
   });
 });
