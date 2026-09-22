@@ -1,4 +1,4 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, Logger, ValidationPipe } from '@nestjs/common';
 import { getModelToken, MongooseModule } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
 import { MongoMemoryServer } from 'mongodb-memory-server';
@@ -412,6 +412,203 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
         cursinhoId: 'cur-1',
       });
       expect(r).toEqual([]);
+    });
+
+    /**
+     * O card 03: as cinco colunas de alternativa da aba de Questões não são
+     * interpretáveis sem o gabarito. "51% marcaram B" é a turma acertando em
+     * peso ou meia turma caindo no mesmo distrator — leituras opostas, e a
+     * tela não permitia escolher entre elas.
+     *
+     * ⚠️ O valor sai do HISTÓRICO, nunca de `Questao.alternativa`: é o gabarito
+     * que VALEU naquela aplicação, que é a pergunta certa quando a questão foi
+     * editada depois. E `Questao.alternativa` é `select: false` — trazê-lo
+     * abriria um caminho de leitura de gabarito onde hoje não existe nenhum.
+     */
+    it('devolve a alternativa correta de cada questão', async () => {
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-1',
+      });
+
+      expect(
+        r.find((q) => q.questaoId === Q1.toString())!.alternativaCorreta,
+      ).toBe('A');
+      expect(
+        r.find((q) => q.questaoId === Q2.toString())!.alternativaCorreta,
+      ).toBe('B');
+    });
+
+    it('⚠️ INVARIANTE: `porAlternativa[correta] === acertos`', async () => {
+      // Se o gabarito devolvido não for o mesmo que a agregação usou para
+      // contar `acertos`, esta igualdade quebra. É o teste que liga o campo
+      // novo aos números que já existiam, em vez de afirmá-lo isolado.
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-1',
+      });
+
+      expect(r).toHaveLength(2);
+      for (const q of r) {
+        expect(q.porAlternativa[q.alternativaCorreta!]).toBe(q.acertos);
+      }
+    });
+
+    it('⚠️ só o histórico COMPLETED define o gabarito', async () => {
+      // u-6 (`failed`) e u-7 (`pending`) carregam `alternativaCorreta: 'A'` em
+      // Q1 — igual aos completos, então este teste não distingue nada sozinho.
+      // O que ele trava é que o campo passa pelo MESMO `$match` dos outros: se
+      // o gabarito fosse coletado antes do filtro de status, um reprocessamento
+      // com gabarito novo mandaria a divergência para dentro do grupo.
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_C.toString(),
+        cursinhoId: 'cur-1',
+      });
+      const q1 = r.find((q) => q.questaoId === Q1.toString())!;
+
+      expect(q1.respondentes).toBe(3);
+      expect(q1.alternativaCorreta).toBe('A');
+    });
+  });
+
+  /**
+   * O caso patológico do card 03, isolado no seu próprio cursinho para não
+   * mexer em nenhum número dos testes acima.
+   *
+   * ⚠️ **Não é hipotético.** `docs/cards/etapa-11/` registra a corrida do
+   * `adicionarEmProva` que permite a mesma questão entrar duas vezes num
+   * simulado; e uma questão editada entre duas aplicações do mesmo simulado
+   * produz históricos com gabaritos diferentes. Enquanto isso for possível,
+   * `$first` é um chute que ninguém vê.
+   */
+  describe('agregado por questão — gabaritos divergentes (card 03)', () => {
+    const SIM_G = new Types.ObjectId();
+    const Q_DIVERGE = new Types.ObjectId();
+    const Q_OK = new Types.ObjectId();
+
+    beforeAll(async () => {
+      const com = async (usuario: string, respostas: any[]) => {
+        const h = await histModel.create({
+          usuario,
+          simulado: SIM_G,
+          status: 'completed',
+          respostas,
+        });
+        await relModel.create({
+          historico: h._id,
+          simulado: SIM_G,
+          usuario,
+          cursinhoId: 'cur-gab',
+        });
+      };
+
+      // A questão foi editada entre as duas aplicações: o gabarito era 'A' e
+      // virou 'D'. Cada histórico guardou o que valia na hora.
+      await com('g-1', [
+        {
+          questao: Q_DIVERGE,
+          alternativaEstudante: 'A',
+          alternativaCorreta: 'A',
+        },
+        { questao: Q_OK, alternativaEstudante: 'C', alternativaCorreta: 'C' },
+      ]);
+      await com('g-2', [
+        {
+          questao: Q_DIVERGE,
+          alternativaEstudante: 'D',
+          alternativaCorreta: 'D',
+        },
+        { questao: Q_OK, alternativaEstudante: 'B', alternativaCorreta: 'C' },
+      ]);
+      /*
+        Histórico antigo: a resposta existe e o gabarito não foi copiado.
+        Ausência não é divergência — ver o `filter(Boolean)` do `gabaritoUnico`.
+
+        ⚠️ **Os dois casos, e eles NÃO são equivalentes** — medido no Mongo:
+        `$addToSet` IGNORA caminho ausente e INCLUI `null` explícito. Um seed
+        só com a chave faltando deixaria o `filter(Boolean)` sem exercício
+        nenhum, e a mutação que o remove sobreviveria.
+      */
+      await com('g-3', [{ questao: Q_OK, alternativaEstudante: 'C' }]);
+      await com('g-4', [
+        { questao: Q_OK, alternativaEstudante: 'C', alternativaCorreta: null },
+      ]);
+    }, 120_000);
+
+    it('⚠️ devolve `null` em vez de escolher um dos dois gabaritos', async () => {
+      const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_G.toString(),
+        cursinhoId: 'cur-gab',
+      });
+
+      expect(
+        r.find((q) => q.questaoId === Q_DIVERGE.toString())!.alternativaCorreta,
+      ).toBeNull();
+      error.mockRestore();
+    });
+
+    it('⚠️ e LOGA — divergência silenciosa é pior que campo vazio', async () => {
+      const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
+      await repo.agregarPorQuestao({
+        simuladoId: SIM_G.toString(),
+        cursinhoId: 'cur-gab',
+      });
+
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining(Q_DIVERGE.toString()),
+      );
+      error.mockRestore();
+    });
+
+    it('⚠️ resposta SEM gabarito copiado não conta como divergência', async () => {
+      // O `$addToSet` inclui `null` quando a chave falta (histórico antigo).
+      // Tratá-lo como uma "segunda letra" apagaria o gabarito bom da questão
+      // inteira — a ausência de um vira a perda da informação de todos.
+      const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_G.toString(),
+        cursinhoId: 'cur-gab',
+      });
+      const q = r.find((x) => x.questaoId === Q_OK.toString())!;
+
+      expect(q.respondentes).toBe(4);
+      expect(q.alternativaCorreta).toBe('C');
+      error.mockRestore();
+    });
+
+    it('a divergência de uma questão NÃO contamina as outras', async () => {
+      const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_G.toString(),
+        cursinhoId: 'cur-gab',
+      });
+
+      expect(
+        r.find((q) => q.questaoId === Q_OK.toString())!.alternativaCorreta,
+      ).toBe('C');
+      error.mockRestore();
+    });
+
+    it('⚠️ com gabarito divergente os acertos seguem CERTOS', async () => {
+      // A conta de `acertos` compara campo com campo dentro da mesma linha, e
+      // por isso é imune à divergência: g-1 acertou por 'A' e g-2 por 'D'. O
+      // que se perde é só a capacidade de dizer QUAL é a correta — e é
+      // exatamente isso que o `null` comunica.
+      const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
+      const r = await repo.agregarPorQuestao({
+        simuladoId: SIM_G.toString(),
+        cursinhoId: 'cur-gab',
+      });
+      const q = r.find((x) => x.questaoId === Q_DIVERGE.toString())!;
+
+      expect(q).toMatchObject({ respondentes: 2, acertos: 2, erros: 0 });
+      error.mockRestore();
     });
   });
 

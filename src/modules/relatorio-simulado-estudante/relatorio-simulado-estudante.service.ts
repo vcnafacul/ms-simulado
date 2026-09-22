@@ -113,6 +113,7 @@ export class RelatorioSimuladoEstudanteService {
       erros: a.erros,
       semLeitura: a.semLeitura,
       porAlternativa: a.porAlternativa,
+      alternativaCorreta: a.alternativaCorreta,
     }));
 
     // Questão sem número vai para o fim: sumir da ordenação seria pior que
