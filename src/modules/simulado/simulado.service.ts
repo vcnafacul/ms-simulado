@@ -263,6 +263,24 @@ export class SimuladoService {
         (r) => r.alternativaEstudante !== undefined,
       ).length;
 
+      /*
+        ⚠️ **Contado aqui, e não derivado do percentual depois** (card 08).
+        `aproveitamento.geral` é uma fração já arredondada na exibição;
+        multiplicá-la pelo total produz `44` onde o aluno fez `45`, e a tela e
+        a planilha passam a discordar sobre um número que o aluno confere à
+        mão contra o próprio cartão.
+
+        ⚠️ Mesma razão de o `questoesRespondidas` acima ser gravado aqui: o
+        relatório não pode pedir `respostas` no `select` (são 90 questões ×
+        centenas de estudantes — medido em 824 KB por 100 linhas), então o que
+        ele precisa contar tem de já estar contado no documento.
+      */
+      const acertos = respostasAproveitamento.filter(
+        (r) =>
+          r.alternativaEstudante !== undefined &&
+          r.alternativaEstudante === r.alternativaCorreta,
+      ).length;
+
       await this.historicoRepository.completeProcessing(histId, {
         ano,
         simulado,
@@ -273,6 +291,7 @@ export class SimuladoService {
         })),
         aproveitamento,
         questoesRespondidas,
+        acertos,
       });
     } catch (err) {
       await this.historicoRepository.marcarFalha(

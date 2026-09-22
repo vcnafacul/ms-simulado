@@ -400,6 +400,8 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       aproveitamento: any;
       /** Quantas questões saíram com marcação legível — ver `processAnswer`. */
       questoesRespondidas: number;
+      /** Quantas foram acertadas — contado, nunca derivado do percentual. */
+      acertos: number;
     },
   ): Promise<void> {
     await this.model
@@ -410,6 +412,7 @@ export class HistoricoRepository extends BaseRepository<Historico> {
         respostas: data.respostas,
         aproveitamento: data.aproveitamento,
         questoesRespondidas: data.questoesRespondidas,
+        acertos: data.acertos,
         rawRespostas: null,
       })
       .exec();

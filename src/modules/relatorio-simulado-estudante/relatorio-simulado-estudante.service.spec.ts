@@ -19,14 +19,32 @@ const linha = (over: any = {}) => ({
   },
 });
 
-const montar = (linhas: any[], total = 30) => {
+/**
+ * ⚠️ `totalDeQuestoes` (card 08) sai do SIMULADO, então o `simuladoRepository`
+ * deixou de ser um `{}` aqui: o `consultar` chama `getNumerosDasQuestoes`.
+ * O padrão são 3 questões, para o total ser distinguível de qualquer contagem
+ * de linhas do teste.
+ */
+const montar = (linhas: any[], total = 30, questoes = 3) => {
   const repository = {
     buscarPorRecorte: jest.fn().mockResolvedValue(linhas),
     contarDoCursinho: jest.fn().mockResolvedValue(total),
   };
+  const simuladoRepository = {
+    getNumerosDasQuestoes: jest.fn().mockResolvedValue(
+      Array.from({ length: questoes }, (_, i) => ({
+        questaoId: `q${i}`,
+        numero: i + 1,
+      })),
+    ),
+  };
   return {
-    svc: new RelatorioSimuladoEstudanteService(repository as any, {} as any),
+    svc: new RelatorioSimuladoEstudanteService(
+      repository as any,
+      simuladoRepository as any,
+    ),
     repository,
+    simuladoRepository,
   };
 };
 
@@ -876,5 +894,97 @@ describe('RelatorioSimuladoEstudanteService.consultar — nota por matéria (car
     );
 
     expect(linha0.aproveitamentoPorMateria).toBeUndefined();
+  });
+});
+
+describe('RelatorioSimuladoEstudanteService.consultar — acertos absolutos (card 08)', () => {
+  /**
+   * O card 08: cursinho conversa em ACERTOS, não em percentual — e o percentual
+   * sozinho esconde o denominador (58% de 45 e 58% de 180 são confianças
+   * diferentes sobre o mesmo número).
+   */
+  async function primeira(l: any, questoes = 90) {
+    const { svc } = montar([l], 30, questoes);
+    const r = await svc.consultar({ simuladoId: SIM, cursinhoId: 'cur-1' });
+    return r;
+  }
+
+  it('devolve os acertos de quem tem leitura concluída', async () => {
+    const r = await primeira(linha({ historico: { acertos: 61 } }));
+
+    expect(r.linhas[0].acertos).toBe(61);
+  });
+
+  it('⚠️ o total vem do SIMULADO, e no topo — não repetido por linha', async () => {
+    // É propriedade do simulado, não do estudante: repetido em 500 linhas seria
+    // dizer 500 vezes a mesma coisa, e abriria a porta para duas discordarem.
+    const r = await primeira(linha({ historico: { acertos: 61 } }), 90);
+
+    expect(r.totalDeQuestoes).toBe(90);
+    expect(r.linhas[0]).not.toHaveProperty('totalDeQuestoes');
+  });
+
+  it('⚠️ o total NÃO sai de `respostas.length`', async () => {
+    // São iguais hoje — o `processAnswer` mapeia sobre `simulado.questoes` — e
+    // "iguais hoje" é o tipo de coisa que deixa de ser verdade sem ninguém
+    // notar. Uma questão removida da prova depois dos cartões lidos já os
+    // separaria. Aqui o simulado tem 90 e a linha traz outro número.
+    const { svc, simuladoRepository } = montar(
+      [linha({ historico: { acertos: 5, respostas: [1, 2, 3] } })],
+      30,
+      90,
+    );
+
+    const r = await svc.consultar({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+    expect(r.totalDeQuestoes).toBe(90);
+    expect(simuladoRepository.getNumerosDasQuestoes).toHaveBeenCalledWith(SIM);
+  });
+
+  it('simulado que não existe mais devolve total 0, e não estoura', async () => {
+    const r = await primeira(linha({ historico: { acertos: 10 } }), 0);
+
+    expect(r.totalDeQuestoes).toBe(0);
+  });
+
+  it('⚠️ linha `failed` NÃO traz acertos, mesmo com o campo gravado', async () => {
+    // `marcarFalha` não limpa o documento: uma linha que leu bem, reprocessou e
+    // falhou carrega os acertos da rodada ANTERIOR.
+    const r = await primeira(
+      linha({ historico: { status: 'failed', acertos: 61 } }),
+    );
+
+    expect(r.linhas[0].acertos).toBeUndefined();
+  });
+
+  it.each(['pending', 'processing', 'awaiting_omr'])(
+    'status %s não traz acertos',
+    async (status) => {
+      const r = await primeira(linha({ historico: { status, acertos: 61 } }));
+
+      expect(r.linhas[0].acertos).toBeUndefined();
+    },
+  );
+
+  it('⚠️ histórico anterior ao card 08 devolve o campo AUSENTE, não 0', async () => {
+    // O campo simplesmente não foi gravado. Zero afirmaria que o aluno não
+    // acertou nada — e ele tem nota na mesma linha.
+    const r = await primeira(
+      linha({
+        historico: { acertos: undefined, aproveitamento: { geral: 0.7 } },
+      }),
+    );
+
+    expect(r.linhas[0].acertos).toBeUndefined();
+    expect(r.linhas[0].aproveitamentoGeral).toBe(0.7);
+  });
+
+  it('⚠️ zero acertos é ZERO, e não ausente', async () => {
+    // Cartão lido em que o aluno não acertou nada é uma medida, e diferente de
+    // não ter medida. Se o gate confundisse os dois, a distinção que este card
+    // inteiro defende iria embora no caso extremo.
+    const r = await primeira(linha({ historico: { acertos: 0 } }));
+
+    expect(r.linhas[0].acertos).toBe(0);
   });
 });

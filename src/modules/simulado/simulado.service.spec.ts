@@ -625,3 +625,153 @@ describe('SimuladoService.processAnswer — questoesRespondidas (card 01)', () =
     ).toBe(1);
   });
 });
+
+describe('SimuladoService.processAnswer — acertos absolutos (card 08)', () => {
+  /**
+   * O card 08: cursinho conversa em ACERTOS ("fiz 61 na primeira aplicação",
+   * "o corte de Medicina ficou em 78"), não em percentual — e o percentual
+   * sozinho esconde o denominador: 58% de 45 e 58% de 180 são confianças
+   * completamente diferentes sobre o mesmo número.
+   *
+   * ⚠️ Contado aqui, e **nunca derivado** de `aproveitamento.geral × total`:
+   * a fração já arredondada produz 44 onde o aluno fez 45 — e ele confere esse
+   * número à mão, contra o próprio cartão.
+   */
+  function questao(id: string, alternativa = 'A') {
+    return {
+      _id: { toString: () => id },
+      alternativa,
+      materia: { _id: { toString: () => 'm1' }, nome: 'Mat' },
+      frente1: { _id: { toString: () => 'f1' }, nome: 'Fr' },
+    } as any;
+  }
+
+  function montar(opts: { questoes: any[]; rawRespostas: any[] }) {
+    const historicoRepository: any = {
+      claimForProcessing: jest.fn().mockResolvedValue(true),
+      getById: jest.fn().mockResolvedValue({
+        simulado: 's1',
+        rawRespostas: opts.rawRespostas,
+      }),
+      completeProcessing: jest.fn().mockResolvedValue(undefined),
+      marcarFalha: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new SimuladoService(
+      {
+        answer: jest.fn().mockResolvedValue({
+          _id: 's1',
+          questoes: opts.questoes.map((q, i) => ({
+            questao: q,
+            numero: i + 1,
+          })),
+        }),
+      } as any,
+      {
+        findAnoByQuestao: jest.fn().mockResolvedValue(2026),
+        updateQuestionAnswered: jest.fn().mockResolvedValue(undefined),
+      } as any,
+      {} as any,
+      historicoRepository,
+      {} as any,
+      {} as any,
+    );
+    return { service, historicoRepository };
+  }
+
+  async function acertosDe(opts: { questoes: any[]; rawRespostas: any[] }) {
+    const { service, historicoRepository } = montar(opts);
+    await service.processAnswer('hist1');
+    return historicoRepository.completeProcessing.mock.calls[0][1].acertos;
+  }
+
+  it('conta os acertos, comparando com o gabarito da questão', async () => {
+    expect(
+      await acertosDe({
+        questoes: [questao('q1', 'A'), questao('q2', 'B'), questao('q3', 'C')],
+        rawRespostas: [
+          { questao: 'q1', alternativaEstudante: 'A' },
+          { questao: 'q2', alternativaEstudante: 'B' },
+          { questao: 'q3', alternativaEstudante: 'E' },
+        ],
+      }),
+    ).toBe(2);
+  });
+
+  it('⚠️ questão NÃO LIDA não conta como acerto nem como erro', async () => {
+    // A chave `alternativaEstudante` vem ausente quando o ms-omr descartou a
+    // marcação (branco ou dupla).
+    expect(
+      await acertosDe({
+        questoes: [questao('q1', 'A'), questao('q2', 'B')],
+        rawRespostas: [{ questao: 'q1', alternativaEstudante: 'A' }],
+      }),
+    ).toBe(1);
+  });
+
+  it('⚠️ questão SEM GABARITO não vira acerto de quem não respondeu', async () => {
+    /*
+      O caso que a guarda `!== undefined` existe para impedir, e ele é REAL:
+      `Questao.alternativa` é `@Prop({ select: false })` no schema. Se uma
+      consulta deixar de trazê-lo, `alternativaCorreta` chega `undefined` em
+      TODAS as respostas — e `undefined === undefined` é `true`.
+
+      Sem a guarda, um simulado inteiro sem gabarito daria 100% de acerto para
+      quem não marcou nada. Escrevi este teste depois que a mutação que remove
+      a guarda sobreviveu a todos os outros: nenhum deles tinha gabarito
+      ausente, porque o caso parece impossível até olhar o `select: false`.
+    */
+    const semGabarito = {
+      _id: { toString: () => 'q1' },
+      alternativa: undefined,
+      materia: { _id: { toString: () => 'm1' }, nome: 'Mat' },
+      frente1: { _id: { toString: () => 'f1' }, nome: 'Fr' },
+    } as any;
+
+    expect(
+      await acertosDe({
+        questoes: [semGabarito, semGabarito],
+        rawRespostas: [],
+      }),
+    ).toBe(0);
+  });
+
+  it('cartão totalmente ilegível grava 0 acertos, e não ausente', async () => {
+    expect(
+      await acertosDe({
+        questoes: [questao('q1'), questao('q2')],
+        rawRespostas: [],
+      }),
+    ).toBe(0);
+  });
+
+  it('⚠️ resposta de questão fora do simulado não conta', async () => {
+    // Mesma razão do `questoesRespondidas`: o `map` sobre `simulado.questoes` é
+    // o gate, e a contagem sai de depois dele.
+    expect(
+      await acertosDe({
+        questoes: [questao('q1', 'A')],
+        rawRespostas: [
+          { questao: 'q1', alternativaEstudante: 'A' },
+          { questao: 'q-de-outra-prova', alternativaEstudante: 'A' },
+        ],
+      }),
+    ).toBe(1);
+  });
+
+  it('⚠️ acertos ≤ questoesRespondidas ≤ total, sempre', async () => {
+    // A invariante que pega um filtro trocado: acertar mais questões do que se
+    // respondeu é impossível, e sairia como nota acima de 100% na tela.
+    const { service, historicoRepository } = montar({
+      questoes: [questao('q1', 'A'), questao('q2', 'B'), questao('q3', 'C')],
+      rawRespostas: [
+        { questao: 'q1', alternativaEstudante: 'A' },
+        { questao: 'q2', alternativaEstudante: 'E' },
+      ],
+    });
+    await service.processAnswer('hist1');
+    const p = historicoRepository.completeProcessing.mock.calls[0][1];
+
+    expect(p.acertos).toBeLessThanOrEqual(p.questoesRespondidas);
+    expect(p.questoesRespondidas).toBeLessThanOrEqual(p.respostas.length);
+  });
+});

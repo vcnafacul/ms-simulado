@@ -114,10 +114,14 @@ describe('contadores de plataforma × cartão-resposta (card 01) — Mongo real'
         respostas: [{}, {}, {}],
         aproveitamento: { geral: 0.5, materias: [] },
         questoesRespondidas: 2,
+        acertos: 1,
       });
 
       const salvo = await histModel.findById(criado._id).lean();
       expect(salvo?.questoesRespondidas).toBe(2);
+      // ⚠️ `acertos` (card 08) também tem de chegar ao documento: o
+      // `findByIdAndUpdate` ignora em silêncio campo fora do schema.
+      expect(salvo?.acertos).toBe(1);
       expect(salvo?.status).toBe(HistoricoStatus.Completed);
     });
   });

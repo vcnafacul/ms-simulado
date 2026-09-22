@@ -70,10 +70,25 @@ export class RelatorioSimuladoEstudanteService {
     /** A turma ATUAL, quando o chamador a resolve. Ver card 18. */
     usuarios?: string[];
   }): Promise<RelatorioSimuladoDtoOutput> {
-    const [linhas, total] = await Promise.all([
+    const [linhas, total, numeros] = await Promise.all([
       this.repository.buscarPorRecorte(params),
       // do CURSINHO, não da turma: é o denominador do rodapé
       this.repository.contarDoCursinho(params.simuladoId, params.cursinhoId),
+      /*
+        ⚠️ **O total vem do SIMULADO, não de `respostas.length`** (card 08).
+        São iguais hoje — o `processAnswer` mapeia sobre `simulado.questoes` —
+        e "iguais hoje" é o tipo de coisa que deixa de ser verdade sem ninguém
+        notar. Uma questão removida da prova depois dos cartões lidos já
+        separaria os dois.
+
+        ⚠️ Reusa o `getNumerosDasQuestoes`, que o `consultarQuestoes` já chama:
+        uma consulta a mais por relatório, com projeção de dois campos. Um
+        método só para contar economizaria pouco e seria mais uma coisa a
+        manter em acordo com esta.
+
+        ⚠️ Em paralelo com as outras duas: não depende de nenhuma delas.
+      */
+      this.simuladoRepository.getNumerosDasQuestoes(params.simuladoId),
     ]);
 
     return {
@@ -81,6 +96,8 @@ export class RelatorioSimuladoEstudanteService {
       // ver `montarLinha`.
       linhas: linhas.flatMap((l) => this.montarLinha(l, params.cursinhoId)),
       totalEstudantesComCartaoNoCursinho: total,
+      // ⚠️ `0` quando o simulado não existe mais: a tela mostra só o percentual.
+      totalDeQuestoes: numeros.length,
     };
   }
 
@@ -138,6 +155,15 @@ export class RelatorioSimuladoEstudanteService {
         questoesRespondidas: h.questoesRespondidas,
         // ausente, não zero — ver o docblock do DTO
         aproveitamentoGeral: aproveitamento?.geral,
+        /*
+          ⚠️ Mesmo gate de `completed` do aproveitamento: `marcarFalha` não
+          limpa o documento, e uma linha `failed` carregaria os acertos da
+          leitura ANTERIOR.
+
+          ⚠️ E ausente quando o histórico é anterior ao card 08 — o campo
+          simplesmente não foi gravado. A tela trata ausência como ausência.
+        */
+        acertos: leituraConcluida ? h.acertos : undefined,
         // ⚠️ `length ? : undefined` — lista vazia NUNCA sai daqui: ela faria a
         // tela desenhar barra em zero em toda matéria. Ver o docblock do DTO.
         aproveitamentoPorMateria: aproveitamento?.materias?.length
