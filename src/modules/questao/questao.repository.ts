@@ -284,6 +284,56 @@ export class QuestaoRepository extends BaseRepository<Questao> {
    * ⚠️ Tudo num `bulkWrite` só: a mesma questão pode aparecer dos dois lados, e
    * duas chamadas deixariam uma janela em que o contador está negativo.
    */
+  /**
+   * Os contadores globais de um conjunto de questões — o acerto da BASE
+   * INTEIRA, não do recorte do relatório (card 16).
+   *
+   * Responde a pergunta que o recorte não pode responder: *"minha turma foi mal
+   * nesta questão, ou a questão é difícil para todo mundo?"*. Saber que a base
+   * acerta 24% muda a conclusão de "preciso dar essa aula" para "a questão é
+   * dura mesmo, a turma está na média".
+   *
+   * ⚠️ **Projeção mínima, pelo mesmo motivo do `getNumerosDasQuestoes`** (card
+   * 03): são até 180 questões por relatório, e a `Questao` carrega enunciado,
+   * alternativas e assets. Trazer o corpo inteiro para ler dois inteiros é
+   * carga enorme num caminho que a tela abre a cada relatório.
+   *
+   * ⚠️ **Os ids têm de ser `ObjectId` válidos** — um inválido estoura
+   * `BSONError` e derruba a aba de Questões inteira, não só uma linha. Sem
+   * guarda de propósito: eles chegam do `agregarPorQuestao`, que os produz de
+   * um `$group` sobre `respostas.questao`. Blindar aqui esconderia um defeito
+   * de quem chamasse errado.
+   *
+   * ⚠️ **Os números só são confiáveis depois do card 21 (escrita) E do sync do
+   * card 22 (passado).** Antes disso `quantidadeResposta` contava apresentações
+   * e o reprocessamento contava duas vezes — medido: 0 de 181 questões batiam
+   * com o histórico. Quem consome tem de saber disso.
+   */
+  public async contadoresGlobais(
+    ids: string[],
+  ): Promise<Map<string, { acertos: number; quantidadeResposta: number }>> {
+    if (ids.length === 0) return new Map();
+    const docs = await this.model
+      .find(
+        { _id: { $in: ids.map((id) => new Types.ObjectId(id)) } },
+        { acertos: 1, quantidadeResposta: 1 },
+      )
+      .lean()
+      .exec();
+    return new Map(
+      docs.map((d: any) => [
+        d._id.toString(),
+        {
+          // ⚠️ `?? 0` porque questão nunca respondida não tem os campos — e
+          // ausente aqui É zero: ninguém respondeu, o que é uma afirmação
+          // verdadeira, diferente do `null` que a tela usa para "base pequena".
+          acertos: d.acertos ?? 0,
+          quantidadeResposta: d.quantidadeResposta ?? 0,
+        },
+      ]),
+    );
+  }
+
   public async updateQuestionAnswered(
     respostas: Resposta[],
     /**

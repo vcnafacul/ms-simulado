@@ -42,10 +42,21 @@ const montar = (linhas: any[], total = 30, questoes = 3) => {
       .fn()
       .mockResolvedValue([{ id: SIM, nome: 'Simulado' }]),
   };
+
+  /*
+    ⚠️ Entrou no card 16: `consultarQuestoes` passou a buscar os
+    contadores GLOBAIS da questão — outro ESCOPO, não outro cálculo.
+    Mapa vazio por padrão: o service trata a ausência como zero, e é o
+    que os testes que não falam de dificuldade global exercitam.
+  */
+  const questaoRepository = {
+    contadoresGlobais: jest.fn().mockResolvedValue(new Map()),
+  };
   return {
     svc: new RelatorioSimuladoEstudanteService(
       repository as any,
       simuladoRepository as any,
+      questaoRepository as any,
     ),
     repository,
     simuladoRepository,
@@ -170,13 +181,25 @@ describe('RelatorioSimuladoEstudanteService.consultarQuestoes', () => {
     const simuladoRepository = {
       getNumerosDasQuestoes: jest.fn().mockResolvedValue(numeros),
     };
+
+    /*
+      ⚠️ Entrou no card 16: `consultarQuestoes` passou a buscar os
+      contadores GLOBAIS da questão — outro ESCOPO, não outro cálculo.
+      Mapa vazio por padrão: o service trata a ausência como zero, e é o
+      que os testes que não falam de dificuldade global exercitam.
+    */
+    const questaoRepository = {
+      contadoresGlobais: jest.fn().mockResolvedValue(new Map()),
+    };
     return {
       svc: new RelatorioSimuladoEstudanteService(
         repository as any,
         simuladoRepository as any,
+        questaoRepository as any,
       ),
       repository,
       simuladoRepository,
+      questaoRepository,
     };
   };
 
@@ -196,6 +219,16 @@ describe('RelatorioSimuladoEstudanteService.consultarQuestoes', () => {
       erros: 3,
       semLeitura: 1,
       porAlternativa: { A: 6, B: 2, C: 1, D: 0, E: 0 },
+      alternativaCorreta: undefined,
+      discriminacao: undefined,
+      /*
+        ⚠️ Zero, e não ausente (card 16): questão que não está na coleção — ou
+        que ninguém respondeu — sai com contador zerado. A tela é quem decide
+        não exibir, pelo piso de base; um `null` obrigaria todo o caminho até a
+        coluna a carregar mais um estado.
+      */
+      acertosGeral: 0,
+      baseGeral: 0,
     });
   });
 
@@ -287,6 +320,67 @@ describe('RelatorioSimuladoEstudanteService.consultarQuestoes', () => {
 
     expect(r.questoes).toEqual([]);
   });
+
+  describe('dificuldade global (card 16)', () => {
+    it('⚠️ traz o acerto da BASE INTEIRA junto do acerto do recorte', async () => {
+      /*
+        É outro ESCOPO, não outro cálculo. O recorte não tem como responder
+        "minha turma foi mal nesta questão, ou a questão é difícil para todo
+        mundo?" — e é essa a pergunta que muda a decisão de "preciso dar essa
+        aula" para "a questão é dura mesmo".
+      */
+      const { svc, questaoRepository } = montarQ(
+        [agregado()],
+        [{ questaoId: 'q1', numero: 5 }],
+      );
+      questaoRepository.contadoresGlobais.mockResolvedValue(
+        new Map([['q1', { acertos: 443, quantidadeResposta: 1847 }]]),
+      );
+
+      const r = await svc.consultarQuestoes({
+        simuladoId: SIM,
+        cursinhoId: 'cur-1',
+      });
+
+      expect(r.questoes[0].acertosGeral).toBe(443);
+      expect(r.questoes[0].baseGeral).toBe(1847);
+      // e o do recorte continua intacto ao lado
+      expect(r.questoes[0].acertos).toBe(6);
+      expect(r.questoes[0].respondentes).toBe(10);
+    });
+
+    it('⚠️ busca só as questões do AGREGADO, não as do simulado inteiro', async () => {
+      // As que ninguém respondeu não viram linha nenhuma na tabela — buscá-las
+      // seria carga por nada.
+      const { svc, questaoRepository } = montarQ(
+        [agregado({ questaoId: 'q1' }), agregado({ questaoId: 'q2' })],
+        [
+          { questaoId: 'q1', numero: 1 },
+          { questaoId: 'q2', numero: 2 },
+          { questaoId: 'q3', numero: 3 },
+        ],
+      );
+
+      await svc.consultarQuestoes({ simuladoId: SIM, cursinhoId: 'cur-1' });
+
+      expect(questaoRepository.contadoresGlobais).toHaveBeenCalledWith([
+        'q1',
+        'q2',
+      ]);
+    });
+
+    it('questão sem contador sai com zero, e não quebra a linha', async () => {
+      const { svc } = montarQ([agregado()], [{ questaoId: 'q1', numero: 5 }]);
+
+      const r = await svc.consultarQuestoes({
+        simuladoId: SIM,
+        cursinhoId: 'cur-1',
+      });
+
+      expect(r.questoes[0].acertosGeral).toBe(0);
+      expect(r.questoes[0].baseGeral).toBe(0);
+    });
+  });
 });
 
 describe('RelatorioSimuladoEstudanteService.listarSimulados', () => {
@@ -302,9 +396,20 @@ describe('RelatorioSimuladoEstudanteService.listarSimulados', () => {
     const simuladoRepository = {
       getNomesPorIds: jest.fn().mockResolvedValue(over?.nomes ?? []),
     };
+
+    /*
+      ⚠️ Entrou no card 16: `consultarQuestoes` passou a buscar os
+      contadores GLOBAIS da questão — outro ESCOPO, não outro cálculo.
+      Mapa vazio por padrão: o service trata a ausência como zero, e é o
+      que os testes que não falam de dificuldade global exercitam.
+    */
+    const questaoRepository = {
+      contadoresGlobais: jest.fn().mockResolvedValue(new Map()),
+    };
     const svc = new RelatorioSimuladoEstudanteService(
       repository as any,
       simuladoRepository as any,
+      questaoRepository as any,
     );
     return { svc, repository, simuladoRepository };
   };
@@ -412,9 +517,20 @@ describe('RelatorioSimuladoEstudanteService.consultarDetalhe', () => {
     const simuladoRepository = {
       getNumerosDasQuestoes: jest.fn().mockResolvedValue(over?.numeros ?? []),
     };
+
+    /*
+      ⚠️ Entrou no card 16: `consultarQuestoes` passou a buscar os
+      contadores GLOBAIS da questão — outro ESCOPO, não outro cálculo.
+      Mapa vazio por padrão: o service trata a ausência como zero, e é o
+      que os testes que não falam de dificuldade global exercitam.
+    */
+    const questaoRepository = {
+      contadoresGlobais: jest.fn().mockResolvedValue(new Map()),
+    };
     const svc = new RelatorioSimuladoEstudanteService(
       repository as any,
       simuladoRepository as any,
+      questaoRepository as any,
     );
     return { svc, repository, simuladoRepository };
   };
@@ -1023,10 +1139,21 @@ describe('RelatorioSimuladoEstudanteService.consultar — identificação (card 
             : [{ id: SIM, nome: opts.nome ?? 'ENEM 2024' }],
         ),
     };
+
+    /*
+      ⚠️ Entrou no card 16: `consultarQuestoes` passou a buscar os
+      contadores GLOBAIS da questão — outro ESCOPO, não outro cálculo.
+      Mapa vazio por padrão: o service trata a ausência como zero, e é o
+      que os testes que não falam de dificuldade global exercitam.
+    */
+    const questaoRepository = {
+      contadoresGlobais: jest.fn().mockResolvedValue(new Map()),
+    };
     return {
       svc: new RelatorioSimuladoEstudanteService(
         repository as any,
         simuladoRepository as any,
+        questaoRepository as any,
       ),
       simuladoRepository,
     };

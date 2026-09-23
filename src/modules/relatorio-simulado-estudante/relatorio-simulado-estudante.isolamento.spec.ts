@@ -4,6 +4,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { Model, Types } from 'mongoose';
 import { Historico, HistoricoSchema } from '../historico/historico.schema';
+import { Prova, ProvaSchema } from '../prova/prova.schema';
+import { QuestaoRepository } from '../questao/questao.repository';
+import { Questao, QuestaoSchema } from '../questao/questao.schema';
 import { SimuladoRepository } from '../simulado/simulado.repository';
 import { Simulado, SimuladoSchema } from '../simulado/schemas/simulado.schema';
 import { RelatorioSimuladoEstudanteController } from './relatorio-simulado-estudante.controller';
@@ -50,11 +53,20 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
           },
           { name: Historico.name, schema: HistoricoSchema },
           { name: Simulado.name, schema: SimuladoSchema },
+          /*
+            ⚠️ Entraram no card 16: `consultarQuestoes` passou a ler os
+            contadores GLOBAIS da `Questao`. O `QuestaoRepository` abaixo é o
+            REAL, contra o mesmo Mongo em memória — é o que prova o campo de
+            ponta a ponta, do documento até o DTO.
+          */
+          { name: Questao.name, schema: QuestaoSchema },
+          { name: Prova.name, schema: ProvaSchema },
         ]),
       ],
       providers: [
         RelatorioSimuladoEstudanteRepository,
         SimuladoRepository,
+        QuestaoRepository,
         RelatorioSimuladoEstudanteService,
       ],
     }).compile();
@@ -1197,6 +1209,9 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
             },
             { name: Historico.name, schema: HistoricoSchema },
             { name: Simulado.name, schema: SimuladoSchema },
+            // ⚠️ Card 16 — ver o módulo principal desta suíte.
+            { name: Questao.name, schema: QuestaoSchema },
+            { name: Prova.name, schema: ProvaSchema },
           ]),
         ],
         controllers: [RelatorioSimuladoEstudanteController],
@@ -1204,6 +1219,7 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
           RelatorioSimuladoEstudanteRepository,
           RelatorioSimuladoEstudanteService,
           SimuladoRepository,
+          QuestaoRepository,
         ],
       }).compile();
 

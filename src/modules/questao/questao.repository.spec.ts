@@ -245,3 +245,62 @@ describe('QuestaoRepository.updateQuestionAnswered (contadores globais — card 
     expect(bulkWrite.mock.calls[0][0]).toHaveLength(2);
   });
 });
+
+describe('QuestaoRepository.contadoresGlobais (card 16)', () => {
+  const montar = (docs: unknown[]) => {
+    const exec = jest.fn().mockResolvedValue(docs);
+    const lean = jest.fn().mockReturnValue({ exec });
+    const find = jest.fn().mockReturnValue({ lean });
+    return { repo: new QuestaoRepository({ find } as any, {} as any), find };
+  };
+
+  /*
+    ⚠️ **Id hex de 24 caracteres, e não `'q1'` como nos outros fixtures deste
+    arquivo.** O método converte para `Types.ObjectId`, e um id inválido estoura
+    `BSONError` — o que derrubaria a aba de Questões inteira, não só uma linha.
+
+    Não há guarda, e é decisão: os ids chegam do `agregarPorQuestao`, que os
+    produz de um `$group` sobre `respostas.questao` — sempre `ObjectId`. Blindar
+    aqui esconderia um defeito de quem chamasse errado.
+  */
+  const ID = '665f0c1a2b3c4d5e6f00abc2';
+
+  it('devolve o par (acertos, respostas) indexado por id', async () => {
+    const { repo } = montar([
+      { _id: ID, acertos: 443, quantidadeResposta: 1847 },
+    ]);
+
+    const mapa = await repo.contadoresGlobais([ID]);
+
+    expect(mapa.get(ID)).toEqual({ acertos: 443, quantidadeResposta: 1847 });
+  });
+
+  it('⚠️ campo ausente vira zero — ninguém respondeu É uma afirmação', async () => {
+    // Diferente do `null` que a TELA usa para "base pequena demais para dizer".
+    const { repo } = montar([{ _id: ID }]);
+
+    const mapa = await repo.contadoresGlobais([ID]);
+
+    expect(mapa.get(ID)).toEqual({ acertos: 0, quantidadeResposta: 0 });
+  });
+
+  it('⚠️ projeta só os dois campos — a Questao carrega enunciado e assets', async () => {
+    // São até 180 questões por relatório; trazer o corpo inteiro para ler dois
+    // inteiros é carga enorme num caminho que a tela abre a cada relatório.
+    const { repo, find } = montar([]);
+
+    await repo.contadoresGlobais(['665f0c1a2b3c4d5e6f00abc2']);
+
+    expect(find.mock.calls[0][1]).toEqual({
+      acertos: 1,
+      quantidadeResposta: 1,
+    });
+  });
+
+  it('lista vazia não consulta o banco', async () => {
+    const { repo, find } = montar([]);
+
+    await expect(repo.contadoresGlobais([])).resolves.toEqual(new Map());
+    expect(find).not.toHaveBeenCalled();
+  });
+});
