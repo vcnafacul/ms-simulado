@@ -1020,7 +1020,6 @@ describe('QuestaoService.duplicar (card 25)', () => {
     const repository = {
       getParaDuplicar: jest.fn().mockResolvedValue(doc),
       create: jest.fn((d) => Promise.resolve({ ...d, _id: 'q2' })),
-      listarCopias: jest.fn().mockResolvedValue([]),
     };
     const service = new QuestaoService(
       repository as any,
@@ -1290,5 +1289,110 @@ describe('QuestaoService.updateContent — questão congelada (card 26)', () => 
       service.updateContent('q1', { textoQuestao: 'x' } as any),
     ).rejects.toThrow();
     expect(repository.updateContent).not.toHaveBeenCalled();
+  });
+});
+
+describe('QuestaoService.linhagem (card 34A)', () => {
+  const no = (id: string, over: Record<string, unknown> = {}) => ({
+    _id: id,
+    status: 0,
+    congelada: false,
+    origem: null as string | null,
+    tipoOrigem: null as string | null,
+    textoQuestao: `enunciado ${id}`,
+    ...over,
+  });
+
+  const montar = (banco: Record<string, any>) => {
+    const repository = {
+      noDaLinhagem: jest.fn(async (id: string) => banco[id] ?? null),
+      sucessoraDe: jest.fn(
+        async (id: string) =>
+          Object.values(banco).find(
+            (q: any) => q.origem === id && q.tipoOrigem === 'versao',
+          ) ?? null,
+      ),
+      copiasDe: jest.fn(async (id: string) =>
+        Object.values(banco).filter(
+          (q: any) => q.origem === id && q.tipoOrigem !== 'versao',
+        ),
+      ),
+      findProvasContendoMany: jest.fn(async () => new Map([['v2', [{}, {}]]])),
+    };
+    const service = new QuestaoService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+    return { service, repository };
+  };
+
+  const banco = {
+    v1: no('v1', { congelada: true }),
+    v2: no('v2', { origem: 'v1', tipoOrigem: 'versao' }),
+    c1: no('c1', { origem: 'v2', tipoOrigem: 'copia' }),
+  };
+
+  it('versões, cópias e origem numa resposta só', async () => {
+    const { service } = montar(banco);
+
+    const r = await service.linhagem('v2');
+
+    expect(r.atual).toBe('v2');
+    expect(r.versoes.map((v) => v.id)).toEqual(['v1', 'v2']);
+    expect(r.copias.map((c) => c.id)).toEqual(['c1']);
+    // ⚠️ v2 é VERSÃO de v1, não cópia: não tem "origem de cópia".
+    expect(r.origemCopia).toBeNull();
+  });
+
+  it('a cópia vê de quem é cópia, e não tem cadeia de versões', async () => {
+    const { service } = montar(banco);
+
+    const r = await service.linhagem('c1');
+
+    expect(r.origemCopia?.id).toBe('v2');
+    expect(r.versoes).toEqual([]);
+  });
+
+  it('cada item diz o que identifica a questão', async () => {
+    const { service } = montar(banco);
+
+    const r = await service.linhagem('v2');
+
+    expect(r.versoes[0]).toEqual({
+      id: 'v1',
+      status: 0,
+      congelada: true,
+      enunciado: 'enunciado v1',
+      provas: 0,
+    });
+    expect(r.versoes[1].provas).toBe(2);
+  });
+
+  it('⚠️ as provas de todos os itens vêm numa consulta só', async () => {
+    const { service, repository } = montar(banco);
+
+    await service.linhagem('v2');
+
+    expect(repository.findProvasContendoMany).toHaveBeenCalledTimes(1);
+    expect(repository.findProvasContendoMany).toHaveBeenCalledWith([
+      'v1',
+      'v2',
+      'c1',
+    ]);
+  });
+
+  it('inexistente ou excluída: 404', async () => {
+    const { service } = montar({});
+
+    await expect(service.linhagem('x')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 });

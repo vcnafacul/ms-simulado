@@ -180,13 +180,14 @@ export class QuestaoController {
     return await this.service.novaVersao(id, body, body.userId);
   }
 
-  @Get(':id/copias')
+  @Get(':id/linhagem')
   @ApiResponse({
     status: 200,
-    description: 'as cópias diretas desta questão',
+    description:
+      'a cadeia de versões, as cópias diretas e a origem desta questão',
   })
-  public async listarCopias(@Param('id') id: string) {
-    return await this.service.listarCopias(id);
+  public async linhagem(@Param('id') id: string) {
+    return await this.service.linhagem(id);
   }
 
   @Patch(':id/content')

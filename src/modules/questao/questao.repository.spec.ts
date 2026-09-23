@@ -420,6 +420,12 @@ describe('QuestaoRepository — linhagem (card 25)', () => {
     expect(lean).toHaveBeenCalled();
   });
 
+  const leitura = (valor: unknown) => {
+    const exec = jest.fn().mockResolvedValue(valor);
+    const lean = jest.fn().mockReturnValue({ exec });
+    return { lean };
+  };
+
   it('⚠️ as cópias são DERIVADAS de `origem`, não lidas de um array', async () => {
     /*
       Decisão contra o doc 10 da #61: uma lista denormalizada de filhas é o
@@ -427,51 +433,50 @@ describe('QuestaoRepository — linhagem (card 25)', () => {
       os contadores incrementais batendo com o histórico. Aqui não há segunda
       cópia da verdade para divergir.
     */
-    const exec = jest
-      .fn()
-      .mockResolvedValue([
-        { _id: 'q2', status: 'Pending', origem: 'q1', tipoOrigem: 'copia' },
-      ]);
-    const lean = jest.fn().mockReturnValue({ exec });
-    const find = jest.fn().mockReturnValue({ lean });
+    const find = jest.fn().mockReturnValue(leitura([]));
     const repo = new QuestaoRepository({ find } as any, {} as any, {} as any);
 
-    const r = await repo.listarCopias('q1');
+    await repo.copiasDe('q1');
 
-    expect(find.mock.calls[0][0]).toEqual({ origem: 'q1' });
-    expect(r).toEqual([
-      { id: 'q2', status: 'Pending', origem: 'q1', tipo: 'copia' },
-    ]);
-  });
-
-  it('⚠️ cada filha diz se é cópia ou versão (card 32)', async () => {
-    const exec = jest.fn().mockResolvedValue([
-      { _id: 'q2', status: 'Pending', origem: 'q1', tipoOrigem: 'versao' },
-      // ⚠️ Sem tipo = anterior ao card 32 = cópia.
-      { _id: 'q3', status: 'Pending', origem: 'q1' },
-    ]);
-    const lean = jest.fn().mockReturnValue({ exec });
-    const find = jest.fn().mockReturnValue({ lean });
-    const repo = new QuestaoRepository({ find } as any, {} as any, {} as any);
-
-    const r = await repo.listarCopias('q1');
-
-    expect(r.map((c) => c.tipo)).toEqual(['versao', 'copia']);
-  });
-
-  it('projeta só o que a lista de cópias mostra', async () => {
-    const exec = jest.fn().mockResolvedValue([]);
-    const lean = jest.fn().mockReturnValue({ exec });
-    const find = jest.fn().mockReturnValue({ lean });
-    const repo = new QuestaoRepository({ find } as any, {} as any, {} as any);
-
-    await repo.listarCopias('q1');
-
-    expect(find.mock.calls[0][1]).toEqual({
-      status: 1,
-      origem: 1,
-      tipoOrigem: 1,
+    expect(find.mock.calls[0][0]).toEqual({
+      origem: 'q1',
+      // ⚠️ `$ne: versao`: `origem` sem tipo (anterior ao card 32) é cópia.
+      tipoOrigem: { $ne: 'versao' },
+      deleted: { $ne: true },
     });
+  });
+
+  it('⚠️ a sucessora é só o vínculo do tipo VERSÃO', async () => {
+    const findOne = jest.fn().mockReturnValue(leitura(null));
+    const repo = new QuestaoRepository(
+      { findOne } as any,
+      {} as any,
+      {} as any,
+    );
+
+    await repo.sucessoraDe('q1');
+
+    expect(findOne.mock.calls[0][0]).toEqual({
+      origem: 'q1',
+      tipoOrigem: 'versao',
+      deleted: { $ne: true },
+    });
+  });
+
+  it('projeta só o que a aba mostra — nada de alternativas nem imagens', async () => {
+    const findOne = jest.fn().mockReturnValue(leitura(null));
+    const repo = new QuestaoRepository(
+      { findOne } as any,
+      {} as any,
+      {} as any,
+    );
+
+    await repo.noDaLinhagem('q1');
+
+    expect(findOne.mock.calls[0]).toEqual([
+      { _id: 'q1', deleted: { $ne: true } },
+      { status: 1, congelada: 1, origem: 1, tipoOrigem: 1, textoQuestao: 1 },
+    ]);
   });
 });
 

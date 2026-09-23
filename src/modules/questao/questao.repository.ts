@@ -18,6 +18,15 @@ import { Questao } from './questao.schema';
 import { TipoOrigem } from './enums/tipo-origem.enum';
 import { Historico } from '../historico/historico.schema';
 import { EstadoParaExclusao, STATUS_EXCLUIVEIS } from './exclusaoDaQuestao';
+import { NoDaLinhagem } from './linhagemDaQuestao';
+
+const PROJECAO_DA_LINHAGEM = {
+  status: 1,
+  congelada: 1,
+  origem: 1,
+  tipoOrigem: 1,
+  textoQuestao: 1,
+} as const;
 
 /**
  * ⚠️ **Toda leitura do banco de questões passa por isto** (card 33). A exclusão
@@ -418,35 +427,44 @@ export class QuestaoRepository extends BaseRepository<Questao> {
   }
 
   /**
-   * As cópias diretas de uma questão.
+   * Leituras da aba Linhagem (card 34A) — projeção mínima, só o que a lista
+   * mostra, e nunca questão excluída.
    *
-   * ⚠️ **Derivado, e não um `copias[]` no documento** — decisão registrada no
-   * docblock do campo `origem`. Uma lista denormalizada é o padrão que os cards
-   * 21 e 22 mostraram que erra; aqui não há segunda cópia da verdade para
-   * divergir.
-   *
-   * ⚠️ Projeção mínima: o front mostra uma lista de "ver cópias", não o
-   * enunciado de cada uma.
+   * ⚠️ **Derivadas de `origem`, e não de um `copias[]`** — ver o docblock do
+   * campo no schema.
    */
-  async listarCopias(
-    id: string,
-  ): Promise<
-    { id: string; status: Status; origem: string; tipo: TipoOrigem }[]
-  > {
-    const docs = await this.model
-      .find({ origem: id }, { status: 1, origem: 1, tipoOrigem: 1 })
-      .lean()
+  async noDaLinhagem(id: string): Promise<NoDaLinhagem | null> {
+    return this.model
+      .findOne({ _id: id, ...NAO_EXCLUIDA }, PROJECAO_DA_LINHAGEM)
+      .lean<NoDaLinhagem>()
       .exec();
-    return docs.map((d: any) => ({
-      id: d._id.toString(),
-      status: d.status,
-      origem: d.origem,
-      /*
-        ⚠️ **Cópia e versão caem na mesma consulta, e é o tipo que separa**
-        (card 32). Sem ele, "3 cópias" podia ser 1 cópia e 2 versões.
-      */
-      tipo: tipoDoVinculo(d),
-    }));
+  }
+
+  /** A versão que substituiu esta — no máximo uma, porque a original congela. */
+  async sucessoraDe(id: string): Promise<NoDaLinhagem | null> {
+    return this.model
+      .findOne(
+        { origem: id, tipoOrigem: TipoOrigem.versao, ...NAO_EXCLUIDA },
+        PROJECAO_DA_LINHAGEM,
+      )
+      .lean<NoDaLinhagem>()
+      .exec();
+  }
+
+  /**
+   * As cópias diretas.
+   *
+   * ⚠️ **`$ne: versao`, e não `copia`**: `origem` sem tipo é cópia (dado
+   * anterior ao card 32), e `tipoOrigem: 'copia'` a deixaria de fora.
+   */
+  async copiasDe(id: string): Promise<NoDaLinhagem[]> {
+    return this.model
+      .find(
+        { origem: id, tipoOrigem: { $ne: TipoOrigem.versao }, ...NAO_EXCLUIDA },
+        PROJECAO_DA_LINHAGEM,
+      )
+      .lean<NoDaLinhagem[]>()
+      .exec();
   }
 
   public async contadoresGlobais(
@@ -784,12 +802,4 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       { $sort: { count: -1 } },
     ]);
   }
-}
-
-/**
- * O tipo do vínculo de uma filha (card 32). ⚠️ Ausente = `copia` — ver o
- * docblock de `tipoOrigem` no schema.
- */
-function tipoDoVinculo(d: { tipoOrigem?: TipoOrigem | null }): TipoOrigem {
-  return d.tipoOrigem ?? TipoOrigem.copia;
 }

@@ -30,6 +30,13 @@ import { Status } from './enums/status.enum';
 import { documentoDaCopia } from './duplicarQuestao';
 import { TipoOrigem } from './enums/tipo-origem.enum';
 import {
+  cadeiaDeVersoes,
+  ItemDaLinhagem,
+  LinhagemDaQuestao,
+  NoDaLinhagem,
+  resumoDoEnunciado,
+} from './linhagemDaQuestao';
+import {
   MotivoParaNaoExcluir,
   motivosParaNaoExcluir,
   TEXTO_DO_MOTIVO,
@@ -566,9 +573,55 @@ export class QuestaoService {
     return copia;
   }
 
-  /** As cópias diretas — ver o docblock do campo `origem`. */
-  public async listarCopias(id: string) {
-    return this.repository.listarCopias(id);
+  /**
+   * A linhagem da questão: a cadeia de versões, as cópias diretas e a origem
+   * (card 34A).
+   *
+   * ⚠️ **Um endpoint, e não dois.** O `listarCopias` do card 25 morreu aqui —
+   * dois endpoints para a mesma relação saem de acordo no primeiro que mudar.
+   */
+  public async linhagem(id: string): Promise<LinhagemDaQuestao> {
+    const atual = await this.repository.noDaLinhagem(id);
+    if (!atual) {
+      throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
+    }
+
+    const [cadeia, copias, origem] = await Promise.all([
+      cadeiaDeVersoes(
+        atual,
+        (x) => this.repository.noDaLinhagem(x),
+        (x) => this.repository.sucessoraDe(x),
+      ),
+      this.repository.copiasDe(id),
+      atual.origem && atual.tipoOrigem !== TipoOrigem.versao
+        ? this.repository.noDaLinhagem(atual.origem)
+        : Promise.resolve(null),
+    ]);
+    // ⚠️ Sem versões, a cadeia é só a própria questão — e a tela diz "nenhuma".
+    const versoes = cadeia.length > 1 ? cadeia : [];
+
+    /*
+      ⚠️ **Uma consulta para as provas de TODOS os itens**, e não uma por item.
+      O `provasContendo` da Etapa 9 é por questão; aqui a lista pode ter N.
+    */
+    const todos = [...versoes, ...copias, ...(origem ? [origem] : [])];
+    const provas = await this.repository.findProvasContendoMany(
+      todos.map((n) => String(n._id)),
+    );
+    const item = (n: NoDaLinhagem): ItemDaLinhagem => ({
+      id: String(n._id),
+      status: n.status,
+      congelada: !!n.congelada,
+      enunciado: resumoDoEnunciado(n.textoQuestao),
+      provas: provas.get(String(n._id))?.length ?? 0,
+    });
+
+    return {
+      atual: id,
+      versoes: versoes.map(item),
+      copias: copias.map(item),
+      origemCopia: origem ? item(origem) : null,
+    };
   }
 
   /**
