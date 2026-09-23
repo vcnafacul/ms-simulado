@@ -1042,3 +1042,119 @@ describe('SimuladoService.processAnswer — contadores globais (card 21)', () =>
     expect(updateQuestionAnswered.mock.calls[0][1]).toEqual([]);
   });
 });
+
+describe('SimuladoService.criaAproveitamento — base por matéria e frente (card 30)', () => {
+  /**
+   * Monta uma questão com até três frentes, cada uma podendo ter matéria
+   * própria — é o caso que o card 14 mediu: 928 das 1.616 frentes secundárias
+   * são de matéria diferente da questão.
+   */
+  const questaoCom = (
+    id: string,
+    frentes: { f: string; m: string }[],
+    materia = 'm1',
+  ): any => {
+    const q: any = {
+      _id: { toString: () => id },
+      alternativa: 'A',
+      materia: { _id: { toString: () => materia }, nome: materia },
+    };
+    frentes.forEach((v, i) => {
+      q[`frente${i + 1}`] = {
+        _id: { toString: () => v.f },
+        nome: v.f,
+        materia: { _id: { toString: () => v.m }, nome: v.m },
+      };
+    });
+    return q;
+  };
+
+  const processar = async (questoes: any[], marcadas: string[]) => {
+    const completeProcessing = jest.fn().mockResolvedValue(undefined);
+    const service = new SimuladoService(
+      {
+        answer: jest.fn().mockResolvedValue({
+          _id: 's1',
+          questoes: questoes.map((questao, i) => ({ questao, numero: i + 1 })),
+        }),
+      } as any,
+      {
+        findAnoByQuestao: jest.fn().mockResolvedValue(2023),
+        updateQuestionAnswered: jest.fn().mockResolvedValue(undefined),
+      } as any,
+      {} as any,
+      {
+        claimForProcessing: jest.fn().mockResolvedValue(true),
+        getById: jest.fn().mockResolvedValue({
+          simulado: 's1',
+          rawRespostas: marcadas.map((q) => ({
+            questao: q,
+            alternativaEstudante: 'A',
+          })),
+        }),
+        completeProcessing,
+      } as any,
+      {} as any,
+      {} as any,
+    );
+    await service.processAnswer('h1');
+    return completeProcessing.mock.calls[0][1].aproveitamento;
+  };
+
+  it('grava quantas questões tocam cada matéria e cada frente', async () => {
+    const ap = await processar(
+      [
+        questaoCom('q1', [{ f: 'Álgebra', m: 'Matemática' }], 'Matemática'),
+        questaoCom('q2', [{ f: 'Álgebra', m: 'Matemática' }], 'Matemática'),
+        questaoCom('q3', [{ f: 'Geometria', m: 'Matemática' }], 'Matemática'),
+      ],
+      ['q1'],
+    );
+
+    const mat = ap.materias.find((m: any) => m.nome === 'Matemática');
+    expect(mat.questoes).toBe(3);
+    expect(mat.frentes.find((f: any) => f.nome === 'Álgebra').questoes).toBe(2);
+    expect(mat.frentes.find((f: any) => f.nome === 'Geometria').questoes).toBe(1);
+  });
+
+  it('⚠️ as bases somam MAIS que o total do simulado, e é isso que a base explica', async () => {
+    /*
+      É a consequência do card 14: uma questão conta inteira em cada (matéria,
+      frente) que toca. Duas questões, uma delas interdisciplinar, produzem três
+      vínculos — e sem a base na tela, quem soma as matérias acha que a conta
+      não fecha.
+    */
+    const ap = await processar(
+      [
+        questaoCom('q1', [{ f: 'Brasil', m: 'História' }], 'História'),
+        questaoCom(
+          'q2',
+          [
+            { f: 'Brasil', m: 'História' },
+            { f: 'Trabalho', m: 'Sociologia' },
+          ],
+          'História',
+        ),
+      ],
+      ['q1'],
+    );
+
+    const soma = ap.materias.reduce((t: number, m: any) => t + m.questoes, 0);
+    expect(soma).toBe(3);
+    expect(ap.materias).toHaveLength(2);
+  });
+
+  it('a base é de QUESTÕES, não de acertos — conta quem não marcou também', async () => {
+    const ap = await processar(
+      [
+        questaoCom('q1', [{ f: 'Álgebra', m: 'Matemática' }], 'Matemática'),
+        questaoCom('q2', [{ f: 'Álgebra', m: 'Matemática' }], 'Matemática'),
+      ],
+      [], // ninguém marcou nada
+    );
+
+    const mat = ap.materias[0];
+    expect(mat.questoes).toBe(2);
+    expect(mat.aproveitamento).toBe(0);
+  });
+});

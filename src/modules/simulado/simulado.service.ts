@@ -482,10 +482,21 @@ export class SimuladoService {
         id: m.id as never,
         nome: m.nome,
         aproveitamento: m.total > 0 ? m.acertos / m.total : 0,
+        /*
+          ⚠️ **O total deixa de ser descartado** (card 30). Ele já era calculado
+          aqui para dividir, e ia embora — então "Álgebra 60%" chegava à tela
+          sem dizer de quantas questões.
+
+          ⚠️ E isso importa desde o card 14: as bases NÃO somam o total do
+          simulado, porque uma questão conta inteira em cada (matéria, frente)
+          que toca. Sem a base, quem soma as matérias acha que a conta não fecha.
+        */
+        questoes: m.total,
         frentes: [...m.frentes.values()].map((f) => ({
           id: f.id as never,
           nome: f.nome,
           aproveitamento: f.total > 0 ? f.acertos / f.total : 0,
+          questoes: f.total,
           materia: m.nome,
         })),
       })),
