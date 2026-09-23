@@ -17,6 +17,7 @@ import {
   QuestaoDoRelatorioDtoOutput,
   QuestoesDoRelatorioDtoOutput,
 } from './dtos/questoes-do-relatorio.dto.output';
+import { SerieDoEstudanteDtoOutput } from './dtos/serie-do-estudante.dto.output';
 import { SimuladosComCartaoDtoOutput } from './dtos/simulados-com-cartao.dto.output';
 import {
   LinhaComHistorico,
@@ -395,6 +396,95 @@ export class RelatorioSimuladoEstudanteService {
           ? descreverFalha(h.falha)
           : undefined,
       respostas,
+    };
+  }
+
+  /**
+   * A série de aplicações de um estudante — "o Pedro melhorou?" (card 17).
+   *
+   * ⚠️ **Traz a média do RECORTE em cada ponto, e não só a nota do aluno.** Dois
+   * simulados de dificuldade diferente não se comparam por percentual bruto:
+   * cair de 62% para 55% pode ser MELHORA, se o segundo foi muito mais difícil.
+   *
+   * Desenhar as duas linhas juntas resolve isso sem normalizar nada — se a
+   * turma caiu 10 pontos e o aluno caiu 7, o gráfico mostra. A alternativa
+   * (z-score contra a turma) é mais correta e ilegível para quem vai usar.
+   *
+   * ⚠️ **A linha do aluno sozinha é o gráfico que mais convida à conclusão
+   * errada**, e é o padrão em quase toda plataforma de simulado. Por isso a
+   * média vem do servidor junto: deixá-la opcional na tela seria deixar a
+   * porta aberta.
+   *
+   * ⚠️ **Nada é guardado.** Já existem dois lugares que calculam desempenho
+   * (este relatório, sob demanda, e o `user_group_aggregates`, mensal por
+   * cron); um terceiro agregado daria três números diferentes para a mesma
+   * turma na mesma semana.
+   */
+  async serieDoEstudante(params: {
+    cursinhoId: string;
+    usuario: string;
+    turmaId?: string;
+    usuarios?: string[];
+  }): Promise<SerieDoEstudanteDtoOutput> {
+    const pontos = await this.repository.serieDoEstudante({
+      cursinhoId: params.cursinhoId,
+      usuario: params.usuario,
+      turmaId: params.turmaId,
+    });
+    if (pontos.length === 0) return { pontos: [] };
+
+    /*
+      ⚠️ **A média do recorte é calculada por simulado, sobre as MESMAS linhas
+      que o relatório daquele simulado usaria** — não sobre o agregado mensal.
+      Misturar as duas fontes faria o ponto do gráfico discordar do número que a
+      pessoa vê ao abrir aquele relatório.
+    */
+    const nomes = await this.simuladoRepository.getNomesPorIds(
+      pontos.map((p) => p.simuladoId),
+    );
+    const nomePorId = new Map(nomes.map((n) => [n.id, n.nome]));
+
+    const medias = await Promise.all(
+      pontos.map(async (p) => {
+        const linhas = await this.repository.buscarPorRecorte({
+          simuladoId: p.simuladoId,
+          cursinhoId: params.cursinhoId,
+          turmaId: params.turmaId,
+          usuarios: params.usuarios,
+        });
+        const comLeitura = linhas.filter(
+          (l) =>
+            l.historico?.status === HistoricoStatus.Completed &&
+            typeof l.historico?.aproveitamento?.geral === 'number',
+        );
+        return {
+          /*
+            ⚠️ `null`, e não zero, quando ninguém mais tem leitura: zero
+            desenharia a turma no chão e o aluno voando. A tela desenha o ponto
+            do aluno e deixa a linha da turma com falha — que é a verdade.
+          */
+          media: comLeitura.length
+            ? comLeitura.reduce(
+                (t, l) => t + l.historico!.aproveitamento.geral,
+                0,
+              ) / comLeitura.length
+            : null,
+          base: comLeitura.length,
+        };
+      }),
+    );
+
+    return {
+      pontos: pontos.map((p, i) => ({
+        simuladoId: p.simuladoId,
+        // `?? null`: simulado apagado depois do vínculo não some da série.
+        nome: nomePorId.get(p.simuladoId) ?? null,
+        aproveitamento: p.aproveitamento,
+        acertos: p.acertos,
+        em: p.em.toISOString(),
+        mediaDoRecorte: medias[i].media,
+        baseDoRecorte: medias[i].base,
+      })),
     };
   }
 

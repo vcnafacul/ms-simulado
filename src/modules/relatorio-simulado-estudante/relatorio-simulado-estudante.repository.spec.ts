@@ -255,3 +255,116 @@ describe('RelatorioSimuladoEstudanteRepository.agregarPorQuestao', () => {
     }
   });
 });
+
+describe('RelatorioSimuladoEstudanteRepository.serieDoEstudante (card 17)', () => {
+  const linha = (over: Record<string, unknown> = {}) => ({
+    simulado: { toString: () => 's1' },
+    createdAt: new Date('2026-03-10T00:00:00.000Z'),
+    historico: {
+      status: 'completed',
+      aproveitamento: { geral: 0.5 },
+      acertos: 45,
+    },
+    ...over,
+  });
+
+  const montar = (linhas: unknown[]) => {
+    const exec = jest.fn().mockResolvedValue(linhas);
+    const lean = jest.fn().mockReturnValue({ exec });
+    const populate = jest.fn().mockReturnValue({ lean });
+    const find = jest.fn().mockReturnValue({ populate });
+    return {
+      repo: new RelatorioSimuladoEstudanteRepository({ find } as any),
+      find,
+    };
+  };
+
+  it('devolve o ponto com nota, acertos e data da junção', async () => {
+    const { repo } = montar([linha()]);
+
+    const r = await repo.serieDoEstudante({
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    expect(r).toEqual([
+      {
+        simuladoId: 's1',
+        aproveitamento: 0.5,
+        acertos: 45,
+        em: new Date('2026-03-10T00:00:00.000Z'),
+      },
+    ]);
+  });
+
+  it('⚠️ leitura NÃO concluída não vira ponto', async () => {
+    /*
+      O gráfico é sobre subir e descer: um ponto fantasma em zero desenha uma
+      queda que não aconteceu. E `failed` carrega nota VELHA — o `marcarFalha`
+      não limpa o histórico —, então filtrar pela presença da nota não basta.
+    */
+    const { repo } = montar([
+      linha({
+        historico: {
+          status: 'failed',
+          aproveitamento: { geral: 0.2 },
+          acertos: 18,
+        },
+      }),
+      linha({ historico: { status: 'awaiting_omr' } }),
+    ]);
+
+    const r = await repo.serieDoEstudante({
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    expect(r).toEqual([]);
+  });
+
+  it('histórico apagado depois do vínculo não vira ponto', async () => {
+    const { repo } = montar([linha({ historico: null })]);
+
+    await expect(
+      repo.serieDoEstudante({ cursinhoId: 'cur-1', usuario: 'u1' }),
+    ).resolves.toEqual([]);
+  });
+
+  it('⚠️ ordena por data — a série é sobre a ordem', async () => {
+    const { repo } = montar([
+      linha({
+        simulado: { toString: () => 'depois' },
+        createdAt: new Date('2026-05-01T00:00:00.000Z'),
+      }),
+      linha({
+        simulado: { toString: () => 'antes' },
+        createdAt: new Date('2026-03-01T00:00:00.000Z'),
+      }),
+    ]);
+
+    const r = await repo.serieDoEstudante({
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    expect(r.map((p) => p.simuladoId)).toEqual(['antes', 'depois']);
+  });
+
+  it('⚠️ o recorte e o usuário entram no filtro', async () => {
+    // Reimplementar o filtro aqui abriria a porta para esta rota enxergar
+    // cursinho que as outras não enxergam.
+    const { repo, find } = montar([]);
+
+    await repo.serieDoEstudante({
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+      turmaId: 't-9',
+    });
+
+    expect(find).toHaveBeenCalledWith({
+      cursinhoId: 'cur-1',
+      turmaId: 't-9',
+      usuario: 'u1',
+    });
+  });
+});

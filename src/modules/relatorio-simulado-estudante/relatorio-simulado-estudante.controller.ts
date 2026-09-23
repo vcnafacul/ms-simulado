@@ -15,6 +15,7 @@ import { ConsultarRelatorioDtoInput } from './dtos/consultar-relatorio.dto.input
 import { DetalheDoEstudanteDtoOutput } from './dtos/detalhe-do-estudante.dto.output';
 import { QuestoesDoRelatorioDtoOutput } from './dtos/questoes-do-relatorio.dto.output';
 import { RelatorioSimuladoDtoOutput } from './dtos/relatorio-simulado.dto.output';
+import { SerieDoEstudanteDtoOutput } from './dtos/serie-do-estudante.dto.output';
 import { SimuladosComCartaoDtoOutput } from './dtos/simulados-com-cartao.dto.output';
 import { RelatorioSimuladoEstudanteService } from './relatorio-simulado-estudante.service';
 
@@ -102,6 +103,35 @@ export class RelatorioSimuladoEstudanteController {
       simuladoId,
       cursinhoId: body.cursinhoId,
       usuarios: body.usuarios,
+    });
+  }
+
+  /**
+   * ⚠️ **ANTES das rotas com `:simuladoId`, e a ordem é o que faz ela
+   * funcionar.** `serie/estudante/:usuario` tem TRÊS segmentos, os mesmos de
+   * `:simuladoId/estudante/:usuario` — e o segundo segmento é `estudante` nas
+   * duas. Declarada depois, esta rota seria capturada por aquela com
+   * `simuladoId = 'serie'`, o `isValid` recusaria e a chamada viraria **400**,
+   * sem pista nenhuma.
+   *
+   * É a mesma armadilha que o `simulados` logo abaixo já documenta, e a mesma
+   * do `summary` no controller de questão. **Só um app de verdade pega**: teste
+   * de unidade chama o método direto e passa com a ordem errada.
+   */
+  @Get('serie/estudante/:usuario')
+  @ApiResponse({
+    status: 200,
+    description: 'as aplicações de um estudante, com a média do recorte',
+    type: SerieDoEstudanteDtoOutput,
+  })
+  async serieDoEstudante(
+    @Param('usuario') usuario: string,
+    @Query() query: ConsultarRelatorioDtoInput,
+  ): Promise<SerieDoEstudanteDtoOutput> {
+    return this.service.serieDoEstudante({
+      usuario,
+      cursinhoId: query.cursinhoId,
+      turmaId: query.turmaId,
     });
   }
 

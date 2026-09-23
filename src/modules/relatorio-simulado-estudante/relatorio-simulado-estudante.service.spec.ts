@@ -1296,3 +1296,157 @@ describe('enxugarMaterias — base por matéria e frente (card 30)', () => {
     expect('materia' in m.frentes[0]).toBe(false);
   });
 });
+
+describe('RelatorioSimuladoEstudanteService.serieDoEstudante (card 17)', () => {
+  const ponto = (simuladoId: string, aproveitamento: number, dia: number) => ({
+    simuladoId,
+    aproveitamento,
+    acertos: Math.round(aproveitamento * 90),
+    em: new Date(`2026-0${dia}-10T00:00:00.000Z`),
+  });
+
+  const montarSerie = (
+    pontos: ReturnType<typeof ponto>[],
+    linhasPorSimulado: Record<string, unknown[]> = {},
+  ) => {
+    const repository = {
+      serieDoEstudante: jest.fn().mockResolvedValue(pontos),
+      buscarPorRecorte: jest.fn(({ simuladoId }: { simuladoId: string }) =>
+        Promise.resolve(linhasPorSimulado[simuladoId] ?? []),
+      ),
+    };
+    const simuladoRepository = {
+      getNomesPorIds: jest.fn().mockResolvedValue(
+        pontos.map((p) => ({
+          id: p.simuladoId,
+          nome: `Prova ${p.simuladoId}`,
+        })),
+      ),
+    };
+    const questaoRepository = {
+      contadoresGlobais: jest.fn().mockResolvedValue(new Map()),
+    };
+    return {
+      svc: new RelatorioSimuladoEstudanteService(
+        repository as any,
+        simuladoRepository as any,
+        questaoRepository as any,
+      ),
+      repository,
+    };
+  };
+
+  const comNota = (nota: number) => ({
+    historico: { status: 'completed', aproveitamento: { geral: nota } },
+  });
+
+  it('devolve os pontos com nome e data', async () => {
+    const { svc } = montarSerie([ponto('s1', 0.5, 3)]);
+
+    const r = await svc.serieDoEstudante({
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    expect(r.pontos[0]).toMatchObject({
+      simuladoId: 's1',
+      nome: 'Prova s1',
+      aproveitamento: 0.5,
+      em: '2026-03-10T00:00:00.000Z',
+    });
+  });
+
+  it('⚠️ traz a média do recorte em CADA ponto', async () => {
+    /*
+      É o que impede a conclusão errada: dois simulados de dificuldade diferente
+      não se comparam por percentual bruto. Cair de 62% para 55% pode ser
+      MELHORA, se o segundo foi muito mais difícil — e com as duas linhas juntas
+      isso se lê sem normalizar nada.
+    */
+    const { svc } = montarSerie([ponto('s1', 0.62, 3), ponto('s2', 0.55, 4)], {
+      s1: [comNota(0.6), comNota(0.64)],
+      // a turma inteira caiu mais que o aluno
+      s2: [comNota(0.4), comNota(0.44)],
+    });
+
+    const r = await svc.serieDoEstudante({
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    expect(r.pontos[0].mediaDoRecorte).toBeCloseTo(0.62);
+    expect(r.pontos[1].mediaDoRecorte).toBeCloseTo(0.42);
+  });
+
+  it('⚠️ a base de cada média vem junto — 27 alunos e 2 desenham o mesmo traço', async () => {
+    const { svc } = montarSerie([ponto('s1', 0.5, 3)], {
+      s1: [comNota(0.4), comNota(0.6)],
+    });
+
+    const r = await svc.serieDoEstudante({
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    expect(r.pontos[0].baseDoRecorte).toBe(2);
+  });
+
+  it('⚠️ recorte sem mais ninguém com leitura dá média `null`, nunca zero', async () => {
+    // Zero desenharia a turma no chão e o aluno voando.
+    const { svc } = montarSerie([ponto('s1', 0.5, 3)], { s1: [] });
+
+    const r = await svc.serieDoEstudante({
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    expect(r.pontos[0].mediaDoRecorte).toBeNull();
+    expect(r.pontos[0].baseDoRecorte).toBe(0);
+  });
+
+  it('⚠️ linha sem leitura concluída não entra na média da turma', async () => {
+    const { svc } = montarSerie([ponto('s1', 0.5, 3)], {
+      s1: [
+        comNota(0.8),
+        // `failed` carrega nota VELHA: o `marcarFalha` não limpa o histórico
+        { historico: { status: 'failed', aproveitamento: { geral: 0.2 } } },
+      ],
+    });
+
+    const r = await svc.serieDoEstudante({
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    expect(r.pontos[0].mediaDoRecorte).toBeCloseTo(0.8);
+    expect(r.pontos[0].baseDoRecorte).toBe(1);
+  });
+
+  it('estudante sem nenhuma aplicação devolve lista vazia, sem buscar nome', async () => {
+    const { svc, repository } = montarSerie([]);
+
+    const r = await svc.serieDoEstudante({
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    expect(r.pontos).toEqual([]);
+    expect(repository.buscarPorRecorte).not.toHaveBeenCalled();
+  });
+
+  it('simulado apagado depois do vínculo continua na série, com nome nulo', async () => {
+    const { svc } = montarSerie([ponto('s1', 0.5, 3)]);
+    // sobrescreve: o nome não veio
+    (svc as any).simuladoRepository.getNomesPorIds = jest
+      .fn()
+      .mockResolvedValue([]);
+
+    const r = await svc.serieDoEstudante({
+      cursinhoId: 'cur-1',
+      usuario: 'u1',
+    });
+
+    expect(r.pontos).toHaveLength(1);
+    expect(r.pontos[0].nome).toBeNull();
+  });
+});

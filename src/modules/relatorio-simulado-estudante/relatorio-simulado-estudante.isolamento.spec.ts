@@ -1199,6 +1199,25 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
         cursinhoId: 'cur-http',
       });
 
+      /*
+        ⚠️ Card 17: a série só tem ponto com leitura CONCLUÍDA, então o bloco
+        precisou de um estudante assim — os dois acima são `failed` e
+        `awaiting_omr`, e é justamente por isso que eles NÃO viram ponto.
+      */
+      const hLido = await histModel.create({
+        usuario: 'u-http-serie',
+        simulado: SIM_HTTP,
+        status: 'completed',
+        acertos: 45,
+        aproveitamento: { geral: 0.5, materias: [] },
+      });
+      await relModel.create({
+        historico: hLido._id,
+        simulado: SIM_HTTP,
+        usuario: 'u-http-serie',
+        cursinhoId: 'cur-http',
+      });
+
       httpMod = await Test.createTestingModule({
         imports: [
           MongooseModule.forRoot(uri),
@@ -1259,7 +1278,17 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
           ),
         }),
       );
-      expect(res.body.totalEstudantesComCartaoNoCursinho).toBe(2);
+      /*
+        ⚠️ **Três, e não dois, desde o card 17:** o bloco ganhou um terceiro
+        estudante (`u-http-serie`, com leitura concluída) porque a série só tem
+        ponto com leitura concluída — e os outros dois são `failed` e
+        `awaiting_omr`.
+
+        O número subiu porque a contagem está CERTA: ela conta cartões do
+        cursinho, e agora há três. Ajustar o teste aqui é o correto; o que seria
+        errado é o contador ignorar o cartão novo.
+      */
+      expect(res.body.totalEstudantesComCartaoNoCursinho).toBe(3);
     });
 
     it('400 — sem cursinhoId, a rota recusa em vez de devolver "todos os cursinhos"', async () => {
@@ -1319,6 +1348,47 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
         cartoes: expect.any(Number),
         comLeituraConcluida: expect.any(Number),
       });
+    });
+
+    it('⚠️ GET serie/estudante/:usuario resolve para a rota literal, não para :simuladoId', async () => {
+      /*
+        ⚠️ **Esta é a armadilha do card 17, e só um app de verdade a pega.**
+        `serie/estudante/:usuario` e `:simuladoId/estudante/:usuario` têm TRÊS
+        segmentos, e o segundo é `estudante` nas duas. Declarada depois, esta
+        rota seria capturada por aquela com `simuladoId = 'serie'`, o `isValid`
+        recusaria e a chamada viraria **400** — sem pista nenhuma.
+
+        Teste de unidade chama o método direto e passa com a ordem errada.
+      */
+      const res = await request(app.getHttpServer())
+        .get('/v1/relatorio-simulado/serie/estudante/u-http')
+        .query({ cursinhoId: 'cur-http' })
+        .expect(200);
+
+      expect(Array.isArray(res.body.pontos)).toBe(true);
+    });
+
+    it('a série traz o ponto do estudante com a média do recorte junto', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/v1/relatorio-simulado/serie/estudante/u-http-serie')
+        .query({ cursinhoId: 'cur-http' })
+        .expect(200);
+
+      expect(res.body.pontos[0]).toMatchObject({
+        simuladoId: expect.any(String),
+        aproveitamento: expect.any(Number),
+        em: expect.any(String),
+        baseDoRecorte: expect.any(Number),
+      });
+    });
+
+    it('estudante de outro cursinho devolve série vazia, não a de outro', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/v1/relatorio-simulado/serie/estudante/u-http-serie')
+        .query({ cursinhoId: 'cur-de-outro' })
+        .expect(200);
+
+      expect(res.body.pontos).toEqual([]);
     });
 
     it('GET /simulados sem cursinhoId recusa com 400', async () => {
