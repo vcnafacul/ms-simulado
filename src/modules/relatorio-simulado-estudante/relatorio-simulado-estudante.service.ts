@@ -47,10 +47,18 @@ function enxugarMaterias(
     id: m.id,
     nome: m.nome,
     aproveitamento: m.aproveitamento,
+    /*
+      ⚠️ **Atravessa como está, inclusive ausente** (card 30). Histórico gravado
+      antes do card não tem a contagem, e um `?? 0` aqui afirmaria "nenhuma
+      questão desta matéria" — que é outra coisa, e faria a tela escrever "de 0
+      questões" em todo relatório antigo.
+    */
+    questoes: m.questoes,
     frentes: (m.frentes ?? []).map((f) => ({
       id: f.id,
       nome: f.nome,
       aproveitamento: f.aproveitamento,
+      questoes: f.questoes,
     })),
   }));
 }

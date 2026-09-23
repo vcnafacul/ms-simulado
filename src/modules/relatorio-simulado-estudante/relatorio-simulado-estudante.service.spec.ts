@@ -1236,3 +1236,63 @@ describe('RelatorioSimuladoEstudanteService.consultar — identificação (card 
     });
   });
 });
+
+describe('enxugarMaterias — base por matéria e frente (card 30)', () => {
+  const comMaterias = (materias: unknown[]) =>
+    montar([
+      linha({ historico: { aproveitamento: { geral: 0.5, materias } } }),
+    ]);
+
+  const primeira = async (materias: unknown[]) => {
+    const { svc } = comMaterias(materias);
+    const r = await svc.consultar({ simuladoId: SIM, cursinhoId: 'cur-1' });
+    return r.linhas[0].aproveitamentoPorMateria![0];
+  };
+
+  const materia = (over: any = {}) => ({
+    id: 'm1',
+    nome: 'Matemática',
+    aproveitamento: 0.5,
+    frentes: [
+      {
+        id: 'f1',
+        nome: 'Álgebra',
+        aproveitamento: 0.6,
+        materia: 'm1',
+        ...over.frente,
+      },
+    ],
+    ...over.materia,
+  });
+
+  it('a contagem atravessa em matéria e em frente', async () => {
+    const m = await primeira([
+      materia({ materia: { questoes: 12 }, frente: { questoes: 5 } }),
+    ]);
+
+    expect(m.questoes).toBe(12);
+    expect(m.frentes[0].questoes).toBe(5);
+  });
+
+  it('⚠️ histórico antigo atravessa SEM a contagem — nunca com zero', async () => {
+    /*
+      O total nunca foi gravado antes do card 30, e é irrecuperável: o
+      `criaAproveitamento` calculava para dividir e descartava. Um `?? 0`
+      afirmaria "nenhuma questão desta matéria", e a tela escreveria "de 0
+      questões" em todo relatório antigo.
+    */
+    const m = await primeira([materia()]);
+
+    expect(m.questoes).toBeUndefined();
+    expect(m.frentes[0].questoes).toBeUndefined();
+  });
+
+  it('o eco de `materia` dentro da frente continua sendo cortado', async () => {
+    // O card 02 mediu: 23% do payload só por não repetir o que a posição já diz.
+    const m = await primeira([
+      materia({ materia: { questoes: 12 }, frente: { questoes: 5 } }),
+    ]);
+
+    expect('materia' in m.frentes[0]).toBe(false);
+  });
+});
