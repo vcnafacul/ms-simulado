@@ -321,12 +321,13 @@ describe('QuestaoRepository.contadoresGlobais (card 16)', () => {
     expect(find.mock.calls[0][1]).toEqual({
       acertos: 1,
       quantidadeResposta: 1,
-      // ⚠️ Card 29 — explica a base pequena, não soma nada.
-      origem: 1,
+      // ⚠️ Card 29 — explica a base pequena, não soma nada. Card 32: o tipo
+      // decide, não a presença do `origem`.
+      tipoOrigem: 1,
     });
   });
 
-  it('⚠️ questão COM `origem` é marcada como versão', async () => {
+  it('⚠️ questão que é VERSÃO é marcada como versão', async () => {
     /*
       Card 29: a contagem é da QUESTÃO, não da linhagem — "correção" edita
       in-place e só "nova versão" cria entidade nova, então toda versão nasce de
@@ -335,10 +336,44 @@ describe('QuestaoRepository.contadoresGlobais (card 16)', () => {
       Este booleano existe para a tela EXPLICAR a base pequena, não para somar.
     */
     const { repo } = montar([
-      { _id: ID, acertos: 4, quantidadeResposta: 12, origem: 'q0' },
+      {
+        _id: ID,
+        acertos: 4,
+        quantidadeResposta: 12,
+        origem: 'q0',
+        tipoOrigem: 'versao',
+      },
     ]);
 
     expect((await repo.contadoresGlobais([ID])).get(ID)?.ehVersao).toBe(true);
+  });
+
+  it('⚠️ CÓPIA não é versão — o defeito do card 32', async () => {
+    /*
+      Com `ehVersao = origem != null`, uma cópia manual recebia na coluna
+      `Acerto geral` a frase "O histórico anterior ficou com a versão anterior"
+      — falsa: cópia não tem histórico anterior, nasceu do zero.
+    */
+    const { repo } = montar([
+      {
+        _id: ID,
+        acertos: 0,
+        quantidadeResposta: 2,
+        origem: 'q0',
+        tipoOrigem: 'copia',
+      },
+    ]);
+
+    expect((await repo.contadoresGlobais([ID])).get(ID)?.ehVersao).toBe(false);
+  });
+
+  it('⚠️ `origem` sem tipo (dado anterior ao card 32) conta como CÓPIA', async () => {
+    // O tipo mais antigo, e o que não afirma um histórico que talvez não exista.
+    const { repo } = montar([
+      { _id: ID, acertos: 0, quantidadeResposta: 2, origem: 'q0' },
+    ]);
+
+    expect((await repo.contadoresGlobais([ID])).get(ID)?.ehVersao).toBe(false);
   });
 
   it('lista vazia não consulta o banco', async () => {
@@ -389,7 +424,9 @@ describe('QuestaoRepository — linhagem (card 25)', () => {
     */
     const exec = jest
       .fn()
-      .mockResolvedValue([{ _id: 'q2', status: 'Pending', origem: 'q1' }]);
+      .mockResolvedValue([
+        { _id: 'q2', status: 'Pending', origem: 'q1', tipoOrigem: 'copia' },
+      ]);
     const lean = jest.fn().mockReturnValue({ exec });
     const find = jest.fn().mockReturnValue({ lean });
     const repo = new QuestaoRepository({ find } as any, {} as any, {} as any);
@@ -397,7 +434,24 @@ describe('QuestaoRepository — linhagem (card 25)', () => {
     const r = await repo.listarCopias('q1');
 
     expect(find.mock.calls[0][0]).toEqual({ origem: 'q1' });
-    expect(r).toEqual([{ id: 'q2', status: 'Pending', origem: 'q1' }]);
+    expect(r).toEqual([
+      { id: 'q2', status: 'Pending', origem: 'q1', tipo: 'copia' },
+    ]);
+  });
+
+  it('⚠️ cada filha diz se é cópia ou versão (card 32)', async () => {
+    const exec = jest.fn().mockResolvedValue([
+      { _id: 'q2', status: 'Pending', origem: 'q1', tipoOrigem: 'versao' },
+      // ⚠️ Sem tipo = anterior ao card 32 = cópia.
+      { _id: 'q3', status: 'Pending', origem: 'q1' },
+    ]);
+    const lean = jest.fn().mockReturnValue({ exec });
+    const find = jest.fn().mockReturnValue({ lean });
+    const repo = new QuestaoRepository({ find } as any, {} as any, {} as any);
+
+    const r = await repo.listarCopias('q1');
+
+    expect(r.map((c) => c.tipo)).toEqual(['versao', 'copia']);
   });
 
   it('projeta só o que a lista de cópias mostra', async () => {
@@ -408,7 +462,11 @@ describe('QuestaoRepository — linhagem (card 25)', () => {
 
     await repo.listarCopias('q1');
 
-    expect(find.mock.calls[0][1]).toEqual({ status: 1, origem: 1 });
+    expect(find.mock.calls[0][1]).toEqual({
+      status: 1,
+      origem: 1,
+      tipoOrigem: 1,
+    });
   });
 });
 

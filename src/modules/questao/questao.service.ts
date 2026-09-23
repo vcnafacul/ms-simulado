@@ -27,6 +27,7 @@ import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
 import { documentoDaCopia } from './duplicarQuestao';
+import { TipoOrigem } from './enums/tipo-origem.enum';
 import {
   CAMPOS_DE_CLASSIFICACAO,
   CAMPOS_DE_CONTEUDO,
@@ -488,7 +489,7 @@ export class QuestaoService {
     }
 
     const copia = await this.repository.create(
-      documentoDaCopia(original) as Questao,
+      documentoDaCopia(TipoOrigem.copia, original) as Questao,
     );
 
     await this.auditLogService.create({
@@ -557,7 +558,7 @@ export class QuestaoService {
     }
 
     const sucessora = await this.repository.create(
-      documentoDaCopia(original) as Questao,
+      documentoDaCopia(TipoOrigem.versao, original) as Questao,
     );
     const novaId = String((sucessora as { _id: unknown })._id);
 

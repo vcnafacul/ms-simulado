@@ -950,6 +950,8 @@ describe('QuestaoService.duplicar (card 25)', () => {
 
     expect(repository.create).toHaveBeenCalledTimes(1);
     expect((copia as { origem?: string }).origem).toBe('q1');
+    // ⚠️ Card 32: duplicar produz CÓPIA — a mesma função serve a versão.
+    expect((copia as { tipoOrigem?: string }).tipoOrigem).toBe('copia');
   });
 
   it('⚠️ a ORIGINAL não é tocada', async () => {
@@ -1118,6 +1120,14 @@ describe('QuestaoService.novaVersao (card 26)', () => {
       quantidadeResposta: 0,
       origem: 'q1',
     });
+  });
+
+  it('⚠️ a sucessora é marcada como VERSÃO, não como cópia (card 32)', async () => {
+    const { service, repository } = montar();
+
+    await service.novaVersao('q1', conteudo as any);
+
+    expect(repository.create.mock.calls[0][0].tipoOrigem).toBe('versao');
   });
 
   it('o conteúdo novo é escrito na SUCESSORA, não na original', async () => {

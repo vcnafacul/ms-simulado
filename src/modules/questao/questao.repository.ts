@@ -15,6 +15,7 @@ import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
 import { Questao } from './questao.schema';
+import { TipoOrigem } from './enums/tipo-origem.enum';
 
 /** Entrada do reverse-lookup: prova que contém a questão + o número nela. */
 export interface ProvaContendo {
@@ -415,15 +416,22 @@ export class QuestaoRepository extends BaseRepository<Questao> {
    */
   async listarCopias(
     id: string,
-  ): Promise<{ id: string; status: Status; origem: string }[]> {
+  ): Promise<
+    { id: string; status: Status; origem: string; tipo: TipoOrigem }[]
+  > {
     const docs = await this.model
-      .find({ origem: id }, { status: 1, origem: 1 })
+      .find({ origem: id }, { status: 1, origem: 1, tipoOrigem: 1 })
       .lean()
       .exec();
     return docs.map((d: any) => ({
       id: d._id.toString(),
       status: d.status,
       origem: d.origem,
+      /*
+        ⚠️ **Cópia e versão caem na mesma consulta, e é o tipo que separa**
+        (card 32). Sem ele, "3 cópias" podia ser 1 cópia e 2 versões.
+      */
+      tipo: tipoDoVinculo(d),
     }));
   }
 
@@ -445,7 +453,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
           porque ela é rara. Sem isso, a coluna `Acerto geral` some com o uso e
           ninguém sabe por quê.
         */
-        { acertos: 1, quantidadeResposta: 1, origem: 1 },
+        { acertos: 1, quantidadeResposta: 1, tipoOrigem: 1 },
       )
       .lean()
       .exec();
@@ -464,7 +472,13 @@ export class QuestaoRepository extends BaseRepository<Questao> {
             pequena. Mandar o id convidaria a buscar a questão antiga e somar os
             números, que é exatamente o que este card decidiu NÃO fazer.
           */
-          ehVersao: d.origem != null,
+          /*
+            ⚠️ **Pelo TIPO, não pela presença de `origem`** (card 32). Cópia
+            também tem `origem`, e com `origem != null` uma cópia manual recebia
+            a frase "o histórico anterior ficou com a versão anterior" — falsa:
+            cópia nasceu do zero.
+          */
+          ehVersao: d.tipoOrigem === TipoOrigem.versao,
         },
       ]),
     );
@@ -675,4 +689,12 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       { $sort: { count: -1 } },
     ]);
   }
+}
+
+/**
+ * O tipo do vínculo de uma filha (card 32). ⚠️ Ausente = `copia` — ver o
+ * docblock de `tipoOrigem` no schema.
+ */
+function tipoDoVinculo(d: { tipoOrigem?: TipoOrigem | null }): TipoOrigem {
+  return d.tipoOrigem ?? TipoOrigem.copia;
 }
