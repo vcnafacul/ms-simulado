@@ -5,6 +5,7 @@ import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllWhereInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { Prova } from '../prova/prova.schema';
+import { Simulado } from '../simulado/schemas/simulado.schema';
 import { resolveQuestaoId } from '../prova/helpers/question-container.helpers';
 import { Resposta } from '../historico/types/resposta';
 import { UpdateClassificacaoDTOInput } from './dtos/update-classificacao.dto.input';
@@ -27,6 +28,13 @@ export class QuestaoRepository extends BaseRepository<Questao> {
   constructor(
     @InjectModel(Questao.name) model: Model<Questao>,
     @InjectModel(Prova.name) private readonly provaModel: Model<Prova>,
+    /*
+      ⚠️ Entrou no card 26: a troca de ponteiro precisa alcançar **as duas**
+      coleções. `Prova.questoes` e `Simulado.questoes` são arrays independentes,
+      e trocar só numa deixaria a prova com a sucessora e o simulado com a
+      original congelada — o aluno responderia o texto velho.
+    */
+    @InjectModel(Simulado.name) private readonly simuladoModel: Model<Simulado>,
   ) {
     super(model);
   }
@@ -320,6 +328,57 @@ export class QuestaoRepository extends BaseRepository<Questao> {
    * `Object.entries`, e num documento hidratado isso traz métodos e internos do
    * Mongoose em vez dos campos.
    */
+  /**
+   * Troca a questão apontada em TODAS as provas e simulados que a contêm
+   * (card 26).
+   *
+   * ⚠️ **Substituição no lugar, e NÃO remover + adicionar.** Remover e
+   * acrescentar passaria pela validação da factory — que pode recusar (número
+   * ocupado, regra ENEM de idiomática) e deixar a prova **sem a questão**. A
+   * sucessora tem a mesma classificação da original, então os simulados em que
+   * ela deve estar são exatamente os mesmos: trocar o ponteiro preserva a
+   * estrutura inteira, inclusive o `numero`.
+   *
+   * ⚠️ **Nas duas coleções.** `Prova.questoes` e `Simulado.questoes` são arrays
+   * independentes — trocar só numa deixaria a prova com a sucessora e o
+   * simulado com a original congelada, e o aluno responderia o texto velho.
+   *
+   * ⚠️ **Medido: uma questão está em 2,7 simulados em média** (card 22), máximo
+   * 5. A troca é sempre multi-prova, nunca "a prova que eu estava editando".
+   *
+   * ⚠️ **A corrida do `adicionarEmProva` alcança isto**
+   * (`docs/cards/etapa-11/BUG-corrida-no-adicionar-questao-em-prova.md`): este
+   * `updateMany` escreve nos mesmos arrays. Enquanto aquele bug estiver aberto,
+   * a troca carrega a mesma fragilidade — multiplicada pelas provas atingidas.
+   */
+  async substituirQuestao(
+    de: string,
+    para: string,
+  ): Promise<{ provas: number; simulados: number }> {
+    const filtro = { 'questoes.questao': new Types.ObjectId(de) };
+    const update = {
+      $set: { 'questoes.$[alvo].questao': new Types.ObjectId(para) },
+    };
+    const opcoes = {
+      arrayFilters: [{ 'alvo.questao': new Types.ObjectId(de) }],
+    };
+
+    const [provas, simulados] = await Promise.all([
+      this.provaModel.updateMany(filtro, update, opcoes).exec(),
+      this.simuladoModel.updateMany(filtro, update, opcoes).exec(),
+    ]);
+
+    return {
+      provas: provas.modifiedCount,
+      simulados: simulados.modifiedCount,
+    };
+  }
+
+  /** Marca a questão como congelada — ver o docblock do campo no schema. */
+  async congelar(id: string): Promise<void> {
+    await this.model.updateOne({ _id: id }, { $set: { congelada: true } });
+  }
+
   async getParaDuplicar(id: string): Promise<Questao | null> {
     return this.model
       .findById(id)

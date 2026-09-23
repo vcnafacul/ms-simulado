@@ -146,6 +146,22 @@ export class QuestaoController {
     return await this.service.duplicar(id, body?.userId);
   }
 
+  @Patch(':id/nova-versao')
+  @ApiResponse({
+    status: 200,
+    description:
+      'congela esta questão e cria a sucessora já editada; as provas e simulados passam a apontar a nova',
+    type: Questao,
+  })
+  @ApiResponse({ status: 400, description: 'questão já congelada' })
+  @ApiResponse({ status: 404, description: 'questão não encontrada' })
+  public async novaVersao(
+    @Param('id') id: string,
+    @Body() body: UpdateContentDTOInput,
+  ) {
+    return await this.service.novaVersao(id, body, body.userId);
+  }
+
   @Get(':id/copias')
   @ApiResponse({
     status: 200,
