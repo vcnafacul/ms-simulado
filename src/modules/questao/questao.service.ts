@@ -26,6 +26,12 @@ import { UpdateImageAlternativaDTOInput } from './dtos/update-image-alternativa.
 import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
+import {
+  CAMPOS_DE_CLASSIFICACAO,
+  CAMPOS_DE_CONTEUDO,
+  camposAlterados,
+  registroDaEdicao,
+} from './camposAlterados';
 import { ProvaContendo, QuestaoRepository } from './questao.repository';
 import { Questao } from './questao.schema';
 
@@ -363,6 +369,30 @@ export class QuestaoService {
       throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
     }
 
+    /*
+      ⚠️ Card 24 — ANTES de qualquer escrita, pelo mesmo motivo do
+      `updateContent`.
+
+      ⚠️ E a questão vem do `getByIdToUpdate`, que popula `frente1`/`materia` —
+      por isso a comparação normaliza para string: o documento traz objetos, e o
+      payload traz ids.
+    */
+    const alterados = camposAlterados(
+      {
+        enemArea: questao.enemArea,
+        materia: questao.materia?._id?.toString(),
+        frente1: questao.frente1?._id?.toString(),
+        frente2: (
+          questao as { frente2?: { _id?: unknown } }
+        ).frente2?._id?.toString(),
+        frente3: (
+          questao as { frente3?: { _id?: unknown } }
+        ).frente3?._id?.toString(),
+      },
+      classificacao as unknown as Record<string, unknown>,
+      CAMPOS_DE_CLASSIFICACAO,
+    );
+
     const enemAreaChanged = classificacao.enemArea !== questao.enemArea;
     const frente1Changed =
       classificacao.frente1 !== questao.frente1?._id?.toString();
@@ -418,6 +448,20 @@ export class QuestaoService {
         );
       }
       await this.repository.updateClassificacao(id, classificacao);
+
+      // ⚠️ Card 24 — ver o docblock no `updateContent`.
+      if (alterados.length > 0) {
+        await this.auditLogService.create({
+          user: classificacao.userId,
+          entityId: id,
+          entityType: 'Questao',
+          changes: registroDaEdicao(
+            'updateClassificacao',
+            alterados,
+            questao.quantidadeResposta,
+          ),
+        });
+      }
     } catch (error: any) {
       throw new HttpException(
         `Não foi possível atualizar a classificação. ${error.message}`,
@@ -431,6 +475,16 @@ export class QuestaoService {
     if (!questao) {
       throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
     }
+
+    /*
+      ⚠️ **Calculado ANTES de escrever** (card 24): depois do `updateContent` o
+      documento já é o novo, e comparar não diria mais nada.
+    */
+    const alterados = camposAlterados(
+      questao as unknown as Record<string, unknown>,
+      content as unknown as Record<string, unknown>,
+      CAMPOS_DE_CONTEUDO,
+    );
 
     try {
       await this.repository.updateContent(id, content);
@@ -457,6 +511,28 @@ export class QuestaoService {
         }
 
         await this.repository.updateAssets(id, assets);
+      }
+
+      /*
+        ⚠️ **Só quando muda de fato** (card 24). Um save que não altera nada não
+        é edição, e contá-lo inflaria o número que o card 26 vai usar para
+        decidir se o versionamento se paga.
+
+        ⚠️ **Depois da escrita, e DENTRO do try:** log de uma edição que falhou
+        seria pior que log nenhum — o card 26 leria como alteração algo que o
+        banco recusou.
+      */
+      if (alterados.length > 0) {
+        await this.auditLogService.create({
+          user: content.userId,
+          entityId: id,
+          entityType: 'Questao',
+          changes: registroDaEdicao(
+            'updateContent',
+            alterados,
+            questao.quantidadeResposta,
+          ),
+        });
       }
     } catch (error: any) {
       throw new HttpException(

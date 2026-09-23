@@ -550,7 +550,13 @@ describe('QuestaoService.updateClassificacao', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
+      /*
+        ⚠️ Card 24: o `updateClassificacao` passou a registrar QUAIS campos
+        mudaram, para medir a frequência de edição — ver `camposAlterados.ts`.
+        Um `{}` aqui estoura com "create is not a function", e o `catch` do
+        método transforma isso num 400 que parece falha de validação.
+      */
+      { create: jest.fn() } as any,
       {} as any,
       provaFactory,
     );
@@ -587,7 +593,13 @@ describe('QuestaoService.updateClassificacao', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
+      /*
+        ⚠️ Card 24: o `updateClassificacao` passou a registrar QUAIS campos
+        mudaram, para medir a frequência de edição — ver `camposAlterados.ts`.
+        Um `{}` aqui estoura com "create is not a function", e o `catch` do
+        método transforma isso num 400 que parece falha de validação.
+      */
+      { create: jest.fn() } as any,
       {} as any,
       provaFactory,
     );
@@ -658,7 +670,13 @@ describe('QuestaoService.updateClassificacao', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
+      /*
+        ⚠️ Card 24: o `updateClassificacao` passou a registrar QUAIS campos
+        mudaram, para medir a frequência de edição — ver `camposAlterados.ts`.
+        Um `{}` aqui estoura com "create is not a function", e o `catch` do
+        método transforma isso num 400 que parece falha de validação.
+      */
+      { create: jest.fn() } as any,
       {} as any,
       provaFactory,
     );
@@ -705,7 +723,8 @@ describe('QuestaoService.updateClassificacao', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
+      // ⚠️ Card 24 — ver o comentário nos outros testes deste bloco.
+      { create: jest.fn() } as any,
       {} as any,
       provaFactory,
     );
@@ -724,5 +743,168 @@ describe('QuestaoService.updateClassificacao', () => {
       'q1',
       expect.anything(),
     );
+  });
+});
+
+describe('QuestaoService — log de edição de conteúdo (card 24)', () => {
+  const questao = (over: Record<string, unknown> = {}) => ({
+    _id: 'q1',
+    textoQuestao: 'antes',
+    pergunta: 'p',
+    textoAlternativaA: 'a',
+    textoAlternativaB: 'b',
+    textoAlternativaC: 'c',
+    textoAlternativaD: 'd',
+    textoAlternativaE: 'e',
+    alternativa: 'A',
+    quantidadeResposta: 0,
+    ...over,
+  });
+
+  const conteudo = (over: Record<string, unknown> = {}) => ({
+    textoQuestao: 'antes',
+    pergunta: 'p',
+    textoAlternativaA: 'a',
+    textoAlternativaB: 'b',
+    textoAlternativaC: 'c',
+    textoAlternativaD: 'd',
+    textoAlternativaE: 'e',
+    alternativa: 'A',
+    textClassification: true,
+    alternativeClassfication: true,
+    ...over,
+  });
+
+  const montar = (doc: Record<string, unknown>) => {
+    const auditLogService = { create: jest.fn().mockResolvedValue({}) };
+    const repository = {
+      getById: jest.fn().mockResolvedValue(doc),
+      updateContent: jest.fn().mockResolvedValue(undefined),
+      updateAssets: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new QuestaoService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      auditLogService as any,
+      {} as any,
+      {} as any,
+    );
+    return { service, auditLogService };
+  };
+
+  const registro = (auditLogService: { create: jest.Mock }) =>
+    JSON.parse(auditLogService.create.mock.calls[0][0].changes);
+
+  it('grava QUAIS campos mudaram', async () => {
+    const { service, auditLogService } = montar(questao());
+
+    await service.updateContent('q1', conteudo({ textoQuestao: 'depois' }) as any);
+
+    expect(registro(auditLogService).campos).toEqual(['textoQuestao']);
+    expect(auditLogService.create.mock.calls[0][0]).toMatchObject({
+      entityId: 'q1',
+      entityType: 'Questao',
+    });
+  });
+
+  it('⚠️ save que não altera nada NÃO gera registro', async () => {
+    /*
+      É o ponto do card: contá-lo inflaria o número que o card 26 vai usar para
+      decidir se o versionamento se paga.
+    */
+    const { service, auditLogService } = montar(questao());
+
+    await service.updateContent('q1', conteudo() as any);
+
+    expect(auditLogService.create).not.toHaveBeenCalled();
+  });
+
+  it('⚠️ o CONTEÚDO não é gravado — só os nomes dos campos', async () => {
+    /*
+      Gravar o texto antigo aqui seria versionamento pela porta dos fundos, com
+      as decisões do card 26 tomadas por omissão. Este teste existe para ninguém
+      "melhorar" isso depois.
+    */
+    const { service, auditLogService } = montar(questao());
+
+    await service.updateContent(
+      'q1',
+      conteudo({ textoQuestao: 'texto novo secreto' }) as any,
+    );
+
+    const changes = auditLogService.create.mock.calls[0][0].changes;
+    expect(changes).not.toContain('texto novo secreto');
+    expect(changes).not.toContain('antes');
+  });
+
+  it('⚠️ marca se a questão JÁ tinha resposta — é a pergunta do card', async () => {
+    const { service, auditLogService } = montar(
+      questao({ quantidadeResposta: 12 }),
+    );
+
+    await service.updateContent('q1', conteudo({ alternativa: 'C' }) as any);
+
+    expect(registro(auditLogService).respondida).toBe(true);
+  });
+
+  it('questão nunca respondida marca `respondida: false`', async () => {
+    const { service, auditLogService } = montar(questao());
+
+    await service.updateContent('q1', conteudo({ alternativa: 'C' }) as any);
+
+    expect(registro(auditLogService).respondida).toBe(false);
+  });
+
+  it('⚠️ trocar o GABARITO é registrado — é o caso mais grave', async () => {
+    // Muda quem acertou, e é de onde nasce o card 28 (recorreção).
+    const { service, auditLogService } = montar(questao());
+
+    await service.updateContent('q1', conteudo({ alternativa: 'E' }) as any);
+
+    expect(registro(auditLogService).campos).toEqual(['alternativa']);
+  });
+
+  it('o `userId` atravessa quando o client manda', async () => {
+    const { service, auditLogService } = montar(questao());
+
+    await service.updateContent(
+      'q1',
+      conteudo({ textoQuestao: 'x', userId: 'u-9' }) as any,
+    );
+
+    expect(auditLogService.create.mock.calls[0][0].user).toBe('u-9');
+  });
+
+  it('⚠️ sem `userId` o log é gravado mesmo assim', async () => {
+    /*
+      O client ainda não manda nestas rotas, e exigi-lo quebraria a edição até o
+      deploy do outro lado. O log existe para medir FREQUÊNCIA, e essa pergunta
+      se responde sem o autor.
+    */
+    const { service, auditLogService } = montar(questao());
+
+    await service.updateContent('q1', conteudo({ textoQuestao: 'x' }) as any);
+
+    expect(auditLogService.create).toHaveBeenCalledTimes(1);
+    expect(auditLogService.create.mock.calls[0][0].user).toBeUndefined();
+  });
+
+  it('⚠️ edição que FALHA não vira registro', async () => {
+    // Log de uma edição que o banco recusou faria o card 26 ler como alteração
+    // algo que nunca aconteceu.
+    const { service, auditLogService } = montar(questao());
+    (service as any).repository.updateContent = jest
+      .fn()
+      .mockRejectedValue(new Error('caiu'));
+
+    await expect(
+      service.updateContent('q1', conteudo({ textoQuestao: 'x' }) as any),
+    ).rejects.toThrow();
+
+    expect(auditLogService.create).not.toHaveBeenCalled();
   });
 });
