@@ -309,6 +309,50 @@ export class QuestaoRepository extends BaseRepository<Questao> {
    * e o reprocessamento contava duas vezes — medido: 0 de 181 questões batiam
    * com o histórico. Quem consome tem de saber disso.
    */
+  /**
+   * A questão a ser duplicada, com TODOS os campos — inclusive o gabarito.
+   *
+   * ⚠️ **`+alternativa` é obrigatório aqui**, e é fácil esquecer: o campo é
+   * `@Prop({ select: false })`, então uma leitura comum devolve a questão sem
+   * gabarito — e a cópia nasceria sem ele, em silêncio.
+   *
+   * ⚠️ **`.lean()`, e não o documento do Mongoose**: o `documentoDaCopia` itera
+   * `Object.entries`, e num documento hidratado isso traz métodos e internos do
+   * Mongoose em vez dos campos.
+   */
+  async getParaDuplicar(id: string): Promise<Questao | null> {
+    return this.model
+      .findById(id)
+      .select('+alternativa')
+      .lean<Questao>()
+      .exec();
+  }
+
+  /**
+   * As cópias diretas de uma questão.
+   *
+   * ⚠️ **Derivado, e não um `copias[]` no documento** — decisão registrada no
+   * docblock do campo `origem`. Uma lista denormalizada é o padrão que os cards
+   * 21 e 22 mostraram que erra; aqui não há segunda cópia da verdade para
+   * divergir.
+   *
+   * ⚠️ Projeção mínima: o front mostra uma lista de "ver cópias", não o
+   * enunciado de cada uma.
+   */
+  async listarCopias(
+    id: string,
+  ): Promise<{ id: string; status: Status; origem: string }[]> {
+    const docs = await this.model
+      .find({ origem: id }, { status: 1, origem: 1 })
+      .lean()
+      .exec();
+    return docs.map((d: any) => ({
+      id: d._id.toString(),
+      status: d.status,
+      origem: d.origem,
+    }));
+  }
+
   public async contadoresGlobais(
     ids: string[],
   ): Promise<Map<string, { acertos: number; quantidadeResposta: number }>> {

@@ -802,7 +802,10 @@ describe('QuestaoService — log de edição de conteúdo (card 24)', () => {
   it('grava QUAIS campos mudaram', async () => {
     const { service, auditLogService } = montar(questao());
 
-    await service.updateContent('q1', conteudo({ textoQuestao: 'depois' }) as any);
+    await service.updateContent(
+      'q1',
+      conteudo({ textoQuestao: 'depois' }) as any,
+    );
 
     expect(registro(auditLogService).campos).toEqual(['textoQuestao']);
     expect(auditLogService.create.mock.calls[0][0]).toMatchObject({
@@ -906,5 +909,107 @@ describe('QuestaoService — log de edição de conteúdo (card 24)', () => {
     ).rejects.toThrow();
 
     expect(auditLogService.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('QuestaoService.duplicar (card 25)', () => {
+  const original = {
+    _id: 'q1',
+    textoQuestao: 'enunciado',
+    alternativa: 'C',
+    status: 'Approved',
+    acertos: 8,
+    quantidadeResposta: 10,
+  };
+
+  const montar = (doc: unknown = original) => {
+    const auditLogService = { create: jest.fn().mockResolvedValue({}) };
+    const repository = {
+      getParaDuplicar: jest.fn().mockResolvedValue(doc),
+      create: jest.fn((d) => Promise.resolve({ ...d, _id: 'q2' })),
+      listarCopias: jest.fn().mockResolvedValue([]),
+    };
+    const service = new QuestaoService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      auditLogService as any,
+      {} as any,
+      {} as any,
+    );
+    return { service, repository, auditLogService };
+  };
+
+  it('cria a cópia com lastro e devolve o documento novo', async () => {
+    const { service, repository } = montar();
+
+    const copia = await service.duplicar('q1');
+
+    expect(repository.create).toHaveBeenCalledTimes(1);
+    expect((copia as { origem?: string }).origem).toBe('q1');
+  });
+
+  it('⚠️ a ORIGINAL não é tocada', async () => {
+    /*
+      Duplicar é uma ação sobre a NOVA questão: nem o conteúdo, nem os
+      contadores, nem o vínculo com prova nenhuma da original mudam.
+    */
+    const { service, repository } = montar();
+
+    await service.duplicar('q1');
+
+    expect(repository).not.toHaveProperty('updateContent');
+    // o único write é o `create` da cópia
+    expect(repository.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('⚠️ a cópia nasce com as estatísticas em zero', async () => {
+    const { service, repository } = montar();
+
+    await service.duplicar('q1');
+
+    expect(repository.create.mock.calls[0][0]).toMatchObject({
+      acertos: 0,
+      quantidadeResposta: 0,
+      quantidadeSimulado: 0,
+    });
+  });
+
+  it('questão inexistente dá 404, e não cria nada', async () => {
+    const { service, repository } = montar(null);
+
+    await expect(service.duplicar('q1')).rejects.toThrow();
+    expect(repository.create).not.toHaveBeenCalled();
+  });
+
+  it('⚠️ o log fica na ORIGINAL, não na cópia', async () => {
+    /*
+      Quem vai procurar o rastro abre a questão de onde a cópia saiu, e o
+      `getLogs` é por `entityId`. Na cópia o lastro já está no campo `origem`.
+    */
+    const { service, auditLogService } = montar();
+
+    await service.duplicar('q1', 'u-9');
+
+    expect(auditLogService.create).toHaveBeenCalledWith(
+      expect.objectContaining({ entityId: 'q1', user: 'u-9' }),
+    );
+    expect(
+      JSON.parse(auditLogService.create.mock.calls[0][0].changes),
+    ).toMatchObject({ acao: 'duplicar', copia: 'q2' });
+  });
+
+  it('⚠️ lê com o gabarito — ele é `select: false` e sairia de fora', async () => {
+    // Uma leitura comum devolve a questão sem `alternativa`, e a cópia nasceria
+    // sem gabarito em silêncio.
+    const { service, repository } = montar();
+
+    await service.duplicar('q1');
+
+    expect(repository.getParaDuplicar).toHaveBeenCalledWith('q1');
+    expect(repository.create.mock.calls[0][0].alternativa).toBe('C');
   });
 });

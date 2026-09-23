@@ -26,6 +26,7 @@ import { UpdateImageAlternativaDTOInput } from './dtos/update-image-alternativa.
 import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
+import { documentoDaCopia } from './duplicarQuestao';
 import {
   CAMPOS_DE_CLASSIFICACAO,
   CAMPOS_DE_CONTEUDO,
@@ -468,6 +469,49 @@ export class QuestaoService {
         HttpStatus.BAD_REQUEST,
       );
     }
+  }
+
+  /**
+   * Cria uma cópia editável desta questão, com lastro (card 25).
+   *
+   * ⚠️ **A original não é tocada** — nem o conteúdo, nem os contadores, nem o
+   * vínculo com prova nenhuma. Duplicar é uma ação sobre a NOVA questão.
+   *
+   * ⚠️ **E a cópia nasce órfã**, sem prova. É o que distingue duplicar de
+   * "versionar" (card 26): lá as provas passam a apontar a sucessora; aqui elas
+   * não mudam. Quem duplica quer outra questão, não substituir esta.
+   */
+  public async duplicar(id: string, userId?: string): Promise<Questao> {
+    const original = await this.repository.getParaDuplicar(id);
+    if (!original) {
+      throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
+    }
+
+    const copia = await this.repository.create(
+      documentoDaCopia(original) as Questao,
+    );
+
+    await this.auditLogService.create({
+      user: userId,
+      /*
+        ⚠️ **O log é da ORIGINAL, não da cópia.** Quem vai procurar o rastro
+        abre a questão de onde a cópia saiu — e o `getLogs` é por `entityId`.
+        Na cópia o lastro já está no campo `origem`.
+      */
+      entityId: id,
+      entityType: 'Questao',
+      changes: JSON.stringify({
+        acao: 'duplicar',
+        copia: String((copia as { _id: unknown })._id),
+      }),
+    });
+
+    return copia;
+  }
+
+  /** As cópias diretas — ver o docblock do campo `origem`. */
+  public async listarCopias(id: string) {
+    return this.repository.listarCopias(id);
   }
 
   public async updateContent(id: string, content: UpdateContentDTOInput) {

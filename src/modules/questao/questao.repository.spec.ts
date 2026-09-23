@@ -12,14 +12,22 @@ describe('QuestaoRepository.setProvaBase (atualiza campo provaBase com session)'
     const { repo, updateOne } = makeRepoWithUpdateOne();
     const session = {} as any;
     await repo.setProvaBase('q1', 'p1', session);
-    expect(updateOne).toHaveBeenCalledWith({ _id: 'q1' }, { provaBase: 'p1' }, { session });
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: 'q1' },
+      { provaBase: 'p1' },
+      { session },
+    );
   });
 
   it('aceita null como provaBase e passa null no payload para model.updateOne', async () => {
     const { repo, updateOne } = makeRepoWithUpdateOne();
     const session = {} as any;
     await repo.setProvaBase('q1', null, session);
-    expect(updateOne).toHaveBeenCalledWith({ _id: 'q1' }, { provaBase: null }, { session });
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: 'q1' },
+      { provaBase: null },
+      { session },
+    );
   });
 });
 
@@ -30,21 +38,31 @@ describe('QuestaoRepository.canInsertQuestion (reverse-lookup em Prova.questoes)
     const findById = jest.fn().mockReturnValue({ populate });
     const questaoModel: any = {};
     const provaModel: any = { findById };
-    return { repo: new QuestaoRepository(questaoModel, provaModel), findById, populate };
+    return {
+      repo: new QuestaoRepository(questaoModel, provaModel),
+      findById,
+      populate,
+    };
   }
 
   it('retorna false quando já existe entry com o mesmo numero+frente1', async () => {
-    const { repo } = makeRepo({ questoes: [{ numero: 5, questao: { frente1: 'f1' } }] });
+    const { repo } = makeRepo({
+      questoes: [{ numero: 5, questao: { frente1: 'f1' } }],
+    });
     expect(await repo.canInsertQuestion('p1', 5, 'f1')).toBe(false);
   });
 
   it('retorna true quando o numero está livre', async () => {
-    const { repo } = makeRepo({ questoes: [{ numero: 6, questao: { frente1: 'f1' } }] });
+    const { repo } = makeRepo({
+      questoes: [{ numero: 6, questao: { frente1: 'f1' } }],
+    });
     expect(await repo.canInsertQuestion('p1', 5, 'f1')).toBe(true);
   });
 
   it('retorna true quando o numero existe mas com outra frente1 (idiomática)', async () => {
-    const { repo } = makeRepo({ questoes: [{ numero: 5, questao: { frente1: 'fx' } }] });
+    const { repo } = makeRepo({
+      questoes: [{ numero: 5, questao: { frente1: 'fx' } }],
+    });
     expect(await repo.canInsertQuestion('p1', 5, 'f1')).toBe(true);
   });
 
@@ -302,5 +320,68 @@ describe('QuestaoRepository.contadoresGlobais (card 16)', () => {
 
     await expect(repo.contadoresGlobais([])).resolves.toEqual(new Map());
     expect(find).not.toHaveBeenCalled();
+  });
+});
+
+describe('QuestaoRepository — linhagem (card 25)', () => {
+  it('⚠️ `getParaDuplicar` pede o gabarito explicitamente', async () => {
+    /*
+      `alternativa` é `@Prop({ select: false })`: sem o `+alternativa` a cópia
+      nasceria sem gabarito, em silêncio.
+    */
+    const exec = jest.fn().mockResolvedValue({ _id: 'q1' });
+    const lean = jest.fn().mockReturnValue({ exec });
+    const select = jest.fn().mockReturnValue({ lean });
+    const findById = jest.fn().mockReturnValue({ select });
+    const repo = new QuestaoRepository({ findById } as any, {} as any);
+
+    await repo.getParaDuplicar('q1');
+
+    expect(select).toHaveBeenCalledWith('+alternativa');
+  });
+
+  it('⚠️ `getParaDuplicar` usa `.lean()` — documento hidratado traz internos', async () => {
+    // O `documentoDaCopia` itera `Object.entries`, e num documento do Mongoose
+    // isso traz métodos e internos em vez dos campos.
+    const exec = jest.fn().mockResolvedValue({ _id: 'q1' });
+    const lean = jest.fn().mockReturnValue({ exec });
+    const select = jest.fn().mockReturnValue({ lean });
+    const findById = jest.fn().mockReturnValue({ select });
+    const repo = new QuestaoRepository({ findById } as any, {} as any);
+
+    await repo.getParaDuplicar('q1');
+
+    expect(lean).toHaveBeenCalled();
+  });
+
+  it('⚠️ as cópias são DERIVADAS de `origem`, não lidas de um array', async () => {
+    /*
+      Decisão contra o doc 10 da #61: uma lista denormalizada de filhas é o
+      padrão que os cards 21 e 22 mostraram que erra — 0 de 181 questões tinham
+      os contadores incrementais batendo com o histórico. Aqui não há segunda
+      cópia da verdade para divergir.
+    */
+    const exec = jest
+      .fn()
+      .mockResolvedValue([{ _id: 'q2', status: 'Pending', origem: 'q1' }]);
+    const lean = jest.fn().mockReturnValue({ exec });
+    const find = jest.fn().mockReturnValue({ lean });
+    const repo = new QuestaoRepository({ find } as any, {} as any);
+
+    const r = await repo.listarCopias('q1');
+
+    expect(find.mock.calls[0][0]).toEqual({ origem: 'q1' });
+    expect(r).toEqual([{ id: 'q2', status: 'Pending', origem: 'q1' }]);
+  });
+
+  it('projeta só o que a lista de cópias mostra', async () => {
+    const exec = jest.fn().mockResolvedValue([]);
+    const lean = jest.fn().mockReturnValue({ exec });
+    const find = jest.fn().mockReturnValue({ lean });
+    const repo = new QuestaoRepository({ find } as any, {} as any);
+
+    await repo.listarCopias('q1');
+
+    expect(find.mock.calls[0][1]).toEqual({ status: 1, origem: 1 });
   });
 });

@@ -119,6 +119,39 @@ export class Questao extends QuestaoReview {
   @Prop({ required: false, default: [], type: [String] })
   @ApiProperty()
   public assets: string[];
+
+  /**
+   * De qual questão esta nasceu — o lastro da duplicação (card 25).
+   *
+   * ⚠️ **`null` na esmagadora maioria**: só quem veio de `POST /duplicar` tem.
+   *
+   * ⚠️ **String, e não `ref`**, pelo mesmo motivo do `provaBase` acima: o
+   * consumidor quer o id para montar link e casar com listagem, não o
+   * documento inteiro populado dentro de cada questão.
+   *
+   * ⚠️ **A original apagada NÃO limpa este campo**, e é deliberado: a cópia
+   * continua existindo e o front mostra "Copiada de [questão excluída]".
+   * Perder o lastro seria perder a única pista de onde ela veio.
+   *
+   * ---
+   *
+   * ⚠️ **NÃO existe um `copias[]` ao lado, e isso é decisão contra o doc 10 da
+   * discussion #61.** Uma lista denormalizada de filhas é exatamente o padrão
+   * que os cards 21 e 22 mostraram que erra: medido em homologação, **0 de 181**
+   * questões tinham os contadores incrementais batendo com o histórico.
+   *
+   * As filhas são derivadas por `find({ origem: id })`, com índice — uma
+   * consulta barata que **não pode divergir**, porque não há segunda cópia da
+   * verdade para sincronizar.
+   *
+   * ⚠️ **A linhagem é guardada só em UM nível (pai direto).** A cadeia completa
+   * é derivável subindo por `origem`, e é assim que o card 29 vai somar a
+   * família. Guardar a raiz junto criaria um segundo campo a manter em acordo
+   * com o primeiro.
+   */
+  @Prop({ type: String, required: false, default: null, index: true })
+  @ApiProperty({ required: false, nullable: true })
+  public origem?: string | null;
 }
 
 export const QuestaoSchema = SchemaFactory.createForClass(Questao);
