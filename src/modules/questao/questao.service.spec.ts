@@ -1,4 +1,9 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import {
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
 import { Alternativa } from './enums/alternativa.enum';
 import { EnemArea } from './enums/enem-area.enum';
@@ -97,54 +102,142 @@ describe('QuestaoService.create', () => {
   });
 });
 
-describe('QuestaoService.delete (reverse-lookup provas contendo a questão)', () => {
-  it('remove a questão das provas/simulados que a contêm e deleta', async () => {
-    const question: any = { _id: 'q1', status: 'pending' };
-    const prova: any = { _id: 'pr1', simulados: [{ _id: 's1' }] };
-    const session = {
-      startTransaction: jest.fn(),
-      commitTransaction: jest.fn().mockResolvedValue(undefined),
-      abortTransaction: jest.fn().mockResolvedValue(undefined),
-      endSession: jest.fn(),
-    };
+describe('QuestaoService.delete / podeExcluir (card 33)', () => {
+  const orfa = {
+    status: 0,
+    congelada: false,
+    respondida: false,
+    emProva: false,
+    emSimulado: false,
+    temFilhas: false,
+  };
+
+  const montar = (
+    estado: Record<string, unknown> | null = orfa,
+    escreveu = true,
+  ) => {
     const repository: any = {
-      getByIdToDelete: jest.fn().mockResolvedValue(question),
-      startSession: jest.fn().mockResolvedValue(session),
-      delete: jest.fn().mockResolvedValue(undefined),
-      findProvasContendo: jest.fn().mockResolvedValue([prova]),
+      estadoParaExclusao: jest
+        .fn()
+        .mockResolvedValue(
+          estado && { estado, origem: 'q0', tipoOrigem: 'copia' },
+        ),
+      excluir: jest.fn().mockResolvedValue(escreveu),
     };
-    const simuladoService: any = {
-      removeQuestionSimulados: jest.fn().mockResolvedValue(undefined),
-    };
-    const provaRepository: any = {
-      removeQuestion: jest.fn().mockResolvedValue(undefined),
-    };
-    const { QuestaoService } = require('./questao.service');
+    const auditLogService = { create: jest.fn().mockResolvedValue({}) };
+    const simuladoService = { removeQuestionSimulados: jest.fn() };
+    const provaRepository = { removeQuestion: jest.fn() };
     const service = new QuestaoService(
-      repository, // repository
-      {} as any, // provaService
-      provaRepository, // provaRepository
-      {} as any, // exameRepository
-      {} as any, // materiaRepository
-      {} as any, // frenteRepository
-      {} as any, // auditLogService
-      simuladoService, // simuladoService
-      {} as any, // provaFactory
+      repository,
+      {} as any,
+      provaRepository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      auditLogService as any,
+      simuladoService as any,
+      {} as any,
     );
+    return {
+      service,
+      repository,
+      auditLogService,
+      simuladoService,
+      provaRepository,
+    };
+  };
 
-    await service.delete('q1');
+  it('questão órfã: exclui', async () => {
+    const { service, repository } = montar();
 
-    expect(simuladoService.removeQuestionSimulados).toHaveBeenCalledWith(
-      [{ _id: 's1' }],
-      question,
-      session,
+    await service.delete('q1', 'u-1');
+
+    expect(repository.excluir).toHaveBeenCalledWith('q1');
+  });
+
+  it('⚠️ NÃO tira a questão de prova nenhuma — o comportamento antigo morreu', async () => {
+    /*
+      Antes: questão Pending em prova era removida das provas e simulados e
+      apagada. Agora questão em prova recusa, e "tirar da prova" é a ação
+      explícita de remover.
+    */
+    const { service, simuladoService, provaRepository } = montar({
+      ...orfa,
+      emProva: true,
+    });
+
+    await expect(service.delete('q1')).rejects.toThrow();
+    expect(simuladoService.removeQuestionSimulados).not.toHaveBeenCalled();
+    expect(provaRepository.removeQuestion).not.toHaveBeenCalled();
+  });
+
+  it('⚠️ recusa com 409 e a lista de TODOS os motivos', async () => {
+    const { service, repository } = montar({
+      ...orfa,
+      status: 1, // Approved
+      respondida: true,
+    });
+
+    const erro = await service.delete('q1').catch((e) => e);
+
+    expect(erro).toBeInstanceOf(ConflictException);
+    expect(erro.getResponse().motivos.map((m: any) => m.codigo)).toEqual([
+      'aprovada',
+      'respondida',
+    ]);
+    expect(erro.getResponse().motivos[0].texto).toBeTruthy();
+    expect(repository.excluir).not.toHaveBeenCalled();
+  });
+
+  it('inexistente ou já excluída: 404', async () => {
+    const { service, repository } = montar(null);
+
+    await expect(service.delete('q1')).rejects.toBeInstanceOf(
+      NotFoundException,
     );
-    expect(provaRepository.removeQuestion).toHaveBeenCalledWith(
-      'pr1',
-      question,
+    expect(repository.excluir).not.toHaveBeenCalled();
+  });
+
+  it('⚠️ a questão mudou entre a checagem e a escrita: recusa, não finge sucesso', async () => {
+    const { service, auditLogService } = montar(orfa, false);
+
+    await expect(service.delete('q1')).rejects.toBeInstanceOf(
+      ConflictException,
     );
-    expect(repository.delete).toHaveBeenCalledWith('q1');
-    expect(session.commitTransaction).toHaveBeenCalled();
+    expect(auditLogService.create).not.toHaveBeenCalled();
+  });
+
+  it('⚠️ o log guarda o `origem` que a exclusão removeu', async () => {
+    // Depois do `$unset`, é o único lugar que sabe de onde ela veio.
+    const { service, auditLogService } = montar();
+
+    await service.delete('q1', 'u-1');
+
+    const log = auditLogService.create.mock.calls[0][0];
+    expect(log).toMatchObject({ user: 'u-1', entityId: 'q1' });
+    expect(JSON.parse(log.changes)).toEqual({
+      acao: 'excluir',
+      origem: 'q0',
+      tipoOrigem: 'copia',
+    });
+  });
+
+  it('podeExcluir usa as mesmas condições', async () => {
+    const { service } = montar({ ...orfa, temFilhas: true });
+
+    await expect(service.podeExcluir('q1')).resolves.toEqual({
+      podeExcluir: false,
+      motivos: [expect.objectContaining({ codigo: 'origem-de-outras' })],
+    });
+  });
+
+  it('podeExcluir de questão órfã', async () => {
+    const { service } = montar();
+
+    await expect(service.podeExcluir('q1')).resolves.toEqual({
+      podeExcluir: true,
+      motivos: [],
+    });
   });
 });
 

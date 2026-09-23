@@ -114,8 +114,26 @@ export class QuestaoController {
   }
 
   @Delete(':id')
-  public async delete(@Param('id') id: string): Promise<void> {
-    return await this.service.delete(id);
+  @ApiResponse({ status: 200, description: 'exclui (soft) uma questão órfã' })
+  @ApiResponse({
+    status: 409,
+    description: 'não pode ser excluída — o corpo lista os motivos',
+  })
+  public async delete(
+    @Param('id') id: string,
+    // ⚠️ Query, e não corpo: o `delete` do axios da api não manda corpo.
+    @Query('userId') userId?: string,
+  ): Promise<void> {
+    return await this.service.delete(id, userId);
+  }
+
+  @Get(':id/exclusao')
+  @ApiResponse({
+    status: 200,
+    description: 'se a questão pode ser excluída, e os motivos se não',
+  })
+  public async podeExcluir(@Param('id') id: string) {
+    return await this.service.podeExcluir(id);
   }
 
   @Patch(':id/classification')

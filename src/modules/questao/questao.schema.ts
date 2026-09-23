@@ -130,9 +130,10 @@ export class Questao extends QuestaoReview {
    * consumidor quer o id para montar link e casar com listagem, não o
    * documento inteiro populado dentro de cada questão.
    *
-   * ⚠️ **A original apagada NÃO limpa este campo**, e é deliberado: a cópia
-   * continua existindo e o front mostra "Copiada de [questão excluída]".
-   * Perder o lastro seria perder a única pista de onde ela veio.
+   * ⚠️ **Nunca aponta para uma questão excluída** (card 33): questão que é
+   * origem de alguém não pode ser excluída. E quem é excluída PERDE este campo
+   * na mesma escrita — uma cópia excluída deixa de ser cópia, mesmo restaurada,
+   * e por isso não prende a origem. O valor removido fica no `auditlogs`.
    *
    * ---
    *

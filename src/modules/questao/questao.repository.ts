@@ -16,6 +16,17 @@ import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
 import { Questao } from './questao.schema';
 import { TipoOrigem } from './enums/tipo-origem.enum';
+import { Historico } from '../historico/historico.schema';
+import { EstadoParaExclusao, STATUS_EXCLUIVEIS } from './exclusaoDaQuestao';
+
+/**
+ * ⚠️ **Toda leitura do banco de questões passa por isto** (card 33). A exclusão
+ * é soft (`deleted: true`), então uma consulta sem o filtro devolve a questão
+ * que a pessoa excluiu — e a geração automática de simulado poderia sorteá-la.
+ *
+ * `$ne: true`, e não `false`: as 2.640 questões anteriores não têm o campo.
+ */
+export const NAO_EXCLUIDA = { deleted: { $ne: true } } as const;
 
 /** Entrada do reverse-lookup: prova que contém a questão + o número nela. */
 export interface ProvaContendo {
@@ -36,6 +47,13 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       original congelada — o aluno responderia o texto velho.
     */
     @InjectModel(Simulado.name) private readonly simuladoModel: Model<Simulado>,
+    /*
+      ⚠️ Entrou no card 33: "ninguém respondeu" é medido no HISTÓRICO, não no
+      contador — ver `EstadoParaExclusao.respondida`. Opcional só na assinatura,
+      para os testes que não tocam a exclusão; o Nest sempre injeta.
+    */
+    @InjectModel(Historico.name)
+    private readonly historicoModel?: Model<Historico>,
   ) {
     super(model);
   }
@@ -61,7 +79,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       .populate(['materia'])
       .select('+alternativa');
 
-    const queryCount = this.model.where({ ...where });
+    const queryCount = this.model.where({ ...where, ...NAO_EXCLUIDA });
 
     if (or.length > 0) {
       query.and(
@@ -75,7 +93,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
         })),
       );
     }
-    query.where({ ...where });
+    query.where({ ...where, ...NAO_EXCLUIDA });
     const data = await query;
     const totalItems = await queryCount.countDocuments();
 
@@ -88,7 +106,9 @@ export class QuestaoRepository extends BaseRepository<Questao> {
   }
 
   override async getById(id: string) {
-    return await this.model.findById(id).select('+alternativa');
+    return await this.model
+      .findOne({ _id: id, ...NAO_EXCLUIDA })
+      .select('+alternativa');
   }
 
   async findProvaAtual(questaoId: string): Promise<string | undefined> {
@@ -120,14 +140,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
 
   async getByIdToUpdate(id: string) {
     return await this.model
-      .findById(id)
-      .select('+alternativa')
-      .populate(['frente1', 'materia']);
-  }
-
-  async getByIdToDelete(id: string) {
-    return await this.model
-      .findById(id)
+      .findOne({ _id: id, ...NAO_EXCLUIDA })
       .select('+alternativa')
       .populate(['frente1', 'materia']);
   }
@@ -148,7 +161,8 @@ export class QuestaoRepository extends BaseRepository<Questao> {
    */
   async getQuestaoByFiltro(filtro: object, quant: number): Promise<Questao[]> {
     const questoes = await this.model
-      .find(filtro)
+      // ⚠️ Card 33: sem isto a geração automática sortearia questão excluída.
+      .find({ ...filtro, ...NAO_EXCLUIDA })
       .exists('imageId', true)
       .select('_id')
       .sort({ quantidadeSimulado: 1 })
@@ -397,7 +411,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
 
   async getParaDuplicar(id: string): Promise<Questao | null> {
     return this.model
-      .findById(id)
+      .findOne({ _id: id, ...NAO_EXCLUIDA })
       .select('+alternativa')
       .lean<Questao>()
       .exec();
@@ -553,8 +567,89 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     await this.model.updateOne({ _id: id }, { assets });
   }
 
-  async delete(_id: string) {
-    await this.model.deleteOne({ _id });
+  /**
+   * O que decide se a questão pode ser excluída (card 33) — `null` se ela não
+   * existe ou já foi excluída.
+   *
+   * ⚠️ **Uma consulta por condição, todas em paralelo, e sem atalho.** A
+   * recusa lista todos os motivos, então todas as condições são medidas.
+   *
+   * ⚠️ **Prova E simulado**: arrays independentes, e a questão pode estar num
+   * sem estar no outro se algo ficou inconsistente (mesmo motivo do card 26).
+   *
+   * ⚠️ **Filhas sem filtrar o tipo**: cópia e versão bloqueiam igual. E sem
+   * filtrar `deleted` — a filha excluída perde o `origem` (ver `excluir`), então
+   * ela não aparece aqui.
+   */
+  async estadoParaExclusao(id: string): Promise<{
+    estado: EstadoParaExclusao;
+    origem: string | null;
+    tipoOrigem: TipoOrigem | null;
+  } | null> {
+    const questao = await this.model
+      .findOne(
+        { _id: id, ...NAO_EXCLUIDA },
+        { status: 1, congelada: 1, origem: 1, tipoOrigem: 1 },
+      )
+      .lean<Questao>()
+      .exec();
+    if (!questao) return null;
+
+    const oid = new Types.ObjectId(id);
+    const [respondida, emProva, emSimulado, temFilhas] = await Promise.all([
+      this.historicoModel.exists({ 'respostas.questao': oid }),
+      this.provaModel.exists({ 'questoes.questao': oid }),
+      this.simuladoModel.exists({ 'questoes.questao': oid }),
+      this.model.exists({ origem: id }),
+    ]);
+
+    return {
+      estado: {
+        status: questao.status,
+        congelada: !!questao.congelada,
+        respondida: !!respondida,
+        emProva: !!emProva,
+        emSimulado: !!emSimulado,
+        temFilhas: !!temFilhas,
+      },
+      origem: questao.origem ?? null,
+      tipoOrigem: questao.tipoOrigem ?? null,
+    };
+  }
+
+  /**
+   * Exclui (soft) e desfaz o vínculo de origem — **numa escrita só** (card 33).
+   *
+   * ⚠️ **O `$unset` na mesma escrita do `deleted`.** Em duas, uma falha no meio
+   * deixaria uma questão excluída que ainda bloqueia a origem — o defeito que a
+   * regra existe para evitar. E é decisão de produto que uma cópia excluída
+   * deixa de ser cópia, **mesmo se restaurada**.
+   *
+   * ⚠️ **O filtro repete as condições do próprio documento** (status,
+   * congelada). É o que fecha a corrida contra alguém aprovando ou versionando
+   * a questão entre a checagem e esta escrita. As condições de OUTRAS coleções
+   * (prova, simulado, histórico, filhas) não cabem num filtro sem transação — e
+   * o Mongo deste serviço só tem replica set em dev. Limitação declarada, a
+   * mesma do `novaVersao`.
+   *
+   * @returns `false` se nada foi escrito — a questão mudou no meio.
+   */
+  async excluir(id: string): Promise<boolean> {
+    const r = await this.model
+      .updateOne(
+        {
+          _id: id,
+          ...NAO_EXCLUIDA,
+          status: { $in: STATUS_EXCLUIVEIS },
+          congelada: { $ne: true },
+        },
+        {
+          $set: { deleted: true },
+          $unset: { origem: '', tipoOrigem: '' },
+        },
+      )
+      .exec();
+    return r.modifiedCount === 1;
   }
 
   async findProvasContendo(questaoId: string): Promise<Prova[]> {
@@ -615,21 +710,21 @@ export class QuestaoRepository extends BaseRepository<Questao> {
   }
 
   async getTotalEntity() {
-    return this.model.find({ deletedAt: null }).count();
+    return this.model.find({ ...NAO_EXCLUIDA }).count();
   }
 
   async entityByStatus(status: Status) {
-    return this.model.find({ deletedAt: null, status }).countDocuments();
+    return this.model.find({ ...NAO_EXCLUIDA, status }).countDocuments();
   }
 
   async getTotalEntityReported() {
     return this.model
-      .find({ deletedAt: null, reported: true })
+      .find({ ...NAO_EXCLUIDA, reported: true })
       .countDocuments();
   }
 
   async getTotalEntityClassified() {
-    const query = this.model.find({ deletedAt: null });
+    const query = this.model.find({ ...NAO_EXCLUIDA });
 
     query.where({
       $or: [
@@ -648,7 +743,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     materiaIds?: string[],
   ): Promise<Array<{ materiaId: string; materiaName: string; count: number }>> {
     const match: Record<string, any> = {
-      deletedAt: null,
+      ...NAO_EXCLUIDA,
       status: Status.Pending,
     };
 
