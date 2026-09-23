@@ -563,6 +563,73 @@ export class RelatorioSimuladoEstudanteRepository {
    * `historico` pode vir `null` (ref apagada depois do vínculo) — quem consome
    * trata, como no `buscarPorRecorte`.
    */
+  /**
+   * As aplicações de um estudante, em ordem de data — a série que responde
+   * "o Pedro melhorou?" (card 17, degrau 2).
+   *
+   * ⚠️ **É a pergunta que o `classSimuladoAnalytics` não responde, de
+   * propósito:** o design dele lista "drill-down até o aluno individual" como
+   * FORA do escopo. Ele sabe dizer se a turma melhorou; sobre o aluno, nada — e
+   * é sobre o aluno que o coordenador conversa com a família.
+   *
+   * ⚠️ **Calculada na hora, sem agregado guardado**, e é decisão do card: já
+   * existem dois lugares que calculam desempenho de turma (o relatório, sob
+   * demanda, e o `user_group_aggregates`, mensal por cron). Um terceiro
+   * agregado seria garantia de três números diferentes para a mesma turma na
+   * mesma semana. A escala aqui é trivial — um aluno × N simulados.
+   *
+   * ⚠️ **O recorte é o MESMO `filtroDoRecorte` das outras consultas**, mais o
+   * usuário. Reimplementar o filtro aqui abriria a porta para esta rota
+   * enxergar cursinho que as outras não enxergam.
+   *
+   * ⚠️ **Só leitura CONCLUÍDA entra.** Uma aplicação `failed` ou em
+   * processamento viraria um ponto no gráfico, e o gráfico é justamente sobre
+   * subir e descer: um ponto fantasma em zero desenha uma queda que não
+   * aconteceu. Mesmo critério do `comLeitura` no resto da série.
+   */
+  async serieDoEstudante(params: {
+    cursinhoId: string;
+    usuario: string;
+    turmaId?: string;
+  }): Promise<
+    {
+      simuladoId: string;
+      aproveitamento: number;
+      acertos?: number;
+      em: Date;
+    }[]
+  > {
+    const linhas = await this.model
+      .find({ ...filtroDoRecorte(params), usuario: params.usuario })
+      .populate({ path: 'historico', select: 'status aproveitamento acertos' })
+      .lean()
+      .exec();
+
+    return (linhas as unknown as LinhaComHistorico[])
+      .filter(
+        (l) =>
+          l.historico?.status === HistoricoStatus.Completed &&
+          typeof l.historico?.aproveitamento?.geral === 'number',
+      )
+      .map((l) => ({
+        simuladoId: l.simulado.toString(),
+        aproveitamento: l.historico!.aproveitamento.geral,
+        acertos: (l.historico as { acertos?: number }).acertos,
+        /*
+          ⚠️ **`createdAt` da JUNÇÃO, e não do histórico.** É quando o cartão
+          deste estudante entrou neste recorte — o mesmo campo que o
+          `ultimoEnvio` do `listarSimuladosComCartao` usa. O histórico tem data
+          própria, e os dois divergem no reprocessamento.
+
+          ⚠️ E **não é "data da prova"**: ela não existe no modelo
+          (`disponivelDe` está preenchida em 0 dos 131 simulados de
+          homologação). Quem rotula isso na tela tem de dizer o que é.
+        */
+        em: (l as unknown as { createdAt: Date }).createdAt,
+      }))
+      .sort((a, b) => a.em.getTime() - b.em.getTime());
+  }
+
   async buscarDetalheDoEstudante(params: {
     simuladoId: string;
     cursinhoId: string;
