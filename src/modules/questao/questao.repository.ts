@@ -312,6 +312,21 @@ export class QuestaoRepository extends BaseRepository<Questao> {
    * um `$group` sobre `respostas.questao`. Blindar aqui esconderia um defeito
    * de quem chamasse errado.
    *
+   * ⚠️ **A contagem é DA QUESTÃO, e não da linhagem — decisão do card 29.**
+   *
+   * A pergunta era: "24% de acerto" é desta entidade ou da família toda? As duas
+   * respostas eram defensáveis, e o card 27 decidiu sem querer: **"correção"
+   * edita in-place e NÃO cria versão** — só "nova versão" cria, e ela significa
+   * por definição que *o conteúdo mudou de verdade*.
+   *
+   * Logo **toda versão nasce de uma mudança substantiva**, e somar a linhagem
+   * somaria sempre textos diferentes. O número honesto é o desta questão.
+   *
+   * ⚠️ **E isso tem um custo que precisa estar escrito: a base encolhe a cada
+   * versão criada.** Uma questão com 1.847 respostas vira duas de ~900 na
+   * primeira versão. O `ehVersao` existe para a tela poder dizer isso — não para
+   * somar.
+   *
    * ⚠️ **Os números só são confiáveis depois do card 21 (escrita) E do sync do
    * card 22 (passado).** Antes disso `quantidadeResposta` contava apresentações
    * e o reprocessamento contava duas vezes — medido: 0 de 181 questões batiam
@@ -414,12 +429,23 @@ export class QuestaoRepository extends BaseRepository<Questao> {
 
   public async contadoresGlobais(
     ids: string[],
-  ): Promise<Map<string, { acertos: number; quantidadeResposta: number }>> {
+  ): Promise<
+    Map<
+      string,
+      { acertos: number; quantidadeResposta: number; ehVersao: boolean }
+    >
+  > {
     if (ids.length === 0) return new Map();
     const docs = await this.model
       .find(
         { _id: { $in: ids.map((id) => new Types.ObjectId(id)) } },
-        { acertos: 1, quantidadeResposta: 1 },
+        /*
+          ⚠️ `origem` entrou no card 29, e é um campo só: é o que permite à tela
+          dizer que a base é pequena PORQUE a questão é uma versão nova, e não
+          porque ela é rara. Sem isso, a coluna `Acerto geral` some com o uso e
+          ninguém sabe por quê.
+        */
+        { acertos: 1, quantidadeResposta: 1, origem: 1 },
       )
       .lean()
       .exec();
@@ -432,6 +458,13 @@ export class QuestaoRepository extends BaseRepository<Questao> {
           // verdadeira, diferente do `null` que a tela usa para "base pequena".
           acertos: d.acertos ?? 0,
           quantidadeResposta: d.quantidadeResposta ?? 0,
+          /*
+            ⚠️ **Booleano, e não o id da origem.** A tela não navega daqui — ela
+            só precisa saber que existe história anterior para explicar a base
+            pequena. Mandar o id convidaria a buscar a questão antiga e somar os
+            números, que é exatamente o que este card decidiu NÃO fazer.
+          */
+          ehVersao: d.origem != null,
         },
       ]),
     );
@@ -518,7 +551,10 @@ export class QuestaoRepository extends BaseRepository<Questao> {
   }
 
   async findQuestaoIdsByProva(provaId: string): Promise<string[]> {
-    const prova = await this.provaModel.findById(provaId).select('questoes').exec();
+    const prova = await this.provaModel
+      .findById(provaId)
+      .select('questoes')
+      .exec();
     if (!prova) return [];
     return prova.questoes.map((qc) => resolveQuestaoId(qc));
   }
@@ -594,9 +630,9 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     return query.countDocuments();
   }
 
-  async pendingByMateria(materiaIds?: string[]): Promise<
-    Array<{ materiaId: string; materiaName: string; count: number }>
-  > {
+  async pendingByMateria(
+    materiaIds?: string[],
+  ): Promise<Array<{ materiaId: string; materiaName: string; count: number }>> {
     const match: Record<string, any> = {
       deletedAt: null,
       status: Status.Pending,
