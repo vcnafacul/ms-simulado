@@ -5,6 +5,7 @@ import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllWhereInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { Prova } from '../prova/prova.schema';
+import { Simulado } from '../simulado/schemas/simulado.schema';
 import { resolveQuestaoId } from '../prova/helpers/question-container.helpers';
 import { Resposta } from '../historico/types/resposta';
 import { UpdateClassificacaoDTOInput } from './dtos/update-classificacao.dto.input';
@@ -27,6 +28,13 @@ export class QuestaoRepository extends BaseRepository<Questao> {
   constructor(
     @InjectModel(Questao.name) model: Model<Questao>,
     @InjectModel(Prova.name) private readonly provaModel: Model<Prova>,
+    /*
+      ⚠️ Entrou no card 26: a troca de ponteiro precisa alcançar **as duas**
+      coleções. `Prova.questoes` e `Simulado.questoes` são arrays independentes,
+      e trocar só numa deixaria a prova com a sucessora e o simulado com a
+      original congelada — o aluno responderia o texto velho.
+    */
+    @InjectModel(Simulado.name) private readonly simuladoModel: Model<Simulado>,
   ) {
     super(model);
   }
@@ -304,6 +312,21 @@ export class QuestaoRepository extends BaseRepository<Questao> {
    * um `$group` sobre `respostas.questao`. Blindar aqui esconderia um defeito
    * de quem chamasse errado.
    *
+   * ⚠️ **A contagem é DA QUESTÃO, e não da linhagem — decisão do card 29.**
+   *
+   * A pergunta era: "24% de acerto" é desta entidade ou da família toda? As duas
+   * respostas eram defensáveis, e o card 27 decidiu sem querer: **"correção"
+   * edita in-place e NÃO cria versão** — só "nova versão" cria, e ela significa
+   * por definição que *o conteúdo mudou de verdade*.
+   *
+   * Logo **toda versão nasce de uma mudança substantiva**, e somar a linhagem
+   * somaria sempre textos diferentes. O número honesto é o desta questão.
+   *
+   * ⚠️ **E isso tem um custo que precisa estar escrito: a base encolhe a cada
+   * versão criada.** Uma questão com 1.847 respostas vira duas de ~900 na
+   * primeira versão. O `ehVersao` existe para a tela poder dizer isso — não para
+   * somar.
+   *
    * ⚠️ **Os números só são confiáveis depois do card 21 (escrita) E do sync do
    * card 22 (passado).** Antes disso `quantidadeResposta` contava apresentações
    * e o reprocessamento contava duas vezes — medido: 0 de 181 questões batiam
@@ -320,6 +343,57 @@ export class QuestaoRepository extends BaseRepository<Questao> {
    * `Object.entries`, e num documento hidratado isso traz métodos e internos do
    * Mongoose em vez dos campos.
    */
+  /**
+   * Troca a questão apontada em TODAS as provas e simulados que a contêm
+   * (card 26).
+   *
+   * ⚠️ **Substituição no lugar, e NÃO remover + adicionar.** Remover e
+   * acrescentar passaria pela validação da factory — que pode recusar (número
+   * ocupado, regra ENEM de idiomática) e deixar a prova **sem a questão**. A
+   * sucessora tem a mesma classificação da original, então os simulados em que
+   * ela deve estar são exatamente os mesmos: trocar o ponteiro preserva a
+   * estrutura inteira, inclusive o `numero`.
+   *
+   * ⚠️ **Nas duas coleções.** `Prova.questoes` e `Simulado.questoes` são arrays
+   * independentes — trocar só numa deixaria a prova com a sucessora e o
+   * simulado com a original congelada, e o aluno responderia o texto velho.
+   *
+   * ⚠️ **Medido: uma questão está em 2,7 simulados em média** (card 22), máximo
+   * 5. A troca é sempre multi-prova, nunca "a prova que eu estava editando".
+   *
+   * ⚠️ **A corrida do `adicionarEmProva` alcança isto**
+   * (`docs/cards/etapa-11/BUG-corrida-no-adicionar-questao-em-prova.md`): este
+   * `updateMany` escreve nos mesmos arrays. Enquanto aquele bug estiver aberto,
+   * a troca carrega a mesma fragilidade — multiplicada pelas provas atingidas.
+   */
+  async substituirQuestao(
+    de: string,
+    para: string,
+  ): Promise<{ provas: number; simulados: number }> {
+    const filtro = { 'questoes.questao': new Types.ObjectId(de) };
+    const update = {
+      $set: { 'questoes.$[alvo].questao': new Types.ObjectId(para) },
+    };
+    const opcoes = {
+      arrayFilters: [{ 'alvo.questao': new Types.ObjectId(de) }],
+    };
+
+    const [provas, simulados] = await Promise.all([
+      this.provaModel.updateMany(filtro, update, opcoes).exec(),
+      this.simuladoModel.updateMany(filtro, update, opcoes).exec(),
+    ]);
+
+    return {
+      provas: provas.modifiedCount,
+      simulados: simulados.modifiedCount,
+    };
+  }
+
+  /** Marca a questão como congelada — ver o docblock do campo no schema. */
+  async congelar(id: string): Promise<void> {
+    await this.model.updateOne({ _id: id }, { $set: { congelada: true } });
+  }
+
   async getParaDuplicar(id: string): Promise<Questao | null> {
     return this.model
       .findById(id)
@@ -355,12 +429,23 @@ export class QuestaoRepository extends BaseRepository<Questao> {
 
   public async contadoresGlobais(
     ids: string[],
-  ): Promise<Map<string, { acertos: number; quantidadeResposta: number }>> {
+  ): Promise<
+    Map<
+      string,
+      { acertos: number; quantidadeResposta: number; ehVersao: boolean }
+    >
+  > {
     if (ids.length === 0) return new Map();
     const docs = await this.model
       .find(
         { _id: { $in: ids.map((id) => new Types.ObjectId(id)) } },
-        { acertos: 1, quantidadeResposta: 1 },
+        /*
+          ⚠️ `origem` entrou no card 29, e é um campo só: é o que permite à tela
+          dizer que a base é pequena PORQUE a questão é uma versão nova, e não
+          porque ela é rara. Sem isso, a coluna `Acerto geral` some com o uso e
+          ninguém sabe por quê.
+        */
+        { acertos: 1, quantidadeResposta: 1, origem: 1 },
       )
       .lean()
       .exec();
@@ -373,6 +458,13 @@ export class QuestaoRepository extends BaseRepository<Questao> {
           // verdadeira, diferente do `null` que a tela usa para "base pequena".
           acertos: d.acertos ?? 0,
           quantidadeResposta: d.quantidadeResposta ?? 0,
+          /*
+            ⚠️ **Booleano, e não o id da origem.** A tela não navega daqui — ela
+            só precisa saber que existe história anterior para explicar a base
+            pequena. Mandar o id convidaria a buscar a questão antiga e somar os
+            números, que é exatamente o que este card decidiu NÃO fazer.
+          */
+          ehVersao: d.origem != null,
         },
       ]),
     );
@@ -459,7 +551,10 @@ export class QuestaoRepository extends BaseRepository<Questao> {
   }
 
   async findQuestaoIdsByProva(provaId: string): Promise<string[]> {
-    const prova = await this.provaModel.findById(provaId).select('questoes').exec();
+    const prova = await this.provaModel
+      .findById(provaId)
+      .select('questoes')
+      .exec();
     if (!prova) return [];
     return prova.questoes.map((qc) => resolveQuestaoId(qc));
   }
@@ -535,9 +630,9 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     return query.countDocuments();
   }
 
-  async pendingByMateria(materiaIds?: string[]): Promise<
-    Array<{ materiaId: string; materiaName: string; count: number }>
-  > {
+  async pendingByMateria(
+    materiaIds?: string[],
+  ): Promise<Array<{ materiaId: string; materiaName: string; count: number }>> {
     const match: Record<string, any> = {
       deletedAt: null,
       status: Status.Pending,

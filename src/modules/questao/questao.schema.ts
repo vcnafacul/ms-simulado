@@ -152,6 +152,27 @@ export class Questao extends QuestaoReview {
   @Prop({ type: String, required: false, default: null, index: true })
   @ApiProperty({ required: false, nullable: true })
   public origem?: string | null;
+
+  /**
+   * A questão parou de aceitar edição de conteúdo (card 26).
+   *
+   * ⚠️ **É o que torna o enunciado do histórico confiável sem copiar nada.** A
+   * alternativa era guardar o texto em cada cartão — medido no card 23: 860 B
+   * de conteúdo × 54 questões = ~46 KB por cartão contra 5,5 KB, e os 500
+   * cartões do mesmo simulado copiariam o MESMO texto 500 vezes. Se a questão
+   * que o histórico aponta é imutável, o enunciado está garantido de graça.
+   *
+   * ⚠️ **Congela só o CONTEÚDO.** Matéria e frente não mudam o que o aluno leu,
+   * e reclassificar uma questão antiga é trabalho legítimo de catálogo — o
+   * `updateClassificacao` continua aceito. Quem mexer nisso precisa saber que a
+   * distinção é deliberada.
+   *
+   * ⚠️ **Só quem já foi respondida chega aqui.** Questão sem resposta é
+   * rascunho: edita in-place, sem cerimônia e sem sucessora.
+   */
+  @Prop({ type: Boolean, required: false, default: false })
+  @ApiProperty({ required: false })
+  public congelada?: boolean;
 }
 
 export const QuestaoSchema = SchemaFactory.createForClass(Questao);
