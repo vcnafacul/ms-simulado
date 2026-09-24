@@ -13,9 +13,11 @@ import { ApiTags } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { CartaoCallbackService } from './cartao-callback.service';
 import { CartaoHistoricoService } from './cartao-historico.service';
+import { CartaoImagemService } from './cartao-imagem.service';
 import { CartaoReprocessoService } from './cartao-reprocesso.service';
 import { CartaoCallbackDtoInput } from './dtos/cartao-callback.dto.input';
 import { CriarHistoricoCartaoDtoInput } from './dtos/criar-historico-cartao.dto.input';
+import { LocalizarImagemCartaoDtoInput } from './dtos/localizar-imagem-cartao.dto.input';
 import { ReprocessarCartaoDtoInput } from './dtos/reprocessar-cartao.dto.input';
 import { TemplateProvisionService } from './template-provision.service';
 
@@ -27,6 +29,7 @@ export class CartaoRespostaController {
     private readonly cartaoHistorico: CartaoHistoricoService,
     private readonly cartaoCallback: CartaoCallbackService,
     private readonly cartaoReprocesso: CartaoReprocessoService,
+    private readonly cartaoImagem: CartaoImagemService,
   ) {}
 
   @Get(':simuladoId')
@@ -84,5 +87,23 @@ export class CartaoRespostaController {
       agora: new Date(),
     });
     return { status: 'aceito' };
+  }
+
+  /**
+   * Onde está a foto do cartão, para a api baixar do bucket.
+   *
+   * ⚠️ **POST, com o `cursinhoId` no corpo** — o mesmo contrato do
+   * `reprocessar`, pelo mesmo motivo. 200 explícito: não cria nada.
+   */
+  @Post(':historicoId/imagem')
+  @HttpCode(200)
+  async localizarImagem(
+    @Param('historicoId') historicoId: string,
+    @Body() dto: LocalizarImagemCartaoDtoInput,
+  ): Promise<{ imageKey: string }> {
+    if (!Types.ObjectId.isValid(historicoId)) {
+      throw new BadRequestException(`historicoId inválido: ${historicoId}`);
+    }
+    return this.cartaoImagem.localizar(historicoId, dto.cursinhoId);
   }
 }

@@ -8,6 +8,7 @@ import { Test } from '@nestjs/testing';
 import { CartaoCallbackService } from './cartao-callback.service';
 import { CartaoHistoricoService } from './cartao-historico.service';
 import { CartaoReprocessoService } from './cartao-reprocesso.service';
+import { CartaoImagemService } from './cartao-imagem.service';
 import { CartaoRespostaController } from './cartao-resposta.controller';
 import { TemplateProvisionService } from './template-provision.service';
 
@@ -26,6 +27,7 @@ describe('CartaoRespostaController', () => {
       cartaoHistorico as any,
       cartaoCallback as any,
       { reprocessar: jest.fn() } as any,
+      { localizar: jest.fn() } as any,
     );
     const res = await controller.getCartao('665f0c1a2b3c4d5e6f000001');
     expect(res).toBeInstanceOf(StreamableFile);
@@ -43,6 +45,7 @@ describe('CartaoRespostaController', () => {
       cartaoHistorico as any,
       cartaoCallback as any,
       { reprocessar: jest.fn() } as any,
+      { localizar: jest.fn() } as any,
     );
     const r = await controller.criarHistorico({
       usuario: 'u1',
@@ -64,6 +67,7 @@ describe('CartaoRespostaController', () => {
       { criar: jest.fn() } as any,
       { processar: jest.fn() } as any,
       reprocesso as any,
+      { localizar: jest.fn() } as any,
     );
 
     await expect(
@@ -83,6 +87,7 @@ describe('CartaoRespostaController', () => {
       cartaoHistorico as any,
       cartaoCallback as any,
       { reprocessar: jest.fn() } as any,
+      { localizar: jest.fn() } as any,
     );
     const r = await controller.callback({ imageKey: 'k', respostas: [] });
     expect(cartaoCallback.processar).toHaveBeenCalledWith({
@@ -99,6 +104,7 @@ describe('CartaoRespostaController', () => {
       {} as any,
       {} as any,
       service as any,
+      {} as any,
     );
 
     await ctrl.reprocessar('665f0c1a2b3c4d5e6f00ab09', {
@@ -131,6 +137,9 @@ describe('CartaoRespostaController', () => {
 describe('CartaoRespostaController — roteamento HTTP', () => {
   let app: INestApplication;
   const cartaoReprocesso = { reprocessar: jest.fn() };
+  const cartaoImagem = {
+    localizar: jest.fn().mockResolvedValue({ imageKey: 'cartoes/s/f.jpg' }),
+  };
 
   beforeAll(async () => {
     const mod = await Test.createTestingModule({
@@ -143,6 +152,7 @@ describe('CartaoRespostaController — roteamento HTTP', () => {
         { provide: CartaoHistoricoService, useValue: { criar: jest.fn() } },
         { provide: CartaoCallbackService, useValue: { processar: jest.fn() } },
         { provide: CartaoReprocessoService, useValue: cartaoReprocesso },
+        { provide: CartaoImagemService, useValue: cartaoImagem },
       ],
     }).compile();
 
@@ -178,5 +188,31 @@ describe('CartaoRespostaController — roteamento HTTP', () => {
       .expect(400);
 
     expect(cartaoReprocesso.reprocessar).not.toHaveBeenCalled();
+  });
+
+  it('POST :historicoId/imagem responde 200 com a chave — não é engolida pelo GET :simuladoId', async () => {
+    const { body } = await request(app.getHttpServer())
+      .post('/v1/cartao-resposta/665f0c1a2b3c4d5e6f00ab09/imagem')
+      .send({ cursinhoId: 'cur-1' })
+      .expect(200);
+
+    expect(body).toEqual({ imageKey: 'cartoes/s/f.jpg' });
+    expect(cartaoImagem.localizar).toHaveBeenCalledWith(
+      '665f0c1a2b3c4d5e6f00ab09',
+      'cur-1',
+    );
+  });
+
+  it('⚠️ imagem sem cursinhoId no corpo é 400; historicoId inválido também', async () => {
+    await request(app.getHttpServer())
+      .post('/v1/cartao-resposta/665f0c1a2b3c4d5e6f00ab09/imagem')
+      .send({})
+      .expect(400);
+    await request(app.getHttpServer())
+      .post('/v1/cartao-resposta/nao-e-id/imagem')
+      .send({ cursinhoId: 'cur-1' })
+      .expect(400);
+
+    expect(cartaoImagem.localizar).not.toHaveBeenCalled();
   });
 });
