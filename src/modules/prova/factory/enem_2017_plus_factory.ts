@@ -1,3 +1,4 @@
+import { validarAreaNaProva } from '../services/area-da-prova';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { FrenteRepository } from 'src/modules/frente/frente.repository';
 import { Frente } from 'src/modules/frente/frente.schema';
@@ -151,6 +152,8 @@ export class Enem2017PlusFactory implements IProvaFactory {
     );
 
     const provaToEnter = await this.provaRepository.getById(question.prova);
+    // ⚠️ A área tem de caber no dia da prova — ANTES de qualquer escrita.
+    validarAreaNaProva(provaToEnter, question.enemArea);
     // Define o "dia1" para Ciências Humanas e Linguagens
     const dia1 = [EnemArea.CienciasHumanas, EnemArea.Linguagens].includes(
       question.enemArea,
@@ -215,6 +218,8 @@ export class Enem2017PlusFactory implements IProvaFactory {
       question._id,
     );
     const provaToEnter = await this.provaRepository.getById(question.prova);
+    // ⚠️ A área tem de caber no dia da prova — ANTES de qualquer escrita.
+    validarAreaNaProva(provaToEnter, question.enemArea);
     const changeProva = provaToLeaveId !== provaToEnter._id.toString();
     const changeSimulados =
       changeProva ||
@@ -342,6 +347,8 @@ export class Enem2017PlusFactory implements IProvaFactory {
     );
 
     const provaToEnter = await this.provaRepository.getById(provaId);
+    // ⚠️ A área tem de caber no dia da prova — ANTES de qualquer escrita.
+    validarAreaNaProva(provaToEnter, questao.enemArea);
     const dia1 = [EnemArea.CienciasHumanas, EnemArea.Linguagens].includes(
       questao.enemArea,
     );

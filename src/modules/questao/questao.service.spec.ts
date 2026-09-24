@@ -617,6 +617,77 @@ describe('QuestaoService.definirProvaBase', () => {
   });
 });
 
+describe('QuestaoService.updateClassificacao — área × TODAS as provas (area-enem 01)', () => {
+  const questao: any = {
+    _id: 'q1',
+    enemArea: 'Linguagens',
+    frente1: { _id: { toString: () => 'f1' } },
+    alternativa: 'A',
+  };
+  const enemDia1 = {
+    _id: 'p1',
+    nome: 'ENEM 2026 Dia 1',
+    enemAreas: ['Linguagens', 'Ciências Humanas'],
+  };
+  const custom = {
+    _id: 'p9',
+    nome: 'Simulado do cursinho',
+    enemAreas: [] as string[],
+  };
+
+  const montar = (provas: unknown[]) => {
+    const repository: any = {
+      getByIdToUpdate: jest.fn().mockResolvedValue(questao),
+      findProvasContendo: jest.fn().mockResolvedValue(provas),
+      updateClassificacao: jest.fn(),
+    };
+    const provaFactory: any = { getFactory: jest.fn() };
+    const service = new QuestaoService(
+      repository,
+      {} as any,
+      { getById: jest.fn() } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      { create: jest.fn() } as any,
+      {} as any,
+      provaFactory,
+    );
+    return { service, repository, provaFactory };
+  };
+
+  it('⚠️ recusa mudar a área editando pelo vínculo da CUSTOMIZADA se a ENEM não aceita', async () => {
+    const { service, repository, provaFactory } = montar([enemDia1, custom]);
+
+    await expect(
+      service.updateClassificacao('q1', {
+        prova: 'p9',
+        enemArea: 'Matemática',
+        frente1: 'f1',
+        materia: 'm1',
+      } as any),
+    ).rejects.toThrow(/não é permitida na prova ENEM 2026 Dia 1/);
+    // ⚠️ Antes de qualquer escrita.
+    expect(provaFactory.getFactory).not.toHaveBeenCalled();
+    expect(repository.updateClassificacao).not.toHaveBeenCalled();
+  });
+
+  it('sem mudar a área, nem consulta as provas', async () => {
+    const { service, repository } = montar([enemDia1]);
+
+    await service
+      .updateClassificacao('q1', {
+        prova: 'p1',
+        enemArea: 'Linguagens',
+        frente1: 'f1',
+        materia: 'm1',
+      } as any)
+      .catch(() => undefined);
+
+    expect(repository.findProvasContendo).not.toHaveBeenCalled();
+  });
+});
+
 describe('QuestaoService.updateClassificacao', () => {
   const questao: any = {
     _id: 'q1',
@@ -795,6 +866,8 @@ describe('QuestaoService.updateClassificacao', () => {
     const repository: any = {
       getByIdToUpdate: jest.fn().mockResolvedValue(questao),
       updateClassificacao: jest.fn().mockResolvedValue(undefined),
+      // ⚠️ area-enem 01: mudar a área confere todas as provas da questão.
+      findProvasContendo: jest.fn().mockResolvedValue([]),
     };
     const provaService: any = { syncNumero: jest.fn() };
     const provaRepository: any = {
