@@ -1,3 +1,4 @@
+import { validarAreaNaProva } from '../services/area-da-prova';
 import { BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { FrenteRepository } from 'src/modules/frente/frente.repository';
 import { Frente } from 'src/modules/frente/frente.schema';
@@ -153,6 +154,8 @@ export class Enem2010_2017Factory implements IProvaFactory {
 
     // Obtém a prova e prepara os simulados para atualizar
     const provaToEnter = await this.provaRepository.getById(question.prova);
+    // ⚠️ A área tem de caber no dia da prova — ANTES de qualquer escrita.
+    validarAreaNaProva(provaToEnter, question.enemArea);
     const isIngles = question.frente1 === frenteIngles._id.toString();
     const isEspanhol =
       !isIngles && question.frente1 === frenteEspanhol._id.toString();
@@ -241,6 +244,8 @@ export class Enem2010_2017Factory implements IProvaFactory {
       question._id,
     );
     const provaToEnter = await this.provaRepository.getById(question.prova);
+    // ⚠️ A área tem de caber no dia da prova — ANTES de qualquer escrita.
+    validarAreaNaProva(provaToEnter, question.enemArea);
     const changeProva = provaToLeaveId !== provaToEnter._id.toString();
     const changeSimulados =
       changeProva ||
@@ -364,6 +369,8 @@ export class Enem2010_2017Factory implements IProvaFactory {
     );
 
     const provaToEnter = await this.provaRepository.getById(provaId);
+    // ⚠️ A área tem de caber no dia da prova — ANTES de qualquer escrita.
+    validarAreaNaProva(provaToEnter, questao.enemArea);
     const isIngles = questionLike.frente1 === frenteIngles._id.toString();
     const isEspanhol =
       !isIngles && questionLike.frente1 === frenteEspanhol._id.toString();

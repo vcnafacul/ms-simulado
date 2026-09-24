@@ -28,6 +28,7 @@ import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
 import { documentoDaCopia } from './duplicarQuestao';
+import { provasQueRecusamArea } from '../prova/services/area-da-prova';
 import { TipoOrigem } from './enums/tipo-origem.enum';
 import {
   cadeiaDeVersoes,
@@ -461,6 +462,29 @@ export class QuestaoService {
     const enemAreaChanged = classificacao.enemArea !== questao.enemArea;
     const frente1Changed =
       classificacao.frente1 !== questao.frente1?._id?.toString();
+
+    /*
+      ⚠️ **A área nova tem de caber em TODAS as provas da questão**, e não só na
+      do vínculo que está sendo editado (card 01 de `area-enem-da-questao`). A
+      fábrica recebe só `classificacao.prova`: uma questão na ENEM Dia 1 e numa
+      customizada trocaria Linguagens → Matemática editando pelo vínculo da
+      customizada, e ficaria errada na do Dia 1.
+
+      ANTES de qualquer escrita, e fora do `try` — que embrulharia a mensagem.
+    */
+    if (enemAreaChanged) {
+      const recusam = provasQueRecusamArea(
+        await this.repository.findProvasContendo(id),
+        classificacao.enemArea,
+      );
+      if (recusam.length > 0) {
+        throw new BadRequestException(
+          `Questão de ${classificacao.enemArea} não é permitida ` +
+            `${recusam.length === 1 ? 'na prova' : 'nas provas'} ` +
+            `${recusam.map((p) => p.nome).join(', ')}, em que esta questão está.`,
+        );
+      }
+    }
 
     try {
       // enemArea/frente1 podem mudar a membership de simulado (idiomáticas ENEM)
