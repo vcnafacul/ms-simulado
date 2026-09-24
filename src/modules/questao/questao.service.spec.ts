@@ -1,4 +1,9 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import {
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
 import { Alternativa } from './enums/alternativa.enum';
 import { EnemArea } from './enums/enem-area.enum';
@@ -97,54 +102,142 @@ describe('QuestaoService.create', () => {
   });
 });
 
-describe('QuestaoService.delete (reverse-lookup provas contendo a questão)', () => {
-  it('remove a questão das provas/simulados que a contêm e deleta', async () => {
-    const question: any = { _id: 'q1', status: 'pending' };
-    const prova: any = { _id: 'pr1', simulados: [{ _id: 's1' }] };
-    const session = {
-      startTransaction: jest.fn(),
-      commitTransaction: jest.fn().mockResolvedValue(undefined),
-      abortTransaction: jest.fn().mockResolvedValue(undefined),
-      endSession: jest.fn(),
-    };
+describe('QuestaoService.delete / podeExcluir (card 33)', () => {
+  const orfa = {
+    status: 0,
+    congelada: false,
+    respondida: false,
+    emProva: false,
+    emSimulado: false,
+    temFilhas: false,
+  };
+
+  const montar = (
+    estado: Record<string, unknown> | null = orfa,
+    escreveu = true,
+  ) => {
     const repository: any = {
-      getByIdToDelete: jest.fn().mockResolvedValue(question),
-      startSession: jest.fn().mockResolvedValue(session),
-      delete: jest.fn().mockResolvedValue(undefined),
-      findProvasContendo: jest.fn().mockResolvedValue([prova]),
+      estadoParaExclusao: jest
+        .fn()
+        .mockResolvedValue(
+          estado && { estado, origem: 'q0', tipoOrigem: 'copia' },
+        ),
+      excluir: jest.fn().mockResolvedValue(escreveu),
     };
-    const simuladoService: any = {
-      removeQuestionSimulados: jest.fn().mockResolvedValue(undefined),
-    };
-    const provaRepository: any = {
-      removeQuestion: jest.fn().mockResolvedValue(undefined),
-    };
-    const { QuestaoService } = require('./questao.service');
+    const auditLogService = { create: jest.fn().mockResolvedValue({}) };
+    const simuladoService = { removeQuestionSimulados: jest.fn() };
+    const provaRepository = { removeQuestion: jest.fn() };
     const service = new QuestaoService(
-      repository, // repository
-      {} as any, // provaService
-      provaRepository, // provaRepository
-      {} as any, // exameRepository
-      {} as any, // materiaRepository
-      {} as any, // frenteRepository
-      {} as any, // auditLogService
-      simuladoService, // simuladoService
-      {} as any, // provaFactory
+      repository,
+      {} as any,
+      provaRepository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      auditLogService as any,
+      simuladoService as any,
+      {} as any,
     );
+    return {
+      service,
+      repository,
+      auditLogService,
+      simuladoService,
+      provaRepository,
+    };
+  };
 
-    await service.delete('q1');
+  it('questão órfã: exclui', async () => {
+    const { service, repository } = montar();
 
-    expect(simuladoService.removeQuestionSimulados).toHaveBeenCalledWith(
-      [{ _id: 's1' }],
-      question,
-      session,
+    await service.delete('q1', 'u-1');
+
+    expect(repository.excluir).toHaveBeenCalledWith('q1');
+  });
+
+  it('⚠️ NÃO tira a questão de prova nenhuma — o comportamento antigo morreu', async () => {
+    /*
+      Antes: questão Pending em prova era removida das provas e simulados e
+      apagada. Agora questão em prova recusa, e "tirar da prova" é a ação
+      explícita de remover.
+    */
+    const { service, simuladoService, provaRepository } = montar({
+      ...orfa,
+      emProva: true,
+    });
+
+    await expect(service.delete('q1')).rejects.toThrow();
+    expect(simuladoService.removeQuestionSimulados).not.toHaveBeenCalled();
+    expect(provaRepository.removeQuestion).not.toHaveBeenCalled();
+  });
+
+  it('⚠️ recusa com 409 e a lista de TODOS os motivos', async () => {
+    const { service, repository } = montar({
+      ...orfa,
+      status: 1, // Approved
+      respondida: true,
+    });
+
+    const erro = await service.delete('q1').catch((e) => e);
+
+    expect(erro).toBeInstanceOf(ConflictException);
+    expect(erro.getResponse().motivos.map((m: any) => m.codigo)).toEqual([
+      'aprovada',
+      'respondida',
+    ]);
+    expect(erro.getResponse().motivos[0].texto).toBeTruthy();
+    expect(repository.excluir).not.toHaveBeenCalled();
+  });
+
+  it('inexistente ou já excluída: 404', async () => {
+    const { service, repository } = montar(null);
+
+    await expect(service.delete('q1')).rejects.toBeInstanceOf(
+      NotFoundException,
     );
-    expect(provaRepository.removeQuestion).toHaveBeenCalledWith(
-      'pr1',
-      question,
+    expect(repository.excluir).not.toHaveBeenCalled();
+  });
+
+  it('⚠️ a questão mudou entre a checagem e a escrita: recusa, não finge sucesso', async () => {
+    const { service, auditLogService } = montar(orfa, false);
+
+    await expect(service.delete('q1')).rejects.toBeInstanceOf(
+      ConflictException,
     );
-    expect(repository.delete).toHaveBeenCalledWith('q1');
-    expect(session.commitTransaction).toHaveBeenCalled();
+    expect(auditLogService.create).not.toHaveBeenCalled();
+  });
+
+  it('⚠️ o log guarda o `origem` que a exclusão removeu', async () => {
+    // Depois do `$unset`, é o único lugar que sabe de onde ela veio.
+    const { service, auditLogService } = montar();
+
+    await service.delete('q1', 'u-1');
+
+    const log = auditLogService.create.mock.calls[0][0];
+    expect(log).toMatchObject({ user: 'u-1', entityId: 'q1' });
+    expect(JSON.parse(log.changes)).toEqual({
+      acao: 'excluir',
+      origem: 'q0',
+      tipoOrigem: 'copia',
+    });
+  });
+
+  it('podeExcluir usa as mesmas condições', async () => {
+    const { service } = montar({ ...orfa, temFilhas: true });
+
+    await expect(service.podeExcluir('q1')).resolves.toEqual({
+      podeExcluir: false,
+      motivos: [expect.objectContaining({ codigo: 'origem-de-outras' })],
+    });
+  });
+
+  it('podeExcluir de questão órfã', async () => {
+    const { service } = montar();
+
+    await expect(service.podeExcluir('q1')).resolves.toEqual({
+      podeExcluir: true,
+      motivos: [],
+    });
   });
 });
 
@@ -927,7 +1020,6 @@ describe('QuestaoService.duplicar (card 25)', () => {
     const repository = {
       getParaDuplicar: jest.fn().mockResolvedValue(doc),
       create: jest.fn((d) => Promise.resolve({ ...d, _id: 'q2' })),
-      listarCopias: jest.fn().mockResolvedValue([]),
     };
     const service = new QuestaoService(
       repository as any,
@@ -950,6 +1042,8 @@ describe('QuestaoService.duplicar (card 25)', () => {
 
     expect(repository.create).toHaveBeenCalledTimes(1);
     expect((copia as { origem?: string }).origem).toBe('q1');
+    // ⚠️ Card 32: duplicar produz CÓPIA — a mesma função serve a versão.
+    expect((copia as { tipoOrigem?: string }).tipoOrigem).toBe('copia');
   });
 
   it('⚠️ a ORIGINAL não é tocada', async () => {
@@ -1120,6 +1214,14 @@ describe('QuestaoService.novaVersao (card 26)', () => {
     });
   });
 
+  it('⚠️ a sucessora é marcada como VERSÃO, não como cópia (card 32)', async () => {
+    const { service, repository } = montar();
+
+    await service.novaVersao('q1', conteudo as any);
+
+    expect(repository.create.mock.calls[0][0].tipoOrigem).toBe('versao');
+  });
+
   it('o conteúdo novo é escrito na SUCESSORA, não na original', async () => {
     const { service, repository } = montar();
 
@@ -1187,5 +1289,110 @@ describe('QuestaoService.updateContent — questão congelada (card 26)', () => 
       service.updateContent('q1', { textoQuestao: 'x' } as any),
     ).rejects.toThrow();
     expect(repository.updateContent).not.toHaveBeenCalled();
+  });
+});
+
+describe('QuestaoService.linhagem (card 34A)', () => {
+  const no = (id: string, over: Record<string, unknown> = {}) => ({
+    _id: id,
+    status: 0,
+    congelada: false,
+    origem: null as string | null,
+    tipoOrigem: null as string | null,
+    textoQuestao: `enunciado ${id}`,
+    ...over,
+  });
+
+  const montar = (banco: Record<string, any>) => {
+    const repository = {
+      noDaLinhagem: jest.fn(async (id: string) => banco[id] ?? null),
+      sucessoraDe: jest.fn(
+        async (id: string) =>
+          Object.values(banco).find(
+            (q: any) => q.origem === id && q.tipoOrigem === 'versao',
+          ) ?? null,
+      ),
+      copiasDe: jest.fn(async (id: string) =>
+        Object.values(banco).filter(
+          (q: any) => q.origem === id && q.tipoOrigem !== 'versao',
+        ),
+      ),
+      findProvasContendoMany: jest.fn(async () => new Map([['v2', [{}, {}]]])),
+    };
+    const service = new QuestaoService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+    return { service, repository };
+  };
+
+  const banco = {
+    v1: no('v1', { congelada: true }),
+    v2: no('v2', { origem: 'v1', tipoOrigem: 'versao' }),
+    c1: no('c1', { origem: 'v2', tipoOrigem: 'copia' }),
+  };
+
+  it('versões, cópias e origem numa resposta só', async () => {
+    const { service } = montar(banco);
+
+    const r = await service.linhagem('v2');
+
+    expect(r.atual).toBe('v2');
+    expect(r.versoes.map((v) => v.id)).toEqual(['v1', 'v2']);
+    expect(r.copias.map((c) => c.id)).toEqual(['c1']);
+    // ⚠️ v2 é VERSÃO de v1, não cópia: não tem "origem de cópia".
+    expect(r.origemCopia).toBeNull();
+  });
+
+  it('a cópia vê de quem é cópia, e não tem cadeia de versões', async () => {
+    const { service } = montar(banco);
+
+    const r = await service.linhagem('c1');
+
+    expect(r.origemCopia?.id).toBe('v2');
+    expect(r.versoes).toEqual([]);
+  });
+
+  it('cada item diz o que identifica a questão', async () => {
+    const { service } = montar(banco);
+
+    const r = await service.linhagem('v2');
+
+    expect(r.versoes[0]).toEqual({
+      id: 'v1',
+      status: 0,
+      congelada: true,
+      enunciado: 'enunciado v1',
+      provas: 0,
+    });
+    expect(r.versoes[1].provas).toBe(2);
+  });
+
+  it('⚠️ as provas de todos os itens vêm numa consulta só', async () => {
+    const { service, repository } = montar(banco);
+
+    await service.linhagem('v2');
+
+    expect(repository.findProvasContendoMany).toHaveBeenCalledTimes(1);
+    expect(repository.findProvasContendoMany).toHaveBeenCalledWith([
+      'v1',
+      'v2',
+      'c1',
+    ]);
+  });
+
+  it('inexistente ou excluída: 404', async () => {
+    const { service } = montar({});
+
+    await expect(service.linhagem('x')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 });

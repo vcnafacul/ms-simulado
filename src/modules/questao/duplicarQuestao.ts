@@ -1,4 +1,5 @@
 import { Status } from './enums/status.enum';
+import { TipoOrigem } from './enums/tipo-origem.enum';
 import { Questao } from './questao.schema';
 
 /**
@@ -38,6 +39,8 @@ export const NAO_HERDADOS = {
   provaBase: true,
   /** ⚠️ Não herda o avô: `origem` da cópia é sempre a questão duplicada. */
   origem: true,
+  /** ⚠️ Nem o tipo do vínculo do pai: a cópia de uma versão é cópia (card 32). */
+  tipoOrigem: true,
 } as const;
 
 /**
@@ -57,7 +60,16 @@ export const NAO_HERDADOS = {
  * o texto e **não** para a imagem. É o mesmo furo que o card 23 registrou, e a
  * regra de nunca sobrescrever key resolve os dois de uma vez.
  */
-export function documentoDaCopia(original: Questao): Partial<Questao> {
+export function documentoDaCopia(
+  /**
+   * ⚠️ **Obrigatório, e o PRIMEIRO parâmetro** (card 32). `duplicar` e
+   * `novaVersao` usam esta mesma função; sem o tipo aqui, o vínculo nascia
+   * indistinguível e a sucessora aparecia como "cópia". Parâmetro sem default
+   * é o que impede um terceiro caminho de esquecer.
+   */
+  tipo: TipoOrigem,
+  original: Questao,
+): Partial<Questao> {
   const copia: Record<string, unknown> = {};
   for (const [chave, valor] of Object.entries(original)) {
     if (chave in NAO_HERDADOS) continue;
@@ -70,6 +82,7 @@ export function documentoDaCopia(original: Questao): Partial<Questao> {
   copia.quantidadeSimulado = 0;
   copia.provaBase = null;
   copia.origem = String((original as { _id: unknown })._id);
+  copia.tipoOrigem = tipo;
 
   return copia as Partial<Questao>;
 }

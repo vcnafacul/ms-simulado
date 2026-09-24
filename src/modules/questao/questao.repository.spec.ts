@@ -321,12 +321,13 @@ describe('QuestaoRepository.contadoresGlobais (card 16)', () => {
     expect(find.mock.calls[0][1]).toEqual({
       acertos: 1,
       quantidadeResposta: 1,
-      // ⚠️ Card 29 — explica a base pequena, não soma nada.
-      origem: 1,
+      // ⚠️ Card 29 — explica a base pequena, não soma nada. Card 32: o tipo
+      // decide, não a presença do `origem`.
+      tipoOrigem: 1,
     });
   });
 
-  it('⚠️ questão COM `origem` é marcada como versão', async () => {
+  it('⚠️ questão que é VERSÃO é marcada como versão', async () => {
     /*
       Card 29: a contagem é da QUESTÃO, não da linhagem — "correção" edita
       in-place e só "nova versão" cria entidade nova, então toda versão nasce de
@@ -335,10 +336,44 @@ describe('QuestaoRepository.contadoresGlobais (card 16)', () => {
       Este booleano existe para a tela EXPLICAR a base pequena, não para somar.
     */
     const { repo } = montar([
-      { _id: ID, acertos: 4, quantidadeResposta: 12, origem: 'q0' },
+      {
+        _id: ID,
+        acertos: 4,
+        quantidadeResposta: 12,
+        origem: 'q0',
+        tipoOrigem: 'versao',
+      },
     ]);
 
     expect((await repo.contadoresGlobais([ID])).get(ID)?.ehVersao).toBe(true);
+  });
+
+  it('⚠️ CÓPIA não é versão — o defeito do card 32', async () => {
+    /*
+      Com `ehVersao = origem != null`, uma cópia manual recebia na coluna
+      `Acerto geral` a frase "O histórico anterior ficou com a versão anterior"
+      — falsa: cópia não tem histórico anterior, nasceu do zero.
+    */
+    const { repo } = montar([
+      {
+        _id: ID,
+        acertos: 0,
+        quantidadeResposta: 2,
+        origem: 'q0',
+        tipoOrigem: 'copia',
+      },
+    ]);
+
+    expect((await repo.contadoresGlobais([ID])).get(ID)?.ehVersao).toBe(false);
+  });
+
+  it('⚠️ `origem` sem tipo (dado anterior ao card 32) conta como CÓPIA', async () => {
+    // O tipo mais antigo, e o que não afirma um histórico que talvez não exista.
+    const { repo } = montar([
+      { _id: ID, acertos: 0, quantidadeResposta: 2, origem: 'q0' },
+    ]);
+
+    expect((await repo.contadoresGlobais([ID])).get(ID)?.ehVersao).toBe(false);
   });
 
   it('lista vazia não consulta o banco', async () => {
@@ -358,12 +393,17 @@ describe('QuestaoRepository — linhagem (card 25)', () => {
     const exec = jest.fn().mockResolvedValue({ _id: 'q1' });
     const lean = jest.fn().mockReturnValue({ exec });
     const select = jest.fn().mockReturnValue({ lean });
-    const findById = jest.fn().mockReturnValue({ select });
-    const repo = new QuestaoRepository({ findById } as any, {} as any, {} as any);
+    const findOne = jest.fn().mockReturnValue({ select });
+    const repo = new QuestaoRepository({ findOne } as any, {} as any, {} as any);
 
     await repo.getParaDuplicar('q1');
 
     expect(select).toHaveBeenCalledWith('+alternativa');
+    // ⚠️ Card 33: não se duplica questão excluída.
+    expect(findOne.mock.calls[0][0]).toEqual({
+      _id: 'q1',
+      deleted: { $ne: true },
+    });
   });
 
   it('⚠️ `getParaDuplicar` usa `.lean()` — documento hidratado traz internos', async () => {
@@ -372,13 +412,19 @@ describe('QuestaoRepository — linhagem (card 25)', () => {
     const exec = jest.fn().mockResolvedValue({ _id: 'q1' });
     const lean = jest.fn().mockReturnValue({ exec });
     const select = jest.fn().mockReturnValue({ lean });
-    const findById = jest.fn().mockReturnValue({ select });
-    const repo = new QuestaoRepository({ findById } as any, {} as any, {} as any);
+    const findOne = jest.fn().mockReturnValue({ select });
+    const repo = new QuestaoRepository({ findOne } as any, {} as any, {} as any);
 
     await repo.getParaDuplicar('q1');
 
     expect(lean).toHaveBeenCalled();
   });
+
+  const leitura = (valor: unknown) => {
+    const exec = jest.fn().mockResolvedValue(valor);
+    const lean = jest.fn().mockReturnValue({ exec });
+    return { lean };
+  };
 
   it('⚠️ as cópias são DERIVADAS de `origem`, não lidas de um array', async () => {
     /*
@@ -387,28 +433,50 @@ describe('QuestaoRepository — linhagem (card 25)', () => {
       os contadores incrementais batendo com o histórico. Aqui não há segunda
       cópia da verdade para divergir.
     */
-    const exec = jest
-      .fn()
-      .mockResolvedValue([{ _id: 'q2', status: 'Pending', origem: 'q1' }]);
-    const lean = jest.fn().mockReturnValue({ exec });
-    const find = jest.fn().mockReturnValue({ lean });
+    const find = jest.fn().mockReturnValue(leitura([]));
     const repo = new QuestaoRepository({ find } as any, {} as any, {} as any);
 
-    const r = await repo.listarCopias('q1');
+    await repo.copiasDe('q1');
 
-    expect(find.mock.calls[0][0]).toEqual({ origem: 'q1' });
-    expect(r).toEqual([{ id: 'q2', status: 'Pending', origem: 'q1' }]);
+    expect(find.mock.calls[0][0]).toEqual({
+      origem: 'q1',
+      // ⚠️ `$ne: versao`: `origem` sem tipo (anterior ao card 32) é cópia.
+      tipoOrigem: { $ne: 'versao' },
+      deleted: { $ne: true },
+    });
   });
 
-  it('projeta só o que a lista de cópias mostra', async () => {
-    const exec = jest.fn().mockResolvedValue([]);
-    const lean = jest.fn().mockReturnValue({ exec });
-    const find = jest.fn().mockReturnValue({ lean });
-    const repo = new QuestaoRepository({ find } as any, {} as any, {} as any);
+  it('⚠️ a sucessora é só o vínculo do tipo VERSÃO', async () => {
+    const findOne = jest.fn().mockReturnValue(leitura(null));
+    const repo = new QuestaoRepository(
+      { findOne } as any,
+      {} as any,
+      {} as any,
+    );
 
-    await repo.listarCopias('q1');
+    await repo.sucessoraDe('q1');
 
-    expect(find.mock.calls[0][1]).toEqual({ status: 1, origem: 1 });
+    expect(findOne.mock.calls[0][0]).toEqual({
+      origem: 'q1',
+      tipoOrigem: 'versao',
+      deleted: { $ne: true },
+    });
+  });
+
+  it('projeta só o que a aba mostra — nada de alternativas nem imagens', async () => {
+    const findOne = jest.fn().mockReturnValue(leitura(null));
+    const repo = new QuestaoRepository(
+      { findOne } as any,
+      {} as any,
+      {} as any,
+    );
+
+    await repo.noDaLinhagem('q1');
+
+    expect(findOne.mock.calls[0]).toEqual([
+      { _id: 'q1', deleted: { $ne: true } },
+      { status: 1, congelada: 1, origem: 1, tipoOrigem: 1, textoQuestao: 1 },
+    ]);
   });
 });
 
@@ -491,5 +559,184 @@ describe('QuestaoRepository.congelar (card 26)', () => {
       { _id: 'q1' },
       { $set: { congelada: true } },
     );
+  });
+});
+
+describe('QuestaoRepository — exclusão (card 33)', () => {
+  const ID = '665f0c1a2b3c4d5e6f00abc2';
+  const chain = (valor: unknown) => ({
+    lean: () => ({ exec: jest.fn().mockResolvedValue(valor) }),
+  });
+
+  const montar = (
+    questao: unknown,
+    existe: {
+      historico?: boolean;
+      prova?: boolean;
+      simulado?: boolean;
+      filhas?: boolean;
+    } = {},
+  ) => {
+    const model = {
+      findOne: jest.fn().mockReturnValue(chain(questao)),
+      exists: jest.fn().mockResolvedValue(existe.filhas ? { _id: 'x' } : null),
+      updateOne: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
+      }),
+    };
+    const prova = {
+      exists: jest.fn().mockResolvedValue(existe.prova ? { _id: 'p' } : null),
+    };
+    const simulado = {
+      exists: jest
+        .fn()
+        .mockResolvedValue(existe.simulado ? { _id: 's' } : null),
+    };
+    const historico = {
+      exists: jest
+        .fn()
+        .mockResolvedValue(existe.historico ? { _id: 'h' } : null),
+    };
+    const repo = new QuestaoRepository(
+      model as any,
+      prova as any,
+      simulado as any,
+      historico as any,
+    );
+    return { repo, model, prova, simulado, historico };
+  };
+
+  it('⚠️ "ninguém respondeu" é medido no HISTÓRICO, não no contador', async () => {
+    /*
+      O contador `quantidadeResposta` só é confiável depois do card 21 e do
+      sync do 22 — antes deles, 0 de 181 questões batiam em homologação. Uma
+      questão respondida poderia aparecer zerada e ser apagada.
+    */
+    const { repo, historico } = montar(
+      { status: 0, quantidadeResposta: 0 },
+      { historico: true },
+    );
+
+    const r = await repo.estadoParaExclusao(ID);
+
+    expect(r?.estado.respondida).toBe(true);
+    expect(historico.exists.mock.calls[0][0]).toHaveProperty([
+      'respostas.questao',
+    ]);
+  });
+
+  it('⚠️ mede prova E simulado — as duas coleções', async () => {
+    const { repo, prova, simulado } = montar({ status: 0 }, { simulado: true });
+
+    const r = await repo.estadoParaExclusao(ID);
+
+    expect(prova.exists).toHaveBeenCalled();
+    expect(simulado.exists).toHaveBeenCalled();
+    expect(r?.estado).toMatchObject({ emProva: false, emSimulado: true });
+  });
+
+  it('⚠️ filhas de QUALQUER tipo — o filtro não olha `tipoOrigem`', async () => {
+    const { repo, model } = montar({ status: 0 }, { filhas: true });
+
+    const r = await repo.estadoParaExclusao(ID);
+
+    expect(model.exists).toHaveBeenCalledWith({ origem: ID });
+    expect(r?.estado.temFilhas).toBe(true);
+  });
+
+  it('devolve o `origem` para o log', async () => {
+    const { repo } = montar({
+      status: 0,
+      origem: 'q0',
+      tipoOrigem: 'versao',
+    });
+
+    const r = await repo.estadoParaExclusao(ID);
+
+    expect(r).toMatchObject({ origem: 'q0', tipoOrigem: 'versao' });
+  });
+
+  it('já excluída conta como inexistente', async () => {
+    const { repo, model } = montar(null);
+
+    await expect(repo.estadoParaExclusao(ID)).resolves.toBeNull();
+    expect(model.findOne.mock.calls[0][0]).toMatchObject({
+      deleted: { $ne: true },
+    });
+  });
+
+  it('⚠️ excluir marca `deleted` E remove o vínculo na MESMA escrita', async () => {
+    /*
+      Em duas escritas, uma falha no meio deixaria uma questão excluída que
+      ainda bloqueia a origem. E uma cópia excluída deixa de ser cópia, mesmo
+      restaurada.
+    */
+    const { repo, model } = montar(null);
+
+    await repo.excluir(ID);
+
+    expect(model.updateOne).toHaveBeenCalledTimes(1);
+    expect(model.updateOne.mock.calls[0][1]).toEqual({
+      $set: { deleted: true },
+      $unset: { origem: '', tipoOrigem: '' },
+    });
+  });
+
+  it('⚠️ o filtro da escrita repete status e congelada — fecha a corrida', async () => {
+    const { repo, model } = montar(null);
+
+    await repo.excluir(ID);
+
+    expect(model.updateOne.mock.calls[0][0]).toEqual({
+      _id: ID,
+      deleted: { $ne: true },
+      status: { $in: [0, 2] },
+      congelada: { $ne: true },
+    });
+  });
+
+  it('nada escrito = a questão mudou no meio', async () => {
+    const { repo, model } = montar(null);
+    model.updateOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
+    });
+
+    await expect(repo.excluir(ID)).resolves.toBe(false);
+  });
+});
+
+describe('QuestaoRepository — questão excluída some das leituras (card 33)', () => {
+  it('⚠️ a geração automática de simulado não sorteia questão excluída', async () => {
+    const exec = jest.fn().mockResolvedValue([]);
+    const limit = jest.fn().mockReturnValue({ exec });
+    const sort = jest.fn().mockReturnValue({ limit });
+    const select = jest.fn().mockReturnValue({ sort });
+    const exists = jest.fn().mockReturnValue({ select });
+    const find = jest.fn().mockReturnValue({ exists });
+    const repo = new QuestaoRepository({ find } as any, {} as any, {} as any);
+
+    await repo.getQuestaoByFiltro({ materia: 'm1' }, 5);
+
+    expect(find.mock.calls[0][0]).toEqual({
+      materia: 'm1',
+      deleted: { $ne: true },
+    });
+  });
+
+  it('getById não encontra questão excluída', async () => {
+    const select = jest.fn().mockResolvedValue(null);
+    const findOne = jest.fn().mockReturnValue({ select });
+    const repo = new QuestaoRepository(
+      { findOne } as any,
+      {} as any,
+      {} as any,
+    );
+
+    await repo.getById('q1');
+
+    expect(findOne.mock.calls[0][0]).toEqual({
+      _id: 'q1',
+      deleted: { $ne: true },
+    });
   });
 });

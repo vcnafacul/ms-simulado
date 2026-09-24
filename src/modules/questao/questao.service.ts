@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -27,6 +28,28 @@ import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
 import { documentoDaCopia } from './duplicarQuestao';
+import { TipoOrigem } from './enums/tipo-origem.enum';
+import {
+  cadeiaDeVersoes,
+  ItemDaLinhagem,
+  LinhagemDaQuestao,
+  NoDaLinhagem,
+  resumoDoEnunciado,
+} from './linhagemDaQuestao';
+import {
+  MotivoParaNaoExcluir,
+  motivosParaNaoExcluir,
+  TEXTO_DO_MOTIVO,
+} from './exclusaoDaQuestao';
+
+/** Um motivo de recusa como a tela recebe: código para decidir, texto para ler. */
+export interface Motivo {
+  codigo: MotivoParaNaoExcluir;
+  texto: string;
+}
+
+const descreverMotivos = (ms: MotivoParaNaoExcluir[]): Motivo[] =>
+  ms.map((codigo) => ({ codigo, texto: TEXTO_DO_MOTIVO[codigo] }));
 import {
   CAMPOS_DE_CLASSIFICACAO,
   CAMPOS_DE_CONTEUDO,
@@ -151,36 +174,77 @@ export class QuestaoService {
     };
   }
 
-  public async delete(id: string): Promise<void> {
-    const question = await this.repository.getByIdToDelete(id);
-    if (!question) {
-      throw new NotFoundException(`Registro com ID ${id} não encontrado.`);
+  /**
+   * Se a questão pode ser excluída, e por quê não (card 33).
+   *
+   * ⚠️ **É a MESMA função que o `delete` usa**, e é por isso que o client pode
+   * confiar nela para mostrar o botão — mas não pode confiar no botão: entre
+   * esta consulta e o clique, alguém pode pôr a questão numa prova.
+   */
+  public async podeExcluir(
+    id: string,
+  ): Promise<{ podeExcluir: boolean; motivos: Motivo[] }> {
+    const r = await this.repository.estadoParaExclusao(id);
+    if (!r) {
+      throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
     }
-    if (question.status === Status.Approved) {
-      throw new BadRequestException(
-        'Não é permitido excluir questões já aprovadas',
-      );
+    const motivos = descreverMotivos(motivosParaNaoExcluir(r.estado));
+    return { podeExcluir: motivos.length === 0, motivos };
+  }
+
+  /**
+   * Exclui uma questão órfã (card 33).
+   *
+   * ⚠️ **Mudou de comportamento.** Antes, excluir uma questão `Pending` que
+   * estivesse em provas a TIRAVA das provas e simulados e fazia `deleteOne`.
+   * Agora questão em prova ou simulado **recusa** — tirar de prova é a ação
+   * "remover da prova", explícita — e a exclusão é soft.
+   *
+   * ⚠️ **As condições são todas E**, verificadas aqui no servidor. A recusa é
+   * `409` com a lista de motivos, não "não é possível excluir" — que mandaria a
+   * pessoa adivinhar.
+   */
+  public async delete(id: string, userId?: string): Promise<void> {
+    const r = await this.repository.estadoParaExclusao(id);
+    if (!r) {
+      throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
     }
-    const session = await this.repository.startSession();
-    session.startTransaction();
-    try {
-      const provas = await this.repository.findProvasContendo(id);
-      for (const prova of provas) {
-        await this.simuladoService.removeQuestionSimulados(
-          prova.simulados,
-          question,
-          session,
-        );
-        await this.provaRepository.removeQuestion(prova._id, question);
-      }
-      await this.repository.delete(id);
-      await session.commitTransaction();
-      session.endSession();
-    } catch (error) {
-      await session.abortTransaction();
-      session.endSession();
-      throw error;
+
+    const motivos = descreverMotivos(motivosParaNaoExcluir(r.estado));
+    if (motivos.length > 0) {
+      throw new ConflictException({
+        message: 'Esta questão não pode ser excluída.',
+        motivos,
+      });
     }
+
+    /*
+      ⚠️ `false` = a questão mudou entre a checagem e a escrita (foi aprovada
+      ou versionada no meio). Recusar em vez de fingir sucesso.
+    */
+    if (!(await this.repository.excluir(id))) {
+      throw new ConflictException({
+        message:
+          'A questão mudou enquanto era excluída. Recarregue e tente de novo.',
+        motivos: [],
+      });
+    }
+
+    await this.auditLogService.create({
+      user: userId,
+      entityId: id,
+      entityType: 'Questao',
+      /*
+        ⚠️ **O `origem` removido vai para o log.** Depois do `$unset`, o banco
+        não sabe mais de onde a questão excluída veio; aqui fica a auditoria sem
+        reviver o vínculo.
+      */
+      changes: JSON.stringify({
+        acao: 'excluir',
+        origem: r.origem,
+        tipoOrigem: r.tipoOrigem,
+      }),
+    });
   }
 
   public async getInfos() {
@@ -488,7 +552,7 @@ export class QuestaoService {
     }
 
     const copia = await this.repository.create(
-      documentoDaCopia(original) as Questao,
+      documentoDaCopia(TipoOrigem.copia, original) as Questao,
     );
 
     await this.auditLogService.create({
@@ -509,9 +573,55 @@ export class QuestaoService {
     return copia;
   }
 
-  /** As cópias diretas — ver o docblock do campo `origem`. */
-  public async listarCopias(id: string) {
-    return this.repository.listarCopias(id);
+  /**
+   * A linhagem da questão: a cadeia de versões, as cópias diretas e a origem
+   * (card 34A).
+   *
+   * ⚠️ **Um endpoint, e não dois.** O `listarCopias` do card 25 morreu aqui —
+   * dois endpoints para a mesma relação saem de acordo no primeiro que mudar.
+   */
+  public async linhagem(id: string): Promise<LinhagemDaQuestao> {
+    const atual = await this.repository.noDaLinhagem(id);
+    if (!atual) {
+      throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
+    }
+
+    const [cadeia, copias, origem] = await Promise.all([
+      cadeiaDeVersoes(
+        atual,
+        (x) => this.repository.noDaLinhagem(x),
+        (x) => this.repository.sucessoraDe(x),
+      ),
+      this.repository.copiasDe(id),
+      atual.origem && atual.tipoOrigem !== TipoOrigem.versao
+        ? this.repository.noDaLinhagem(atual.origem)
+        : Promise.resolve(null),
+    ]);
+    // ⚠️ Sem versões, a cadeia é só a própria questão — e a tela diz "nenhuma".
+    const versoes = cadeia.length > 1 ? cadeia : [];
+
+    /*
+      ⚠️ **Uma consulta para as provas de TODOS os itens**, e não uma por item.
+      O `provasContendo` da Etapa 9 é por questão; aqui a lista pode ter N.
+    */
+    const todos = [...versoes, ...copias, ...(origem ? [origem] : [])];
+    const provas = await this.repository.findProvasContendoMany(
+      todos.map((n) => String(n._id)),
+    );
+    const item = (n: NoDaLinhagem): ItemDaLinhagem => ({
+      id: String(n._id),
+      status: n.status,
+      congelada: !!n.congelada,
+      enunciado: resumoDoEnunciado(n.textoQuestao),
+      provas: provas.get(String(n._id))?.length ?? 0,
+    });
+
+    return {
+      atual: id,
+      versoes: versoes.map(item),
+      copias: copias.map(item),
+      origemCopia: origem ? item(origem) : null,
+    };
   }
 
   /**
@@ -557,7 +667,7 @@ export class QuestaoService {
     }
 
     const sucessora = await this.repository.create(
-      documentoDaCopia(original) as Questao,
+      documentoDaCopia(TipoOrigem.versao, original) as Questao,
     );
     const novaId = String((sucessora as { _id: unknown })._id);
 

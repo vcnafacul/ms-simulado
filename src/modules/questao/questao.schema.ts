@@ -7,6 +7,7 @@ import { Alternativa } from './enums/alternativa.enum';
 import { EnemArea } from './enums/enem-area.enum';
 import { Status } from './enums/status.enum';
 import { QuestaoReview } from './questao.review.schema';
+import { TipoOrigem } from './enums/tipo-origem.enum';
 
 @Schema({ timestamps: true, versionKey: false })
 export class Questao extends QuestaoReview {
@@ -129,9 +130,10 @@ export class Questao extends QuestaoReview {
    * consumidor quer o id para montar link e casar com listagem, não o
    * documento inteiro populado dentro de cada questão.
    *
-   * ⚠️ **A original apagada NÃO limpa este campo**, e é deliberado: a cópia
-   * continua existindo e o front mostra "Copiada de [questão excluída]".
-   * Perder o lastro seria perder a única pista de onde ela veio.
+   * ⚠️ **Nunca aponta para uma questão excluída** (card 33): questão que é
+   * origem de alguém não pode ser excluída. E quem é excluída PERDE este campo
+   * na mesma escrita — uma cópia excluída deixa de ser cópia, mesmo restaurada,
+   * e por isso não prende a origem. O valor removido fica no `auditlogs`.
    *
    * ---
    *
@@ -152,6 +154,30 @@ export class Questao extends QuestaoReview {
   @Prop({ type: String, required: false, default: null, index: true })
   @ApiProperty({ required: false, nullable: true })
   public origem?: string | null;
+
+  /**
+   * O que esta questão é em relação à `origem`: cópia ou versão (card 32).
+   *
+   * ⚠️ **É atributo do vínculo, não uma segunda relação.** Não existe um
+   * `versaoDe` ao lado de `origem` — dois campos para a mesma relação saem de
+   * acordo no primeiro caminho que escrever um e esquecer o outro. Aqui o
+   * vínculo continua sendo só `origem`; o tipo diz o que ele significa.
+   *
+   * ⚠️ **Ausente com `origem` preenchida = `copia`.** É o dado anterior ao card
+   * 32, e cópia é o tipo que não afirma nada sobre histórico anterior — ler
+   * como versão faria a tela dizer "o histórico ficou com a versão anterior"
+   * sobre uma questão que talvez não tenha nenhuma.
+   *
+   * Escrito em um lugar só: `documentoDaCopia`, que exige o tipo.
+   */
+  @Prop({
+    type: String,
+    enum: Object.values(TipoOrigem),
+    required: false,
+    default: null,
+  })
+  @ApiProperty({ required: false, nullable: true, enum: TipoOrigem })
+  public tipoOrigem?: TipoOrigem | null;
 
   /**
    * A questão parou de aceitar edição de conteúdo (card 26).

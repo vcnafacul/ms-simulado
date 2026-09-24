@@ -5,6 +5,7 @@ import { ExameModule } from '../exame/exame.module';
 import { FrenteModule } from '../frente/frente.module';
 import { Frente, FrenteSchema } from '../frente/frente.schema';
 import { HistoricoModule } from '../historico/historico.module';
+import { Historico, HistoricoSchema } from '../historico/historico.schema';
 import { MateriaModule } from '../materia/materia.module';
 import { ProvaFactory } from '../prova/factory/prova_factory';
 import { ProvaRepository } from '../prova/prova.repository';
@@ -32,6 +33,8 @@ import { QuestaoService } from './questao.service';
       { name: Categoria.name, schema: CategoriaSchema },
       { name: Simulado.name, schema: SimuladoSchema },
       { name: Frente.name, schema: FrenteSchema },
+      // ⚠️ Card 33: "ninguém respondeu" é medido no histórico.
+      { name: Historico.name, schema: HistoricoSchema },
     ]),
     QuestaoModule,
     ExameModule,
