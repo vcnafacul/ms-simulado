@@ -802,7 +802,10 @@ describe('QuestaoService — log de edição de conteúdo (card 24)', () => {
   it('grava QUAIS campos mudaram', async () => {
     const { service, auditLogService } = montar(questao());
 
-    await service.updateContent('q1', conteudo({ textoQuestao: 'depois' }) as any);
+    await service.updateContent(
+      'q1',
+      conteudo({ textoQuestao: 'depois' }) as any,
+    );
 
     expect(registro(auditLogService).campos).toEqual(['textoQuestao']);
     expect(auditLogService.create.mock.calls[0][0]).toMatchObject({
@@ -906,5 +909,283 @@ describe('QuestaoService — log de edição de conteúdo (card 24)', () => {
     ).rejects.toThrow();
 
     expect(auditLogService.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('QuestaoService.duplicar (card 25)', () => {
+  const original = {
+    _id: 'q1',
+    textoQuestao: 'enunciado',
+    alternativa: 'C',
+    status: 'Approved',
+    acertos: 8,
+    quantidadeResposta: 10,
+  };
+
+  const montar = (doc: unknown = original) => {
+    const auditLogService = { create: jest.fn().mockResolvedValue({}) };
+    const repository = {
+      getParaDuplicar: jest.fn().mockResolvedValue(doc),
+      create: jest.fn((d) => Promise.resolve({ ...d, _id: 'q2' })),
+      listarCopias: jest.fn().mockResolvedValue([]),
+    };
+    const service = new QuestaoService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      auditLogService as any,
+      {} as any,
+      {} as any,
+    );
+    return { service, repository, auditLogService };
+  };
+
+  it('cria a cópia com lastro e devolve o documento novo', async () => {
+    const { service, repository } = montar();
+
+    const copia = await service.duplicar('q1');
+
+    expect(repository.create).toHaveBeenCalledTimes(1);
+    expect((copia as { origem?: string }).origem).toBe('q1');
+  });
+
+  it('⚠️ a ORIGINAL não é tocada', async () => {
+    /*
+      Duplicar é uma ação sobre a NOVA questão: nem o conteúdo, nem os
+      contadores, nem o vínculo com prova nenhuma da original mudam.
+    */
+    const { service, repository } = montar();
+
+    await service.duplicar('q1');
+
+    expect(repository).not.toHaveProperty('updateContent');
+    // o único write é o `create` da cópia
+    expect(repository.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('⚠️ a cópia nasce com as estatísticas em zero', async () => {
+    const { service, repository } = montar();
+
+    await service.duplicar('q1');
+
+    expect(repository.create.mock.calls[0][0]).toMatchObject({
+      acertos: 0,
+      quantidadeResposta: 0,
+      quantidadeSimulado: 0,
+    });
+  });
+
+  it('questão inexistente dá 404, e não cria nada', async () => {
+    const { service, repository } = montar(null);
+
+    await expect(service.duplicar('q1')).rejects.toThrow();
+    expect(repository.create).not.toHaveBeenCalled();
+  });
+
+  it('⚠️ o log fica na ORIGINAL, não na cópia', async () => {
+    /*
+      Quem vai procurar o rastro abre a questão de onde a cópia saiu, e o
+      `getLogs` é por `entityId`. Na cópia o lastro já está no campo `origem`.
+    */
+    const { service, auditLogService } = montar();
+
+    await service.duplicar('q1', 'u-9');
+
+    expect(auditLogService.create).toHaveBeenCalledWith(
+      expect.objectContaining({ entityId: 'q1', user: 'u-9' }),
+    );
+    expect(
+      JSON.parse(auditLogService.create.mock.calls[0][0].changes),
+    ).toMatchObject({ acao: 'duplicar', copia: 'q2' });
+  });
+
+  it('⚠️ lê com o gabarito — ele é `select: false` e sairia de fora', async () => {
+    // Uma leitura comum devolve a questão sem `alternativa`, e a cópia nasceria
+    // sem gabarito em silêncio.
+    const { service, repository } = montar();
+
+    await service.duplicar('q1');
+
+    expect(repository.getParaDuplicar).toHaveBeenCalledWith('q1');
+    expect(repository.create.mock.calls[0][0].alternativa).toBe('C');
+  });
+});
+
+describe('QuestaoService.novaVersao (card 26)', () => {
+  const original = (over: Record<string, unknown> = {}) => ({
+    _id: 'q1',
+    textoQuestao: 'antes',
+    alternativa: 'A',
+    quantidadeResposta: 12,
+    congelada: false,
+    ...over,
+  });
+
+  const conteudo = {
+    textoQuestao: 'depois',
+    textoAlternativaA: 'a',
+    textoAlternativaB: 'b',
+    textoAlternativaC: 'c',
+    textoAlternativaD: 'd',
+    textoAlternativaE: 'e',
+    alternativa: 'A',
+    textClassification: true,
+    alternativeClassfication: true,
+  };
+
+  const montar = (doc: unknown = original()) => {
+    const ordem: string[] = [];
+    const auditLogService = { create: jest.fn().mockResolvedValue({}) };
+    const repository = {
+      getParaDuplicar: jest.fn().mockResolvedValue(doc),
+      create: jest.fn((d) => {
+        ordem.push('create');
+        return Promise.resolve({ ...d, _id: 'q2' });
+      }),
+      updateContent: jest.fn(() => {
+        ordem.push('updateContent');
+        return Promise.resolve(undefined);
+      }),
+      substituirQuestao: jest.fn(() => {
+        ordem.push('substituir');
+        return Promise.resolve({ provas: 3, simulados: 5 });
+      }),
+      congelar: jest.fn(() => {
+        ordem.push('congelar');
+        return Promise.resolve(undefined);
+      }),
+      getById: jest.fn().mockResolvedValue(doc),
+      updateAssets: jest.fn(),
+    };
+    const service = new QuestaoService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      auditLogService as any,
+      {} as any,
+      {} as any,
+    );
+    return { service, repository, auditLogService, ordem };
+  };
+
+  it('⚠️ TODAS as provas e simulados passam a apontar a sucessora', async () => {
+    /*
+      É o que distingue versionar de duplicar (card 25): lá a cópia nasce órfã e
+      as provas não mudam. Aqui, sem a troca, a próxima aplicação usaria o texto
+      que acabou de ser considerado errado.
+
+      ⚠️ E medido no card 22: uma questão está em 2,7 simulados em média — a
+      troca é sempre multi-prova, nunca "a prova que eu estava editando".
+    */
+    const { service, repository } = montar();
+
+    await service.novaVersao('q1', conteudo as any);
+
+    expect(repository.substituirQuestao).toHaveBeenCalledWith('q1', 'q2');
+  });
+
+  it('⚠️ a ordem protege o pior estado possível', async () => {
+    /*
+      Congelar antes de a sucessora existir deixaria a questão inalcançável para
+      edição E sem substituta — irreversível pela própria tela. Por isso
+      congelar é o ÚLTIMO passo.
+    */
+    const { service, ordem } = montar();
+
+    await service.novaVersao('q1', conteudo as any);
+
+    expect(ordem).toEqual([
+      'create',
+      'updateContent',
+      'substituir',
+      'congelar',
+    ]);
+  });
+
+  it('a sucessora nasce com as estatísticas zeradas', async () => {
+    const { service, repository } = montar();
+
+    await service.novaVersao('q1', conteudo as any);
+
+    expect(repository.create.mock.calls[0][0]).toMatchObject({
+      acertos: 0,
+      quantidadeResposta: 0,
+      origem: 'q1',
+    });
+  });
+
+  it('o conteúdo novo é escrito na SUCESSORA, não na original', async () => {
+    const { service, repository } = montar();
+
+    await service.novaVersao('q1', conteudo as any);
+
+    expect(repository.updateContent).toHaveBeenCalledWith('q2', conteudo);
+  });
+
+  it('⚠️ questão já congelada recusa, e não cria uma segunda sucessora', async () => {
+    const { service, repository } = montar(original({ congelada: true }));
+
+    await expect(service.novaVersao('q1', conteudo as any)).rejects.toThrow();
+    expect(repository.create).not.toHaveBeenCalled();
+  });
+
+  it('questão inexistente dá 404 sem tocar em nada', async () => {
+    const { service, repository } = montar(null);
+
+    await expect(service.novaVersao('q1', conteudo as any)).rejects.toThrow();
+    expect(repository.create).not.toHaveBeenCalled();
+    expect(repository.congelar).not.toHaveBeenCalled();
+  });
+
+  it('o log registra quantas provas e simulados foram atingidos', async () => {
+    const { service, auditLogService } = montar();
+
+    await service.novaVersao('q1', conteudo as any, 'u-9');
+
+    expect(
+      JSON.parse(auditLogService.create.mock.calls[0][0].changes),
+    ).toMatchObject({
+      acao: 'novaVersao',
+      sucessora: 'q2',
+      provas: 3,
+      simulados: 5,
+    });
+    expect(auditLogService.create.mock.calls[0][0].entityId).toBe('q1');
+  });
+});
+
+describe('QuestaoService.updateContent — questão congelada (card 26)', () => {
+  it('⚠️ recusa a edição, em vez de aceitar em silêncio', async () => {
+    /*
+      A questão congelada é o que algum histórico aponta: mudá-la reescreveria o
+      enunciado de uma prova já aplicada. E `BadRequest`, não no-op — a tela
+      precisa da recusa para oferecer "criar nova versão".
+    */
+    const repository = {
+      getById: jest.fn().mockResolvedValue({ _id: 'q1', congelada: true }),
+      updateContent: jest.fn(),
+    };
+    const service = new QuestaoService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      { create: jest.fn() } as any,
+      {} as any,
+      {} as any,
+    );
+
+    await expect(
+      service.updateContent('q1', { textoQuestao: 'x' } as any),
+    ).rejects.toThrow();
+    expect(repository.updateContent).not.toHaveBeenCalled();
   });
 });

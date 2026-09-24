@@ -132,6 +132,45 @@ export class QuestaoController {
     await this.service.updateClassificacao(id, classificacao);
   }
 
+  @Post(':id/duplicar')
+  @ApiResponse({
+    status: 201,
+    description: 'cria uma cópia editável da questão, com lastro',
+    type: Questao,
+  })
+  @ApiResponse({ status: 404, description: 'questão não encontrada' })
+  public async duplicar(
+    @Param('id') id: string,
+    @Body() body: { userId?: string },
+  ) {
+    return await this.service.duplicar(id, body?.userId);
+  }
+
+  @Patch(':id/nova-versao')
+  @ApiResponse({
+    status: 200,
+    description:
+      'congela esta questão e cria a sucessora já editada; as provas e simulados passam a apontar a nova',
+    type: Questao,
+  })
+  @ApiResponse({ status: 400, description: 'questão já congelada' })
+  @ApiResponse({ status: 404, description: 'questão não encontrada' })
+  public async novaVersao(
+    @Param('id') id: string,
+    @Body() body: UpdateContentDTOInput,
+  ) {
+    return await this.service.novaVersao(id, body, body.userId);
+  }
+
+  @Get(':id/copias')
+  @ApiResponse({
+    status: 200,
+    description: 'as cópias diretas desta questão',
+  })
+  public async listarCopias(@Param('id') id: string) {
+    return await this.service.listarCopias(id);
+  }
+
   @Patch(':id/content')
   @ApiResponse({
     status: 200,

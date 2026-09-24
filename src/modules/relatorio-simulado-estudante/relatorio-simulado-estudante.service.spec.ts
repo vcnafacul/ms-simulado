@@ -229,6 +229,8 @@ describe('RelatorioSimuladoEstudanteService.consultarQuestoes', () => {
       */
       acertosGeral: 0,
       baseGeral: 0,
+      // ⚠️ Card 29: sem contador, a questão não é tratada como versão.
+      ehVersao: false,
     });
   });
 
@@ -379,6 +381,57 @@ describe('RelatorioSimuladoEstudanteService.consultarQuestoes', () => {
 
       expect(r.questoes[0].acertosGeral).toBe(0);
       expect(r.questoes[0].baseGeral).toBe(0);
+    });
+  });
+
+  describe('dificuldade por questão, não por linhagem (card 29)', () => {
+    it('⚠️ marca a questão que é versão, e NÃO soma a família', async () => {
+      /*
+        ⚠️ **O card 27 decidiu isto sem querer:** "correção" edita in-place e só
+        "nova versão" cria entidade nova — então toda versão nasce de uma mudança
+        SUBSTANTIVA, e somar a linhagem somaria sempre textos diferentes.
+
+        O custo é a base encolher a cada versão. O `ehVersao` existe para a tela
+        poder dizer *"a base é pequena porque a questão é nova"*, em vez de a
+        coluna sumir sem explicação.
+      */
+      const { svc, questaoRepository } = montarQ(
+        [agregado()],
+        [{ questaoId: 'q1', numero: 5 }],
+      );
+      questaoRepository.contadoresGlobais.mockResolvedValue(
+        new Map([
+          ['q1', { acertos: 4, quantidadeResposta: 12, ehVersao: true }],
+        ]),
+      );
+
+      const r = await svc.consultarQuestoes({
+        simuladoId: SIM,
+        cursinhoId: 'cur-1',
+      });
+
+      expect(r.questoes[0].ehVersao).toBe(true);
+      // ⚠️ e a contagem continua sendo só a DESTA questão
+      expect(r.questoes[0].baseGeral).toBe(12);
+    });
+
+    it('questão original não é marcada como versão', async () => {
+      const { svc, questaoRepository } = montarQ(
+        [agregado()],
+        [{ questaoId: 'q1', numero: 5 }],
+      );
+      questaoRepository.contadoresGlobais.mockResolvedValue(
+        new Map([
+          ['q1', { acertos: 443, quantidadeResposta: 1847, ehVersao: false }],
+        ]),
+      );
+
+      const r = await svc.consultarQuestoes({
+        simuladoId: SIM,
+        cursinhoId: 'cur-1',
+      });
+
+      expect(r.questoes[0].ehVersao).toBe(false);
     });
   });
 });

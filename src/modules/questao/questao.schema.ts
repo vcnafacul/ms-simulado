@@ -119,6 +119,60 @@ export class Questao extends QuestaoReview {
   @Prop({ required: false, default: [], type: [String] })
   @ApiProperty()
   public assets: string[];
+
+  /**
+   * De qual questão esta nasceu — o lastro da duplicação (card 25).
+   *
+   * ⚠️ **`null` na esmagadora maioria**: só quem veio de `POST /duplicar` tem.
+   *
+   * ⚠️ **String, e não `ref`**, pelo mesmo motivo do `provaBase` acima: o
+   * consumidor quer o id para montar link e casar com listagem, não o
+   * documento inteiro populado dentro de cada questão.
+   *
+   * ⚠️ **A original apagada NÃO limpa este campo**, e é deliberado: a cópia
+   * continua existindo e o front mostra "Copiada de [questão excluída]".
+   * Perder o lastro seria perder a única pista de onde ela veio.
+   *
+   * ---
+   *
+   * ⚠️ **NÃO existe um `copias[]` ao lado, e isso é decisão contra o doc 10 da
+   * discussion #61.** Uma lista denormalizada de filhas é exatamente o padrão
+   * que os cards 21 e 22 mostraram que erra: medido em homologação, **0 de 181**
+   * questões tinham os contadores incrementais batendo com o histórico.
+   *
+   * As filhas são derivadas por `find({ origem: id })`, com índice — uma
+   * consulta barata que **não pode divergir**, porque não há segunda cópia da
+   * verdade para sincronizar.
+   *
+   * ⚠️ **A linhagem é guardada só em UM nível (pai direto).** A cadeia completa
+   * é derivável subindo por `origem`, e é assim que o card 29 vai somar a
+   * família. Guardar a raiz junto criaria um segundo campo a manter em acordo
+   * com o primeiro.
+   */
+  @Prop({ type: String, required: false, default: null, index: true })
+  @ApiProperty({ required: false, nullable: true })
+  public origem?: string | null;
+
+  /**
+   * A questão parou de aceitar edição de conteúdo (card 26).
+   *
+   * ⚠️ **É o que torna o enunciado do histórico confiável sem copiar nada.** A
+   * alternativa era guardar o texto em cada cartão — medido no card 23: 860 B
+   * de conteúdo × 54 questões = ~46 KB por cartão contra 5,5 KB, e os 500
+   * cartões do mesmo simulado copiariam o MESMO texto 500 vezes. Se a questão
+   * que o histórico aponta é imutável, o enunciado está garantido de graça.
+   *
+   * ⚠️ **Congela só o CONTEÚDO.** Matéria e frente não mudam o que o aluno leu,
+   * e reclassificar uma questão antiga é trabalho legítimo de catálogo — o
+   * `updateClassificacao` continua aceito. Quem mexer nisso precisa saber que a
+   * distinção é deliberada.
+   *
+   * ⚠️ **Só quem já foi respondida chega aqui.** Questão sem resposta é
+   * rascunho: edita in-place, sem cerimônia e sem sucessora.
+   */
+  @Prop({ type: Boolean, required: false, default: false })
+  @ApiProperty({ required: false })
+  public congelada?: boolean;
 }
 
 export const QuestaoSchema = SchemaFactory.createForClass(Questao);

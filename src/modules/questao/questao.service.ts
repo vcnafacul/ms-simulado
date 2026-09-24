@@ -26,6 +26,7 @@ import { UpdateImageAlternativaDTOInput } from './dtos/update-image-alternativa.
 import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
+import { documentoDaCopia } from './duplicarQuestao';
 import {
   CAMPOS_DE_CLASSIFICACAO,
   CAMPOS_DE_CONTEUDO,
@@ -470,10 +471,135 @@ export class QuestaoService {
     }
   }
 
+  /**
+   * Cria uma cópia editável desta questão, com lastro (card 25).
+   *
+   * ⚠️ **A original não é tocada** — nem o conteúdo, nem os contadores, nem o
+   * vínculo com prova nenhuma. Duplicar é uma ação sobre a NOVA questão.
+   *
+   * ⚠️ **E a cópia nasce órfã**, sem prova. É o que distingue duplicar de
+   * "versionar" (card 26): lá as provas passam a apontar a sucessora; aqui elas
+   * não mudam. Quem duplica quer outra questão, não substituir esta.
+   */
+  public async duplicar(id: string, userId?: string): Promise<Questao> {
+    const original = await this.repository.getParaDuplicar(id);
+    if (!original) {
+      throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
+    }
+
+    const copia = await this.repository.create(
+      documentoDaCopia(original) as Questao,
+    );
+
+    await this.auditLogService.create({
+      user: userId,
+      /*
+        ⚠️ **O log é da ORIGINAL, não da cópia.** Quem vai procurar o rastro
+        abre a questão de onde a cópia saiu — e o `getLogs` é por `entityId`.
+        Na cópia o lastro já está no campo `origem`.
+      */
+      entityId: id,
+      entityType: 'Questao',
+      changes: JSON.stringify({
+        acao: 'duplicar',
+        copia: String((copia as { _id: unknown })._id),
+      }),
+    });
+
+    return copia;
+  }
+
+  /** As cópias diretas — ver o docblock do campo `origem`. */
+  public async listarCopias(id: string) {
+    return this.repository.listarCopias(id);
+  }
+
+  /**
+   * Congela esta questão e cria a sucessora, já editada (card 26).
+   *
+   * ⚠️ **É o que distingue versionar de duplicar** (card 25): lá a cópia nasce
+   * órfã e as provas não mudam; aqui **todas as provas e simulados passam a
+   * apontar a sucessora**. Quem versiona diz "o conteúdo mudou de verdade"; a
+   * próxima aplicação tem de usar o texto novo, e a anterior tem de continuar
+   * vendo o velho.
+   *
+   * ⚠️ **A ordem importa, e é esta:**
+   *
+   * 1. cria a sucessora (se falhar, nada aconteceu);
+   * 2. escreve o conteúdo novo nela;
+   * 3. troca o ponteiro das provas e simulados;
+   * 4. congela a original **por último**.
+   *
+   * Congelar antes de a sucessora existir deixaria a questão inalcançável para
+   * edição **e** sem substituta — o pior estado possível, e irreversível pela
+   * própria tela.
+   *
+   * ⚠️ **Sem transação**, e é limitação declarada: o Mongo deste serviço só tem
+   * replica set em desenvolvimento (`docker-mongodb-replica.sh`), e as escritas
+   * atravessam três coleções. Uma falha entre os passos 3 e 4 deixa a original
+   * descongelada com as provas já apontando a sucessora — estado recuperável
+   * (basta versionar de novo), ao contrário do inverso.
+   */
+  public async novaVersao(
+    id: string,
+    content: UpdateContentDTOInput,
+    userId?: string,
+  ): Promise<Questao> {
+    const original = await this.repository.getParaDuplicar(id);
+    if (!original) {
+      throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
+    }
+    if ((original as { congelada?: boolean }).congelada) {
+      throw new HttpException(
+        `A questão ${id} já está congelada.`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const sucessora = await this.repository.create(
+      documentoDaCopia(original) as Questao,
+    );
+    const novaId = String((sucessora as { _id: unknown })._id);
+
+    await this.repository.updateContent(novaId, content);
+    const trocas = await this.repository.substituirQuestao(id, novaId);
+    await this.repository.congelar(id);
+
+    await this.auditLogService.create({
+      user: userId,
+      // ⚠️ Na ORIGINAL, como o `duplicar` — é onde quem procura o rastro abre.
+      entityId: id,
+      entityType: 'Questao',
+      changes: JSON.stringify({
+        acao: 'novaVersao',
+        sucessora: novaId,
+        provas: trocas.provas,
+        simulados: trocas.simulados,
+      }),
+    });
+
+    return sucessora;
+  }
+
   public async updateContent(id: string, content: UpdateContentDTOInput) {
     const questao = await this.repository.getById(id);
     if (!questao) {
       throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
+    }
+
+    /*
+      ⚠️ **Questão congelada não aceita edição de conteúdo** (card 26). Ela é o
+      que algum histórico aponta, e mudá-la reescreveria o enunciado de uma
+      prova já aplicada — que é exatamente o defeito que o card 23 mediu.
+
+      ⚠️ **`BadRequest`, e não um no-op silencioso:** quem chamou acha que
+      editou. A tela precisa receber a recusa para oferecer "criar nova versão".
+    */
+    if (questao.congelada) {
+      throw new HttpException(
+        `A questão ${id} está congelada: crie uma nova versão para editar.`,
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     /*
