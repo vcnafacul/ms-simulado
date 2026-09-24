@@ -172,7 +172,14 @@ export class Questao extends QuestaoReview {
    */
   @Prop({
     type: String,
-    enum: Object.values(TipoOrigem),
+    /*
+      ⚠️ **`null` DENTRO do enum.** O validador de enum do Mongoose recusa
+      `null`, inclusive o do `default` — sem isto, TODO cadastro de questão
+      falhava ("`null` is not a valid enum value for path `tipoOrigem`"), e só
+      duplicar/versionar escapavam, por gravarem o tipo preenchido. Ver
+      `questao.schema.tipo-origem.spec.ts`.
+    */
+    enum: [...Object.values(TipoOrigem), null],
     required: false,
     default: null,
   })
