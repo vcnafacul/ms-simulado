@@ -671,22 +671,10 @@ describe('QuestaoService.updateClassificacao — área × TODAS as provas (area-
     expect(provaFactory.getFactory).not.toHaveBeenCalled();
     expect(repository.updateClassificacao).not.toHaveBeenCalled();
   });
-
-  it('sem mudar a área, nem consulta as provas', async () => {
-    const { service, repository } = montar([enemDia1]);
-
-    await service
-      .updateClassificacao('q1', {
-        prova: 'p1',
-        enemArea: 'Linguagens',
-        frente1: 'f1',
-        materia: 'm1',
-      } as any)
-      .catch(() => undefined);
-
-    expect(repository.findProvasContendo).not.toHaveBeenCalled();
-  });
 });
+
+/** Uma prova qualquer, sem restrição de área — a questão "está em prova". */
+const EM_PROVA = { _id: 'p1', nome: 'Prova 1', enemAreas: [] as string[] };
 
 describe('QuestaoService.updateClassificacao', () => {
   const questao: any = {
@@ -699,6 +687,8 @@ describe('QuestaoService.updateClassificacao', () => {
   it('numero-only: chama syncNumero e NAO a factory', async () => {
     const repository: any = {
       getByIdToUpdate: jest.fn().mockResolvedValue(questao),
+      // ⚠️ area-enem 02: o caminho é decidido pelas provas da questão.
+      findProvasContendo: jest.fn().mockResolvedValue([EM_PROVA]),
       updateClassificacao: jest.fn().mockResolvedValue(undefined),
       provaContemQuestao: jest.fn().mockResolvedValue(true),
     };
@@ -745,6 +735,8 @@ describe('QuestaoService.updateClassificacao', () => {
   it('numero ausente (undefined): não mexe no numero', async () => {
     const repository: any = {
       getByIdToUpdate: jest.fn().mockResolvedValue(questao),
+      // ⚠️ area-enem 02: o caminho é decidido pelas provas da questão.
+      findProvasContendo: jest.fn().mockResolvedValue([EM_PROVA]),
       updateClassificacao: jest.fn().mockResolvedValue(undefined),
       provaContemQuestao: jest.fn().mockResolvedValue(true),
     };
@@ -785,6 +777,8 @@ describe('QuestaoService.updateClassificacao', () => {
   it('numero-only: falha alto se a prova enviada não contém a questão', async () => {
     const repository: any = {
       getByIdToUpdate: jest.fn().mockResolvedValue(questao),
+      // ⚠️ area-enem 02: o caminho é decidido pelas provas da questão.
+      findProvasContendo: jest.fn().mockResolvedValue([EM_PROVA]),
       updateClassificacao: jest.fn().mockResolvedValue(undefined),
       provaContemQuestao: jest.fn().mockResolvedValue(false),
     };
@@ -819,6 +813,8 @@ describe('QuestaoService.updateClassificacao', () => {
   it('numero explicitamente null: chama syncNumero com null (limpar número)', async () => {
     const repository: any = {
       getByIdToUpdate: jest.fn().mockResolvedValue(questao),
+      // ⚠️ area-enem 02: o caminho é decidido pelas provas da questão.
+      findProvasContendo: jest.fn().mockResolvedValue([EM_PROVA]),
       updateClassificacao: jest.fn().mockResolvedValue(undefined),
       provaContemQuestao: jest.fn().mockResolvedValue(true),
     };
@@ -865,9 +861,9 @@ describe('QuestaoService.updateClassificacao', () => {
   it('enemArea mudou: dispara factory.updateQuestion e NAO syncNumero', async () => {
     const repository: any = {
       getByIdToUpdate: jest.fn().mockResolvedValue(questao),
+      // ⚠️ area-enem 02: o caminho é decidido pelas provas da questão.
+      findProvasContendo: jest.fn().mockResolvedValue([EM_PROVA]),
       updateClassificacao: jest.fn().mockResolvedValue(undefined),
-      // ⚠️ area-enem 01: mudar a área confere todas as provas da questão.
-      findProvasContendo: jest.fn().mockResolvedValue([]),
     };
     const provaService: any = { syncNumero: jest.fn() };
     const provaRepository: any = {
@@ -1467,5 +1463,96 @@ describe('QuestaoService.linhagem (card 34A)', () => {
     await expect(service.linhagem('x')).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+});
+
+describe('QuestaoService.updateClassificacao — questão SEM prova (area-enem 02)', () => {
+  const questao: any = {
+    _id: 'q1',
+    enemArea: 'Linguagens',
+    frente1: { _id: { toString: () => 'f1' } },
+    alternativa: 'A',
+  };
+  const corpo = (over: Record<string, unknown> = {}) =>
+    ({
+      enemArea: 'Matemática',
+      frente1: 'f2',
+      materia: 'm2',
+      ...over,
+    }) as any;
+
+  const montar = (provas: unknown[]) => {
+    const repository: any = {
+      getByIdToUpdate: jest.fn().mockResolvedValue(questao),
+      findProvasContendo: jest.fn().mockResolvedValue(provas),
+      updateClassificacao: jest.fn().mockResolvedValue(undefined),
+      provaContemQuestao: jest.fn(),
+    };
+    const provaService: any = { syncNumero: jest.fn() };
+    const provaRepository: any = { getById: jest.fn() };
+    const auditLogService: any = { create: jest.fn() };
+    const provaFactory: any = { getFactory: jest.fn() };
+    const service = new QuestaoService(
+      repository,
+      provaService,
+      provaRepository,
+      {} as any,
+      {} as any,
+      {} as any,
+      auditLogService,
+      {} as any,
+      provaFactory,
+    );
+    return { service, repository, provaService, provaFactory, auditLogService };
+  };
+
+  it('⚠️ sem prova: só salva — nem fábrica, nem syncNumero', async () => {
+    /*
+      Sem prova não há simulado para reposicionar nem posição para sincronizar.
+      Antes, o DTO exigia `prova` e a cópia recém-duplicada (que nasce sem
+      prova) não conseguia ser reclassificada.
+    */
+    const { service, repository, provaService, provaFactory } = montar([]);
+
+    await service.updateClassificacao('q1', corpo());
+
+    expect(repository.updateClassificacao).toHaveBeenCalledWith(
+      'q1',
+      expect.objectContaining({ enemArea: 'Matemática', frente1: 'f2' }),
+    );
+    expect(provaFactory.getFactory).not.toHaveBeenCalled();
+    expect(provaService.syncNumero).not.toHaveBeenCalled();
+  });
+
+  it('sem prova: o log de edição (card 24) continua', async () => {
+    const { service, auditLogService } = montar([]);
+
+    await service.updateClassificacao('q1', corpo());
+
+    expect(auditLogService.create).toHaveBeenCalled();
+  });
+
+  it('⚠️ quem decide é o ESTADO da questão — em prova e corpo sem `prova`: 400', async () => {
+    /*
+      Decidir pela ausência de `prova` no corpo deixaria um client antigo, ou um
+      bug, mandar sem prova uma questão que ESTÁ em prova — e pular a fábrica
+      que reposiciona os simulados.
+    */
+    const { service, repository, provaFactory } = montar([EM_PROVA]);
+
+    await expect(service.updateClassificacao('q1', corpo())).rejects.toThrow(
+      /Informe a prova/,
+    );
+    expect(repository.updateClassificacao).not.toHaveBeenCalled();
+    expect(provaFactory.getFactory).not.toHaveBeenCalled();
+  });
+
+  it('sem prova e corpo COM `prova`: 400 — a questão não está nela', async () => {
+    const { service, repository } = montar([]);
+
+    await expect(
+      service.updateClassificacao('q1', corpo({ prova: 'p7' })),
+    ).rejects.toThrow(/não está em prova nenhuma/);
+    expect(repository.updateClassificacao).not.toHaveBeenCalled();
   });
 });

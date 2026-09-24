@@ -472,11 +472,32 @@ export class QuestaoService {
 
       ANTES de qualquer escrita, e fora do `try` — que embrulharia a mensagem.
     */
-    if (enemAreaChanged) {
-      const recusam = provasQueRecusamArea(
-        await this.repository.findProvasContendo(id),
-        classificacao.enemArea,
+    const provas = await this.repository.findProvasContendo(id);
+
+    /*
+      ⚠️ **Questão sem prova tem caminho próprio: só salva** (card 02 de
+      `area-enem-da-questao`). Sem prova não há simulado para reposicionar nem
+      posição para sincronizar — é o caso da cópia recém-duplicada, que nasce
+      sem prova e é a que mais precisa ser reclassificada.
+
+      ⚠️ **Quem decide é o ESTADO da questão, não o corpo.** Decidir pela
+      ausência de `prova` no payload deixaria um client antigo, ou um bug,
+      mandar sem prova uma questão que ESTÁ em prova — e pular a fábrica.
+    */
+    const semProva = provas.length === 0;
+    if (semProva && classificacao.prova) {
+      throw new BadRequestException(
+        `A questão ${id} não está em prova nenhuma — não informe a prova.`,
       );
+    }
+    if (!semProva && !classificacao.prova) {
+      throw new BadRequestException(
+        'Informe a prova do vínculo editado: esta questão está em prova.',
+      );
+    }
+
+    if (enemAreaChanged) {
+      const recusam = provasQueRecusamArea(provas, classificacao.enemArea);
       if (recusam.length > 0) {
         throw new BadRequestException(
           `Questão de ${classificacao.enemArea} não é permitida ` +
@@ -489,7 +510,9 @@ export class QuestaoService {
     try {
       // enemArea/frente1 podem mudar a membership de simulado (idiomáticas ENEM)
       // → precisa da factory. A factory já sincroniza o numero no fim.
-      if (enemAreaChanged || frente1Changed) {
+      if (semProva) {
+        // Nem fábrica, nem syncNumero: só a escrita abaixo. `numero` ignorado.
+      } else if (enemAreaChanged || frente1Changed) {
         const updateDto = new UpdateDTOInput();
         updateDto._id = id;
         updateDto.prova = classificacao.prova;

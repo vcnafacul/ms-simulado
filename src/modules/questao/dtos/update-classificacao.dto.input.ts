@@ -13,10 +13,19 @@ import { ProvaExist } from 'src/modules/prova/validator/prova-exist.validator';
 import { EnemArea } from '../enums/enem-area.enum';
 
 export class UpdateClassificacaoDTOInput {
-  @ApiProperty()
+  /**
+   * O vínculo editado.
+   *
+   * ⚠️ **Opcional desde o card 02 de `area-enem-da-questao`** — questão sem
+   * prova (a cópia recém-duplicada) não tem vínculo para informar. Mas quem
+   * decide se pode faltar é o SERVICE, pelo estado da questão: em prova e sem
+   * este campo é 400.
+   */
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
   @ProvaExist({ message: 'prova não existe' })
-  public prova: string;
+  public prova?: string;
 
   @ApiProperty({ required: false, nullable: true })
   @IsOptional()
