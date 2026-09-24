@@ -275,6 +275,7 @@ export class RelatorioSimuladoEstudanteService {
       const g = globais.get(a.questaoId) ?? {
         acertos: 0,
         quantidadeResposta: 0,
+        ehVersao: false,
       };
       return {
         numero: numeroPorQuestao.get(a.questaoId) ?? null,
@@ -288,6 +289,7 @@ export class RelatorioSimuladoEstudanteService {
         discriminacao: a.discriminacao,
         acertosGeral: g.acertos,
         baseGeral: g.quantidadeResposta,
+        ehVersao: g.ehVersao,
       };
     });
 

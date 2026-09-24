@@ -60,4 +60,21 @@ export class UpdateClassificacaoDTOInput {
   @ApiProperty()
   @IsBoolean()
   public reported: boolean;
+
+  /**
+   * Quem editou, quando o client manda.
+   *
+   * ⚠️ **Opcional, e é decisão** (card 24): o client ainda não manda este campo
+   * nestas duas rotas, e exigi-lo agora quebraria a edição de questão até o
+   * deploy do outro lado. O log existe para **medir a frequência** das edições,
+   * e essa pergunta se responde sem o autor.
+   *
+   * ⚠️ Com `@IsOptional()`, o client pode passar a mandar depois **sem mudança
+   * de contrato** — é o mesmo `userId` no corpo que o `adicionarEmProva` e o
+   * `updateStatus` já usam.
+   */
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  public userId?: string;
 }

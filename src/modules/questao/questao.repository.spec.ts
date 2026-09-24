@@ -5,21 +5,29 @@ describe('QuestaoRepository.setProvaBase (atualiza campo provaBase com session)'
     const updateOne = jest.fn().mockResolvedValue({ acknowledged: true });
     const questaoModel: any = { updateOne };
     const provaModel: any = {};
-    return { repo: new QuestaoRepository(questaoModel, provaModel), updateOne };
+    return { repo: new QuestaoRepository(questaoModel, provaModel, {} as any), updateOne };
   }
 
   it('chama model.updateOne com filtro _id, payload provaBase e session quando session é passada', async () => {
     const { repo, updateOne } = makeRepoWithUpdateOne();
     const session = {} as any;
     await repo.setProvaBase('q1', 'p1', session);
-    expect(updateOne).toHaveBeenCalledWith({ _id: 'q1' }, { provaBase: 'p1' }, { session });
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: 'q1' },
+      { provaBase: 'p1' },
+      { session },
+    );
   });
 
   it('aceita null como provaBase e passa null no payload para model.updateOne', async () => {
     const { repo, updateOne } = makeRepoWithUpdateOne();
     const session = {} as any;
     await repo.setProvaBase('q1', null, session);
-    expect(updateOne).toHaveBeenCalledWith({ _id: 'q1' }, { provaBase: null }, { session });
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: 'q1' },
+      { provaBase: null },
+      { session },
+    );
   });
 });
 
@@ -30,21 +38,31 @@ describe('QuestaoRepository.canInsertQuestion (reverse-lookup em Prova.questoes)
     const findById = jest.fn().mockReturnValue({ populate });
     const questaoModel: any = {};
     const provaModel: any = { findById };
-    return { repo: new QuestaoRepository(questaoModel, provaModel), findById, populate };
+    return {
+      repo: new QuestaoRepository(questaoModel, provaModel, {} as any),
+      findById,
+      populate,
+    };
   }
 
   it('retorna false quando já existe entry com o mesmo numero+frente1', async () => {
-    const { repo } = makeRepo({ questoes: [{ numero: 5, questao: { frente1: 'f1' } }] });
+    const { repo } = makeRepo({
+      questoes: [{ numero: 5, questao: { frente1: 'f1' } }],
+    });
     expect(await repo.canInsertQuestion('p1', 5, 'f1')).toBe(false);
   });
 
   it('retorna true quando o numero está livre', async () => {
-    const { repo } = makeRepo({ questoes: [{ numero: 6, questao: { frente1: 'f1' } }] });
+    const { repo } = makeRepo({
+      questoes: [{ numero: 6, questao: { frente1: 'f1' } }],
+    });
     expect(await repo.canInsertQuestion('p1', 5, 'f1')).toBe(true);
   });
 
   it('retorna true quando o numero existe mas com outra frente1 (idiomática)', async () => {
-    const { repo } = makeRepo({ questoes: [{ numero: 5, questao: { frente1: 'fx' } }] });
+    const { repo } = makeRepo({
+      questoes: [{ numero: 5, questao: { frente1: 'fx' } }],
+    });
     expect(await repo.canInsertQuestion('p1', 5, 'f1')).toBe(true);
   });
 
@@ -58,7 +76,7 @@ describe('QuestaoRepository.updateQuestionAnswered (contadores globais — card 
   const montar = () => {
     const bulkWrite = jest.fn().mockResolvedValue({});
     return {
-      repo: new QuestaoRepository({ bulkWrite } as any, {} as any),
+      repo: new QuestaoRepository({ bulkWrite } as any, {} as any, {} as any),
       bulkWrite,
     };
   };
@@ -251,7 +269,7 @@ describe('QuestaoRepository.contadoresGlobais (card 16)', () => {
     const exec = jest.fn().mockResolvedValue(docs);
     const lean = jest.fn().mockReturnValue({ exec });
     const find = jest.fn().mockReturnValue({ lean });
-    return { repo: new QuestaoRepository({ find } as any, {} as any), find };
+    return { repo: new QuestaoRepository({ find } as any, {} as any, {} as any), find };
   };
 
   /*
@@ -272,7 +290,12 @@ describe('QuestaoRepository.contadoresGlobais (card 16)', () => {
 
     const mapa = await repo.contadoresGlobais([ID]);
 
-    expect(mapa.get(ID)).toEqual({ acertos: 443, quantidadeResposta: 1847 });
+    expect(mapa.get(ID)).toEqual({
+      acertos: 443,
+      quantidadeResposta: 1847,
+      // ⚠️ Card 29: `origem` ausente = questão original, não versão.
+      ehVersao: false,
+    });
   });
 
   it('⚠️ campo ausente vira zero — ninguém respondeu É uma afirmação', async () => {
@@ -281,12 +304,16 @@ describe('QuestaoRepository.contadoresGlobais (card 16)', () => {
 
     const mapa = await repo.contadoresGlobais([ID]);
 
-    expect(mapa.get(ID)).toEqual({ acertos: 0, quantidadeResposta: 0 });
+    expect(mapa.get(ID)).toEqual({
+      acertos: 0,
+      quantidadeResposta: 0,
+      ehVersao: false,
+    });
   });
 
-  it('⚠️ projeta só os dois campos — a Questao carrega enunciado e assets', async () => {
-    // São até 180 questões por relatório; trazer o corpo inteiro para ler dois
-    // inteiros é carga enorme num caminho que a tela abre a cada relatório.
+  it('⚠️ projeta só o mínimo — a Questao carrega enunciado e assets', async () => {
+    // São até 180 questões por relatório; trazer o corpo inteiro para ler três
+    // campos é carga enorme num caminho que a tela abre a cada relatório.
     const { repo, find } = montar([]);
 
     await repo.contadoresGlobais(['665f0c1a2b3c4d5e6f00abc2']);
@@ -294,7 +321,24 @@ describe('QuestaoRepository.contadoresGlobais (card 16)', () => {
     expect(find.mock.calls[0][1]).toEqual({
       acertos: 1,
       quantidadeResposta: 1,
+      // ⚠️ Card 29 — explica a base pequena, não soma nada.
+      origem: 1,
     });
+  });
+
+  it('⚠️ questão COM `origem` é marcada como versão', async () => {
+    /*
+      Card 29: a contagem é da QUESTÃO, não da linhagem — "correção" edita
+      in-place e só "nova versão" cria entidade nova, então toda versão nasce de
+      mudança substantiva e somar a família somaria textos diferentes.
+
+      Este booleano existe para a tela EXPLICAR a base pequena, não para somar.
+    */
+    const { repo } = montar([
+      { _id: ID, acertos: 4, quantidadeResposta: 12, origem: 'q0' },
+    ]);
+
+    expect((await repo.contadoresGlobais([ID])).get(ID)?.ehVersao).toBe(true);
   });
 
   it('lista vazia não consulta o banco', async () => {
@@ -302,5 +346,150 @@ describe('QuestaoRepository.contadoresGlobais (card 16)', () => {
 
     await expect(repo.contadoresGlobais([])).resolves.toEqual(new Map());
     expect(find).not.toHaveBeenCalled();
+  });
+});
+
+describe('QuestaoRepository — linhagem (card 25)', () => {
+  it('⚠️ `getParaDuplicar` pede o gabarito explicitamente', async () => {
+    /*
+      `alternativa` é `@Prop({ select: false })`: sem o `+alternativa` a cópia
+      nasceria sem gabarito, em silêncio.
+    */
+    const exec = jest.fn().mockResolvedValue({ _id: 'q1' });
+    const lean = jest.fn().mockReturnValue({ exec });
+    const select = jest.fn().mockReturnValue({ lean });
+    const findById = jest.fn().mockReturnValue({ select });
+    const repo = new QuestaoRepository({ findById } as any, {} as any, {} as any);
+
+    await repo.getParaDuplicar('q1');
+
+    expect(select).toHaveBeenCalledWith('+alternativa');
+  });
+
+  it('⚠️ `getParaDuplicar` usa `.lean()` — documento hidratado traz internos', async () => {
+    // O `documentoDaCopia` itera `Object.entries`, e num documento do Mongoose
+    // isso traz métodos e internos em vez dos campos.
+    const exec = jest.fn().mockResolvedValue({ _id: 'q1' });
+    const lean = jest.fn().mockReturnValue({ exec });
+    const select = jest.fn().mockReturnValue({ lean });
+    const findById = jest.fn().mockReturnValue({ select });
+    const repo = new QuestaoRepository({ findById } as any, {} as any, {} as any);
+
+    await repo.getParaDuplicar('q1');
+
+    expect(lean).toHaveBeenCalled();
+  });
+
+  it('⚠️ as cópias são DERIVADAS de `origem`, não lidas de um array', async () => {
+    /*
+      Decisão contra o doc 10 da #61: uma lista denormalizada de filhas é o
+      padrão que os cards 21 e 22 mostraram que erra — 0 de 181 questões tinham
+      os contadores incrementais batendo com o histórico. Aqui não há segunda
+      cópia da verdade para divergir.
+    */
+    const exec = jest
+      .fn()
+      .mockResolvedValue([{ _id: 'q2', status: 'Pending', origem: 'q1' }]);
+    const lean = jest.fn().mockReturnValue({ exec });
+    const find = jest.fn().mockReturnValue({ lean });
+    const repo = new QuestaoRepository({ find } as any, {} as any, {} as any);
+
+    const r = await repo.listarCopias('q1');
+
+    expect(find.mock.calls[0][0]).toEqual({ origem: 'q1' });
+    expect(r).toEqual([{ id: 'q2', status: 'Pending', origem: 'q1' }]);
+  });
+
+  it('projeta só o que a lista de cópias mostra', async () => {
+    const exec = jest.fn().mockResolvedValue([]);
+    const lean = jest.fn().mockReturnValue({ exec });
+    const find = jest.fn().mockReturnValue({ lean });
+    const repo = new QuestaoRepository({ find } as any, {} as any, {} as any);
+
+    await repo.listarCopias('q1');
+
+    expect(find.mock.calls[0][1]).toEqual({ status: 1, origem: 1 });
+  });
+});
+
+describe('QuestaoRepository.substituirQuestao (card 26)', () => {
+  const montar = () => {
+    const provaUpdate = jest
+      .fn()
+      .mockReturnValue({ exec: jest.fn().mockResolvedValue({ modifiedCount: 3 }) });
+    const simuladoUpdate = jest
+      .fn()
+      .mockReturnValue({ exec: jest.fn().mockResolvedValue({ modifiedCount: 5 }) });
+    const repo = new QuestaoRepository(
+      {} as any,
+      { updateMany: provaUpdate } as any,
+      { updateMany: simuladoUpdate } as any,
+    );
+    return { repo, provaUpdate, simuladoUpdate };
+  };
+
+  const DE = '665f0c1a2b3c4d5e6f00abc1';
+  const PARA = '665f0c1a2b3c4d5e6f00abc2';
+
+  it('⚠️ escreve nas DUAS coleções', async () => {
+    /*
+      `Prova.questoes` e `Simulado.questoes` são arrays independentes. Trocar só
+      numa deixaria a prova com a sucessora e o simulado com a original
+      congelada — e o aluno responderia o texto velho.
+    */
+    const { repo, provaUpdate, simuladoUpdate } = montar();
+
+    const r = await repo.substituirQuestao(DE, PARA);
+
+    expect(provaUpdate).toHaveBeenCalledTimes(1);
+    expect(simuladoUpdate).toHaveBeenCalledTimes(1);
+    expect(r).toEqual({ provas: 3, simulados: 5 });
+  });
+
+  it('⚠️ substitui no LUGAR — o `numero` da entry não é tocado', async () => {
+    /*
+      Remover e adicionar passaria pela validação da factory, que pode recusar
+      (número ocupado, regra ENEM) e deixar a prova SEM a questão.
+    */
+    const { repo, provaUpdate } = montar();
+
+    await repo.substituirQuestao(DE, PARA);
+
+    const update = provaUpdate.mock.calls[0][1];
+    expect(Object.keys(update)).toEqual(['$set']);
+    expect(Object.keys(update.$set)).toEqual(['questoes.$[alvo].questao']);
+    // nada de `$pull`/`$push`, que é o caminho que perderia o número
+    expect(JSON.stringify(update)).not.toContain('$pull');
+  });
+
+  it('o arrayFilter mira exatamente a questão antiga', async () => {
+    const { repo, provaUpdate } = montar();
+
+    await repo.substituirQuestao(DE, PARA);
+
+    const opcoes = provaUpdate.mock.calls[0][2];
+    expect(String(opcoes.arrayFilters[0]['alvo.questao'])).toBe(DE);
+  });
+
+  it('o filtro só atinge quem contém a questão', async () => {
+    const { repo, provaUpdate } = montar();
+
+    await repo.substituirQuestao(DE, PARA);
+
+    expect(String(provaUpdate.mock.calls[0][0]['questoes.questao'])).toBe(DE);
+  });
+});
+
+describe('QuestaoRepository.congelar (card 26)', () => {
+  it('marca só o campo `congelada`', async () => {
+    const updateOne = jest.fn().mockResolvedValue({});
+    const repo = new QuestaoRepository({ updateOne } as any, {} as any, {} as any);
+
+    await repo.congelar('q1');
+
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: 'q1' },
+      { $set: { congelada: true } },
+    );
   });
 });
