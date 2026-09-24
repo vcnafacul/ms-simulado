@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   HttpException,
   HttpStatus,
@@ -50,6 +51,75 @@ function makeCreateDto(
     alternativa: Alternativa.A,
   } as CreateQuestaoDTOInput;
 }
+
+describe('QuestaoService.create — SEM prova (area-enem 03)', () => {
+  const montar = () => {
+    const repository: any = {
+      create: jest
+        .fn()
+        .mockImplementation(async (q) => ({ ...q, _id: 'q-nova' })),
+    };
+    const provaRepository: any = { getById: jest.fn() };
+    const provaFactory: any = { getFactory: jest.fn() };
+    const service = new QuestaoService(
+      repository,
+      null as any,
+      provaRepository,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      provaFactory,
+    );
+    return { service, repository, provaRepository, provaFactory };
+  };
+  const semProva = (over: Record<string, unknown> = {}) =>
+    ({
+      enemArea: EnemArea.Linguagens,
+      alternativa: Alternativa.A,
+      textoQuestao: 'enunciado',
+      ...over,
+    }) as CreateQuestaoDTOInput;
+
+  it('⚠️ sem prova: só grava a questão — nem prova, nem fábrica', async () => {
+    const { service, repository, provaRepository, provaFactory } = montar();
+
+    const q = await service.create(semProva());
+
+    expect(repository.create).toHaveBeenCalledTimes(1);
+    expect(provaRepository.getById).not.toHaveBeenCalled();
+    expect(provaFactory.getFactory).not.toHaveBeenCalled();
+    expect((q as any)._id).toBe('q-nova');
+  });
+
+  it('⚠️ nasce Pending — o caminho sem fábrica não tem atalho para Approved', async () => {
+    const { service, repository } = montar();
+
+    await service.create(semProva({ status: 1 }));
+
+    expect(repository.create.mock.calls[0][0].status).toBe(0);
+  });
+
+  it('não grava `prova` nem `numero` no documento', async () => {
+    const { service, repository } = montar();
+
+    await service.create(semProva());
+
+    const doc = repository.create.mock.calls[0][0];
+    expect('prova' in doc).toBe(false);
+    expect('numero' in doc).toBe(false);
+  });
+
+  it('⚠️ sem prova e COM número: 400 — número é posição numa prova', async () => {
+    const { service, repository } = montar();
+
+    await expect(service.create(semProva({ numero: 5 }))).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(repository.create).not.toHaveBeenCalled();
+  });
+});
 
 describe('QuestaoService.create', () => {
   beforeEach(() => {

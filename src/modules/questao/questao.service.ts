@@ -77,6 +77,13 @@ export class QuestaoService {
   ) {}
 
   public async create(item: CreateQuestaoDTOInput): Promise<Questao> {
+    /*
+      ⚠️ **Sem prova, só grava a questão** (card 03 de `area-enem-da-questao`):
+      sem fábrica, sem simulado, sem número. Entrar numa prova depois é o
+      "Adicionar em uma prova" da Classificação, que valida área e número.
+    */
+    if (!item.prova) return await this.createSemProva(item);
+
     const prova = await this.provaRepository.getById(item.prova);
     const factory = this.provaFactory.getFactory(prova.categoria, prova.ano);
     if (
@@ -89,6 +96,26 @@ export class QuestaoService {
       `Possível questão já cadastrada com número ${item.numero}.`,
       HttpStatus.CONFLICT,
     );
+  }
+
+  private async createSemProva(item: CreateQuestaoDTOInput): Promise<Questao> {
+    /*
+      ⚠️ **Número sem prova é 400, e não descartado.** Número é posição numa
+      prova; a tela nunca deveria mandar um sem prova, e aceitar calado
+      esconderia o bug de quem mandou.
+    */
+    if (item.numero != null) {
+      throw new BadRequestException(
+        'Questão sem prova não tem número: informe a prova ou retire o número.',
+      );
+    }
+    const questao = Object.assign(new Questao(), item) as Questao &
+      Partial<Record<'prova' | 'numero', unknown>>;
+    delete questao.prova;
+    delete questao.numero;
+    // ⚠️ `Pending` sempre: o caminho sem fábrica não tem atalho para `Approved`.
+    questao.status = Status.Pending;
+    return await this.repository.create(questao);
   }
 
   public async getById(

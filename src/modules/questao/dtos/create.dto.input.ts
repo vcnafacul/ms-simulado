@@ -73,10 +73,15 @@ export class CreateQuestaoDTOInput {
   @IsEnum(Alternativa)
   public alternativa: Alternativa;
 
-  @ApiProperty()
+  /**
+   * ⚠️ **Opcional desde o card 03 de `area-enem-da-questao`**: sem prova, o
+   * `create` só grava a questão, sem fábrica. Quando vem, tem de existir.
+   */
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
   @ProvaExist({ message: 'prova não existe' })
-  public prova: string;
+  public prova?: string;
 
   @ApiProperty({ required: false, enum: ['plain', 'markdown'] })
   @IsOptional()
