@@ -290,7 +290,12 @@ describe('QuestaoRepository.contadoresGlobais (card 16)', () => {
 
     const mapa = await repo.contadoresGlobais([ID]);
 
-    expect(mapa.get(ID)).toEqual({ acertos: 443, quantidadeResposta: 1847 });
+    expect(mapa.get(ID)).toEqual({
+      acertos: 443,
+      quantidadeResposta: 1847,
+      // ⚠️ Card 29: `origem` ausente = questão original, não versão.
+      ehVersao: false,
+    });
   });
 
   it('⚠️ campo ausente vira zero — ninguém respondeu É uma afirmação', async () => {
@@ -299,12 +304,16 @@ describe('QuestaoRepository.contadoresGlobais (card 16)', () => {
 
     const mapa = await repo.contadoresGlobais([ID]);
 
-    expect(mapa.get(ID)).toEqual({ acertos: 0, quantidadeResposta: 0 });
+    expect(mapa.get(ID)).toEqual({
+      acertos: 0,
+      quantidadeResposta: 0,
+      ehVersao: false,
+    });
   });
 
-  it('⚠️ projeta só os dois campos — a Questao carrega enunciado e assets', async () => {
-    // São até 180 questões por relatório; trazer o corpo inteiro para ler dois
-    // inteiros é carga enorme num caminho que a tela abre a cada relatório.
+  it('⚠️ projeta só o mínimo — a Questao carrega enunciado e assets', async () => {
+    // São até 180 questões por relatório; trazer o corpo inteiro para ler três
+    // campos é carga enorme num caminho que a tela abre a cada relatório.
     const { repo, find } = montar([]);
 
     await repo.contadoresGlobais(['665f0c1a2b3c4d5e6f00abc2']);
@@ -312,7 +321,24 @@ describe('QuestaoRepository.contadoresGlobais (card 16)', () => {
     expect(find.mock.calls[0][1]).toEqual({
       acertos: 1,
       quantidadeResposta: 1,
+      // ⚠️ Card 29 — explica a base pequena, não soma nada.
+      origem: 1,
     });
+  });
+
+  it('⚠️ questão COM `origem` é marcada como versão', async () => {
+    /*
+      Card 29: a contagem é da QUESTÃO, não da linhagem — "correção" edita
+      in-place e só "nova versão" cria entidade nova, então toda versão nasce de
+      mudança substantiva e somar a família somaria textos diferentes.
+
+      Este booleano existe para a tela EXPLICAR a base pequena, não para somar.
+    */
+    const { repo } = montar([
+      { _id: ID, acertos: 4, quantidadeResposta: 12, origem: 'q0' },
+    ]);
+
+    expect((await repo.contadoresGlobais([ID])).get(ID)?.ehVersao).toBe(true);
   });
 
   it('lista vazia não consulta o banco', async () => {
