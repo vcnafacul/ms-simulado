@@ -2,17 +2,16 @@ import { Types } from 'mongoose';
 import { SimuladoRepository } from './simulado.repository';
 
 describe('SimuladoRepository.countByCategoria', () => {
-  it('conta simulados não-deletados que referenciam a categoria', async () => {
+  it('⚠️ conta TODOS os simulados da categoria — inclusive os arquivados', async () => {
+    // A exclusão de categoria é definitiva: um arquivado apontando para ela
+    // ficaria com a referência quebrada.
     const countDocuments = jest.fn().mockResolvedValue(3);
     const repo = new SimuladoRepository({ countDocuments } as any);
 
     const total = await repo.countByCategoria('cat-123');
 
     expect(total).toBe(3);
-    expect(countDocuments).toHaveBeenCalledWith({
-      categoria: 'cat-123',
-      deleted: { $ne: true },
-    });
+    expect(countDocuments).toHaveBeenCalledWith({ categoria: 'cat-123' });
   });
 });
 
