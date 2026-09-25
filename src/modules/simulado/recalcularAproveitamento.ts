@@ -47,10 +47,36 @@ function canonico(ap: AproveitamentoHistorico | null | undefined): string {
 export function recalcularAproveitamento(
   gravado: AproveitamentoHistorico | null | undefined,
   questoes: Questao[],
-  rawRespostas: { questao: unknown; alternativaEstudante?: unknown }[],
+  respostas: {
+    questao: unknown;
+    alternativaEstudante?: unknown;
+    alternativaCorreta?: unknown;
+  }[],
 ): { novo: AproveitamentoHistorico; mudou: boolean } {
-  const novo = calcularAproveitamento(
-    montarRespostasAproveitamento(questoes, rawRespostas),
+  /*
+    ⚠️ **O gabarito é o GRAVADO, não o de hoje.** O `montarRespostas...` usa o
+    `questao.alternativa` atual, que é o certo no processamento — e errado
+    aqui: medido no clone, 8 de 23 históricos tinham questão com o gabarito
+    TROCADO depois do cartão, e o recálculo recorrigia a prova (o `geral` caía
+    0,2 e o `acertos` gravado ficava contradizendo). Este script conserta a
+    CONTAGEM por matéria; recorrigir gabarito é outra decisão.
+  */
+  const gabaritoGravado = new Map(
+    respostas
+      .filter((r) => r.alternativaCorreta !== undefined)
+      .map((r) => [String(r.questao), r.alternativaCorreta]),
   );
+  const entradas = montarRespostasAproveitamento(questoes, respostas).map(
+    (e) =>
+      gabaritoGravado.has(e.questao._id.toString())
+        ? {
+            ...e,
+            alternativaCorreta: gabaritoGravado.get(
+              e.questao._id.toString(),
+            ) as never,
+          }
+        : e,
+  );
+  const novo = calcularAproveitamento(entradas);
   return { novo, mudou: canonico(novo) !== canonico(gravado) };
 }

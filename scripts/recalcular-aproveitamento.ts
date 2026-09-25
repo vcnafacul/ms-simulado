@@ -147,6 +147,7 @@ async function run(): Promise<void> {
       (h.respostas ?? []) as {
         questao: unknown;
         alternativaEstudante?: unknown;
+        alternativaCorreta?: unknown;
       }[],
     );
     if (!mudou) continue;

@@ -87,4 +87,15 @@ describe('recalcularAproveitamento (contagem-por-materia 02)', () => {
 
     expect(novo.geral).toBe(1);
   });
+
+  it('⚠️ usa o gabarito GRAVADO — gabarito trocado depois não recorrige a prova', () => {
+    // Hoje o gabarito de q1 é 'A'; na época do cartão era 'D', e o aluno marcou D.
+    const { novo } = recalcularAproveitamento(
+      null,
+      [questao('q1', frente('Álgebra'))],
+      [{ questao: 'q1', alternativaEstudante: 'D', alternativaCorreta: 'D' }],
+    );
+
+    expect(novo.geral).toBe(1);
+  });
 });
