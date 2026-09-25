@@ -9,25 +9,50 @@ import { Status } from './enums/status.enum';
 import { QuestaoReview } from './questao.review.schema';
 import { TipoOrigem } from './enums/tipo-origem.enum';
 
+/**
+ * ⚠️ **`""` vira `null` nas referências** (contagem-por-materia 04). MEDIDO:
+ * o Mongoose grava `""` tal e qual num campo `ObjectId` — no `create`, no
+ * `updateOne` e no `findByIdAndUpdate` —, e uma frente `""` faz o `populate`
+ * do `SimuladoRepository.answer` estourar `CastError`, derrubando o
+ * processamento de TODO cartão do simulado. O select vazio do client é quem
+ * manda `""`.
+ *
+ * Setter, e não validação no DTO: vale para toda escrita que passe pelo
+ * schema, inclusive as de update (o Mongoose aplica setters nelas).
+ */
+export function vazioViraNull(v: unknown): unknown {
+  return v === '' ? null : v;
+}
+
 @Schema({ timestamps: true, versionKey: false })
 export class Questao extends QuestaoReview {
   @Prop()
   @ApiProperty({ enum: EnemArea })
   public enemArea: EnemArea;
 
-  @Prop({ ref: Frente.name, type: Types.ObjectId })
+  @Prop({ ref: Frente.name, type: Types.ObjectId, set: vazioViraNull })
   @ApiProperty()
   public frente1: Frente;
 
-  @Prop({ ref: Frente.name, type: Types.ObjectId, required: false })
+  @Prop({
+    ref: Frente.name,
+    type: Types.ObjectId,
+    required: false,
+    set: vazioViraNull,
+  })
   @ApiProperty()
   public frente2: Frente = null;
 
-  @Prop({ ref: Frente.name, type: Types.ObjectId, required: false })
+  @Prop({
+    ref: Frente.name,
+    type: Types.ObjectId,
+    required: false,
+    set: vazioViraNull,
+  })
   @ApiProperty()
   public frente3: Frente = null;
 
-  @Prop({ ref: Materia.name, type: Types.ObjectId })
+  @Prop({ ref: Materia.name, type: Types.ObjectId, set: vazioViraNull })
   @ApiProperty()
   public materia: Materia;
 
