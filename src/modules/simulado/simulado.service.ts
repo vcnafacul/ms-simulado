@@ -36,7 +36,7 @@ import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
 import { Simulado } from './schemas/simulado.schema';
 import { SimuladoRepository } from './simulado.repository';
 import { RespostaAproveitamento } from './valueObject/resposta-aproveitamento';
-import { vinculosDaQuestao } from './vinculosDaQuestao';
+import { calcularAproveitamento } from './calcularAproveitamento';
 
 @Injectable()
 export class SimuladoService {
@@ -420,87 +420,9 @@ export class SimuladoService {
   private async criaAproveitamento(
     respostas: RespostaAproveitamento[],
   ): Promise<AproveitamentoHistorico> {
-    /*
-      Uma passada só: para cada resposta, cada vínculo (matéria, frente) ganha
-      um acerto e um total. O código antigo fazia três varreduras e um
-      `find`/`filter` aninhado por matéria e por frente — O(n²) sobre 90
-      questões, e impossível de ler.
-    */
-    const porMateria = new Map<
-      string,
-      {
-        id: unknown;
-        nome: string;
-        acertos: number;
-        total: number;
-        frentes: Map<
-          string,
-          { id: unknown; nome: string; acertos: number; total: number }
-        >;
-      }
-    >();
-
-    let acertosGerais = 0;
-
-    for (const res of respostas) {
-      const acertou =
-        res.alternativaEstudante !== undefined &&
-        res.alternativaEstudante === res.alternativaCorreta;
-      if (acertou) acertosGerais++;
-
-      for (const v of vinculosDaQuestao(res.questao)) {
-        const mid = String(v.materia._id);
-        const m = porMateria.get(mid) ?? {
-          id: v.materia._id,
-          nome: v.materia.nome,
-          acertos: 0,
-          total: 0,
-          frentes: new Map(),
-        };
-        m.total++;
-        if (acertou) m.acertos++;
-
-        const fid = String(v.frente._id);
-        const f = m.frentes.get(fid) ?? {
-          id: v.frente._id,
-          nome: v.frente.nome,
-          acertos: 0,
-          total: 0,
-        };
-        f.total++;
-        if (acertou) f.acertos++;
-        m.frentes.set(fid, f);
-
-        porMateria.set(mid, m);
-      }
-    }
-
-    return {
-      // ⚠️ Sobre as RESPOSTAS, não sobre os vínculos — ver o docblock acima.
-      geral: respostas.length > 0 ? acertosGerais / respostas.length : 0,
-      materias: [...porMateria.values()].map((m) => ({
-        id: m.id as never,
-        nome: m.nome,
-        aproveitamento: m.total > 0 ? m.acertos / m.total : 0,
-        /*
-          ⚠️ **O total deixa de ser descartado** (card 30). Ele já era calculado
-          aqui para dividir, e ia embora — então "Álgebra 60%" chegava à tela
-          sem dizer de quantas questões.
-
-          ⚠️ E isso importa desde o card 14: as bases NÃO somam o total do
-          simulado, porque uma questão conta inteira em cada (matéria, frente)
-          que toca. Sem a base, quem soma as matérias acha que a conta não fecha.
-        */
-        questoes: m.total,
-        frentes: [...m.frentes.values()].map((f) => ({
-          id: f.id as never,
-          nome: f.nome,
-          aproveitamento: f.total > 0 ? f.acertos / f.total : 0,
-          questoes: f.total,
-          materia: m.nome,
-        })),
-      })),
-    };
+    // ⚠️ A regra mora em `calcularAproveitamento`, pura — o script de
+    // recálculo dos históricos usa a MESMA função, nunca uma cópia dela.
+    return calcularAproveitamento(respostas);
   }
 
   private increasePerformance(
