@@ -1114,7 +1114,9 @@ describe('SimuladoService.criaAproveitamento — base por matéria e frente (car
     const mat = ap.materias.find((m: any) => m.nome === 'Matemática');
     expect(mat.questoes).toBe(3);
     expect(mat.frentes.find((f: any) => f.nome === 'Álgebra').questoes).toBe(2);
-    expect(mat.frentes.find((f: any) => f.nome === 'Geometria').questoes).toBe(1);
+    expect(mat.frentes.find((f: any) => f.nome === 'Geometria').questoes).toBe(
+      1,
+    );
   });
 
   it('⚠️ as bases somam MAIS que o total do simulado, e é isso que a base explica', async () => {
@@ -1156,5 +1158,53 @@ describe('SimuladoService.criaAproveitamento — base por matéria e frente (car
     const mat = ap.materias[0];
     expect(mat.questoes).toBe(2);
     expect(mat.aproveitamento).toBe(0);
+  });
+
+  it('⚠️ QA: 2 questões de Matemática, uma com 3 frentes — Matemática tem 2, não 4', async () => {
+    const ap = await processar(
+      [
+        questaoCom('q1', [{ f: 'Álgebra', m: 'Matemática' }], 'Matemática'),
+        questaoCom(
+          'q2',
+          [
+            { f: 'Financeira', m: 'Matemática' },
+            { f: 'Álgebra', m: 'Matemática' },
+            { f: 'Estatística', m: 'Matemática' },
+          ],
+          'Matemática',
+        ),
+      ],
+      [],
+    );
+
+    const mat = ap.materias.find((m: any) => m.nome === 'Matemática');
+    expect(mat.questoes).toBe(2);
+    // As frentes continuam com peso inteiro — e somam mais que a matéria.
+    const porFrente = Object.fromEntries(
+      mat.frentes.map((f: any) => [f.nome, f.questoes]),
+    );
+    expect(porFrente).toEqual({ Álgebra: 2, Financeira: 1, Estatística: 1 });
+  });
+
+  it('⚠️ acertar a questão de 3 frentes vale UM acerto na matéria, não três', async () => {
+    const ap = await processar(
+      [
+        questaoCom('q1', [{ f: 'Álgebra', m: 'Matemática' }], 'Matemática'),
+        questaoCom(
+          'q2',
+          [
+            { f: 'Financeira', m: 'Matemática' },
+            { f: 'Álgebra', m: 'Matemática' },
+            { f: 'Estatística', m: 'Matemática' },
+          ],
+          'Matemática',
+        ),
+      ],
+      ['q2'], // acertou só a de 3 frentes
+    );
+
+    const mat = ap.materias.find((m: any) => m.nome === 'Matemática');
+    // Antes: 3/4 = 75%. Certo: 1 de 2.
+    expect(mat.aproveitamento).toBe(0.5);
   });
 });
