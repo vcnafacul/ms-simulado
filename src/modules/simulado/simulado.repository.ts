@@ -12,11 +12,15 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
     super(model);
   }
 
+  /**
+   * Quantos simulados apontam para a categoria — **inclusive os arquivados**.
+   *
+   * ⚠️ Só a exclusão de categoria usa, e ela agora é definitiva (QA). Um
+   * simulado arquivado continua no banco com a referência; excluir a categoria
+   * embaixo dele deixaria o `populate` devolvendo `null`.
+   */
   async countByCategoria(categoriaId: string): Promise<number> {
-    return this.model.countDocuments({
-      categoria: categoriaId,
-      deleted: { $ne: true },
-    });
+    return this.model.countDocuments({ categoria: categoriaId });
   }
 
   async incrementarCartaoSeq(id: string): Promise<number> {
