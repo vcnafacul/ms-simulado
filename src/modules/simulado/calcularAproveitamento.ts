@@ -131,8 +131,13 @@ export function montarRespostasAproveitamento(
   rawRespostas: { questao: unknown; alternativaEstudante?: unknown }[],
 ): RespostaAproveitamento[] {
   return questoes.map((questao) => {
+    /*
+      ⚠️ `String(...)`: no `rawRespostas` o id vem como string, mas no
+      `respostas` gravado (que o recálculo lê) vem como ObjectId — medido no
+      clone de homol. Com `===` cru, toda resposta pareceria não lida.
+    */
     const resposta = rawRespostas.find(
-      (r) => r.questao === questao._id.toString(),
+      (r) => String(r.questao) === questao._id.toString(),
     );
     return {
       questao,

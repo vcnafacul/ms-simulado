@@ -73,4 +73,18 @@ describe('recalcularAproveitamento (contagem-por-materia 02)', () => {
 
     expect(recalcularAproveitamento(semBase, QUESTOES, RAW).mudou).toBe(true);
   });
+
+  it('⚠️ o `respostas` gravado tem o id como ObjectId — a resposta ainda casa', () => {
+    const { Types } = jest.requireActual('mongoose');
+    const id = new Types.ObjectId();
+    const q = questao(String(id), frente('Álgebra'));
+
+    const { novo } = recalcularAproveitamento(
+      null,
+      [q],
+      [{ questao: id, alternativaEstudante: 'A' }],
+    );
+
+    expect(novo.geral).toBe(1);
+  });
 });

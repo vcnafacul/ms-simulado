@@ -96,13 +96,24 @@ async function run(): Promise<void> {
     return questoesDoSimulado.get(simuladoId)!;
   };
 
+  /*
+    ⚠️ **`respostas`, e não `rawRespostas`.** O `completeProcessing` apaga o
+    `rawRespostas` ao concluir (medido no clone: 0 de 23 `completed` o têm). O
+    `respostas` gravado tem TODAS as questões do simulado, com o que o aluno
+    marcou — é a mesma entrada, já normalizada.
+
+    ⚠️ **Só `completed`.** Os históricos SEM status são do digital anterior ao
+    card 14, quando só a `frente1` contava: a matéria já saía uma vez por
+    questão, sem o defeito. Recalculá-los seria mudança de fórmula retroativa,
+    que o card 13 recusou.
+  */
   const cursor = HistoricoModel.find(
     {
       status: HistoricoStatus.Completed,
-      rawRespostas: { $type: 'array' },
+      'respostas.0': { $exists: true },
       deleted: { $ne: true },
     },
-    { simulado: 1, rawRespostas: 1, aproveitamento: 1 },
+    { simulado: 1, respostas: 1, aproveitamento: 1 },
   )
     .lean()
     .cursor();
@@ -114,7 +125,15 @@ async function run(): Promise<void> {
 
   for await (const h of cursor) {
     lidos++;
-    const questoes = await carregarQuestoes(String(h.simulado));
+    /*
+      ⚠️ Em parte dos históricos o `simulado` foi gravado como o DOCUMENTO
+      inteiro, não como id (10 de 23 no clone). O `processAnswer` já faz o
+      mesmo `_id ?? valor`.
+    */
+    const simuladoRef = h.simulado as unknown as { _id?: unknown } | null;
+    const questoes = await carregarQuestoes(
+      String(simuladoRef?._id ?? simuladoRef),
+    );
     // Simulado apagado, ou sem questões: o processamento marcaria falha —
     // aqui fica como está, e conta no relatório final.
     if (!questoes || questoes.length === 0 || questoes.some((q) => !q)) {
@@ -125,7 +144,10 @@ async function run(): Promise<void> {
     const { novo, mudou } = recalcularAproveitamento(
       h.aproveitamento,
       questoes,
-      h.rawRespostas ?? [],
+      (h.respostas ?? []) as {
+        questao: unknown;
+        alternativaEstudante?: unknown;
+      }[],
     );
     if (!mudou) continue;
     mudariam++;
