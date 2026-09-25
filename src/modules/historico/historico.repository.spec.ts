@@ -43,22 +43,21 @@ describe('HistoricoRepository.getById (popula simulado.questoes.questao)', () =>
     });
   });
 
-  it('existsCartaoAtivo consulta status ≠ Failed', async () => {
-    const exists = jest.fn().mockResolvedValue({ _id: 'x' });
-    const repo = new HistoricoRepository({ exists } as any);
-    const r = await repo.existsCartaoAtivo(
+  it('⚠️ buscarCartaoEnviado procura em QUALQUER status — o falho também conta', async () => {
+    const exec = jest.fn().mockResolvedValue({ status: 'failed' });
+    const findOne = jest.fn().mockReturnValue({ lean: () => ({ exec }) });
+    const repo = new HistoricoRepository({ findOne } as any);
+
+    const r = await repo.buscarCartaoEnviado(
       'u1',
       '665f0c1a2b3c4d5e6f00abc1',
       '7',
     );
-    expect(r).toBe(true);
-    expect(exists).toHaveBeenCalledWith(
-      expect.objectContaining({
-        usuario: 'u1',
-        cartaoCode: '7',
-        status: { $ne: 'failed' },
-      }),
-    );
+
+    expect(r).toEqual({ status: 'failed' });
+    const [filtro] = findOne.mock.calls[0];
+    expect(filtro).toMatchObject({ usuario: 'u1', cartaoCode: '7' });
+    expect(filtro).not.toHaveProperty('status');
   });
 
   it('createAwaitingOmr cria com status AwaitingOmr', async () => {

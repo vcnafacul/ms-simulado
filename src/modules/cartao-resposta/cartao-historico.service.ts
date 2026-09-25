@@ -5,12 +5,24 @@ import {
   Logger,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { HistoricoStatus } from '../historico/enums/historico-status.enum';
 import { CodigoFalhaInterno } from '../historico/falha/codigo-falha';
 import { HistoricoRepository } from '../historico/historico.repository';
 import { RelatorioSimuladoEstudanteRepository } from '../relatorio-simulado-estudante/relatorio-simulado-estudante.repository';
 import { CriarHistoricoCartaoDtoInput } from './dtos/criar-historico-cartao.dto.input';
 import { parseSimuladoId } from './imagekey.util';
 import { OmrHttpService } from './omr-http.service';
+
+/**
+ * ⚠️ O falho diz o que fazer: o caminho é o "Reenviar" do relatório, que
+ * reabre O MESMO histórico — não um envio novo.
+ */
+export function textoDeCartaoJaEnviado(status?: HistoricoStatus): string {
+  if (status === HistoricoStatus.Failed) {
+    return 'Este cartão já foi enviado para este estudante e a leitura falhou. Use "Reenviar" no relatório do simulado.';
+  }
+  return 'Este cartão já foi enviado para este estudante.';
+}
 
 @Injectable()
 export class CartaoHistoricoService {
@@ -27,14 +39,13 @@ export class CartaoHistoricoService {
   ): Promise<{ historicoId: string }> {
     const simuladoId = parseSimuladoId(dto.imageKey);
 
-    if (
-      await this.historicoRepository.existsCartaoAtivo(
-        dto.usuario,
-        simuladoId,
-        dto.cartaoCode,
-      )
-    ) {
-      throw new ConflictException('cartão já enviado para este usuário');
+    const jaEnviado = await this.historicoRepository.buscarCartaoEnviado(
+      dto.usuario,
+      simuladoId,
+      dto.cartaoCode,
+    );
+    if (jaEnviado) {
+      throw new ConflictException(textoDeCartaoJaEnviado(jaEnviado.status));
     }
 
     // ⚠️ Cunhado e GRAVADO antes do POST: se o token fosse gravado depois, um
@@ -42,13 +53,22 @@ export class CartaoHistoricoService {
     // bater com nada.
     const tentativaId = randomUUID();
 
-    const historico = await this.historicoRepository.createAwaitingOmr({
-      usuario: dto.usuario,
-      simuladoId,
-      imageKey: dto.imageKey,
-      cartaoCode: dto.cartaoCode,
-      tentativaId,
-    });
+    const historico = await this.historicoRepository
+      .createAwaitingOmr({
+        usuario: dto.usuario,
+        simuladoId,
+        imageKey: dto.imageKey,
+        cartaoCode: dto.cartaoCode,
+        tentativaId,
+      })
+      .catch((err: unknown) => {
+        // A corrida que passou pela consulta: o índice `cartao_por_estudante`
+        // recusa, e vira o mesmo 409.
+        if ((err as { code?: number })?.code === 11000) {
+          throw new ConflictException(textoDeCartaoJaEnviado());
+        }
+        throw err;
+      });
     const historicoId = (
       historico as unknown as { _id: { toString(): string } }
     )._id.toString();
