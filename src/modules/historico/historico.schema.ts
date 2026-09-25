@@ -113,3 +113,23 @@ HistoricoSchema.index(
   { imageKey: 1 },
   { unique: true, partialFilterExpression: { imageKey: { $type: 'string' } } },
 );
+
+/**
+ * ⚠️ **Um cartão por estudante.** A checagem do `CartaoHistoricoService` é
+ * "consulta, depois insere" — dois envios quase juntos (duplo clique) passavam
+ * os dois. O índice é quem fecha a corrida.
+ *
+ * Parcial em `cartaoCode`: o histórico do simulado DIGITAL não tem cartão, e
+ * a mesma pessoa pode fazer o mesmo simulado online mais de uma vez.
+ *
+ * ⚠️ `name` explícito — ver o `caderno-template.schema.ts`: sem nome, um
+ * conflito de índice some calado no `autoIndex`.
+ */
+HistoricoSchema.index(
+  { usuario: 1, simulado: 1, cartaoCode: 1 },
+  {
+    unique: true,
+    name: 'cartao_por_estudante',
+    partialFilterExpression: { cartaoCode: { $type: 'string' } },
+  },
+);

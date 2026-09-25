@@ -242,18 +242,31 @@ export class HistoricoRepository extends BaseRepository<Historico> {
     });
   }
 
-  async existsCartaoAtivo(
+  /**
+   * O histórico que este cartão já gerou para este estudante, em QUALQUER
+   * status.
+   *
+   * ⚠️ **Inclui o `failed`** — antes não incluía, e era o furo: cartão que
+   * falhou podia ser enviado de novo e nascia um SEGUNDO histórico para a mesma
+   * pessoa. Isso vinha de antes do "Reenviar" do relatório (card 14); hoje a
+   * falha se corrige reenviando NO MESMO histórico.
+   */
+  async buscarCartaoEnviado(
     usuario: string,
     simuladoId: string,
     cartaoCode: string,
-  ): Promise<boolean> {
-    const found = await this.model.exists({
-      usuario,
-      simulado: new Types.ObjectId(simuladoId),
-      cartaoCode,
-      status: { $ne: HistoricoStatus.Failed },
-    });
-    return found !== null;
+  ): Promise<{ status: HistoricoStatus } | null> {
+    return this.model
+      .findOne(
+        {
+          usuario,
+          simulado: new Types.ObjectId(simuladoId),
+          cartaoCode,
+        },
+        { status: 1 },
+      )
+      .lean()
+      .exec() as unknown as Promise<{ status: HistoricoStatus } | null>;
   }
 
   async createAwaitingOmr(data: {

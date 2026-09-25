@@ -1,9 +1,10 @@
 import { BadGatewayException, ConflictException, Logger } from '@nestjs/common';
 import { CartaoHistoricoService } from './cartao-historico.service';
+import { HistoricoStatus } from '../historico/enums/historico-status.enum';
 
 function setup(over: any = {}) {
   const repo = {
-    existsCartaoAtivo: jest.fn().mockResolvedValue(false),
+    buscarCartaoEnviado: jest.fn().mockResolvedValue(null),
     createAwaitingOmr: jest.fn().mockResolvedValue({ _id: 'h1' }),
     marcarFalha: jest.fn().mockResolvedValue(undefined),
     ...over.repo,
@@ -43,10 +44,41 @@ it('happy: cria e chama o omr', async () => {
 
 it('dedup: 409 e não cria', async () => {
   const { svc, repo } = setup({
-    repo: { existsCartaoAtivo: jest.fn().mockResolvedValue(true) },
+    repo: {
+      buscarCartaoEnviado: jest
+        .fn()
+        .mockResolvedValue({ status: HistoricoStatus.Completed }),
+    },
+  });
+  await expect(svc.criar(DTO)).rejects.toThrow(
+    new ConflictException('Este cartão já foi enviado para este estudante.'),
+  );
+  expect(repo.createAwaitingOmr).not.toHaveBeenCalled();
+});
+
+it('⚠️ dedup vale também para o cartão FALHO — e manda usar o Reenviar', async () => {
+  const { svc, repo, omr } = setup({
+    repo: {
+      buscarCartaoEnviado: jest
+        .fn()
+        .mockResolvedValue({ status: HistoricoStatus.Failed }),
+    },
+  });
+  await expect(svc.criar(DTO)).rejects.toThrow(/Use "Reenviar" no relatório/);
+  expect(repo.createAwaitingOmr).not.toHaveBeenCalled();
+  expect(omr.enviarProcessamento).not.toHaveBeenCalled();
+});
+
+it('⚠️ a corrida que passa pela consulta: o índice único vira o mesmo 409', async () => {
+  const { svc, omr } = setup({
+    repo: {
+      createAwaitingOmr: jest
+        .fn()
+        .mockRejectedValue(Object.assign(new Error('E11000'), { code: 11000 })),
+    },
   });
   await expect(svc.criar(DTO)).rejects.toBeInstanceOf(ConflictException);
-  expect(repo.createAwaitingOmr).not.toHaveBeenCalled();
+  expect(omr.enviarProcessamento).not.toHaveBeenCalled();
 });
 
 it('omr falha: marca Failed e 502', async () => {
@@ -71,7 +103,7 @@ it('imageKey inválido: 400 sem criar', async () => {
 
 it('cria a linha de junção com o vínculo recebido', async () => {
   const historicoRepository = {
-    existsCartaoAtivo: jest.fn().mockResolvedValue(false),
+    buscarCartaoEnviado: jest.fn().mockResolvedValue(null),
     createAwaitingOmr: jest.fn().mockResolvedValue({ _id: 'h1' }),
     marcarFalha: jest.fn().mockResolvedValue(undefined),
   };
@@ -105,7 +137,7 @@ it('cria a linha de junção com o vínculo recebido', async () => {
 it('sem cursinhoId não cria linha, e avisa no log', async () => {
   const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
   const historicoRepository = {
-    existsCartaoAtivo: jest.fn().mockResolvedValue(false),
+    buscarCartaoEnviado: jest.fn().mockResolvedValue(null),
     createAwaitingOmr: jest.fn().mockResolvedValue({ _id: 'h1' }),
     marcarFalha: jest.fn().mockResolvedValue(undefined),
   };
@@ -133,7 +165,7 @@ it('sem cursinhoId não cria linha, e avisa no log', async () => {
 it('falha ao criar a linha NÃO derruba o upload, mas vai para o log com o historicoId', async () => {
   const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
   const historicoRepository = {
-    existsCartaoAtivo: jest.fn().mockResolvedValue(false),
+    buscarCartaoEnviado: jest.fn().mockResolvedValue(null),
     createAwaitingOmr: jest.fn().mockResolvedValue({ _id: 'h1' }),
     marcarFalha: jest.fn().mockResolvedValue(undefined),
   };

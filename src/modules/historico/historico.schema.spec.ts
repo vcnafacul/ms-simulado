@@ -24,3 +24,17 @@ describe('Historico schema — campo de falha (card 01)', () => {
     expect(HistoricoSchema.path('falha')).toBeDefined();
   });
 });
+
+describe('Historico schema — um cartão por estudante (QA)', () => {
+  it('⚠️ índice único parcial em (usuario, simulado, cartaoCode), com nome', () => {
+    const idx = HistoricoSchema.indexes().find(
+      ([, opts]) => (opts as { name?: string }).name === 'cartao_por_estudante',
+    );
+    expect(idx).toBeDefined();
+    expect(idx![0]).toEqual({ usuario: 1, simulado: 1, cartaoCode: 1 });
+    expect(idx![1]).toMatchObject({
+      unique: true,
+      partialFilterExpression: { cartaoCode: { $type: 'string' } },
+    });
+  });
+});
