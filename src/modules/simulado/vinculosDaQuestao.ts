@@ -28,10 +28,13 @@ export interface VinculoDaQuestao {
  * que é justamente o que este teste de FORMA rejeita, em vez de deixar passar
  * um "objeto" que é só o id.
  *
- * ⚠️ O `""` nunca chega aqui **por este caminho** (o cast do Mongoose já o
- * converte em `undefined`), mas chega por `lean()`, pelo driver cru e por
- * qualquer consulta sem schema. A guarda é defesa em profundidade, e não o
- * conserto de um caso que passaria hoje.
+ * ⚠️ **Correção (contagem-por-materia 04): o `""` NÃO chega como
+ * `undefined`.** Medido com Mongo real: o `populate` do
+ * `SimuladoRepository.answer` monta um `$in` com o `""` e estoura `CastError`
+ * — a consulta inteira falha antes de chegar aqui, e o `processAnswer` falhava
+ * para todo cartão do simulado. O schema da questão agora converte `""` em
+ * `null` na escrita (`vazioViraNull`), e `scripts/limpar-referencias-vazias.ts`
+ * limpa o passado. A guarda abaixo continua valendo para `lean()` e driver cru.
  */
 function frenteValida(f: unknown): f is Frente {
   return typeof f === 'object' && f !== null && (f as Frente)._id !== undefined;
