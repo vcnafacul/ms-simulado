@@ -14,6 +14,7 @@
     "start:prod": "node dist/main",
     "backfill:criador-id": "ts-node scripts/backfill-criador-id.ts",
     "sync:contadores-questao": "ts-node scripts/sync-contadores-da-questao.ts",
+    "recalcular:aproveitamento": "ts-node -r tsconfig-paths/register scripts/recalcular-aproveitamento.ts",
     "repatriar:imagens": "ts-node scripts/repatriar-imagens.ts",
     "seed:template-caderno": "ts-node scripts/seed-template-caderno.ts",
     "cartao:preview": "ts-node src/modules/cartao-resposta/scripts/gerar-amostra.ts",

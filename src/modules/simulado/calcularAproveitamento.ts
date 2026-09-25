@@ -1,4 +1,5 @@
 import { AproveitamentoHistorico } from '../historico/types/aproveitamento';
+import { Questao } from '../questao/questao.schema';
 import { RespostaAproveitamento } from './valueObject/resposta-aproveitamento';
 import { vinculosDaQuestao } from './vinculosDaQuestao';
 
@@ -115,4 +116,30 @@ export function calcularAproveitamento(
       })),
     })),
   };
+}
+
+/**
+ * As entradas do cálculo: TODAS as questões do simulado, cada uma com o que o
+ * estudante marcou (ou nada — não lida conta como erro, card 13).
+ *
+ * ⚠️ Saiu do `processAnswer` para o recálculo (contagem-por-materia 02) montar
+ * as entradas do MESMO jeito. Duas montagens divergiriam, e o script gravaria
+ * um número que o processamento nunca produziria.
+ */
+export function montarRespostasAproveitamento(
+  questoes: Questao[],
+  rawRespostas: { questao: unknown; alternativaEstudante?: unknown }[],
+): RespostaAproveitamento[] {
+  return questoes.map((questao) => {
+    const resposta = rawRespostas.find(
+      (r) => r.questao === questao._id.toString(),
+    );
+    return {
+      questao,
+      alternativaEstudante: resposta?.alternativaEstudante as never,
+      alternativaCorreta: questao.alternativa,
+      materia: questao.materia,
+      frente: questao.frente1,
+    };
+  });
 }

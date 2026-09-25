@@ -36,7 +36,10 @@ import { SimuladoAnswerDTOOutput } from './dtos/simulado-answer.dto.output';
 import { Simulado } from './schemas/simulado.schema';
 import { SimuladoRepository } from './simulado.repository';
 import { RespostaAproveitamento } from './valueObject/resposta-aproveitamento';
-import { calcularAproveitamento } from './calcularAproveitamento';
+import {
+  calcularAproveitamento,
+  montarRespostasAproveitamento,
+} from './calcularAproveitamento';
 
 @Injectable()
 export class SimuladoService {
@@ -220,20 +223,10 @@ export class SimuladoService {
         simulado.questoes[0].questao._id,
       );
 
-      const respostasAproveitamento: RespostaAproveitamento[] =
-        simulado.questoes.map((qc) => {
-          const questao = qc.questao;
-          const resposta = historico.rawRespostas!.find(
-            (r: any) => r.questao === questao._id.toString(),
-          );
-          return {
-            questao,
-            alternativaEstudante: resposta?.alternativaEstudante,
-            alternativaCorreta: questao.alternativa,
-            materia: questao.materia,
-            frente: questao.frente1,
-          };
-        });
+      const respostasAproveitamento = montarRespostasAproveitamento(
+        simulado.questoes.map((qc) => qc.questao),
+        historico.rawRespostas,
+      );
 
       const aproveitamento = await this.criaAproveitamento(
         respostasAproveitamento,
