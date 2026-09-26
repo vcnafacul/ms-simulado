@@ -65,6 +65,11 @@ export type LinhaComHistorico = RelatorioSimuladoEstudante & {
 
 export interface AgregadoDaQuestao {
   questaoId: string;
+  /**
+   * O número gravado no histórico no momento da resposta, ou `null` — ver
+   * `numeroGravado`. A service completa com o número atual no simulado.
+   */
+  numero: number | null;
   respondentes: number;
   acertos: number;
   erros: number;
@@ -171,6 +176,23 @@ function gabaritoUnico(
   }
 
   return null;
+}
+
+/**
+ * O número da questão como os cartões a gravaram, ou `null`.
+ *
+ * ⚠️ `null` quando não há exatamente um: nenhum (histórico anterior ao campo)
+ * ou mais de um (a questão mudou de posição entre duas aplicações do mesmo
+ * simulado). Nos dois casos quem chama cai para o número atual no simulado —
+ * escolher um dos gravados seria arbitrário.
+ */
+function numeroGravado(numeros: unknown): number | null {
+  const unicos = Array.isArray(numeros)
+    ? Array.from(
+        new Set(numeros.filter((n): n is number => typeof n === 'number')),
+      )
+    : [];
+  return unicos.length === 1 ? unicos[0] : null;
 }
 
 @Injectable()
@@ -373,6 +395,8 @@ export class RelatorioSimuladoEstudanteRepository {
               um SINTOMA, não um defeito desta consulta.
             */
             gabaritos: { $addToSet: '$h.respostas.alternativaCorreta' },
+            // O número gravado na resposta — ver `numeroGravado`.
+            numeros: { $addToSet: '$h.respostas.numero' },
             /*
               ⚠️ **Os acumuladores da discriminação saem NESTA passada** (card
               05), e não numa consulta nova. Duas consultas sobre o mesmo
@@ -438,6 +462,7 @@ export class RelatorioSimuladoEstudanteRepository {
 
     return linhas.map((l: any) => ({
       questaoId: l._id?.toString(),
+      numero: numeroGravado(l.numeros),
       respondentes: l.respondentes,
       acertos: l.acertos,
       erros: l.erros,

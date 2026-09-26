@@ -278,7 +278,13 @@ export class RelatorioSimuladoEstudanteService {
         ehVersao: false,
       };
       return {
-        numero: numeroPorQuestao.get(a.questaoId) ?? null,
+        /*
+          ⚠️ **O gravado primeiro, o atual depois.** Uma nova versão (card 26)
+          troca no simulado a original pela sucessora, e o histórico continua
+          apontando a original — pelo número atual ela sairia sem número. O
+          atual só cobre histórico anterior ao campo.
+        */
+        numero: a.numero ?? numeroPorQuestao.get(a.questaoId) ?? null,
         questaoId: a.questaoId,
         respondentes: a.respondentes,
         acertos: a.acertos,
@@ -369,7 +375,8 @@ export class RelatorioSimuladoEstudanteService {
             : ResultadoDaQuestao.Erro;
 
       return {
-        numero: numeroPorQuestao.get(questaoId) ?? null,
+        // ⚠️ O gravado primeiro — mesma regra do `consultarQuestoes`.
+        numero: r.numero ?? numeroPorQuestao.get(questaoId) ?? null,
         questaoId,
         alternativaEstudante: marcada,
         alternativaCorreta: r.alternativaCorreta,

@@ -213,6 +213,91 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
     ]);
   });
 
+  describe('número da questão gravado no histórico (Mongo real)', () => {
+    /*
+      O caso da nova versão (card 26): os cartões responderam a ORIGINAL como
+      questão 7; depois a questão foi versionada e o simulado passou a apontar
+      a SUCESSORA no lugar dela. O histórico continua apontando a original —
+      que não está mais no `Simulado.questoes`, e por isso saía sem número.
+    */
+    const SIM_V = new Types.ObjectId();
+    const ORIGINAL = new Types.ObjectId();
+    const SUCESSORA = new Types.ObjectId();
+    const LEGADA = new Types.ObjectId();
+
+    beforeAll(async () => {
+      const cartao = async (usuario: string, respostas: any[]) => {
+        const h = await histModel.create({
+          usuario,
+          simulado: SIM_V,
+          status: 'completed',
+          respostas,
+        });
+        await relModel.create({
+          historico: h._id,
+          simulado: SIM_V,
+          usuario,
+          cursinhoId: 'cur-v',
+        });
+      };
+
+      await cartao('u-v1', [
+        {
+          questao: ORIGINAL,
+          numero: 7,
+          alternativaEstudante: 'A',
+          alternativaCorreta: 'A',
+        },
+        // histórico processado antes do campo existir: sem `numero`
+        { questao: LEGADA, alternativaEstudante: 'B', alternativaCorreta: 'B' },
+      ]);
+
+      await simuladoModel.create({
+        _id: SIM_V,
+        nome: 'Simulado versionado',
+        questoes: [
+          { questao: SUCESSORA, numero: 7 },
+          { questao: LEGADA, numero: 8 },
+        ],
+      });
+    }, 120_000);
+
+    it('⚠️ a questão versionada mantém o número com que foi respondida', async () => {
+      const r = await svc.consultarQuestoes({
+        simuladoId: SIM_V.toString(),
+        cursinhoId: 'cur-v',
+      });
+
+      const original = r.questoes.find(
+        (q) => q.questaoId === ORIGINAL.toString(),
+      );
+      expect(original?.numero).toBe(7);
+    });
+
+    it('sem número gravado, cai para o número atual no simulado', async () => {
+      const r = await svc.consultarQuestoes({
+        simuladoId: SIM_V.toString(),
+        cursinhoId: 'cur-v',
+      });
+
+      const legada = r.questoes.find((q) => q.questaoId === LEGADA.toString());
+      expect(legada?.numero).toBe(8);
+    });
+
+    it('⚠️ no detalhe do estudante também', async () => {
+      const r = await svc.consultarDetalhe({
+        simuladoId: SIM_V.toString(),
+        cursinhoId: 'cur-v',
+        usuario: 'u-v1',
+      });
+
+      expect(r.respostas.map((x) => [x.questaoId, x.numero])).toEqual([
+        [ORIGINAL.toString(), 7],
+        [LEGADA.toString(), 8],
+      ]);
+    });
+  });
+
   it('a contagem é do cursinho, não global', async () => {
     // cur-2 também tem cartão em SIM_A; ele não pode entrar na conta
     const total = await repo.contarDoCursinho(SIM_A.toString(), 'cur-1');

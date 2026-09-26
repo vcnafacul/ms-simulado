@@ -371,6 +371,9 @@ describe('SimuladoService.processAnswer (lê questoes)', () => {
     expect(payload.respostas).toHaveLength(1);
     expect(payload.respostas[0].alternativaEstudante).toBe('A');
     expect(payload.respostas[0].alternativaCorreta).toBe('A');
+    // ⚠️ O número da questão NO MOMENTO da resposta: depois de uma nova
+    // versão o simulado aponta a sucessora, e o número atual some da original.
+    expect(payload.respostas[0].numero).toBe(1);
   });
 
   it('marca Failed sem crashar quando o simulado não tem questões', async () => {
