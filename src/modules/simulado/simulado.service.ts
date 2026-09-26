@@ -293,11 +293,26 @@ export class SimuladoService {
           r.alternativaEstudante === r.alternativaCorreta,
       ).length;
 
+      /*
+        ⚠️ **O número da questão NO MOMENTO da resposta.** O relatório lia o
+        número do `Simulado.questoes` de hoje — e uma nova versão (card 26)
+        troca ali o ponteiro para a sucessora: a original, que é a que o
+        histórico aponta, ficava sem número. Sai do MESMO `simulado.questoes`
+        que deu o id acima, então id e número são sempre do mesmo instante.
+      */
+      const numeroPorQuestao = new Map(
+        simulado.questoes.map((qc) => [
+          qc.questao._id.toString(),
+          qc.numero ?? null,
+        ]),
+      );
+
       await this.historicoRepository.completeProcessing(histId, {
         ano,
         simulado,
         respostas: respostasAproveitamento.map((r) => ({
           questao: r.questao,
+          numero: numeroPorQuestao.get(r.questao._id.toString()) ?? null,
           alternativaEstudante: r.alternativaEstudante,
           alternativaCorreta: r.alternativaCorreta,
         })),

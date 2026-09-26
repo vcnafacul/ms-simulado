@@ -234,6 +234,22 @@ describe('RelatorioSimuladoEstudanteService.consultarQuestoes', () => {
     });
   });
 
+  it('⚠️ o número gravado no histórico vence o número atual no simulado', async () => {
+    // Depois de uma nova versão, o simulado dá à SUCESSORA o número que a
+    // original tinha; o cartão respondeu a original.
+    const { svc } = montarQ(
+      [agregado({ numero: 3 })],
+      [{ questaoId: 'q1', numero: 5 }],
+    );
+
+    const r = await svc.consultarQuestoes({
+      simuladoId: SIM,
+      cursinhoId: 'cur-1',
+    });
+
+    expect(r.questoes[0].numero).toBe(3);
+  });
+
   it('ordena por número — é como o professor lê', async () => {
     const { svc } = montarQ(
       [agregado({ questaoId: 'q9' }), agregado({ questaoId: 'q1' })],
