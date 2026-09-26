@@ -29,7 +29,9 @@ describe('HistoricoRepository.getById (popula simulado.questoes.questao)', () =>
     expect(findOne).toHaveBeenCalledWith({ _id: 'h1', usuario: 'u1' });
   });
 
-  it('getByIdAndUsuario popula o simulado igual ao getById', async () => {
+  it('getByIdAndUsuario popula as questões e a categoria do simulado', async () => {
+    // A categoria é o que o cabeçalho do detalhe mostra; o `getById` interno
+    // não a usa. O efeito real está em `historico.populate-categoria.spec.ts`.
     const exec = jest.fn().mockResolvedValue({ _id: 'h1' });
     const populate = jest.fn().mockReturnValue({ exec });
     const findOne = jest.fn().mockReturnValue({ populate });
@@ -39,7 +41,10 @@ describe('HistoricoRepository.getById (popula simulado.questoes.questao)', () =>
 
     expect(populate).toHaveBeenCalledWith({
       path: 'simulado',
-      populate: [{ path: 'questoes.questao' }],
+      populate: [
+        { path: 'questoes.questao' },
+        { path: 'categoria', select: '_id nome quantidadeTotalQuestao' },
+      ],
     });
   });
 

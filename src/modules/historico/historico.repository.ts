@@ -12,6 +12,17 @@ import { buildFullSeriesHistorico } from './handle/build-full-series-historico';
 import { buildFullSeriesHistoricoByType } from './handle/build-full-seriesH-historico-by-type';
 import { Historico } from './historico.schema';
 
+/**
+ * O client mostra o nome da categoria e compara `questoesRespondidas` com o
+ * total dela (completo × incompleto) — no card da lista e no cabeçalho do
+ * detalhe. ⚠️ Quando o populate de `tipo` saiu (b5962f9) a categoria não
+ * entrou no lugar, e a lista chegava sem ela: a tela de simulado quebrava.
+ */
+const CATEGORIA_DO_SIMULADO = {
+  path: 'categoria',
+  select: '_id nome quantidadeTotalQuestao',
+};
+
 @Injectable()
 export class HistoricoRepository extends BaseRepository<Historico> {
   constructor(@InjectModel(Historico.name) model: Model<Historico>) {
@@ -30,7 +41,8 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       .sort({ _id: -1 })
       .populate({
         path: 'simulado',
-        select: '_id nome',
+        select: '_id nome categoria',
+        populate: CATEGORIA_DO_SIMULADO,
       })
       .exec();
 
@@ -64,7 +76,7 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       .findOne({ _id: id, usuario })
       .populate({
         path: 'simulado',
-        populate: [{ path: 'questoes.questao' }],
+        populate: [{ path: 'questoes.questao' }, CATEGORIA_DO_SIMULADO],
       })
       .exec();
   }
