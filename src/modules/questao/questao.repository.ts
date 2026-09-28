@@ -590,6 +590,37 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     return new Map(docs.map((d) => [String(d.origem), d]));
   }
 
+  /**
+   * Troca `de` por `para` NESTA prova e nos simulados DELA (tickets/023, card
+   * 14). No lugar — mesmo `$set` com `arrayFilters` do `substituirQuestao`,
+   * que mantém o número. ⚠️ Não toca em nenhuma outra prova nem em simulado
+   * que não seja desta.
+   */
+  async trocarNaProva(
+    provaId: string,
+    simuladoIds: unknown[],
+    de: string,
+    para: string,
+    session?: ClientSession,
+  ): Promise<number> {
+    const deId = new Types.ObjectId(de);
+    const update = {
+      $set: { 'questoes.$[alvo].questao': new Types.ObjectId(para) },
+    };
+    const opcoes = { arrayFilters: [{ 'alvo.questao': deId }], session };
+    await this.provaModel
+      .updateOne({ _id: provaId, 'questoes.questao': deId }, update, opcoes)
+      .exec();
+    const r = await this.simuladoModel
+      .updateMany(
+        { _id: { $in: simuladoIds }, 'questoes.questao': deId },
+        update,
+        opcoes,
+      )
+      .exec();
+    return r.modifiedCount;
+  }
+
   /** As questões pelo id, com o que a cadeia de versões precisa (card 13). */
   async questoesDaCadeia(ids: string[]): Promise<QuestaoDaCadeia[]> {
     if (!ids.length) return [];

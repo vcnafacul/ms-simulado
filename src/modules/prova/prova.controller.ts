@@ -15,6 +15,7 @@ import { GetProvaDTOOutout } from './dtos/get-all.dto.output';
 import { Prova } from './prova.schema';
 import { ProvaService } from './prova.service';
 import { UpdateProvaFilesDTO } from './dtos/update-files.dto.input';
+import { AplicarAtualizacoesDTOInput } from './dtos/aplicar-atualizacoes.dto.input';
 import { ReceberNovasVersoesDTOInput } from './dtos/receber-novas-versoes.dto.input';
 import { Ator, AtorDaRequisicao } from 'src/shared/ator/ator';
 
@@ -101,6 +102,17 @@ export class ProvaController {
     @AtorDaRequisicao() ator?: Ator,
   ) {
     return await this.service.listarAtualizacoes(id, ator);
+  }
+
+  /** tickets/023, card 14 — só o dono; tudo ou nada. */
+  @Post(':id/atualizacoes')
+  @ApiResponse({ status: 201, description: 'aplica versões novas na prova' })
+  public async aplicarAtualizacoes(
+    @Param('id') id: string,
+    @Body() dto: AplicarAtualizacoesDTOInput,
+    @AtorDaRequisicao() ator?: Ator,
+  ) {
+    return await this.service.aplicarAtualizacoes(id, dto.trocas, ator);
   }
 
   /** tickets/023, card 05 — só o dono (403 com o motivo). */
