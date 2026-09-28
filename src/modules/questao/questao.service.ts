@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -28,6 +29,10 @@ import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
 import { Ator } from 'src/shared/ator/ator';
+import {
+  podeComporDono,
+  resumoDoDono,
+} from '../prova/helpers/pode-compor-prova';
 import { documentoDaCopia } from './duplicarQuestao';
 import { provasQueRecusamArea } from '../prova/services/area-da-prova';
 import { TipoOrigem } from './enums/tipo-origem.enum';
@@ -43,6 +48,11 @@ import {
   motivosParaNaoExcluir,
   TEXTO_DO_MOTIVO,
 } from './exclusaoDaQuestao';
+
+/** tickets/023, card 17 — a tela mostra em toast. */
+export const textoAreaFrenteEmProvaOficial = (provas: string[]) =>
+  `Esta questão está numa prova oficial (${provas.join(', ')}). ` +
+  'Área e frente principal só podem ser alteradas pela equipe da plataforma.';
 
 /** Um motivo de recusa como a tela recebe: código para decidir, texto para ler. */
 export interface Motivo {
@@ -127,6 +137,7 @@ export class QuestaoService {
 
   public async getById(
     id: string,
+    ator?: Ator,
   ): Promise<(Questao & { provasContendo: ProvaContendo[] }) | null> {
     const questao = await this.repository.getById(id);
     if (!questao) return null;
@@ -134,7 +145,11 @@ export class QuestaoService {
     const obj = (
       (questao as any).toObject ? (questao as any).toObject() : questao
     ) as Questao & { provasContendo: ProvaContendo[] };
-    obj.provasContendo = map.get(id.toString()) ?? [];
+    // tickets/023, card 07: se o ator da requisição pode compor cada prova.
+    obj.provasContendo = (map.get(id.toString()) ?? []).map((p) => ({
+      ...p,
+      podeComporProva: podeComporDono(p, ator),
+    }));
     return obj;
   }
 
@@ -282,12 +297,19 @@ export class QuestaoService {
     });
   }
 
-  public async getInfos() {
+  public async getInfos(ator?: Ator) {
     const param: GetAllInput = {
       page: 1,
       limit: 0,
     };
-    const provas = await this.provaRepository.getAll(param);
+    const todas = await this.provaRepository.getAll(param);
+    // tickets/023, card 07: cada prova com dono, proteção e se o ator compõe.
+    const provas = {
+      data: todas.data.map((p) => ({
+        ...((p as any).toObject ? (p as any).toObject() : p),
+        ...resumoDoDono(p, ator),
+      })),
+    };
     const exames = await this.exameRepository.getAll(param);
     const materias = await this.materiaRepository.getAll(param);
     const frentes = await this.frenteRepository.getAll(param);
@@ -355,7 +377,10 @@ export class QuestaoService {
   public async updateQuestionDaRota(question: UpdateDTOInput, ator?: Ator) {
     if (question.prova) {
       await this.provaService.assertPodeComporProva(question.prova, ator);
-      const saida = await this.repository.findProvaAtual(question._id);
+      const saida = await this.repository.findProvaDeSaida(
+        question._id,
+        question.prova,
+      );
       if (saida && saida !== question.prova.toString()) {
         await this.provaService.assertPodeComporProva(saida, ator);
       }
@@ -539,6 +564,26 @@ export class QuestaoService {
     const enemAreaChanged = classificacao.enemArea !== questao.enemArea;
     const frente1Changed =
       classificacao.frente1 !== questao.frente1?._id?.toString();
+
+    /*
+      ⚠️ tickets/023, card 17 (R10): questão numa prova de categoria fora de
+      uso (`selecionavel: false` — as oficiais) só muda de área/frente1 pela
+      equipe da plataforma. A área decide em qual simulado do dia a questão
+      fica: mudá-la mexe na prova oficial. ANTES de qualquer escrita.
+    */
+    const mudaAreaOuFrente1 =
+      (classificacao.enemArea !== undefined && enemAreaChanged) ||
+      (classificacao.frente1 !== undefined && frente1Changed);
+    if (mudaAreaOuFrente1 && !ator?.admin) {
+      const oficiais = (
+        (await this.repository.findProvasContendoMany([id])).get(id) ?? []
+      ).filter((p) => !p.selecionavel);
+      if (oficiais.length > 0) {
+        throw new ForbiddenException(
+          textoAreaFrenteEmProvaOficial(oficiais.map((p) => p.provaNome)),
+        );
+      }
+    }
 
     /*
       ⚠️ **A área nova tem de caber em TODAS as provas da questão**, e não só na
@@ -798,6 +843,8 @@ export class QuestaoService {
     await this.repository.updateContent(novaId, content);
     const trocas = await this.repository.substituirQuestao(id, novaId);
     await this.repository.congelar(id);
+    // A sucessora nasce Pending: o contador muda só onde ela entrou (card 06).
+    await this.repository.recalcularTotalValidadas(trocas.provas);
 
     await this.auditLogService.create({
       user: userId,
@@ -808,7 +855,9 @@ export class QuestaoService {
         acao: 'novaVersao',
         sucessora: novaId,
         provas: trocas.provas,
+        provasMantidas: trocas.provasMantidas,
         simulados: trocas.simulados,
+        simuladosMantidos: trocas.simuladosMantidos,
       }),
     });
 

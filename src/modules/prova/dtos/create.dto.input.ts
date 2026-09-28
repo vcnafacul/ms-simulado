@@ -1,6 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Edicao } from '../enums/edicao.enum';
-import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+  IsBoolean,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import { CategoriaExist } from 'src/modules/categoria/validator/categoria-exist.validator';
 
 export class CreateProvaDTOInput {
@@ -54,4 +61,13 @@ export class CreateProvaDTOInput {
   @IsOptional()
   @IsString()
   cursinhoId?: string | null;
+
+  /** Ausente = `false` (tickets/023, card 05). Aceita 'true'/'false' (multipart). */
+  @ApiProperty({ required: false, default: false })
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean()
+  receberNovasVersoes?: boolean;
 }

@@ -13,6 +13,7 @@ type CategoriaDaProva = { dono?: string | null; selecionavel?: boolean | null };
 type ProvaComDono = {
   cursinhoId?: string | null;
   categoria?: CategoriaDaProva | null;
+  receberNovasVersoes?: boolean | null;
 };
 
 /** Categoria da plataforma ou fora de uso: a prova é oficial. */
@@ -24,6 +25,20 @@ export function provaProtegida(categoria?: CategoriaDaProva | null): boolean {
 }
 
 export function podeComporProva(prova: ProvaComDono, ator?: Ator): boolean {
+  return podeComporDono(
+    {
+      cursinhoId: prova.cursinhoId,
+      protegida: provaProtegida(prova.categoria),
+    },
+    ator,
+  );
+}
+
+/** A regra a partir do dono já resolvido — para quem tem o resumo. */
+export function podeComporDono(
+  prova: { cursinhoId?: string | null; protegida: boolean },
+  ator?: Ator,
+): boolean {
   if (!ator) return false;
   // ⚠️ Sem o campo = prova legada = da plataforma.
   const dono = prova.cursinhoId ?? null;
@@ -31,7 +46,7 @@ export function podeComporProva(prova: ProvaComDono, ator?: Ator): boolean {
     ator.editorCursinho &&
     ator.cursinhoId &&
     dono === ator.cursinhoId &&
-    !provaProtegida(prova.categoria)
+    !prova.protegida
   )
     return true;
   if (ator.admin && dono === null) return true;
@@ -55,4 +70,28 @@ export function motivoParaNaoComporProva(
   if (dono !== null && dono !== ator?.cursinhoId) return TEXTO_OUTRO_CURSINHO;
   if (dono === null || provaProtegida(prova.categoria)) return TEXTO_OFICIAL;
   return TEXTO_SEM_PERMISSAO;
+}
+
+/**
+ * O que a tela precisa saber de cada prova para mostrar selo e esconder
+ * ações (tickets/023, card 07). ⚠️ `podeComporProva` é calculado AQUI, com o
+ * ator da requisição — a tela não recalcula.
+ */
+export interface ResumoDoDono {
+  cursinhoId: string | null;
+  protegida: boolean;
+  /** `false` = categoria fora de uso: área/frente1 só pelo projeto (card 17). */
+  selecionavel: boolean;
+  receberNovasVersoes: boolean;
+  podeComporProva: boolean;
+}
+
+export function resumoDoDono(prova: ProvaComDono, ator?: Ator): ResumoDoDono {
+  return {
+    cursinhoId: prova.cursinhoId ?? null,
+    protegida: provaProtegida(prova.categoria),
+    selecionavel: prova.categoria?.selecionavel !== false,
+    receberNovasVersoes: prova.receberNovasVersoes === true,
+    podeComporProva: podeComporProva(prova, ator),
+  };
 }

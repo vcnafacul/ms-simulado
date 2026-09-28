@@ -22,6 +22,7 @@ export class Prova extends BaseSchema {
     this.aplicacao = item.aplicacao;
     this.criadorId = item.criadorId;
     this.cursinhoId = item.cursinhoId ?? null;
+    this.receberNovasVersoes = item.receberNovasVersoes ?? false;
     this.simulados = [];
     this.questoes = [];
   }
@@ -73,6 +74,21 @@ export class Prova extends BaseSchema {
 
   @Prop({ required: false, default: null })
   public cursinhoId?: string | null;
+
+  /**
+   * Se uma nova versão de uma questão desta prova entra no lugar da antiga
+   * automaticamente (tickets/023, card 05, regra R5).
+   *
+   * `false` (padrão na criação): a prova fica como foi montada; o dono
+   * atualiza quando quiser (fase 2). ⚠️ Não afeta a "correção" (edição
+   * direta), que muda a questão em todo lugar (R4).
+   *
+   * ⚠️ As provas que já existiam ganham `true` pela migração 0004, que roda
+   * ANTES do deploy: o Mongoose aplica o `default` ao LER um documento sem o
+   * campo, e sem a migração toda prova antiga seria lida como travada.
+   */
+  @Prop({ type: Boolean, required: true, default: false })
+  public receberNovasVersoes: boolean;
 }
 
 export const ProvaSchema = SchemaFactory.createForClass(Prova);
