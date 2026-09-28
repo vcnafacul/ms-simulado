@@ -5,7 +5,10 @@ describe('QuestaoRepository.setProvaBase (atualiza campo provaBase com session)'
     const updateOne = jest.fn().mockResolvedValue({ acknowledged: true });
     const questaoModel: any = { updateOne };
     const provaModel: any = {};
-    return { repo: new QuestaoRepository(questaoModel, provaModel, {} as any), updateOne };
+    return {
+      repo: new QuestaoRepository(questaoModel, provaModel, {} as any),
+      updateOne,
+    };
   }
 
   it('chama model.updateOne com filtro _id, payload provaBase e session quando session é passada', async () => {
@@ -269,7 +272,10 @@ describe('QuestaoRepository.contadoresGlobais (card 16)', () => {
     const exec = jest.fn().mockResolvedValue(docs);
     const lean = jest.fn().mockReturnValue({ exec });
     const find = jest.fn().mockReturnValue({ lean });
-    return { repo: new QuestaoRepository({ find } as any, {} as any, {} as any), find };
+    return {
+      repo: new QuestaoRepository({ find } as any, {} as any, {} as any),
+      find,
+    };
   };
 
   /*
@@ -394,7 +400,11 @@ describe('QuestaoRepository — linhagem (card 25)', () => {
     const lean = jest.fn().mockReturnValue({ exec });
     const select = jest.fn().mockReturnValue({ lean });
     const findOne = jest.fn().mockReturnValue({ select });
-    const repo = new QuestaoRepository({ findOne } as any, {} as any, {} as any);
+    const repo = new QuestaoRepository(
+      { findOne } as any,
+      {} as any,
+      {} as any,
+    );
 
     await repo.getParaDuplicar('q1');
 
@@ -413,7 +423,11 @@ describe('QuestaoRepository — linhagem (card 25)', () => {
     const lean = jest.fn().mockReturnValue({ exec });
     const select = jest.fn().mockReturnValue({ lean });
     const findOne = jest.fn().mockReturnValue({ select });
-    const repo = new QuestaoRepository({ findOne } as any, {} as any, {} as any);
+    const repo = new QuestaoRepository(
+      { findOne } as any,
+      {} as any,
+      {} as any,
+    );
 
     await repo.getParaDuplicar('q1');
 
@@ -480,78 +494,18 @@ describe('QuestaoRepository — linhagem (card 25)', () => {
   });
 });
 
-describe('QuestaoRepository.substituirQuestao (card 26)', () => {
-  const montar = () => {
-    const provaUpdate = jest
-      .fn()
-      .mockReturnValue({ exec: jest.fn().mockResolvedValue({ modifiedCount: 3 }) });
-    const simuladoUpdate = jest
-      .fn()
-      .mockReturnValue({ exec: jest.fn().mockResolvedValue({ modifiedCount: 5 }) });
-    const repo = new QuestaoRepository(
-      {} as any,
-      { updateMany: provaUpdate } as any,
-      { updateMany: simuladoUpdate } as any,
-    );
-    return { repo, provaUpdate, simuladoUpdate };
-  };
-
-  const DE = '665f0c1a2b3c4d5e6f00abc1';
-  const PARA = '665f0c1a2b3c4d5e6f00abc2';
-
-  it('⚠️ escreve nas DUAS coleções', async () => {
-    /*
-      `Prova.questoes` e `Simulado.questoes` são arrays independentes. Trocar só
-      numa deixaria a prova com a sucessora e o simulado com a original
-      congelada — e o aluno responderia o texto velho.
-    */
-    const { repo, provaUpdate, simuladoUpdate } = montar();
-
-    const r = await repo.substituirQuestao(DE, PARA);
-
-    expect(provaUpdate).toHaveBeenCalledTimes(1);
-    expect(simuladoUpdate).toHaveBeenCalledTimes(1);
-    expect(r).toEqual({ provas: 3, simulados: 5 });
-  });
-
-  it('⚠️ substitui no LUGAR — o `numero` da entry não é tocado', async () => {
-    /*
-      Remover e adicionar passaria pela validação da factory, que pode recusar
-      (número ocupado, regra ENEM) e deixar a prova SEM a questão.
-    */
-    const { repo, provaUpdate } = montar();
-
-    await repo.substituirQuestao(DE, PARA);
-
-    const update = provaUpdate.mock.calls[0][1];
-    expect(Object.keys(update)).toEqual(['$set']);
-    expect(Object.keys(update.$set)).toEqual(['questoes.$[alvo].questao']);
-    // nada de `$pull`/`$push`, que é o caminho que perderia o número
-    expect(JSON.stringify(update)).not.toContain('$pull');
-  });
-
-  it('o arrayFilter mira exatamente a questão antiga', async () => {
-    const { repo, provaUpdate } = montar();
-
-    await repo.substituirQuestao(DE, PARA);
-
-    const opcoes = provaUpdate.mock.calls[0][2];
-    expect(String(opcoes.arrayFilters[0]['alvo.questao'])).toBe(DE);
-  });
-
-  it('o filtro só atinge quem contém a questão', async () => {
-    const { repo, provaUpdate } = montar();
-
-    await repo.substituirQuestao(DE, PARA);
-
-    expect(String(provaUpdate.mock.calls[0][0]['questoes.questao'])).toBe(DE);
-  });
-});
+// substituirQuestao: ver `questao.nova-versao.mongo.spec.ts` (Mongo real) —
+// com a flag do card 06 (tickets/023) a troca passou a depender do que está
+// gravado nas provas, e o mock não prova isso.
 
 describe('QuestaoRepository.congelar (card 26)', () => {
   it('marca só o campo `congelada`', async () => {
     const updateOne = jest.fn().mockResolvedValue({});
-    const repo = new QuestaoRepository({ updateOne } as any, {} as any, {} as any);
+    const repo = new QuestaoRepository(
+      { updateOne } as any,
+      {} as any,
+      {} as any,
+    );
 
     await repo.congelar('q1');
 

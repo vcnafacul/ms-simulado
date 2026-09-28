@@ -73,6 +73,24 @@ export class ProvaRepository extends BaseRepository<Prova> {
       .exec();
   }
 
+  /** Grava a flag e devolve o valor anterior (tickets/023, card 05). */
+  async setReceberNovasVersoes(id: string, valor: boolean): Promise<boolean> {
+    const antes = await this.model
+      .findByIdAndUpdate(id, { $set: { receberNovasVersoes: valor } })
+      .select('receberNovasVersoes')
+      .exec();
+    return antes?.receberNovasVersoes ?? false;
+  }
+
+  /** A composição crua: dono, categoria e as questões com número (card 13). */
+  async getComposicao(id: string): Promise<Prova | null> {
+    return await this.model
+      .findById(id)
+      .select('nome cursinhoId categoria questoes simulados')
+      .populate({ path: 'categoria', select: 'dono selecionavel' })
+      .exec();
+  }
+
   /** Só o que decide a composição: dono, categoria (dono/selecionável), nome. */
   async getDonoDaProva(id: string): Promise<Prova | null> {
     return await this.model
