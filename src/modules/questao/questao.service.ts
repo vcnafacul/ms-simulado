@@ -171,6 +171,7 @@ export class QuestaoService {
     frente,
     prova,
     enemArea,
+    reported,
     sortColumn = 'updatedAt',
     sortOrder = 'desc',
   }: QuestaoDTOInput): Promise<GetAllOutput<QuestaoAllDTO>> {
@@ -186,7 +187,10 @@ export class QuestaoService {
       combineConditions.push(frenteorConditions);
     if (textConditions.length > 0) combineConditions.push(textConditions);
 
-    const where: Record<string, string | number | { $in: string[] }> = {};
+    const where: Record<string, string | number | boolean | { $in: string[] }> =
+      {};
+    // tickets/024, card 04: a equipe acha as sinalizadas para revisão.
+    if (reported === 'true') where['reported'] = true;
     if (status !== undefined) where['status'] = status;
     if (materia) where['materia'] = materia;
     if (prova) {
@@ -320,6 +324,35 @@ export class QuestaoService {
       materias: materias.data,
       frentes: frentes.data,
     };
+  }
+
+  /**
+   * Sinalizar para revisão (tickets/024, card 04): quem não pode recusar a
+   * questão (ela está em provas de outros) pede à equipe da plataforma que
+   * decida. Marca `reported` e deixa o motivo, quem e o cursinho no histórico
+   * da questão — sem coleção nova.
+   */
+  public async sinalizarRevisao(id: string, motivo: string, ator?: Ator) {
+    if (!ator) {
+      throw new ForbiddenException(
+        'Você não tem permissão para sinalizar questões.',
+      );
+    }
+    const questao = await this.repository.getById(id);
+    if (!questao) {
+      throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
+    }
+    await this.repository.marcarReportada(id);
+    await this.auditLogService.create({
+      user: ator.userId,
+      entityId: id,
+      entityType: 'Questao',
+      changes: JSON.stringify({
+        acao: 'sinalizarRevisao',
+        motivo,
+        cursinhoId: ator.cursinhoId,
+      }),
+    });
   }
 
   public async updateStatus(

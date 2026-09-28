@@ -546,6 +546,11 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     await this.model.updateOne({ _id: id }, { $set: { congelada: true } });
   }
 
+  /** Sinalizada para revisão (tickets/024, card 04). */
+  async marcarReportada(id: string): Promise<void> {
+    await this.model.updateOne({ _id: id }, { $set: { reported: true } });
+  }
+
   /** Marca que a questão ganhou uma versão nova (tickets/023, card 18). */
   async marcarTeveSucessora(id: string): Promise<void> {
     await this.model.updateOne({ _id: id }, { $set: { teveSucessora: true } });
