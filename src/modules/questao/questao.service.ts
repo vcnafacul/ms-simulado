@@ -29,6 +29,7 @@ import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
 import { Ator } from 'src/shared/ator/ator';
+import { recusaDoStatus } from './regra-do-status';
 import {
   podeComporDono,
   resumoDoDono,
@@ -170,6 +171,7 @@ export class QuestaoService {
     frente,
     prova,
     enemArea,
+    reported,
     sortColumn = 'updatedAt',
     sortOrder = 'desc',
   }: QuestaoDTOInput): Promise<GetAllOutput<QuestaoAllDTO>> {
@@ -185,7 +187,10 @@ export class QuestaoService {
       combineConditions.push(frenteorConditions);
     if (textConditions.length > 0) combineConditions.push(textConditions);
 
-    const where: Record<string, string | number | { $in: string[] }> = {};
+    const where: Record<string, string | number | boolean | { $in: string[] }> =
+      {};
+    // tickets/024, card 04: a equipe acha as sinalizadas para revisão.
+    if (reported === 'true') where['reported'] = true;
     if (status !== undefined) where['status'] = status;
     if (materia) where['materia'] = materia;
     // Com prova no filtro, a ordem é a do número nela (crescente) — cada questão
@@ -324,28 +329,82 @@ export class QuestaoService {
     };
   }
 
+  /**
+   * Sinalizar para revisão (tickets/024, card 04): quem não pode recusar a
+   * questão (ela está em provas de outros) pede à equipe da plataforma que
+   * decida. Marca `reported` e deixa o motivo, quem e o cursinho no histórico
+   * da questão — sem coleção nova.
+   */
+  public async sinalizarRevisao(id: string, motivo: string, ator?: Ator) {
+    if (!ator) {
+      throw new ForbiddenException(
+        'Você não tem permissão para sinalizar questões.',
+      );
+    }
+    const questao = await this.repository.getById(id);
+    if (!questao) {
+      throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
+    }
+    await this.repository.marcarReportada(id);
+    await this.auditLogService.create({
+      user: ator.userId,
+      entityId: id,
+      entityType: 'Questao',
+      changes: JSON.stringify({
+        acao: 'sinalizarRevisao',
+        motivo,
+        cursinhoId: ator.cursinhoId,
+      }),
+    });
+  }
+
   public async updateStatus(
     id: string,
     status: Status,
     userId: string,
     message?: string,
+    ator?: Ator,
   ) {
+    const alvo = Number(status) as Status;
+    const question = await this.repository.getByIdToUpdate(id);
+    if (!question) {
+      throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
+    }
+    const provas = await this.repository.findProvasContendo(id);
+    /*
+      ⚠️ tickets/024, card 03 — ANTES do `try`, que embrulha tudo num 400:
+      a recusa por permissão tem de sair 403, com as provas que impedem.
+    */
+    const recusa = recusaDoStatus(
+      question.status,
+      alvo,
+      provas.map((p) => ({
+        provaId: String(p._id),
+        provaNome: p.nome,
+        cursinhoId: p.cursinhoId ?? null,
+      })),
+      ator,
+    );
+    if (recusa) {
+      throw new HttpException(
+        { message: recusa.message, provas: recusa.provas },
+        recusa.status,
+      );
+    }
     try {
-      const question = await this.repository.getByIdToUpdate(id);
-      if (question.status === status) {
+      if (question.status === alvo) {
         throw new HttpException(
           'Não houve alteração de status',
           HttpStatus.NOT_MODIFIED,
         );
       }
-      const provas = await this.repository.findProvasContendo(id);
-      if (provas.length === 0) {
-        throw new HttpException(
-          'Para aprovar ou rejeitar, a questão precisa estar em ao menos uma prova',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-      if (status === Status.Approved) {
+      /*
+        ⚠️ tickets/024, card 03: questão SEM prova também muda de status (antes,
+        400 "precisa estar em ao menos uma prova"). O banco é da comunidade e
+        tem questões sem prova (card 03 de area-enem-da-questao); sem prova, só
+        o status e o log mudam — não há contador de prova a mexer.
+      */
+      if (alvo === Status.Approved) {
         for (const prova of provas) {
           await this.provaService.approvedQuestion(prova._id, id);
         }
@@ -354,14 +413,15 @@ export class QuestaoService {
           await this.provaService.refuseQuestion(prova._id, id);
         }
       }
-      await this.repository.UpdateStatus(id, status);
+      await this.repository.UpdateStatus(id, alvo);
       await this.auditLogService.create({
-        user: userId,
+        user: ator?.userId ?? userId,
         entityId: question?._id,
         entityType: 'Questao',
         changes: JSON.stringify({
-          status,
+          status: alvo,
           message,
+          cursinhoId: ator?.cursinhoId ?? null,
         }),
       });
     } catch (error: any) {
@@ -837,6 +897,18 @@ export class QuestaoService {
         HttpStatus.BAD_REQUEST,
       );
     }
+    /*
+      ⚠️ tickets/023, card 18: desde que a original pode seguir viva (em provas
+      com versões fixas), uma segunda versão dela criaria um GALHO (A → A2 e
+      A → A3) — a linhagem e o "Buscar atualizações" supõem uma cadeia só.
+      Quem usa a original corrige no lugar, ou duplica.
+    */
+    if ((original as { teveSucessora?: boolean }).teveSucessora) {
+      throw new HttpException(
+        `A questão ${id} já tem uma versão mais nova. Corrija esta sem criar versão, ou duplique.`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
 
     const sucessora = await this.repository.create(
       documentoDaCopia(TipoOrigem.versao, original) as Questao,
@@ -845,7 +917,15 @@ export class QuestaoService {
 
     await this.repository.updateContent(novaId, content);
     const trocas = await this.repository.substituirQuestao(id, novaId);
-    await this.repository.congelar(id);
+    await this.repository.marcarTeveSucessora(id);
+    /*
+      ⚠️ tickets/023, card 18: congela só se NENHUMA prova ficou com a
+      original. As provas com versões fixas seguem com ela — em uso, e o dono
+      precisa conseguir corrigi-la. Simulado solto não conta como uso: sem
+      prova, ninguém é dono dele para editar.
+    */
+    const congelou = trocas.provasMantidas.length === 0;
+    if (congelou) await this.repository.congelar(id);
     // A sucessora nasce Pending: o contador muda só onde ela entrou (card 06).
     await this.repository.recalcularTotalValidadas(trocas.provas);
 
@@ -861,6 +941,7 @@ export class QuestaoService {
         provasMantidas: trocas.provasMantidas,
         simulados: trocas.simulados,
         simuladosMantidos: trocas.simuladosMantidos,
+        congelou,
       }),
     });
 

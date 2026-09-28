@@ -170,6 +170,16 @@ export class ProvaService {
     });
     // Aprovada trocada por pendente derruba o contador.
     await this.questaoRepository.recalcularTotalValidadas([id]);
+    /*
+      ⚠️ tickets/023, card 19: a regra do card 18 vale aqui também — a
+      original que saiu da ÚLTIMA prova que a usava congela (é o que o
+      histórico aponta). Se outra prova ainda a usa, segue viva e editável.
+    */
+    for (const { de } of trocas) {
+      if (!(await this.questaoRepository.findProvaAtual(de))) {
+        await this.questaoRepository.congelar(de);
+      }
+    }
 
     for (const { de, para } of trocas) {
       await this.auditLogService?.create({

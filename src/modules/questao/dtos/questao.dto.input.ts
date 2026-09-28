@@ -41,6 +41,12 @@ export class QuestaoDTOInput extends GetAllDtoInput {
   @IsOptional()
   text: string = '';
 
+  /** Só as sinalizadas para revisão (tickets/024, card 04). */
+  @ApiProperty({ required: false, enum: ['true'] })
+  @IsOptional()
+  @IsIn(['true'])
+  reported?: 'true';
+
   /** Coluna para ordenação. Ordena por "updatedAt" (padrão). */
   @ApiProperty({ enum: QUESTAO_SORT_COLUMNS, default: 'updatedAt' })
   @IsOptional()

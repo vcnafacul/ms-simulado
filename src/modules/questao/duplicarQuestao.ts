@@ -37,6 +37,13 @@ export const NAO_HERDADOS = {
   status: true,
   /** ⚠️ Nasce ÓRFÃ: sem prova de origem. */
   provaBase: true,
+  /**
+   * ⚠️ tickets/023, card 18: o estado de versão é da ORIGINAL. Herdá-lo fazia
+   * a cópia de uma questão congelada nascer congelada (ineditável), e a de uma
+   * que já teve sucessora nascer recusando nova versão.
+   */
+  congelada: true,
+  teveSucessora: true,
   /** ⚠️ Não herda o avô: `origem` da cópia é sempre a questão duplicada. */
   origem: true,
   /** ⚠️ Nem o tipo do vínculo do pai: a cópia de uma versão é cópia (card 32). */
