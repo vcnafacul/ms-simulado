@@ -29,6 +29,7 @@ import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
 import { Ator } from 'src/shared/ator/ator';
+import { recusaDoStatus } from './regra-do-status';
 import {
   podeComporDono,
   resumoDoDono,
@@ -326,23 +327,48 @@ export class QuestaoService {
     status: Status,
     userId: string,
     message?: string,
+    ator?: Ator,
   ) {
+    const alvo = Number(status) as Status;
+    const question = await this.repository.getByIdToUpdate(id);
+    if (!question) {
+      throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
+    }
+    const provas = await this.repository.findProvasContendo(id);
+    /*
+      ⚠️ tickets/024, card 03 — ANTES do `try`, que embrulha tudo num 400:
+      a recusa por permissão tem de sair 403, com as provas que impedem.
+    */
+    const recusa = recusaDoStatus(
+      question.status,
+      alvo,
+      provas.map((p) => ({
+        provaId: String(p._id),
+        provaNome: p.nome,
+        cursinhoId: p.cursinhoId ?? null,
+      })),
+      ator,
+    );
+    if (recusa) {
+      throw new HttpException(
+        { message: recusa.message, provas: recusa.provas },
+        recusa.status,
+      );
+    }
     try {
-      const question = await this.repository.getByIdToUpdate(id);
-      if (question.status === status) {
+      if (question.status === alvo) {
         throw new HttpException(
           'Não houve alteração de status',
           HttpStatus.NOT_MODIFIED,
         );
       }
-      const provas = await this.repository.findProvasContendo(id);
-      if (provas.length === 0) {
-        throw new HttpException(
-          'Para aprovar ou rejeitar, a questão precisa estar em ao menos uma prova',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-      if (status === Status.Approved) {
+      /*
+        ⚠️ tickets/024, card 03: questão SEM prova também muda de status (antes,
+        400 "precisa estar em ao menos uma prova"). O banco é da comunidade e
+        tem questões sem prova (card 03 de area-enem-da-questao); sem prova, só
+        o status e o log mudam — não há contador de prova a mexer.
+      */
+      if (alvo === Status.Approved) {
         for (const prova of provas) {
           await this.provaService.approvedQuestion(prova._id, id);
         }
@@ -351,14 +377,15 @@ export class QuestaoService {
           await this.provaService.refuseQuestion(prova._id, id);
         }
       }
-      await this.repository.UpdateStatus(id, status);
+      await this.repository.UpdateStatus(id, alvo);
       await this.auditLogService.create({
-        user: userId,
+        user: ator?.userId ?? userId,
         entityId: question?._id,
         entityType: 'Questao',
         changes: JSON.stringify({
-          status,
+          status: alvo,
           message,
+          cursinhoId: ator?.cursinhoId ?? null,
         }),
       });
     } catch (error: any) {

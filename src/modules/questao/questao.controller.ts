@@ -279,8 +279,15 @@ export class QuestaoController {
     @Param('id') id: string,
     @Param('status') status: Status,
     @Body() body: { message: string; userId: string },
+    @AtorDaRequisicao() ator?: Ator,
   ) {
-    await this.service.updateStatus(id, status, body.userId, body.message);
+    await this.service.updateStatus(
+      id,
+      status,
+      body.userId,
+      body.message,
+      ator,
+    );
   }
 
   @Patch()
