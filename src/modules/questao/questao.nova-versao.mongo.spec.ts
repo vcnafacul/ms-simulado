@@ -165,4 +165,25 @@ describe('substituirQuestao com receberNovasVersoes — Mongo real', () => {
     expect(await total(B)).toBe(0);
     expect(await total(A)).toBe(1);
   });
+
+  describe('findProvaDeSaida (023 · 17)', () => {
+    it('⚠️ questão em PB e PA: com PA informada, sai de PA — nunca da "primeira"', async () => {
+      const Q = await q();
+      const PB = await prova(Q, [], true); // gravada primeiro: o findOne acharia esta
+      const PA = await prova(Q, [], true);
+
+      expect(await repo.findProvaAtual(String(Q))).toBe(String(PB));
+      expect(await repo.findProvaDeSaida(String(Q), String(PA))).toBe(
+        String(PA),
+      );
+    });
+
+    it('questão fora da prova informada (mover de prova): cai no findProvaAtual', async () => {
+      const Q = await q();
+      const onde = await prova(Q, [], true);
+      expect(
+        await repo.findProvaDeSaida(String(Q), String(new Types.ObjectId())),
+      ).toBe(String(onde));
+    });
+  });
 });

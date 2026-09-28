@@ -1,10 +1,12 @@
 import {
+  BadRequestException,
   ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ClientSession } from 'mongoose';
 import { Ator } from 'src/shared/ator/ator';
 import { AuditLogService } from '../auditLog/auditLog.service';
 import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
@@ -21,8 +23,21 @@ import { ProvaRepository } from './prova.repository';
 import { Prova } from './prova.schema';
 import { UpdateProvaFilesDTO } from './dtos/update-files.dto.input';
 import { revalidarBloqueado } from '../simulado/helpers/bloqueado';
-import { syncNumeroNaProvaESimulados } from './helpers/question-container.helpers';
-import { motivoParaNaoComporProva } from './helpers/pode-compor-prova';
+import {
+  resolveQuestaoId,
+  syncNumeroNaProvaESimulados,
+} from './helpers/question-container.helpers';
+import {
+  atualizacoesDaProva,
+  Atualizacao,
+  PROFUNDIDADE_MAXIMA,
+} from './helpers/atualizacoes-da-prova';
+import {
+  podeComporProva,
+  motivoParaNaoComporProva,
+  ResumoDoDono,
+  resumoDoDono,
+} from './helpers/pode-compor-prova';
 
 @Injectable()
 export class ProvaService {
@@ -77,6 +92,139 @@ export class ProvaService {
     return { receberNovasVersoes: valor };
   }
 
+  /**
+   * O que mudou nas questões desta prova desde que foi montada (tickets/023,
+   * card 13). Ler é livre (R1); `podeComporProva` diz se a tela oferece
+   * "aplicar" (card 14).
+   */
+  public async listarAtualizacoes(
+    id: string,
+    ator?: Ator,
+  ): Promise<{ podeComporProva: boolean; atualizacoes: Atualizacao[] }> {
+    const prova = await this.repository.getComposicao(id);
+    if (!prova) {
+      throw new NotFoundException(`Prova com ID ${id} não encontrada.`);
+    }
+    const atualizacoes = await atualizacoesDaProva(
+      (prova.questoes ?? []).map((qc) => ({
+        numero: qc.numero ?? null,
+        questaoId: resolveQuestaoId(qc),
+      })),
+      {
+        questoes: (ids) => this.questaoRepository.questoesDaCadeia(ids),
+        sucessoras: (ids) => this.questaoRepository.sucessorasDeVersao(ids),
+      },
+    );
+    return { podeComporProva: podeComporProva(prova, ator), atualizacoes };
+  }
+
+  /**
+   * Aplica versões novas NESTA prova e nos simulados dela (tickets/023, card
+   * 14). Só o dono (R2). Tudo ou nada: valida todas as trocas antes de
+   * escrever, e escreve numa transação.
+   *
+   * Cada troca: `de` está na prova; `para` é DESCENDENTE de `de` na cadeia de
+   * versões (qualquer outra questão seria "adicionar", que tem rota própria);
+   * `para` não está na prova; `para` viva (a cadeia só segue as vivas).
+   * Pode ser `Pending`. O histórico de quem já fez segue com `de`.
+   */
+  public async aplicarAtualizacoes(
+    id: string,
+    trocas: { de: string; para: string }[],
+    ator?: Ator,
+  ): Promise<{ trocadas: number; simulados: number }> {
+    await this.assertPodeComporProva(id, ator);
+    const prova = await this.repository.getComposicao(id);
+    const naProva = new Set(
+      (prova!.questoes ?? []).map((qc) => resolveQuestaoId(qc)),
+    );
+
+    const destinos = new Set<string>();
+    for (const { de, para } of trocas) {
+      if (!naProva.has(de)) {
+        throw new BadRequestException(`A questão ${de} não está nesta prova.`);
+      }
+      if (naProva.has(para) || destinos.has(para)) {
+        throw new BadRequestException(`A questão ${para} já está nesta prova.`);
+      }
+      if (!(await this.ehDescendente(de, para))) {
+        throw new BadRequestException(
+          `A questão ${para} não é uma versão mais nova de ${de}.`,
+        );
+      }
+      destinos.add(para);
+    }
+
+    const simuladoIds = (prova!.simulados ?? []) as unknown[];
+    let simulados = 0;
+    await this.emTransacao(async (session) => {
+      for (const { de, para } of trocas) {
+        simulados += await this.questaoRepository.trocarNaProva(
+          id,
+          simuladoIds,
+          de,
+          para,
+          session,
+        );
+      }
+    });
+    // Aprovada trocada por pendente derruba o contador.
+    await this.questaoRepository.recalcularTotalValidadas([id]);
+
+    for (const { de, para } of trocas) {
+      await this.auditLogService?.create({
+        user: ator!.userId,
+        entityId: id,
+        entityType: 'Prova',
+        changes: JSON.stringify({
+          acao: 'aplicarVersao',
+          provaId: id,
+          de,
+          para,
+          cursinhoId: ator!.cursinhoId,
+        }),
+      });
+    }
+    return { trocadas: trocas.length, simulados };
+  }
+
+  /**
+   * Uma transação, como o `removerDeProva` (prod é replica set). Separada
+   * para os testes com Mongo standalone, que não tem transação — lá a
+   * validação-antes-de-escrever é o que garante o "tudo ou nada" dos 400.
+   */
+  private async emTransacao(
+    escrever: (session: ClientSession) => Promise<void>,
+  ): Promise<void> {
+    const session = await this.questaoRepository.startSession();
+    session.startTransaction();
+    try {
+      await escrever(session);
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  /** `para` está na cadeia de versões a partir de `de` (vivas, até 50). */
+  private async ehDescendente(de: string, para: string): Promise<boolean> {
+    let atual = de;
+    const visitadas = new Set([de]);
+    for (let i = 0; i < PROFUNDIDADE_MAXIMA; i++) {
+      const s = (await this.questaoRepository.sucessorasDeVersao([atual])).get(
+        atual,
+      );
+      if (!s || visitadas.has(String(s._id))) return false;
+      if (String(s._id) === para) return true;
+      visitadas.add(String(s._id));
+      atual = String(s._id);
+    }
+    return false;
+  }
+
   public async create(item: CreateProvaDTOInput): Promise<GetProvaDTOOutout> {
     /*
       ⚠️ Antes de tudo: a fábrica cria os simulados antes da prova e sem
@@ -126,6 +274,22 @@ export class ProvaService {
   public async getById(id: string): Promise<Prova> {
     const prova = await this.repository.getById(id);
     return prova;
+  }
+
+  /**
+   * A prova para a tela, com dono, proteção e se o ator pode compor
+   * (tickets/023, card 07). Ler é livre (R1): quem barra escrita é o assert.
+   */
+  public async getByIdComDono(
+    id: string,
+    ator?: Ator,
+  ): Promise<(Prova & ResumoDoDono) | null> {
+    const prova = await this.repository.getById(id);
+    if (!prova) return null;
+    return {
+      ...((prova as any).toObject ? (prova as any).toObject() : prova),
+      ...resumoDoDono(prova, ator),
+    };
   }
 
   public async syncNumero(

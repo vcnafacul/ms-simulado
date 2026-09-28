@@ -240,8 +240,12 @@ export class Enem2010_2017Factory implements IProvaFactory {
     );
 
     // Determina se houve mudança de prova ou de simulados
-    const provaToLeaveId = await this.questaoRepository.findProvaAtual(
+    // ⚠️ tickets/023, card 17: a prova de saída é a informada, quando a
+    // questão está nela — nunca "a primeira que achar", que podia ser a
+    // prova de outro cursinho.
+    const provaToLeaveId = await this.questaoRepository.findProvaDeSaida(
       question._id,
+      question.prova,
     );
     const provaToEnter = await this.provaRepository.getById(question.prova);
     // ⚠️ A área tem de caber no dia da prova — ANTES de qualquer escrita.

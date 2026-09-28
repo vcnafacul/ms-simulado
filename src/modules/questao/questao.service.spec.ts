@@ -457,8 +457,14 @@ describe('QuestaoService.getById', () => {
     const res: any = await service.getById('q1');
 
     expect(repository.findProvasContendoMany).toHaveBeenCalledWith(['q1']);
+    // + `podeComporProva` do ator (023 · 07): sem ator, false.
     expect(res.provasContendo).toEqual([
-      { provaId: 'p1', provaNome: 'Prova 1', numero: 4 },
+      {
+        provaId: 'p1',
+        provaNome: 'Prova 1',
+        numero: 4,
+        podeComporProva: false,
+      },
     ]);
     expect(res.provaBase).toBe('p1');
   });

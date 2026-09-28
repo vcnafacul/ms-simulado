@@ -62,8 +62,8 @@ export class QuestaoController {
     isArray: true,
   })
   //precisamos criar dto pra isso
-  public async getInfos(): Promise<any> {
-    return await this.service.getInfos();
+  public async getInfos(@AtorDaRequisicao() ator?: Ator): Promise<any> {
+    return await this.service.getInfos(ator);
   }
 
   @Post()
@@ -113,8 +113,9 @@ export class QuestaoController {
   })
   public async getById(
     @Param('id') id: string,
+    @AtorDaRequisicao() ator?: Ator,
   ): Promise<(Questao & { provasContendo: ProvaContendo[] }) | null> {
-    return await this.service.getById(id);
+    return await this.service.getById(id, ator);
   }
 
   @Delete(':id')
