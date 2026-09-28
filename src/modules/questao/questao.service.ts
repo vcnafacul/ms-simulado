@@ -188,10 +188,12 @@ export class QuestaoService {
     const where: Record<string, string | number | { $in: string[] }> = {};
     if (status !== undefined) where['status'] = status;
     if (materia) where['materia'] = materia;
+    // Com prova no filtro, a ordem é a do número nela (crescente) — cada questão
+    // tem um só número dentro de uma prova. Sem prova, segue `sortColumn`.
+    let ordemIds: string[] | undefined;
     if (prova) {
-      where['_id'] = {
-        $in: await this.repository.findQuestaoIdsByProva(prova),
-      };
+      ordemIds = await this.repository.findQuestaoIdsByProva(prova);
+      where['_id'] = { $in: ordemIds };
     }
     if (enemArea) where['enemArea'] = enemArea;
 
@@ -202,6 +204,7 @@ export class QuestaoService {
       or: combineConditions,
       sortColumn,
       sortOrder,
+      ordemIds,
     });
 
     const ids = questoes.data.map((q) => q._id.toString());

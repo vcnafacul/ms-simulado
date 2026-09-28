@@ -117,7 +117,13 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     or,
     sortColumn = 'updatedAt',
     sortOrder = 'asc',
-  }: GetAllWhereInput): Promise<GetAllOutput<Questao>> {
+    ordemIds,
+  }: GetAllWhereInput & { ordemIds?: string[] }): Promise<
+    GetAllOutput<Questao>
+  > {
+    if (ordemIds) {
+      return this.getAllNaOrdem({ page, limit, where, or, ordemIds });
+    }
     const sortDirection: 1 | -1 = sortOrder === 'desc' ? -1 : 1;
     const sort: Record<string, 1 | -1> = {
       [sortColumn ?? 'updatedAt']: sortDirection,
@@ -155,6 +161,45 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       limit: limit,
       totalItems,
     };
+  }
+
+  /**
+   * Listagem filtrada por prova, na ordem do `numero` dela. O número mora em
+   * `Prova.questoes[].numero`, não na questão — então não há campo para o
+   * `.sort()` do Mongo, e o `$in` do filtro não guarda ordem. Uma prova tem
+   * poucas centenas de questões: casa os ids com os filtros, ordena em memória
+   * pela posição em `ordemIds`, pagina e só então busca os documentos da página.
+   */
+  private async getAllNaOrdem({
+    page,
+    limit,
+    where,
+    or,
+    ordemIds,
+  }: GetAllWhereInput & { ordemIds: string[] }): Promise<
+    GetAllOutput<Questao>
+  > {
+    const filtro: Record<string, unknown> = { ...where, ...NAO_EXCLUIDA };
+    if (or && or.length > 0) filtro.$and = or.map((o) => ({ $or: o }));
+
+    const casados = await this.model.find(filtro).select('_id').lean();
+    const posicao = new Map(ordemIds.map((id, i) => [id, i]));
+    const pos = (id: unknown) => posicao.get(String(id)) ?? Infinity;
+    const ordenados = casados
+      .map((q) => String(q._id))
+      .sort((a, b) => pos(a) - pos(b));
+
+    const inicio = (page - 1) * limit;
+    const idsDaPagina = limit
+      ? ordenados.slice(inicio, inicio + limit)
+      : ordenados.slice(inicio);
+    const docs = await this.model
+      .find({ _id: { $in: idsDaPagina } })
+      .populate(['materia'])
+      .select('+alternativa');
+    const data = docs.sort((a, b) => pos(a._id) - pos(b._id));
+
+    return { data, page, limit, totalItems: ordenados.length };
   }
 
   override async getById(id: string) {
@@ -872,7 +917,13 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       .select('questoes')
       .exec();
     if (!prova) return [];
-    return prova.questoes.map((qc) => resolveQuestaoId(qc));
+    // Ordenados pelo número na prova; `sort` é estável, então números repetidos
+    // (ex.: 1–5 de inglês e de espanhol no ENEM) mantêm a ordem do array, e
+    // entrada sem número vai para o fim.
+    const numero = (n: number | null | undefined) => n ?? Infinity;
+    return [...prova.questoes]
+      .sort((a, b) => numero(a.numero) - numero(b.numero))
+      .map((qc) => resolveQuestaoId(qc));
   }
 
   async findProvasContendoMany(
