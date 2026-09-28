@@ -27,6 +27,7 @@ export interface QuestaoDaCadeia {
   origem?: string | null;
   status: Status;
   congelada?: boolean;
+  teveSucessora?: boolean;
   createdAt?: Date;
   [campo: string]: unknown;
 }
@@ -35,6 +36,7 @@ const PROJECAO_DA_CADEIA = {
   origem: 1,
   status: 1,
   congelada: 1,
+  teveSucessora: 1,
   createdAt: 1,
   textoQuestao: 1,
   pergunta: 1,
