@@ -4,6 +4,7 @@ import {
   motivoParaNaoComporProva,
   podeComporProva,
   provaProtegida,
+  resumoDoDono,
   TEXTO_OFICIAL,
   TEXTO_OUTRO_CURSINHO,
 } from './pode-compor-prova';
@@ -72,5 +73,25 @@ describe('podeComporProva (023 · 03)', () => {
     expect(provaProtegida(catDe('A', false))).toBe(true);
     expect(provaProtegida(catDe('A'))).toBe(false);
     expect(provaProtegida(null)).toBe(true);
+  });
+
+  it('resumoDoDono (023 · 07)', () => {
+    expect(resumoDoDono({ ...PA, receberNovasVersoes: true }, A)).toEqual({
+      cursinhoId: 'A',
+      protegida: false,
+      selecionavel: true,
+      receberNovasVersoes: true,
+      podeComporProva: true,
+    });
+    expect(resumoDoDono(PAns, A)).toMatchObject({
+      protegida: true,
+      selecionavel: false,
+      receberNovasVersoes: false,
+      podeComporProva: false,
+    });
+    expect(resumoDoDono(legada, Adm)).toMatchObject({
+      cursinhoId: null,
+      podeComporProva: true,
+    });
   });
 });

@@ -15,6 +15,7 @@ import { GetProvaDTOOutout } from './dtos/get-all.dto.output';
 import { Prova } from './prova.schema';
 import { ProvaService } from './prova.service';
 import { UpdateProvaFilesDTO } from './dtos/update-files.dto.input';
+import { AplicarAtualizacoesDTOInput } from './dtos/aplicar-atualizacoes.dto.input';
 import { ReceberNovasVersoesDTOInput } from './dtos/receber-novas-versoes.dto.input';
 import { Ator, AtorDaRequisicao } from 'src/shared/ator/ator';
 
@@ -75,8 +76,11 @@ export class ProvaController {
     type: Prova,
     isArray: false,
   })
-  public async getById(@Param('id') id: string): Promise<Prova> {
-    return await this.service.getById(id);
+  public async getById(
+    @Param('id') id: string,
+    @AtorDaRequisicao() ator?: Ator,
+  ): Promise<Prova | null> {
+    return await this.service.getByIdComDono(id, ator);
   }
 
   @Get('missing/:id')
@@ -88,6 +92,27 @@ export class ProvaController {
   })
   public async getMissing(@Param('id') id: string): Promise<number[]> {
     return await this.service.getMissingNumbers(id);
+  }
+
+  /** tickets/023, card 13 — ler é livre; `podeComporProva` diz se aplica. */
+  @Get(':id/atualizacoes')
+  @ApiResponse({ status: 200, description: 'atualizações das questões' })
+  public async listarAtualizacoes(
+    @Param('id') id: string,
+    @AtorDaRequisicao() ator?: Ator,
+  ) {
+    return await this.service.listarAtualizacoes(id, ator);
+  }
+
+  /** tickets/023, card 14 — só o dono; tudo ou nada. */
+  @Post(':id/atualizacoes')
+  @ApiResponse({ status: 201, description: 'aplica versões novas na prova' })
+  public async aplicarAtualizacoes(
+    @Param('id') id: string,
+    @Body() dto: AplicarAtualizacoesDTOInput,
+    @AtorDaRequisicao() ator?: Ator,
+  ) {
+    return await this.service.aplicarAtualizacoes(id, dto.trocas, ator);
   }
 
   /** tickets/023, card 05 — só o dono (403 com o motivo). */

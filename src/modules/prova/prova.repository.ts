@@ -82,6 +82,15 @@ export class ProvaRepository extends BaseRepository<Prova> {
     return antes?.receberNovasVersoes ?? false;
   }
 
+  /** A composição crua: dono, categoria e as questões com número (card 13). */
+  async getComposicao(id: string): Promise<Prova | null> {
+    return await this.model
+      .findById(id)
+      .select('nome cursinhoId categoria questoes simulados')
+      .populate({ path: 'categoria', select: 'dono selecionavel' })
+      .exec();
+  }
+
   /** Só o que decide a composição: dono, categoria (dono/selecionável), nome. */
   async getDonoDaProva(id: string): Promise<Prova | null> {
     return await this.model
