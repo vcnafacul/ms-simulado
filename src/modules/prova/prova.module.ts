@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { AuditLogModule } from '../auditLog/auditLog.module';
 import { ExameModule } from '../exame/exame.module';
 import { FrenteModule } from '../frente/frente.module';
 import { MateriaModule } from '../materia/materia.module';
@@ -25,6 +26,7 @@ import { EnemService } from './services/enem_service';
       { name: Categoria.name, schema: CategoriaSchema },
     ]),
     ExameModule,
+    AuditLogModule,
     QuestaoModule,
     MateriaModule,
     FrenteModule,

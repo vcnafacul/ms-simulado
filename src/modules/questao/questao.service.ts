@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -27,6 +28,11 @@ import { UpdateImageAlternativaDTOInput } from './dtos/update-image-alternativa.
 import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
+import { Ator } from 'src/shared/ator/ator';
+import {
+  podeComporDono,
+  resumoDoDono,
+} from '../prova/helpers/pode-compor-prova';
 import { documentoDaCopia } from './duplicarQuestao';
 import { provasQueRecusamArea } from '../prova/services/area-da-prova';
 import { TipoOrigem } from './enums/tipo-origem.enum';
@@ -42,6 +48,11 @@ import {
   motivosParaNaoExcluir,
   TEXTO_DO_MOTIVO,
 } from './exclusaoDaQuestao';
+
+/** tickets/023, card 17 — a tela mostra em toast. */
+export const textoAreaFrenteEmProvaOficial = (provas: string[]) =>
+  `Esta questão está numa prova oficial (${provas.join(', ')}). ` +
+  'Área e frente principal só podem ser alteradas pela equipe da plataforma.';
 
 /** Um motivo de recusa como a tela recebe: código para decidir, texto para ler. */
 export interface Motivo {
@@ -76,7 +87,13 @@ export class QuestaoService {
     private readonly provaFactory: ProvaFactory,
   ) {}
 
-  public async create(item: CreateQuestaoDTOInput): Promise<Questao> {
+  public async create(
+    item: CreateQuestaoDTOInput,
+    ator?: Ator,
+  ): Promise<Questao> {
+    // ⚠️ Criar já dentro da prova é compor a prova (tickets/023, card 03).
+    if (item.prova)
+      await this.provaService.assertPodeComporProva(item.prova, ator);
     /*
       ⚠️ **Sem prova, só grava a questão** (card 03 de `area-enem-da-questao`):
       sem fábrica, sem simulado, sem número. Entrar numa prova depois é o
@@ -120,6 +137,7 @@ export class QuestaoService {
 
   public async getById(
     id: string,
+    ator?: Ator,
   ): Promise<(Questao & { provasContendo: ProvaContendo[] }) | null> {
     const questao = await this.repository.getById(id);
     if (!questao) return null;
@@ -127,7 +145,11 @@ export class QuestaoService {
     const obj = (
       (questao as any).toObject ? (questao as any).toObject() : questao
     ) as Questao & { provasContendo: ProvaContendo[] };
-    obj.provasContendo = map.get(id.toString()) ?? [];
+    // tickets/023, card 07: se o ator da requisição pode compor cada prova.
+    obj.provasContendo = (map.get(id.toString()) ?? []).map((p) => ({
+      ...p,
+      podeComporProva: podeComporDono(p, ator),
+    }));
     return obj;
   }
 
@@ -275,12 +297,19 @@ export class QuestaoService {
     });
   }
 
-  public async getInfos() {
+  public async getInfos(ator?: Ator) {
     const param: GetAllInput = {
       page: 1,
       limit: 0,
     };
-    const provas = await this.provaRepository.getAll(param);
+    const todas = await this.provaRepository.getAll(param);
+    // tickets/023, card 07: cada prova com dono, proteção e se o ator compõe.
+    const provas = {
+      data: todas.data.map((p) => ({
+        ...((p as any).toObject ? (p as any).toObject() : p),
+        ...resumoDoDono(p, ator),
+      })),
+    };
     const exames = await this.exameRepository.getAll(param);
     const materias = await this.materiaRepository.getAll(param);
     const frentes = await this.frenteRepository.getAll(param);
@@ -340,6 +369,25 @@ export class QuestaoService {
     }
   }
 
+  /**
+   * `PATCH v1/questao` — ⚠️ compõe prova: pode tirar a questão de uma prova e
+   * pôr em outra, e troca o número (tickets/023, card 03). Checa o destino e a
+   * prova de onde a fábrica vai tirar a questão.
+   */
+  public async updateQuestionDaRota(question: UpdateDTOInput, ator?: Ator) {
+    if (question.prova) {
+      await this.provaService.assertPodeComporProva(question.prova, ator);
+      const saida = await this.repository.findProvaDeSaida(
+        question._id,
+        question.prova,
+      );
+      if (saida && saida !== question.prova.toString()) {
+        await this.provaService.assertPodeComporProva(saida, ator);
+      }
+    }
+    await this.updateQuestion(question);
+  }
+
   public async updateQuestion(question: UpdateDTOInput) {
     if (!question.prova) {
       throw new HttpException('Prova não informada', HttpStatus.BAD_REQUEST);
@@ -357,7 +405,9 @@ export class QuestaoService {
     questaoId: string,
     provaId: string,
     userId?: string,
+    ator?: Ator,
   ): Promise<void> {
+    await this.provaService.assertPodeComporProva(provaId, ator);
     const provas = await this.repository.findProvasContendo(questaoId);
     if (provas.length <= 1) {
       throw new BadRequestException(
@@ -390,10 +440,14 @@ export class QuestaoService {
       session.endSession();
     }
     await this.auditLogService.create({
-      user: userId,
+      user: ator?.userId ?? userId,
       entityId: questaoId,
       entityType: 'Questao',
-      changes: JSON.stringify({ acao: 'removerDeProva', provaId }),
+      changes: JSON.stringify({
+        acao: 'removerDeProva',
+        provaId,
+        cursinhoId: ator?.cursinhoId ?? null,
+      }),
     });
   }
 
@@ -425,7 +479,9 @@ export class QuestaoService {
     provaId: string,
     numero: number,
     userId?: string,
+    ator?: Ator,
   ): Promise<void> {
+    await this.provaService.assertPodeComporProva(provaId, ator);
     const prova = await this.provaRepository.getById(provaId);
     if (!prova) {
       throw new NotFoundException(`Prova com ID ${provaId} não encontrada.`);
@@ -446,17 +502,36 @@ export class QuestaoService {
     }
     await factory.addQuestaoExistenteAProva(questaoId, provaId, numero);
     await this.auditLogService.create({
-      user: userId,
+      user: ator?.userId ?? userId,
       entityId: questaoId,
       entityType: 'Questao',
-      changes: JSON.stringify({ acao: 'adicionarEmProva', provaId, numero }),
+      changes: JSON.stringify({
+        acao: 'adicionarEmProva',
+        provaId,
+        numero,
+        cursinhoId: ator?.cursinhoId ?? null,
+      }),
     });
   }
 
   public async updateClassificacao(
     id: string,
     classificacao: UpdateClassificacaoDTOInput,
+    ator?: Ator,
   ) {
+    // ⚠️ Trocar o número é compor a prova (tickets/023, card 03). O resto da
+    // classificação é livre (R4); área/frente1 em prova oficial é o card 17.
+    if (classificacao.prova && classificacao.numero !== undefined) {
+      const atual = (await this.repository.findProvasContendoMany([id]))
+        .get(id)
+        ?.find((p) => p.provaId === classificacao.prova.toString());
+      if ((atual?.numero ?? null) !== (classificacao.numero ?? null)) {
+        await this.provaService.assertPodeComporProva(
+          classificacao.prova,
+          ator,
+        );
+      }
+    }
     const questao = await this.repository.getByIdToUpdate(id);
     if (!questao) {
       throw new NotFoundException(`Questão com ID ${id} não encontrada.`);
@@ -489,6 +564,26 @@ export class QuestaoService {
     const enemAreaChanged = classificacao.enemArea !== questao.enemArea;
     const frente1Changed =
       classificacao.frente1 !== questao.frente1?._id?.toString();
+
+    /*
+      ⚠️ tickets/023, card 17 (R10): questão numa prova de categoria fora de
+      uso (`selecionavel: false` — as oficiais) só muda de área/frente1 pela
+      equipe da plataforma. A área decide em qual simulado do dia a questão
+      fica: mudá-la mexe na prova oficial. ANTES de qualquer escrita.
+    */
+    const mudaAreaOuFrente1 =
+      (classificacao.enemArea !== undefined && enemAreaChanged) ||
+      (classificacao.frente1 !== undefined && frente1Changed);
+    if (mudaAreaOuFrente1 && !ator?.admin) {
+      const oficiais = (
+        (await this.repository.findProvasContendoMany([id])).get(id) ?? []
+      ).filter((p) => !p.selecionavel);
+      if (oficiais.length > 0) {
+        throw new ForbiddenException(
+          textoAreaFrenteEmProvaOficial(oficiais.map((p) => p.provaNome)),
+        );
+      }
+    }
 
     /*
       ⚠️ **A área nova tem de caber em TODAS as provas da questão**, e não só na
@@ -748,6 +843,8 @@ export class QuestaoService {
     await this.repository.updateContent(novaId, content);
     const trocas = await this.repository.substituirQuestao(id, novaId);
     await this.repository.congelar(id);
+    // A sucessora nasce Pending: o contador muda só onde ela entrou (card 06).
+    await this.repository.recalcularTotalValidadas(trocas.provas);
 
     await this.auditLogService.create({
       user: userId,
@@ -758,7 +855,9 @@ export class QuestaoService {
         acao: 'novaVersao',
         sucessora: novaId,
         provas: trocas.provas,
+        provasMantidas: trocas.provasMantidas,
         simulados: trocas.simulados,
+        simuladosMantidos: trocas.simuladosMantidos,
       }),
     });
 

@@ -151,8 +151,12 @@ export class CustomProvaFactory implements IProvaFactory {
 
   public async updateQuestion(question: UpdateDTOInput): Promise<void> {
     const questao = await this.questaoRepository.getByIdToUpdate(question._id);
-    const provaToLeaveId = await this.questaoRepository.findProvaAtual(
+    // ⚠️ tickets/023, card 17: a prova de saída é a informada, quando a
+    // questão está nela — nunca "a primeira que achar", que podia ser a
+    // prova de outro cursinho.
+    const provaToLeaveId = await this.questaoRepository.findProvaDeSaida(
       question._id,
+      question.prova,
     );
     const provaToEnter = await this.provaRepository.getById(question.prova);
     const changeProva = provaToLeaveId !== provaToEnter._id.toString();
