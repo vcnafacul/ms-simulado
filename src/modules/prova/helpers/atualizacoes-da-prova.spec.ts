@@ -6,19 +6,19 @@ describe('atualizacoesDaProva', () => {
   const doc = (id: string, o: object = {}) => ({
     _id: id,
     status: Status.Approved,
-    congelada: false,
+    teveSucessora: false,
     ...o,
   });
 
   it('⚠️ sem N+1: uma consulta por NÍVEL, não por questão', async () => {
-    // 3 questões congeladas, cada uma com cadeia de 2 versões.
+    // 3 questões com versão nova, cada uma com cadeia de 2 versões.
     const questoes = jest.fn(async () =>
-      ['a', 'b', 'c'].map((id) => doc(id, { congelada: true })),
+      ['a', 'b', 'c'].map((id) => doc(id, { teveSucessora: true })),
     );
     const cadeia: Record<string, ReturnType<typeof doc>> = {
-      a: doc('a1', { congelada: true }),
-      b: doc('b1', { congelada: true }),
-      c: doc('c1', { congelada: true }),
+      a: doc('a1', { teveSucessora: true }),
+      b: doc('b1', { teveSucessora: true }),
+      c: doc('c1', { teveSucessora: true }),
       a1: doc('a2'),
       b1: doc('b2'),
       c1: doc('c2'),
@@ -42,12 +42,15 @@ describe('atualizacoesDaProva', () => {
     const sucessoras = jest.fn(
       async (ids: string[]) =>
         new Map(
-          ids.map((i) => [i, doc(i === 'x' ? 'y' : 'x', { congelada: true })]),
+          ids.map((i) => [
+            i,
+            doc(i === 'x' ? 'y' : 'x', { teveSucessora: true }),
+          ]),
         ),
     );
     const r = await atualizacoesDaProva(
       [{ numero: 1, questaoId: 'x' }],
-      { questoes: async () => [doc('x', { congelada: true })], sucessoras },
+      { questoes: async () => [doc('x', { teveSucessora: true })], sucessoras },
       50,
     );
     expect(sucessoras.mock.calls.length).toBeLessThanOrEqual(50);

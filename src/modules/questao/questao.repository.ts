@@ -27,6 +27,7 @@ export interface QuestaoDaCadeia {
   origem?: string | null;
   status: Status;
   congelada?: boolean;
+  teveSucessora?: boolean;
   createdAt?: Date;
   [campo: string]: unknown;
 }
@@ -35,6 +36,7 @@ const PROJECAO_DA_CADEIA = {
   origem: 1,
   status: 1,
   congelada: 1,
+  teveSucessora: 1,
   createdAt: 1,
   textoQuestao: 1,
   pergunta: 1,
@@ -542,6 +544,11 @@ export class QuestaoRepository extends BaseRepository<Questao> {
   /** Marca a questão como congelada — ver o docblock do campo no schema. */
   async congelar(id: string): Promise<void> {
     await this.model.updateOne({ _id: id }, { $set: { congelada: true } });
+  }
+
+  /** Sinalizada para revisão (tickets/024, card 04). */
+  async marcarReportada(id: string): Promise<void> {
+    await this.model.updateOne({ _id: id }, { $set: { reported: true } });
   }
 
   /** Marca que a questão ganhou uma versão nova (tickets/023, card 18). */

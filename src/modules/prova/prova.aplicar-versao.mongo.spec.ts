@@ -168,6 +168,36 @@ describe('aplicarAtualizacoes — Mongo real', () => {
     });
   });
 
+  it('⚠️ 023 · 19: a original que saiu da última prova congela; se outra ainda usa, não', async () => {
+    const Q = await q();
+    const Q1 = await versao(Q);
+    // o helper `versao` congela a antecessora — aqui ela está viva, como no card 18
+    await questoes.collection.updateOne(
+      { _id: Q },
+      { $set: { congelada: false } },
+    );
+    const PA = await prova([[Q, 1]], []);
+    const PB = await prova([[Q, 1]], [], 'B');
+
+    await service.aplicarAtualizacoes(
+      String(PA),
+      [{ de: String(Q), para: String(Q1) }],
+      ator({}),
+    );
+    expect((await questoes.collection.findOne({ _id: Q }))!.congelada).toBe(
+      false,
+    ); // PB ainda usa
+
+    await service.aplicarAtualizacoes(
+      String(PB),
+      [{ de: String(Q), para: String(Q1) }],
+      ator({ cursinhoId: 'B' }),
+    );
+    expect((await questoes.collection.findOne({ _id: Q }))!.congelada).toBe(
+      true,
+    );
+  });
+
   it('não dono e admin em prova de cursinho → 403, nada muda', async () => {
     const Q = await q();
     const Q1 = await versao(Q);

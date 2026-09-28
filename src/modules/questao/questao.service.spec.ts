@@ -348,16 +348,23 @@ describe('QuestaoService.updateStatus (reverse-lookup provas)', () => {
       {} as any,
     );
     const { Status } = require('./enums/status.enum');
-    await service.updateStatus('q1', Status.Approved, 'user1');
+    await service.updateStatus('q1', Status.Approved, 'user1', undefined, {
+      userId: 'user1',
+      cursinhoId: null,
+      admin: true,
+      editorCursinho: false,
+      validadorProjeto: true,
+    });
     expect(provaService.approvedQuestion).toHaveBeenCalledWith('pr1', 'q1');
     expect(provaService.approvedQuestion).toHaveBeenCalledWith('pr2', 'q1');
   });
 
-  it('lança quando a questão não está em nenhuma prova', async () => {
+  it('⚠️ 024 · 03: questão sem prova muda de status (antes: 400)', async () => {
     const { Status } = require('./enums/status.enum');
     const repository: any = {
       getByIdToUpdate: jest.fn().mockResolvedValue({ _id: 'q1', status: 0 }),
       findProvasContendo: jest.fn().mockResolvedValue([]),
+      UpdateStatus: jest.fn(),
     };
     const { QuestaoService } = require('./questao.service');
     const service = new QuestaoService(
@@ -371,9 +378,15 @@ describe('QuestaoService.updateStatus (reverse-lookup provas)', () => {
       {} as any,
       {} as any,
     );
-    await expect(
-      service.updateStatus('q1', Status.Approved, 'user1'),
-    ).rejects.toBeTruthy();
+    (service as any).auditLogService = { create: jest.fn() };
+    await service.updateStatus('q1', Status.Rejected, 'user1', 'ruim', {
+      userId: 'user1',
+      cursinhoId: 'A',
+      admin: false,
+      editorCursinho: false,
+      validadorCursinho: true,
+    });
+    expect(repository.UpdateStatus).toHaveBeenCalledWith('q1', Status.Rejected);
   });
 });
 

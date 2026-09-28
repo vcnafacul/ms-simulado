@@ -80,7 +80,8 @@ describe('listarAtualizacoes — Mongo real', () => {
   ) => {
     await questoes.collection.updateOne(
       { _id: de },
-      { $set: { congelada: true } },
+      // 023 · 18: a original ganha teveSucessora e segue viva (não congela)
+      { $set: { teveSucessora: true } },
     );
     return q({ origem: String(de), tipoOrigem: TipoOrigem.versao, ...o });
   };
@@ -109,7 +110,7 @@ describe('listarAtualizacoes — Mongo real', () => {
     editorCursinho: true,
   };
 
-  it('prova sem congeladas → []', async () => {
+  it('prova sem questões com versão nova → []', async () => {
     const id = await prova([[await q(), 1]]);
     await expect(service.listarAtualizacoes(id, dono)).resolves.toEqual({
       podeComporProva: true,
@@ -171,5 +172,30 @@ describe('listarAtualizacoes — Mongo real', () => {
     const r = await service.listarAtualizacoes(id, dono);
     expect(r.podeComporProva).toBe(false);
     expect(r.atualizacoes).toHaveLength(1);
+  });
+
+  it('⚠️ 023 · 19: a original NÃO congelada (ficou na prova fixa) aparece com a versão nova', async () => {
+    const A = await q();
+    const A2 = await versao(A);
+    const id = await prova([[A, 4]]);
+    expect((await questoes.collection.findOne({ _id: A }))!.congelada).toBe(
+      false,
+    );
+
+    const { atualizacoes } = await service.listarAtualizacoes(id, dono);
+
+    expect(atualizacoes[0]).toMatchObject({
+      atual: { _id: String(A) },
+      oferta: { _id: String(A2), saltos: 1 },
+      cadeiaInterrompida: false,
+    });
+  });
+
+  it('rede: questão congelada ANTES da migração 0005 (sem teveSucessora) ainda é vista', async () => {
+    const A = await q({ congelada: true });
+    const A2 = await q({ origem: String(A), tipoOrigem: TipoOrigem.versao });
+    const id = await prova([[A, 1]]);
+    const { atualizacoes } = await service.listarAtualizacoes(id, dono);
+    expect(atualizacoes[0].oferta._id).toBe(String(A2));
   });
 });

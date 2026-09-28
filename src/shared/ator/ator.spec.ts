@@ -9,9 +9,11 @@ describe('lerAtor — header x-ator (023 · 03)', () => {
   };
 
   it('lê o JSON que a api manda', () => {
-    expect(lerAtor(JSON.stringify(ok))).toEqual(ok);
+    // os validadores (024) entram sempre, false quando ausentes
+    const lido = { ...ok, validadorProjeto: false, validadorCursinho: false };
+    expect(lerAtor(JSON.stringify(ok))).toEqual(lido);
     expect(lerAtor(JSON.stringify({ ...ok, cursinhoId: null }))).toEqual({
-      ...ok,
+      ...lido,
       cursinhoId: null,
     });
   });
@@ -26,5 +28,27 @@ describe('lerAtor — header x-ator (023 · 03)', () => {
     ['array', '[]'],
   ])('⚠️ %s → sem ator', (_n, header) => {
     expect(lerAtor(header)).toBeUndefined();
+  });
+});
+
+describe('lerAtor — validadores (024 · 03)', () => {
+  const base = {
+    userId: 'u',
+    cursinhoId: 'c',
+    admin: false,
+    editorCursinho: false,
+  };
+  it('lê os validadores; ausentes ou não-booleanos = false', () => {
+    expect(
+      lerAtor(JSON.stringify({ ...base, validadorCursinho: true })),
+    ).toMatchObject({
+      validadorCursinho: true,
+      validadorProjeto: false,
+    });
+    expect(
+      lerAtor(JSON.stringify({ ...base, validadorProjeto: 'true' })),
+    ).toMatchObject({
+      validadorProjeto: false,
+    });
   });
 });

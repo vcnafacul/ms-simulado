@@ -8,18 +8,22 @@ import { QuestaoDaCadeia } from '../../questao/questao.repository';
 /**
  * As atualizações disponíveis de uma prova (tickets/023, card 13, regra R6).
  *
- * Numa prova com versões fixas, a questão congela quando alguém cria uma
- * versão nova. Para cada questão CONGELADA da prova, segue a cadeia de
- * sucessoras (v1 → v2 → v3) e oferece a ÚLTIMA — inclusive `Pending`:
- * bloquear pendente tira gente da revisão (decisão do Fernando).
+ * Numa prova com versões fixas, a questão fica na versão em que foi montada
+ * quando alguém cria uma nova. Para cada questão da prova que JÁ TEVE
+ * sucessora, segue a cadeia (v1 → v2 → v3) e oferece a ÚLTIMA — inclusive
+ * `Pending`: bloquear pendente tira gente da revisão (decisão do Fernando).
+ *
+ * ⚠️ `teveSucessora`, e não `congelada` (card 19): desde o card 18 a original
+ * que segue numa prova com versões fixas não congela. `congelada` entra junto
+ * só como rede para dado anterior à migração 0005.
  */
 export interface Atualizacao {
   numero: number | null;
   atual: { _id: string; status: Status };
   oferta: { _id: string; status: Status; criadaEm?: Date; saltos: number };
   /**
-   * A cadeia parou numa versão congelada sem sucessora viva — a seguinte foi
-   * excluída. Oferece-se a última alcançável.
+   * A cadeia parou numa versão que teve sucessora, mas ela não está mais viva
+   * — foi excluída. Oferece-se a última alcançável.
    */
   cadeiaInterrompida: boolean;
   camposAlterados: string[];
@@ -34,6 +38,9 @@ export interface FontesDaCadeia {
 /** ⚠️ Contra ciclo por dado corrompido. Cadeias reais têm poucas versões. */
 export const PROFUNDIDADE_MAXIMA = 50;
 
+const jaTeveSucessora = (q?: QuestaoDaCadeia) =>
+  !!(q?.teveSucessora || q?.congelada);
+
 export async function atualizacoesDaProva(
   itens: { numero: number | null; questaoId: string }[],
   fontes: FontesDaCadeia,
@@ -44,7 +51,7 @@ export async function atualizacoesDaProva(
     (await fontes.questoes([...naProva])).map((q) => [String(q._id), q]),
   );
 
-  // Só as congeladas têm sucessora; as outras estão na ponta.
+  // Só quem teve sucessora tem para onde ir; as outras estão na ponta.
   type Cadeia = {
     item: (typeof itens)[number];
     ponta: QuestaoDaCadeia;
@@ -53,7 +60,7 @@ export async function atualizacoesDaProva(
     ativa: boolean;
   };
   const cadeias: Cadeia[] = itens
-    .filter((i) => atuais.get(i.questaoId)?.congelada)
+    .filter((i) => jaTeveSucessora(atuais.get(i.questaoId)))
     .map((item) => ({
       item,
       ponta: atuais.get(item.questaoId)!,
@@ -78,7 +85,7 @@ export async function atualizacoesDaProva(
       c.visitadas.add(String(s._id));
       c.ponta = s;
       c.saltos++;
-      if (!s.congelada) c.ativa = false; // chegou à ponta viva
+      if (!jaTeveSucessora(s)) c.ativa = false; // chegou à ponta viva
     }
   }
 
@@ -95,8 +102,8 @@ export async function atualizacoesDaProva(
           criadaEm: c.ponta.createdAt,
           saltos: c.saltos,
         },
-        // Parou numa congelada = a seguinte sumiu (excluída).
-        cadeiaInterrompida: !!c.ponta.congelada,
+        // Parou numa que teve sucessora = a seguinte sumiu (excluída).
+        cadeiaInterrompida: jaTeveSucessora(c.ponta),
         camposAlterados: camposAlterados(
           atual as Record<string, unknown>,
           c.ponta as Record<string, unknown>,

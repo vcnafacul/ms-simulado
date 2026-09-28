@@ -12,6 +12,10 @@ export type Ator = {
   admin: boolean;
   /** `editarQuestoesCursinho`. */
   editorCursinho: boolean;
+  /** `validarQuestao` — valida como a plataforma (tickets/024). */
+  validadorProjeto?: boolean;
+  /** `validarQuestoesCursinho` — aprova pendente; recusa com regra (024). */
+  validadorCursinho?: boolean;
 };
 
 export const HEADER_ATOR = 'x-ator';
@@ -42,6 +46,9 @@ export function lerAtor(header: unknown): Ator | undefined {
     cursinhoId: (a.cursinhoId as string | null) || null,
     admin: a.admin,
     editorCursinho: a.editorCursinho,
+    // Opcionais (tickets/024): ausente = false — nunca um validador por omissão.
+    validadorProjeto: a.validadorProjeto === true,
+    validadorCursinho: a.validadorCursinho === true,
   };
 }
 
