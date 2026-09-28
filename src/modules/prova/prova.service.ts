@@ -47,7 +47,23 @@ export class ProvaService {
   }
 
   public async create(item: CreateProvaDTOInput): Promise<GetProvaDTOOutout> {
-    const categoria = await this.categoriaRepository.getById(item.categoria);
+    /*
+      ⚠️ Antes de tudo: a fábrica cria os simulados antes da prova e sem
+      transação, então qualquer recusa depois disso deixaria lixo.
+    */
+    const categoria = await this.categoriaRepository.getVivaById(
+      item.categoria,
+    );
+    if (!categoria) {
+      throw new NotFoundException('Categoria não encontrada.');
+    }
+    // tickets/023, card 04 (R3): cursinho só cria prova em categoria dele.
+    // Senão criaria uma prova protegida que nem ele compõe (R2).
+    if (item.cursinhoId && categoria.dono !== item.cursinhoId) {
+      throw new ForbiddenException(
+        'Use uma categoria do seu cursinho para criar a prova.',
+      );
+    }
     const factory = this.provaFactory.getFactory(categoria, item.ano);
     try {
       const prova = await factory.createProva(item);

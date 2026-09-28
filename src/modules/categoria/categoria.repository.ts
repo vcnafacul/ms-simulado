@@ -37,6 +37,17 @@ export class CategoriaRepository extends BaseRepository<Categoria> {
     return await this.model.findOne({ nome, dono, deleted: { $ne: true } });
   }
 
+  /**
+   * A categoria VIVA (não soft-deleted), com o exame. Para criar prova
+   * (tickets/023, card 04): o `getById` não filtra `deleted`, e o
+   * `@CategoriaExist` do DTO também não.
+   */
+  async getVivaById(id: string): Promise<Categoria | null> {
+    return await this.model
+      .findOne({ _id: id, deleted: { $ne: true } })
+      .populate('exame');
+  }
+
   override async getById(id: string): Promise<Categoria> {
     return await this.model.findById(id).populate('exame');
   }

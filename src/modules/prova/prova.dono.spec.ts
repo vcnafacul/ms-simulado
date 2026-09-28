@@ -9,6 +9,7 @@ import {
   CategoriaSchema,
   DONO_SYSTEM,
 } from '../categoria/schemas/categoria.schema';
+import { CategoriaRepository } from '../categoria/categoria.repository';
 import { Prova, ProvaSchema } from './prova.schema';
 import { ProvaRepository } from './prova.repository';
 import { ProvaService } from './prova.service';
@@ -136,5 +137,20 @@ describe('assertPodeComporProva — Mongo real', () => {
         ator({ admin: true }),
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('⚠️ 023 · 04: categoria soft-deleted não serve para criar prova', async () => {
+    const repo = new CategoriaRepository(categorias as never);
+    const viva = await cat('A');
+    const morta = (
+      await categorias.collection.insertOne({
+        nome: `morta ${new Types.ObjectId()}`,
+        dono: 'A',
+        selecionavel: true,
+        deleted: true,
+      } as never)
+    ).insertedId;
+    expect(await repo.getVivaById(viva.toString())).not.toBeNull();
+    expect(await repo.getVivaById(morta.toString())).toBeNull();
   });
 });
