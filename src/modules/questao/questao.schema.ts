@@ -231,6 +231,19 @@ export class Questao extends QuestaoReview {
   @Prop({ type: Boolean, required: false, default: false })
   @ApiProperty({ required: false })
   public congelada?: boolean;
+
+  /**
+   * Já ganhou uma versão nova (tickets/023, card 18).
+   *
+   * ⚠️ **Não é o mesmo que `congelada`.** Desde o card 06 a nova versão só
+   * entra nas provas com `receberNovasVersoes`; as outras seguem com esta
+   * questão, que então continua em uso e editável — e só congela quando
+   * nenhuma prova a usa mais. "Tem versão mais nova" (o "Buscar atualizações",
+   * card 19) é este campo, não o `congelada`.
+   */
+  @Prop({ type: Boolean, required: false, default: false })
+  @ApiProperty({ required: false })
+  public teveSucessora?: boolean;
 }
 
 export const QuestaoSchema = SchemaFactory.createForClass(Questao);

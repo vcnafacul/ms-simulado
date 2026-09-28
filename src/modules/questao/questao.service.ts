@@ -834,6 +834,18 @@ export class QuestaoService {
         HttpStatus.BAD_REQUEST,
       );
     }
+    /*
+      ⚠️ tickets/023, card 18: desde que a original pode seguir viva (em provas
+      com versões fixas), uma segunda versão dela criaria um GALHO (A → A2 e
+      A → A3) — a linhagem e o "Buscar atualizações" supõem uma cadeia só.
+      Quem usa a original corrige no lugar, ou duplica.
+    */
+    if ((original as { teveSucessora?: boolean }).teveSucessora) {
+      throw new HttpException(
+        `A questão ${id} já tem uma versão mais nova. Corrija esta sem criar versão, ou duplique.`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
 
     const sucessora = await this.repository.create(
       documentoDaCopia(TipoOrigem.versao, original) as Questao,
@@ -842,7 +854,15 @@ export class QuestaoService {
 
     await this.repository.updateContent(novaId, content);
     const trocas = await this.repository.substituirQuestao(id, novaId);
-    await this.repository.congelar(id);
+    await this.repository.marcarTeveSucessora(id);
+    /*
+      ⚠️ tickets/023, card 18: congela só se NENHUMA prova ficou com a
+      original. As provas com versões fixas seguem com ela — em uso, e o dono
+      precisa conseguir corrigi-la. Simulado solto não conta como uso: sem
+      prova, ninguém é dono dele para editar.
+    */
+    const congelou = trocas.provasMantidas.length === 0;
+    if (congelou) await this.repository.congelar(id);
     // A sucessora nasce Pending: o contador muda só onde ela entrou (card 06).
     await this.repository.recalcularTotalValidadas(trocas.provas);
 
@@ -858,6 +878,7 @@ export class QuestaoService {
         provasMantidas: trocas.provasMantidas,
         simulados: trocas.simulados,
         simuladosMantidos: trocas.simuladosMantidos,
+        congelou,
       }),
     });
 

@@ -544,6 +544,11 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     await this.model.updateOne({ _id: id }, { $set: { congelada: true } });
   }
 
+  /** Marca que a questão ganhou uma versão nova (tickets/023, card 18). */
+  async marcarTeveSucessora(id: string): Promise<void> {
+    await this.model.updateOne({ _id: id }, { $set: { teveSucessora: true } });
+  }
+
   async getParaDuplicar(id: string): Promise<Questao | null> {
     return this.model
       .findOne({ _id: id, ...NAO_EXCLUIDA })

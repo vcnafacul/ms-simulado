@@ -1299,7 +1299,7 @@ describe('QuestaoService.novaVersao (card 26)', () => {
     alternativeClassfication: true,
   };
 
-  const montar = (doc: unknown = original()) => {
+  const montar = (doc: unknown = original(), provasMantidas: string[] = []) => {
     const ordem: string[] = [];
     const auditLogService = { create: jest.fn().mockResolvedValue({}) };
     const repository = {
@@ -1316,11 +1316,15 @@ describe('QuestaoService.novaVersao (card 26)', () => {
         ordem.push('substituir');
         return Promise.resolve({
           provas: ['pB'],
-          provasMantidas: ['pA'],
+          provasMantidas,
           provasTrocadas: 1,
           simulados: 5,
           simuladosMantidos: 2,
         });
+      }),
+      marcarTeveSucessora: jest.fn(() => {
+        ordem.push('teveSucessora');
+        return Promise.resolve(undefined);
       }),
       congelar: jest.fn(() => {
         ordem.push('congelar');
@@ -1377,6 +1381,7 @@ describe('QuestaoService.novaVersao (card 26)', () => {
       'create',
       'updateContent',
       'substituir',
+      'teveSucessora',
       'congelar',
       'contador',
     ]);
@@ -1425,6 +1430,32 @@ describe('QuestaoService.novaVersao (card 26)', () => {
     expect(repository.congelar).not.toHaveBeenCalled();
   });
 
+  it('⚠️ 023 · 18: prova com versões fixas ficou com a original → NÃO congela', async () => {
+    const { service, repository, auditLogService } = montar(original(), ['pA']);
+
+    await service.novaVersao('q1', conteudo as any);
+
+    expect(repository.marcarTeveSucessora).toHaveBeenCalledWith('q1');
+    expect(repository.congelar).not.toHaveBeenCalled();
+    expect(
+      JSON.parse(auditLogService.create.mock.calls[0][0].changes).congelou,
+    ).toBe(false);
+  });
+
+  it('023 · 18: todas receberam → congela, como antes', async () => {
+    const { service, repository } = montar(original(), []);
+    await service.novaVersao('q1', conteudo as any);
+    expect(repository.congelar).toHaveBeenCalledWith('q1');
+  });
+
+  it('⚠️ 023 · 18: questão que já teve sucessora recusa uma 2ª versão (sem galho)', async () => {
+    const { service, repository } = montar(original({ teveSucessora: true }));
+    await expect(service.novaVersao('q1', conteudo as any)).rejects.toThrow(
+      'já tem uma versão mais nova',
+    );
+    expect(repository.create).not.toHaveBeenCalled();
+  });
+
   it('023 · 06: o contador é recalculado só nas provas que receberam', async () => {
     const { service, repository } = montar();
 
@@ -1444,9 +1475,10 @@ describe('QuestaoService.novaVersao (card 26)', () => {
       acao: 'novaVersao',
       sucessora: 'q2',
       provas: ['pB'],
-      provasMantidas: ['pA'],
+      provasMantidas: [],
       simulados: 5,
       simuladosMantidos: 2,
+      congelou: true,
     });
     expect(auditLogService.create.mock.calls[0][0].entityId).toBe('q1');
   });

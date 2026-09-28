@@ -151,3 +151,16 @@ describe('documentoDaCopia (card 25)', () => {
     expect((c as Record<string, unknown>).campoFuturo).toBe('x');
   });
 });
+
+describe('documentoDaCopia — estado de versão (023 · 18)', () => {
+  it('⚠️ a cópia/versão NÃO herda congelada nem teveSucessora', () => {
+    const doc = documentoDaCopia(TipoOrigem.copia, {
+      _id: 'q1',
+      textoQuestao: 't',
+      congelada: true,
+      teveSucessora: true,
+    } as never);
+    expect(doc).not.toHaveProperty('congelada');
+    expect(doc).not.toHaveProperty('teveSucessora');
+  });
+});
