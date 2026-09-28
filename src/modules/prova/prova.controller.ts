@@ -93,6 +93,16 @@ export class ProvaController {
     return await this.service.getMissingNumbers(id);
   }
 
+  /** tickets/023, card 13 — ler é livre; `podeComporProva` diz se aplica. */
+  @Get(':id/atualizacoes')
+  @ApiResponse({ status: 200, description: 'atualizações das questões' })
+  public async listarAtualizacoes(
+    @Param('id') id: string,
+    @AtorDaRequisicao() ator?: Ator,
+  ) {
+    return await this.service.listarAtualizacoes(id, ator);
+  }
+
   /** tickets/023, card 05 — só o dono (403 com o motivo). */
   @Patch(':id/receber-novas-versoes')
   @ApiResponse({ status: 200, description: 'aplicar novas versões na prova' })

@@ -21,8 +21,16 @@ import { ProvaRepository } from './prova.repository';
 import { Prova } from './prova.schema';
 import { UpdateProvaFilesDTO } from './dtos/update-files.dto.input';
 import { revalidarBloqueado } from '../simulado/helpers/bloqueado';
-import { syncNumeroNaProvaESimulados } from './helpers/question-container.helpers';
 import {
+  resolveQuestaoId,
+  syncNumeroNaProvaESimulados,
+} from './helpers/question-container.helpers';
+import {
+  atualizacoesDaProva,
+  Atualizacao,
+} from './helpers/atualizacoes-da-prova';
+import {
+  podeComporProva,
   motivoParaNaoComporProva,
   ResumoDoDono,
   resumoDoDono,
@@ -79,6 +87,32 @@ export class ProvaService {
       }),
     });
     return { receberNovasVersoes: valor };
+  }
+
+  /**
+   * O que mudou nas questões desta prova desde que foi montada (tickets/023,
+   * card 13). Ler é livre (R1); `podeComporProva` diz se a tela oferece
+   * "aplicar" (card 14).
+   */
+  public async listarAtualizacoes(
+    id: string,
+    ator?: Ator,
+  ): Promise<{ podeComporProva: boolean; atualizacoes: Atualizacao[] }> {
+    const prova = await this.repository.getComposicao(id);
+    if (!prova) {
+      throw new NotFoundException(`Prova com ID ${id} não encontrada.`);
+    }
+    const atualizacoes = await atualizacoesDaProva(
+      (prova.questoes ?? []).map((qc) => ({
+        numero: qc.numero ?? null,
+        questaoId: resolveQuestaoId(qc),
+      })),
+      {
+        questoes: (ids) => this.questaoRepository.questoesDaCadeia(ids),
+        sucessoras: (ids) => this.questaoRepository.sucessorasDeVersao(ids),
+      },
+    );
+    return { podeComporProva: podeComporProva(prova, ator), atualizacoes };
   }
 
   public async create(item: CreateProvaDTOInput): Promise<GetProvaDTOOutout> {
