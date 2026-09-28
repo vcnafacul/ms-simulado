@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Ator } from 'src/shared/ator/ator';
+import { AuditLogService } from '../auditLog/auditLog.service';
 import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { CategoriaRepository } from '../categoria/categoria.repository';
@@ -31,6 +32,7 @@ export class ProvaService {
     private readonly categoriaRepository: CategoriaRepository,
     private readonly simuladoRepository: SimuladoRepository,
     private readonly questaoRepository: QuestaoRepository,
+    private readonly auditLogService?: AuditLogService,
   ) {}
 
   /**
@@ -44,6 +46,35 @@ export class ProvaService {
     }
     const motivo = motivoParaNaoComporProva(prova, ator);
     if (motivo) throw new ForbiddenException(motivo);
+  }
+
+  /**
+   * Liga/desliga o "aplicar novas versões automaticamente" (tickets/023, card
+   * 05). Só o dono da prova (R2).
+   *
+   * ⚠️ `$set` do campo, nunca o `repository.update(prova)`: `approvedQuestion`,
+   * `refuseQuestion` e `updateFiles` regravam o documento inteiro, e um deles
+   * rodando junto desfaria a troca — ou esta desfaria a deles.
+   */
+  public async alterarReceberNovasVersoes(
+    id: string,
+    valor: boolean,
+    ator?: Ator,
+  ): Promise<{ receberNovasVersoes: boolean }> {
+    await this.assertPodeComporProva(id, ator);
+    const de = await this.repository.setReceberNovasVersoes(id, valor);
+    await this.auditLogService?.create({
+      user: ator!.userId,
+      entityId: id,
+      entityType: 'Prova',
+      changes: JSON.stringify({
+        acao: 'receberNovasVersoes',
+        de,
+        para: valor,
+        cursinhoId: ator!.cursinhoId,
+      }),
+    });
+    return { receberNovasVersoes: valor };
   }
 
   public async create(item: CreateProvaDTOInput): Promise<GetProvaDTOOutout> {
@@ -85,6 +116,7 @@ export class ProvaService {
         gabarito: result.gabarito,
         enemAreas: result.enemAreas,
         createdAt: result.createdAt,
+        receberNovasVersoes: result.receberNovasVersoes,
       } as GetProvaDTOOutout;
     } catch (error: any) {
       throw new HttpException(error.message, HttpStatus.CONFLICT);
@@ -126,6 +158,7 @@ export class ProvaService {
       enemAreas: prova.enemAreas,
       totalQuestaoCadastradas: prova.questoes.length,
       createdAt: prova.createdAt,
+      receberNovasVersoes: prova.receberNovasVersoes,
     } as GetProvaDTOOutout;
   }
 
@@ -273,6 +306,7 @@ export class ProvaService {
       gabarito: prova.gabarito,
       enemAreas: prova.enemAreas,
       createdAt: prova.createdAt,
+      receberNovasVersoes: prova.receberNovasVersoes,
     } as GetProvaDTOOutout;
   }
 }

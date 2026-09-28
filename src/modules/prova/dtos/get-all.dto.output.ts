@@ -40,4 +40,7 @@ export class GetProvaDTOOutout {
 
   @ApiProperty()
   createdAt: Date;
+
+  @ApiProperty()
+  receberNovasVersoes: boolean;
 }

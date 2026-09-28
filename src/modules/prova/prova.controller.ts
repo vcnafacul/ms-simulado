@@ -15,6 +15,8 @@ import { GetProvaDTOOutout } from './dtos/get-all.dto.output';
 import { Prova } from './prova.schema';
 import { ProvaService } from './prova.service';
 import { UpdateProvaFilesDTO } from './dtos/update-files.dto.input';
+import { ReceberNovasVersoesDTOInput } from './dtos/receber-novas-versoes.dto.input';
+import { Ator, AtorDaRequisicao } from 'src/shared/ator/ator';
 
 @ApiTags('Prova')
 @Controller('v1/prova')
@@ -86,6 +88,17 @@ export class ProvaController {
   })
   public async getMissing(@Param('id') id: string): Promise<number[]> {
     return await this.service.getMissingNumbers(id);
+  }
+
+  /** tickets/023, card 05 — só o dono (403 com o motivo). */
+  @Patch(':id/receber-novas-versoes')
+  @ApiResponse({ status: 200, description: 'aplicar novas versões na prova' })
+  public async alterarReceberNovasVersoes(
+    @Param('id') id: string,
+    @Body() dto: ReceberNovasVersoesDTOInput,
+    @AtorDaRequisicao() ator?: Ator,
+  ): Promise<{ receberNovasVersoes: boolean }> {
+    return await this.service.alterarReceberNovasVersoes(id, dto.valor, ator);
   }
 
   @Patch(':id/files')

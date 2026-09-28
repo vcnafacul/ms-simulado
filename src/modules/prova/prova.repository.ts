@@ -73,6 +73,15 @@ export class ProvaRepository extends BaseRepository<Prova> {
       .exec();
   }
 
+  /** Grava a flag e devolve o valor anterior (tickets/023, card 05). */
+  async setReceberNovasVersoes(id: string, valor: boolean): Promise<boolean> {
+    const antes = await this.model
+      .findByIdAndUpdate(id, { $set: { receberNovasVersoes: valor } })
+      .select('receberNovasVersoes')
+      .exec();
+    return antes?.receberNovasVersoes ?? false;
+  }
+
   /** Só o que decide a composição: dono, categoria (dono/selecionável), nome. */
   async getDonoDaProva(id: string): Promise<Prova | null> {
     return await this.model
