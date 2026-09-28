@@ -21,6 +21,7 @@ import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
 import { AdicionarEmProvaDTOInput } from './dtos/adicionar-em-prova.dto.input';
 import { DefinirProvaBaseDTOInput } from './dtos/definir-prova-base.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
+import { SinalizarRevisaoDTOInput } from './dtos/sinalizar-revisao.dto.input';
 import { Status } from './enums/status.enum';
 import { ProvaContendo } from './questao.repository';
 import { Questao } from './questao.schema';
@@ -272,6 +273,17 @@ export class QuestaoController {
     @Body() body: DefinirProvaBaseDTOInput,
   ): Promise<void> {
     await this.service.definirProvaBase(id, body.provaId, body.userId);
+  }
+
+  /** tickets/024, card 04 — pede à equipe da plataforma que revise. */
+  @Post(':id/revisao')
+  @ApiResponse({ status: 201, description: 'sinaliza a questão para revisão' })
+  public async sinalizarRevisao(
+    @Param('id') id: string,
+    @Body() body: SinalizarRevisaoDTOInput,
+    @AtorDaRequisicao() ator?: Ator,
+  ): Promise<void> {
+    await this.service.sinalizarRevisao(id, body.motivo, ator);
   }
 
   @Patch(':id/:status')
