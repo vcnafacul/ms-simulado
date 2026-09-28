@@ -1308,10 +1308,20 @@ describe('QuestaoService.novaVersao (card 26)', () => {
       }),
       substituirQuestao: jest.fn(() => {
         ordem.push('substituir');
-        return Promise.resolve({ provas: 3, simulados: 5 });
+        return Promise.resolve({
+          provas: ['pB'],
+          provasMantidas: ['pA'],
+          provasTrocadas: 1,
+          simulados: 5,
+          simuladosMantidos: 2,
+        });
       }),
       congelar: jest.fn(() => {
         ordem.push('congelar');
+        return Promise.resolve(undefined);
+      }),
+      recalcularTotalValidadas: jest.fn(() => {
+        ordem.push('contador');
         return Promise.resolve(undefined);
       }),
       getById: jest.fn().mockResolvedValue(doc),
@@ -1362,6 +1372,7 @@ describe('QuestaoService.novaVersao (card 26)', () => {
       'updateContent',
       'substituir',
       'congelar',
+      'contador',
     ]);
   });
 
@@ -1408,7 +1419,15 @@ describe('QuestaoService.novaVersao (card 26)', () => {
     expect(repository.congelar).not.toHaveBeenCalled();
   });
 
-  it('o log registra quantas provas e simulados foram atingidos', async () => {
+  it('023 · 06: o contador é recalculado só nas provas que receberam', async () => {
+    const { service, repository } = montar();
+
+    await service.novaVersao('q1', conteudo as any);
+
+    expect(repository.recalcularTotalValidadas).toHaveBeenCalledWith(['pB']);
+  });
+
+  it('o log registra as provas recebidas e as mantidas (023 · 06)', async () => {
     const { service, auditLogService } = montar();
 
     await service.novaVersao('q1', conteudo as any, 'u-9');
@@ -1418,8 +1437,10 @@ describe('QuestaoService.novaVersao (card 26)', () => {
     ).toMatchObject({
       acao: 'novaVersao',
       sucessora: 'q2',
-      provas: 3,
+      provas: ['pB'],
+      provasMantidas: ['pA'],
       simulados: 5,
+      simuladosMantidos: 2,
     });
     expect(auditLogService.create.mock.calls[0][0].entityId).toBe('q1');
   });

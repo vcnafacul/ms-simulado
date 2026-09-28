@@ -798,6 +798,8 @@ export class QuestaoService {
     await this.repository.updateContent(novaId, content);
     const trocas = await this.repository.substituirQuestao(id, novaId);
     await this.repository.congelar(id);
+    // A sucessora nasce Pending: o contador muda só onde ela entrou (card 06).
+    await this.repository.recalcularTotalValidadas(trocas.provas);
 
     await this.auditLogService.create({
       user: userId,
@@ -808,7 +810,9 @@ export class QuestaoService {
         acao: 'novaVersao',
         sucessora: novaId,
         provas: trocas.provas,
+        provasMantidas: trocas.provasMantidas,
         simulados: trocas.simulados,
+        simuladosMantidos: trocas.simuladosMantidos,
       }),
     });
 

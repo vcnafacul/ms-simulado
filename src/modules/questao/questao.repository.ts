@@ -20,6 +20,17 @@ import { Historico } from '../historico/historico.schema';
 import { EstadoParaExclusao, STATUS_EXCLUIVEIS } from './exclusaoDaQuestao';
 import { NoDaLinhagem } from './linhagemDaQuestao';
 
+/** O que a nova versão trocou e o que ficou (tickets/023, card 06). */
+export interface TrocaDeVersao {
+  /** Provas que receberam a sucessora (`receberNovasVersoes: true`). */
+  provas: string[];
+  /** Provas travadas: seguem com a original. */
+  provasMantidas: string[];
+  provasTrocadas: number;
+  simulados: number;
+  simuladosMantidos: number;
+}
+
 const PROJECAO_DA_LINHAGEM = {
   status: 1,
   congelada: 1,
@@ -390,27 +401,90 @@ export class QuestaoRepository extends BaseRepository<Questao> {
    * `updateMany` escreve nos mesmos arrays. Enquanto aquele bug estiver aberto,
    * a troca carrega a mesma fragilidade — multiplicada pelas provas atingidas.
    */
-  async substituirQuestao(
-    de: string,
-    para: string,
-  ): Promise<{ provas: number; simulados: number }> {
-    const filtro = { 'questoes.questao': new Types.ObjectId(de) };
+  async substituirQuestao(de: string, para: string): Promise<TrocaDeVersao> {
+    const deId = new Types.ObjectId(de);
+    const filtro = { 'questoes.questao': deId };
     const update = {
       $set: { 'questoes.$[alvo].questao': new Types.ObjectId(para) },
     };
-    const opcoes = {
-      arrayFilters: [{ 'alvo.questao': new Types.ObjectId(de) }],
-    };
+    const opcoes = { arrayFilters: [{ 'alvo.questao': deId }] };
+
+    /*
+      ⚠️ tickets/023, card 06 — só as provas com `receberNovasVersoes: true`
+      trocam. As demais seguem com a original, que congela (é o que elas e o
+      histórico apontam). ⚠️ `=== true` no documento CRU (lean): prova sem o
+      campo NÃO recebe — por isso a migração 0004 roda antes do deploy.
+    */
+    const contendo = await this.provaModel
+      .find(filtro)
+      .select('_id receberNovasVersoes simulados')
+      .lean()
+      .exec();
+    const recebem = contendo.filter((p) => p.receberNovasVersoes === true);
+    const mantem = contendo.filter((p) => p.receberNovasVersoes !== true);
+    /*
+      ⚠️ Simulado não sabe de qual prova veio: o vínculo é `prova.simulados[]`.
+      Os das provas que mantêm ficam de fora — e um simulado que está numa que
+      recebe E numa que mantém NÃO troca (a trava vence). Simulado sem prova
+      nenhuma troca, como antes.
+    */
+    const bloqueados = mantem.flatMap(
+      (p) => (p.simulados ?? []) as unknown as Types.ObjectId[],
+    );
 
     const [provas, simulados] = await Promise.all([
-      this.provaModel.updateMany(filtro, update, opcoes).exec(),
-      this.simuladoModel.updateMany(filtro, update, opcoes).exec(),
+      recebem.length
+        ? this.provaModel
+            .updateMany(
+              { ...filtro, _id: { $in: recebem.map((p) => p._id) } },
+              update,
+              opcoes,
+            )
+            .exec()
+        : { modifiedCount: 0 },
+      this.simuladoModel
+        .updateMany({ ...filtro, _id: { $nin: bloqueados } }, update, opcoes)
+        .exec(),
     ]);
+    const simuladosMantidos = bloqueados.length
+      ? await this.simuladoModel.countDocuments({
+          ...filtro,
+          _id: { $in: bloqueados },
+        })
+      : 0;
 
     return {
-      provas: provas.modifiedCount,
+      provas: recebem.map((p) => String(p._id)),
+      provasMantidas: mantem.map((p) => String(p._id)),
+      provasTrocadas: provas.modifiedCount,
       simulados: simulados.modifiedCount,
+      simuladosMantidos,
     };
+  }
+
+  /**
+   * `totalQuestaoValidadas` = quantas questões da prova estão aprovadas
+   * (tickets/023, card 06; reaproveitado no card 14). Mesmo critério do
+   * `ProvaService.approvedQuestion`, mas por `$set`: não regrava a prova.
+   */
+  async recalcularTotalValidadas(provaIds: string[]): Promise<void> {
+    for (const id of provaIds) {
+      const prova = await this.provaModel
+        .findById(id)
+        .select('questoes.questao')
+        .lean()
+        .exec();
+      if (!prova) continue;
+      const ids = (prova.questoes ?? []).map((q) => q.questao);
+      const total = await this.model.countDocuments({
+        _id: { $in: ids },
+        status: Status.Approved,
+      });
+      await this.provaModel.updateOne(
+        { _id: id },
+        { $set: { totalQuestaoValidadas: total } },
+      );
+    }
   }
 
   /** Marca a questão como congelada — ver o docblock do campo no schema. */
