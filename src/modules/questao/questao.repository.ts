@@ -21,6 +21,31 @@ import { EstadoParaExclusao, STATUS_EXCLUIVEIS } from './exclusaoDaQuestao';
 import { NoDaLinhagem } from './linhagemDaQuestao';
 import { resumoDoDono } from '../prova/helpers/pode-compor-prova';
 
+/** Uma questão vista pela cadeia de versões (tickets/023, card 13). */
+export interface QuestaoDaCadeia {
+  _id: unknown;
+  origem?: string | null;
+  status: Status;
+  congelada?: boolean;
+  createdAt?: Date;
+  [campo: string]: unknown;
+}
+
+const PROJECAO_DA_CADEIA = {
+  origem: 1,
+  status: 1,
+  congelada: 1,
+  createdAt: 1,
+  textoQuestao: 1,
+  pergunta: 1,
+  textoAlternativaA: 1,
+  textoAlternativaB: 1,
+  textoAlternativaC: 1,
+  textoAlternativaD: 1,
+  textoAlternativaE: 1,
+  alternativa: 1,
+};
+
 /** O que a nova versão trocou e o que ficou (tickets/023, card 06). */
 export interface TrocaDeVersao {
   /** Provas que receberam a sucessora (`receberNovasVersoes: true`). */
@@ -136,6 +161,26 @@ export class QuestaoRepository extends BaseRepository<Questao> {
     return await this.model
       .findOne({ _id: id, ...NAO_EXCLUIDA })
       .select('+alternativa');
+  }
+
+  /**
+   * De qual prova a fábrica tira a questão ao atualizar (tickets/023, card
+   * 17). ⚠️ Se a questão está na prova informada, é ela — a atualização é no
+   * lugar. O `findProvaAtual` sozinho é um `findOne`: com a questão em várias
+   * provas, devolvia uma qualquer, e mudar a frente tirava a questão da prova
+   * de outro cursinho. Só quando ela NÃO está na informada (mover de prova,
+   * `PATCH v1/questao`) cai no `findProvaAtual`.
+   */
+  async findProvaDeSaida(
+    questaoId: string,
+    provaInformada?: string,
+  ): Promise<string | undefined> {
+    if (
+      provaInformada &&
+      (await this.provaContemQuestao(provaInformada, questaoId))
+    )
+      return String(provaInformada);
+    return await this.findProvaAtual(questaoId);
   }
 
   async findProvaAtual(questaoId: string): Promise<string | undefined> {
@@ -522,6 +567,69 @@ export class QuestaoRepository extends BaseRepository<Questao> {
   }
 
   /** A versão que substituiu esta — no máximo uma, porque a original congela. */
+  /**
+   * As sucessoras VIVAS (versão) de várias questões numa consulta — um nível
+   * da cadeia de versões (tickets/023, card 13). Excluídas não entram: a
+   * cadeia para nelas.
+   */
+  async sucessorasDeVersao(
+    ids: string[],
+  ): Promise<Map<string, QuestaoDaCadeia>> {
+    if (!ids.length) return new Map();
+    const docs = await this.model
+      .find(
+        {
+          origem: { $in: ids },
+          tipoOrigem: TipoOrigem.versao,
+          ...NAO_EXCLUIDA,
+        },
+        PROJECAO_DA_CADEIA,
+      )
+      .lean<QuestaoDaCadeia[]>()
+      .exec();
+    return new Map(docs.map((d) => [String(d.origem), d]));
+  }
+
+  /**
+   * Troca `de` por `para` NESTA prova e nos simulados DELA (tickets/023, card
+   * 14). No lugar — mesmo `$set` com `arrayFilters` do `substituirQuestao`,
+   * que mantém o número. ⚠️ Não toca em nenhuma outra prova nem em simulado
+   * que não seja desta.
+   */
+  async trocarNaProva(
+    provaId: string,
+    simuladoIds: unknown[],
+    de: string,
+    para: string,
+    session?: ClientSession,
+  ): Promise<number> {
+    const deId = new Types.ObjectId(de);
+    const update = {
+      $set: { 'questoes.$[alvo].questao': new Types.ObjectId(para) },
+    };
+    const opcoes = { arrayFilters: [{ 'alvo.questao': deId }], session };
+    await this.provaModel
+      .updateOne({ _id: provaId, 'questoes.questao': deId }, update, opcoes)
+      .exec();
+    const r = await this.simuladoModel
+      .updateMany(
+        { _id: { $in: simuladoIds }, 'questoes.questao': deId },
+        update,
+        opcoes,
+      )
+      .exec();
+    return r.modifiedCount;
+  }
+
+  /** As questões pelo id, com o que a cadeia de versões precisa (card 13). */
+  async questoesDaCadeia(ids: string[]): Promise<QuestaoDaCadeia[]> {
+    if (!ids.length) return [];
+    return this.model
+      .find({ _id: { $in: ids } }, PROJECAO_DA_CADEIA)
+      .lean<QuestaoDaCadeia[]>()
+      .exec();
+  }
+
   async sucessoraDe(id: string): Promise<NoDaLinhagem | null> {
     return this.model
       .findOne(
