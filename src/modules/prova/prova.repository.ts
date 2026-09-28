@@ -73,6 +73,15 @@ export class ProvaRepository extends BaseRepository<Prova> {
       .exec();
   }
 
+  /** Só o que decide a composição: dono, categoria (dono/selecionável), nome. */
+  async getDonoDaProva(id: string): Promise<Prova | null> {
+    return await this.model
+      .findById(id)
+      .select('nome cursinhoId categoria')
+      .populate({ path: 'categoria', select: 'dono selecionavel' })
+      .exec();
+  }
+
   async getById(id: string): Promise<Prova> {
     return await this.model
       .findById(id)

@@ -25,6 +25,7 @@ import { Status } from './enums/status.enum';
 import { ProvaContendo } from './questao.repository';
 import { Questao } from './questao.schema';
 import { QuestaoService } from './questao.service';
+import { Ator, AtorDaRequisicao } from 'src/shared/ator/ator';
 
 @ApiTags('Questao')
 @Controller('v1/questao')
@@ -72,8 +73,11 @@ export class QuestaoController {
     type: Questao,
     isArray: false,
   })
-  public async post(@Body() model: CreateQuestaoDTOInput): Promise<Questao> {
-    return await this.service.create(model);
+  public async post(
+    @Body() model: CreateQuestaoDTOInput,
+    @AtorDaRequisicao() ator?: Ator,
+  ): Promise<Questao> {
+    return await this.service.create(model, ator);
   }
 
   @Get('summary')
@@ -146,8 +150,9 @@ export class QuestaoController {
   public async updateClassificacao(
     @Param('id') id: string,
     @Body() classificacao: UpdateClassificacaoDTOInput,
+    @AtorDaRequisicao() ator?: Ator,
   ) {
-    await this.service.updateClassificacao(id, classificacao);
+    await this.service.updateClassificacao(id, classificacao, ator);
   }
 
   @Post(':id/duplicar')
@@ -237,8 +242,15 @@ export class QuestaoController {
   public async adicionarEmProva(
     @Param('id') id: string,
     @Body() body: AdicionarEmProvaDTOInput,
+    @AtorDaRequisicao() ator?: Ator,
   ): Promise<void> {
-    await this.service.adicionarEmProva(id, body.provaId, body.numero, body.userId);
+    await this.service.adicionarEmProva(
+      id,
+      body.provaId,
+      body.numero,
+      body.userId,
+      ator,
+    );
   }
 
   @Delete(':id/provas/:provaId')
@@ -247,8 +259,9 @@ export class QuestaoController {
     @Param('id') id: string,
     @Param('provaId') provaId: string,
     @Query('userId') userId?: string,
+    @AtorDaRequisicao() ator?: Ator,
   ): Promise<void> {
-    await this.service.removerDeProva(id, provaId, userId);
+    await this.service.removerDeProva(id, provaId, userId, ator);
   }
 
   @Patch(':id/prova-base')
@@ -276,7 +289,10 @@ export class QuestaoController {
     type: Questao,
     isArray: false,
   })
-  public async updateQuestion(@Body() question: UpdateDTOInput) {
-    await this.service.updateQuestion(question);
+  public async updateQuestion(
+    @Body() question: UpdateDTOInput,
+    @AtorDaRequisicao() ator?: Ator,
+  ) {
+    await this.service.updateQuestionDaRota(question, ator);
   }
 }

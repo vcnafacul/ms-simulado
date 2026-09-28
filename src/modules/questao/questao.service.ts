@@ -27,6 +27,7 @@ import { UpdateImageAlternativaDTOInput } from './dtos/update-image-alternativa.
 import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
+import { Ator } from 'src/shared/ator/ator';
 import { documentoDaCopia } from './duplicarQuestao';
 import { provasQueRecusamArea } from '../prova/services/area-da-prova';
 import { TipoOrigem } from './enums/tipo-origem.enum';
@@ -76,7 +77,13 @@ export class QuestaoService {
     private readonly provaFactory: ProvaFactory,
   ) {}
 
-  public async create(item: CreateQuestaoDTOInput): Promise<Questao> {
+  public async create(
+    item: CreateQuestaoDTOInput,
+    ator?: Ator,
+  ): Promise<Questao> {
+    // ⚠️ Criar já dentro da prova é compor a prova (tickets/023, card 03).
+    if (item.prova)
+      await this.provaService.assertPodeComporProva(item.prova, ator);
     /*
       ⚠️ **Sem prova, só grava a questão** (card 03 de `area-enem-da-questao`):
       sem fábrica, sem simulado, sem número. Entrar numa prova depois é o
@@ -340,6 +347,22 @@ export class QuestaoService {
     }
   }
 
+  /**
+   * `PATCH v1/questao` — ⚠️ compõe prova: pode tirar a questão de uma prova e
+   * pôr em outra, e troca o número (tickets/023, card 03). Checa o destino e a
+   * prova de onde a fábrica vai tirar a questão.
+   */
+  public async updateQuestionDaRota(question: UpdateDTOInput, ator?: Ator) {
+    if (question.prova) {
+      await this.provaService.assertPodeComporProva(question.prova, ator);
+      const saida = await this.repository.findProvaAtual(question._id);
+      if (saida && saida !== question.prova.toString()) {
+        await this.provaService.assertPodeComporProva(saida, ator);
+      }
+    }
+    await this.updateQuestion(question);
+  }
+
   public async updateQuestion(question: UpdateDTOInput) {
     if (!question.prova) {
       throw new HttpException('Prova não informada', HttpStatus.BAD_REQUEST);
@@ -357,7 +380,9 @@ export class QuestaoService {
     questaoId: string,
     provaId: string,
     userId?: string,
+    ator?: Ator,
   ): Promise<void> {
+    await this.provaService.assertPodeComporProva(provaId, ator);
     const provas = await this.repository.findProvasContendo(questaoId);
     if (provas.length <= 1) {
       throw new BadRequestException(
@@ -390,10 +415,14 @@ export class QuestaoService {
       session.endSession();
     }
     await this.auditLogService.create({
-      user: userId,
+      user: ator?.userId ?? userId,
       entityId: questaoId,
       entityType: 'Questao',
-      changes: JSON.stringify({ acao: 'removerDeProva', provaId }),
+      changes: JSON.stringify({
+        acao: 'removerDeProva',
+        provaId,
+        cursinhoId: ator?.cursinhoId ?? null,
+      }),
     });
   }
 
@@ -425,7 +454,9 @@ export class QuestaoService {
     provaId: string,
     numero: number,
     userId?: string,
+    ator?: Ator,
   ): Promise<void> {
+    await this.provaService.assertPodeComporProva(provaId, ator);
     const prova = await this.provaRepository.getById(provaId);
     if (!prova) {
       throw new NotFoundException(`Prova com ID ${provaId} não encontrada.`);
@@ -446,17 +477,36 @@ export class QuestaoService {
     }
     await factory.addQuestaoExistenteAProva(questaoId, provaId, numero);
     await this.auditLogService.create({
-      user: userId,
+      user: ator?.userId ?? userId,
       entityId: questaoId,
       entityType: 'Questao',
-      changes: JSON.stringify({ acao: 'adicionarEmProva', provaId, numero }),
+      changes: JSON.stringify({
+        acao: 'adicionarEmProva',
+        provaId,
+        numero,
+        cursinhoId: ator?.cursinhoId ?? null,
+      }),
     });
   }
 
   public async updateClassificacao(
     id: string,
     classificacao: UpdateClassificacaoDTOInput,
+    ator?: Ator,
   ) {
+    // ⚠️ Trocar o número é compor a prova (tickets/023, card 03). O resto da
+    // classificação é livre (R4); área/frente1 em prova oficial é o card 17.
+    if (classificacao.prova && classificacao.numero !== undefined) {
+      const atual = (await this.repository.findProvasContendoMany([id]))
+        .get(id)
+        ?.find((p) => p.provaId === classificacao.prova.toString());
+      if ((atual?.numero ?? null) !== (classificacao.numero ?? null)) {
+        await this.provaService.assertPodeComporProva(
+          classificacao.prova,
+          ator,
+        );
+      }
+    }
     const questao = await this.repository.getByIdToUpdate(id);
     if (!questao) {
       throw new NotFoundException(`Questão com ID ${id} não encontrada.`);

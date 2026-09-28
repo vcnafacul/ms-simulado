@@ -1,4 +1,11 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Ator } from 'src/shared/ator/ator';
 import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { CategoriaRepository } from '../categoria/categoria.repository';
@@ -14,6 +21,7 @@ import { Prova } from './prova.schema';
 import { UpdateProvaFilesDTO } from './dtos/update-files.dto.input';
 import { revalidarBloqueado } from '../simulado/helpers/bloqueado';
 import { syncNumeroNaProvaESimulados } from './helpers/question-container.helpers';
+import { motivoParaNaoComporProva } from './helpers/pode-compor-prova';
 
 @Injectable()
 export class ProvaService {
@@ -24,6 +32,19 @@ export class ProvaService {
     private readonly simuladoRepository: SimuladoRepository,
     private readonly questaoRepository: QuestaoRepository,
   ) {}
+
+  /**
+   * ⚠️ Antes de qualquer escrita na composição da prova (tickets/023, card
+   * 03). 404 se a prova não existe; 403 com o motivo se o ator não pode.
+   */
+  public async assertPodeComporProva(provaId: string, ator?: Ator) {
+    const prova = await this.repository.getDonoDaProva(provaId);
+    if (!prova) {
+      throw new NotFoundException(`Prova com ID ${provaId} não encontrada.`);
+    }
+    const motivo = motivoParaNaoComporProva(prova, ator);
+    if (motivo) throw new ForbiddenException(motivo);
+  }
 
   public async create(item: CreateProvaDTOInput): Promise<GetProvaDTOOutout> {
     const categoria = await this.categoriaRepository.getById(item.categoria);
