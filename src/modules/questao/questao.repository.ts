@@ -19,6 +19,7 @@ import { TipoOrigem } from './enums/tipo-origem.enum';
 import { Historico } from '../historico/historico.schema';
 import { EstadoParaExclusao, STATUS_EXCLUIVEIS } from './exclusaoDaQuestao';
 import { NoDaLinhagem } from './linhagemDaQuestao';
+import { resumoDoDono } from '../prova/helpers/pode-compor-prova';
 
 /** O que a nova versão trocou e o que ficou (tickets/023, card 06). */
 export interface TrocaDeVersao {
@@ -53,6 +54,12 @@ export interface ProvaContendo {
   provaId: string;
   provaNome: string;
   numero: number;
+  /** Dono e proteção (tickets/023, card 07). `podeComporProva` só no getById. */
+  cursinhoId: string | null;
+  protegida: boolean;
+  selecionavel: boolean;
+  receberNovasVersoes: boolean;
+  podeComporProva?: boolean;
 }
 
 @Injectable()
@@ -765,7 +772,8 @@ export class QuestaoRepository extends BaseRepository<Questao> {
   ): Promise<Map<string, ProvaContendo[]>> {
     const provas = await this.provaModel
       .find({ 'questoes.questao': { $in: questaoIds } })
-      .select('nome questoes')
+      .select('nome questoes cursinhoId receberNovasVersoes categoria')
+      .populate({ path: 'categoria', select: 'dono selecionavel' })
       .exec();
     const map = new Map<string, ProvaContendo[]>();
     for (const prova of provas) {
@@ -773,10 +781,13 @@ export class QuestaoRepository extends BaseRepository<Questao> {
         const qId = resolveQuestaoId(qc);
         if (!questaoIds.includes(qId)) continue;
         if (!map.has(qId)) map.set(qId, []);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { podeComporProva, ...dono } = resumoDoDono(prova as any);
         map.get(qId)!.push({
           provaId: (prova as any)._id.toString(),
           provaNome: (prova as any).nome,
           numero: qc.numero,
+          ...dono,
         });
       }
     }

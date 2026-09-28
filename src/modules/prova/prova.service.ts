@@ -22,7 +22,11 @@ import { Prova } from './prova.schema';
 import { UpdateProvaFilesDTO } from './dtos/update-files.dto.input';
 import { revalidarBloqueado } from '../simulado/helpers/bloqueado';
 import { syncNumeroNaProvaESimulados } from './helpers/question-container.helpers';
-import { motivoParaNaoComporProva } from './helpers/pode-compor-prova';
+import {
+  motivoParaNaoComporProva,
+  ResumoDoDono,
+  resumoDoDono,
+} from './helpers/pode-compor-prova';
 
 @Injectable()
 export class ProvaService {
@@ -126,6 +130,22 @@ export class ProvaService {
   public async getById(id: string): Promise<Prova> {
     const prova = await this.repository.getById(id);
     return prova;
+  }
+
+  /**
+   * A prova para a tela, com dono, proteção e se o ator pode compor
+   * (tickets/023, card 07). Ler é livre (R1): quem barra escrita é o assert.
+   */
+  public async getByIdComDono(
+    id: string,
+    ator?: Ator,
+  ): Promise<(Prova & ResumoDoDono) | null> {
+    const prova = await this.repository.getById(id);
+    if (!prova) return null;
+    return {
+      ...((prova as any).toObject ? (prova as any).toObject() : prova),
+      ...resumoDoDono(prova, ator),
+    };
   }
 
   public async syncNumero(

@@ -75,8 +75,11 @@ export class ProvaController {
     type: Prova,
     isArray: false,
   })
-  public async getById(@Param('id') id: string): Promise<Prova> {
-    return await this.service.getById(id);
+  public async getById(
+    @Param('id') id: string,
+    @AtorDaRequisicao() ator?: Ator,
+  ): Promise<Prova | null> {
+    return await this.service.getByIdComDono(id, ator);
   }
 
   @Get('missing/:id')

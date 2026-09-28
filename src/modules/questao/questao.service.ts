@@ -28,6 +28,10 @@ import { UpdateImageIdDTOInput } from './dtos/update-image-id.dto.input';
 import { UpdateDTOInput } from './dtos/update.dto.input';
 import { Status } from './enums/status.enum';
 import { Ator } from 'src/shared/ator/ator';
+import {
+  podeComporDono,
+  resumoDoDono,
+} from '../prova/helpers/pode-compor-prova';
 import { documentoDaCopia } from './duplicarQuestao';
 import { provasQueRecusamArea } from '../prova/services/area-da-prova';
 import { TipoOrigem } from './enums/tipo-origem.enum';
@@ -127,6 +131,7 @@ export class QuestaoService {
 
   public async getById(
     id: string,
+    ator?: Ator,
   ): Promise<(Questao & { provasContendo: ProvaContendo[] }) | null> {
     const questao = await this.repository.getById(id);
     if (!questao) return null;
@@ -134,7 +139,11 @@ export class QuestaoService {
     const obj = (
       (questao as any).toObject ? (questao as any).toObject() : questao
     ) as Questao & { provasContendo: ProvaContendo[] };
-    obj.provasContendo = map.get(id.toString()) ?? [];
+    // tickets/023, card 07: se o ator da requisição pode compor cada prova.
+    obj.provasContendo = (map.get(id.toString()) ?? []).map((p) => ({
+      ...p,
+      podeComporProva: podeComporDono(p, ator),
+    }));
     return obj;
   }
 
@@ -282,12 +291,19 @@ export class QuestaoService {
     });
   }
 
-  public async getInfos() {
+  public async getInfos(ator?: Ator) {
     const param: GetAllInput = {
       page: 1,
       limit: 0,
     };
-    const provas = await this.provaRepository.getAll(param);
+    const todas = await this.provaRepository.getAll(param);
+    // tickets/023, card 07: cada prova com dono, proteção e se o ator compõe.
+    const provas = {
+      data: todas.data.map((p) => ({
+        ...((p as any).toObject ? (p as any).toObject() : p),
+        ...resumoDoDono(p, ator),
+      })),
+    };
     const exames = await this.exameRepository.getAll(param);
     const materias = await this.materiaRepository.getAll(param);
     const frentes = await this.frenteRepository.getAll(param);
