@@ -17,7 +17,7 @@ function makeFactory(overrides?: {
   getById?: jest.Mock;
   getProvaWithQuestion?: jest.Mock;
   getByIdToUpdate?: jest.Mock;
-  findProvaAtual?: jest.Mock;
+  findProvaDeSaida?: jest.Mock;
   session?: ReturnType<typeof makeSession>;
 }) {
   const session = overrides?.session ?? makeSession();
@@ -25,8 +25,8 @@ function makeFactory(overrides?: {
     startSession: jest.fn().mockResolvedValue(session),
     create: jest.fn().mockImplementation(async (q) => ({ ...q, _id: 'q-new' })),
     getByIdToUpdate: overrides?.getByIdToUpdate ?? jest.fn(),
-    findProvaAtual:
-      overrides?.findProvaAtual ?? jest.fn().mockResolvedValue(undefined),
+    findProvaDeSaida:
+      overrides?.findProvaDeSaida ?? jest.fn().mockResolvedValue(undefined),
     updateQuestion: jest.fn().mockResolvedValue(undefined),
   };
   const provaRepository = {
@@ -207,7 +207,7 @@ describe('CustomProvaFactory.updateQuestion', () => {
       makeFactory({
         getByIdToUpdate: jest.fn().mockResolvedValue(questaoAtual),
         getById: jest.fn().mockResolvedValue({ _id: 'p1', simulados: [] }),
-        findProvaAtual: jest.fn().mockResolvedValue('p1'),
+        findProvaDeSaida: jest.fn().mockResolvedValue('p1'),
       });
 
     await factory.updateQuestion({ _id: 'q1', prova: 'p1' } as any);
@@ -230,7 +230,7 @@ describe('CustomProvaFactory.updateQuestion', () => {
     const { factory, simuladoService, provaRepository } = makeFactory({
       getByIdToUpdate: jest.fn().mockResolvedValue(questaoAtual),
       getById,
-      findProvaAtual: jest.fn().mockResolvedValue('p-old'),
+      findProvaDeSaida: jest.fn().mockResolvedValue('p-old'),
     });
 
     await factory.updateQuestion({ _id: 'q1', prova: 'p-new' } as any);
@@ -358,7 +358,7 @@ describe('CustomProvaFactory.updateQuestion — numero-sync', () => {
     const { factory, provaRepository, simuladoRepository } = makeFactory({
       getById,
       getByIdToUpdate,
-      findProvaAtual: jest.fn().mockResolvedValue('p1'),
+      findProvaDeSaida: jest.fn().mockResolvedValue('p1'),
     });
 
     await factory.updateQuestion({
@@ -393,7 +393,7 @@ describe('CustomProvaFactory.updateQuestion — numero-sync', () => {
     const { factory, provaRepository } = makeFactory({
       getById,
       getByIdToUpdate,
-      findProvaAtual: jest.fn().mockResolvedValue('p1'),
+      findProvaDeSaida: jest.fn().mockResolvedValue('p1'),
     });
 
     await factory.updateQuestion({

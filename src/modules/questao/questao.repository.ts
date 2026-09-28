@@ -138,6 +138,26 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       .select('+alternativa');
   }
 
+  /**
+   * De qual prova a fábrica tira a questão ao atualizar (tickets/023, card
+   * 17). ⚠️ Se a questão está na prova informada, é ela — a atualização é no
+   * lugar. O `findProvaAtual` sozinho é um `findOne`: com a questão em várias
+   * provas, devolvia uma qualquer, e mudar a frente tirava a questão da prova
+   * de outro cursinho. Só quando ela NÃO está na informada (mover de prova,
+   * `PATCH v1/questao`) cai no `findProvaAtual`.
+   */
+  async findProvaDeSaida(
+    questaoId: string,
+    provaInformada?: string,
+  ): Promise<string | undefined> {
+    if (
+      provaInformada &&
+      (await this.provaContemQuestao(provaInformada, questaoId))
+    )
+      return String(provaInformada);
+    return await this.findProvaAtual(questaoId);
+  }
+
   async findProvaAtual(questaoId: string): Promise<string | undefined> {
     const prova = await this.provaModel
       .findOne({ 'questoes.questao': questaoId })

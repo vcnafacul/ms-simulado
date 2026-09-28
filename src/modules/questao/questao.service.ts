@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -47,6 +48,11 @@ import {
   motivosParaNaoExcluir,
   TEXTO_DO_MOTIVO,
 } from './exclusaoDaQuestao';
+
+/** tickets/023, card 17 — a tela mostra em toast. */
+export const textoAreaFrenteEmProvaOficial = (provas: string[]) =>
+  `Esta questão está numa prova oficial (${provas.join(', ')}). ` +
+  'Área e frente principal só podem ser alteradas pela equipe da plataforma.';
 
 /** Um motivo de recusa como a tela recebe: código para decidir, texto para ler. */
 export interface Motivo {
@@ -371,7 +377,10 @@ export class QuestaoService {
   public async updateQuestionDaRota(question: UpdateDTOInput, ator?: Ator) {
     if (question.prova) {
       await this.provaService.assertPodeComporProva(question.prova, ator);
-      const saida = await this.repository.findProvaAtual(question._id);
+      const saida = await this.repository.findProvaDeSaida(
+        question._id,
+        question.prova,
+      );
       if (saida && saida !== question.prova.toString()) {
         await this.provaService.assertPodeComporProva(saida, ator);
       }
@@ -555,6 +564,26 @@ export class QuestaoService {
     const enemAreaChanged = classificacao.enemArea !== questao.enemArea;
     const frente1Changed =
       classificacao.frente1 !== questao.frente1?._id?.toString();
+
+    /*
+      ⚠️ tickets/023, card 17 (R10): questão numa prova de categoria fora de
+      uso (`selecionavel: false` — as oficiais) só muda de área/frente1 pela
+      equipe da plataforma. A área decide em qual simulado do dia a questão
+      fica: mudá-la mexe na prova oficial. ANTES de qualquer escrita.
+    */
+    const mudaAreaOuFrente1 =
+      (classificacao.enemArea !== undefined && enemAreaChanged) ||
+      (classificacao.frente1 !== undefined && frente1Changed);
+    if (mudaAreaOuFrente1 && !ator?.admin) {
+      const oficiais = (
+        (await this.repository.findProvasContendoMany([id])).get(id) ?? []
+      ).filter((p) => !p.selecionavel);
+      if (oficiais.length > 0) {
+        throw new ForbiddenException(
+          textoAreaFrenteEmProvaOficial(oficiais.map((p) => p.provaNome)),
+        );
+      }
+    }
 
     /*
       ⚠️ **A área nova tem de caber em TODAS as provas da questão**, e não só na

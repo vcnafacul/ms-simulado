@@ -36,7 +36,7 @@ function montar(recusa: boolean) {
       .mockResolvedValue(
         new Map([['q1', [{ provaId: 'pA', provaNome: 'A', numero: 5 }]]]),
       ),
-    findProvaAtual: jest.fn().mockResolvedValue('pX'),
+    findProvaDeSaida: jest.fn().mockResolvedValue('pX'),
     provaContemQuestao: jest.fn().mockResolvedValue(false),
     getByIdToUpdate: jest.fn().mockResolvedValue({ _id: 'q1' }),
     updateClassificacao: jest.fn(),

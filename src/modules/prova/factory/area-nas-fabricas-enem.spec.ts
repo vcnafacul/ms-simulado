@@ -46,7 +46,7 @@ const montar = (
       enemArea: areaDaQuestao,
       frente1: { _id: { toString: () => 'f-comum' } },
     }),
-    findProvaAtual: jest.fn().mockResolvedValue(undefined),
+    findProvaDeSaida: jest.fn().mockResolvedValue(undefined),
     canInsertQuestion: jest.fn().mockResolvedValue(true),
   };
   const provaRepository = {
