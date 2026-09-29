@@ -10,6 +10,7 @@ import {
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
 import { GetAllDtoOutput } from 'src/shared/dtos/get-all.dto.output';
+import { DuplicarProvaDTOInput } from './dtos/duplicar.dto.input';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
 import { GetProvaDTOOutout } from './dtos/get-all.dto.output';
 import { Prova } from './prova.schema';
@@ -35,6 +36,17 @@ export class ProvaController {
     @Body() dto: CreateProvaDTOInput,
   ): Promise<GetProvaDTOOutout> {
     return await this.service.create(dto);
+  }
+
+  /** tickets/027, card 01 — mesmas questões, mesmos números, origem guardada. */
+  @Post(':id/duplicar')
+  @ApiResponse({ status: 201, description: 'duplica a prova do cursinho' })
+  public async duplicar(
+    @Param('id') id: string,
+    @Body() dto: DuplicarProvaDTOInput,
+    @AtorDaRequisicao() ator?: Ator,
+  ): Promise<GetProvaDTOOutout> {
+    return await this.service.duplicar(id, dto.nome.trim(), ator);
   }
 
   @Get()
