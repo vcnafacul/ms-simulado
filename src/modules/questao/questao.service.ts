@@ -71,6 +71,7 @@ import {
 } from './camposAlterados';
 import { ProvaContendo, QuestaoRepository } from './questao.repository';
 import { Questao } from './questao.schema';
+import { ContadorCursinhoRepository } from '../contador-cursinho/contador-cursinho.repository';
 
 @Injectable()
 export class QuestaoService {
@@ -86,6 +87,9 @@ export class QuestaoService {
     private readonly auditLogService: AuditLogService,
     private readonly simuladoService: SimuladoService,
     private readonly provaFactory: ProvaFactory,
+    // tickets/025, card 02. Último e opcional: os specs montam o service
+    // na mão com os 9 de antes.
+    private readonly contadorCursinho?: ContadorCursinhoRepository,
   ) {}
 
   public async create(
@@ -430,6 +434,33 @@ export class QuestaoService {
         HttpStatus.BAD_REQUEST,
       );
     }
+
+    /*
+      tickets/025, card 02 — "Questões revisadas e aprovadas" da página do
+      cursinho: +1 para o cursinho de quem aprovou. Só sobe (recusar depois não
+      desconta). FORA do try: a aprovação já foi gravada, e uma falha aqui não
+      pode virar 400 nem desfazer nada.
+    */
+    if (alvo === Status.Approved && ator?.cursinhoId) {
+      try {
+        await this.contadorCursinho?.incrementarAprovadas(ator.cursinhoId);
+      } catch (err) {
+        this.logger.error(
+          `Contador de aprovadas do cursinho ${ator.cursinhoId} falhou`,
+          err,
+        );
+      }
+    }
+  }
+
+  /** tickets/025, card 02. */
+  public async questoesAprovadasDoCursinho(
+    cursinhoId: string,
+  ): Promise<{ questoesAprovadas: number }> {
+    return {
+      questoesAprovadas:
+        (await this.contadorCursinho?.aprovadas(cursinhoId)) ?? 0,
+    };
   }
 
   /**

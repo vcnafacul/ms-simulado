@@ -20,6 +20,11 @@ import {
   CategoriaSchema,
 } from '../categoria/schemas/categoria.schema';
 import { CategoriaRepository } from '../categoria/categoria.repository';
+import { ContadorCursinhoRepository } from '../contador-cursinho/contador-cursinho.repository';
+import {
+  ContadorCursinho,
+  ContadorCursinhoSchema,
+} from '../contador-cursinho/contador-cursinho.schema';
 import { QuestaoController } from './questao.controller';
 import { QuestaoRepository } from './questao.repository';
 import { Questao, QuestaoSchema } from './questao.schema';
@@ -35,6 +40,7 @@ import { QuestaoService } from './questao.service';
       { name: Frente.name, schema: FrenteSchema },
       // ⚠️ Card 33: "ninguém respondeu" é medido no histórico.
       { name: Historico.name, schema: HistoricoSchema },
+      { name: ContadorCursinho.name, schema: ContadorCursinhoSchema },
     ]),
     QuestaoModule,
     ExameModule,
@@ -53,6 +59,7 @@ import { QuestaoService } from './questao.service';
     SimuladoRepository,
     ProvaFactory,
     EnemService,
+    ContadorCursinhoRepository,
   ],
   controllers: [QuestaoController],
   exports: [QuestaoService, QuestaoRepository],
