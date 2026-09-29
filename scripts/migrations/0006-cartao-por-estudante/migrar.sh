@@ -59,7 +59,7 @@ fi
       new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     const fica = ordenados[0];
     const saem = ordenados.slice(1);
-    print("- usuario " + g._id.u + " | simulado " + g._id.s + " | cartão " + g._id.c +
+    print("- usuario " + g._id.u + " | simulado " + String(g._id.s) + " | cartão " + g._id.c +
           " → fica " + fica._id + " (" + fica.status + "); saem " +
           saem.map((d) => d._id + " (" + d.status + ")").join(", "));
     if (MODO === "aplicar") {
