@@ -43,4 +43,8 @@ export class GetProvaDTOOutout {
 
   @ApiProperty()
   receberNovasVersoes: boolean;
+
+  /** tickets/027: de qual prova esta foi duplicada. */
+  @ApiProperty({ required: false, nullable: true })
+  provaOrigemId?: string | null;
 }

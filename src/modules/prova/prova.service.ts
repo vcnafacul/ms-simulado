@@ -24,9 +24,15 @@ import { Prova } from './prova.schema';
 import { UpdateProvaFilesDTO } from './dtos/update-files.dto.input';
 import { revalidarBloqueado } from '../simulado/helpers/bloqueado';
 import {
+  addQuestaoToContainer,
   resolveQuestaoId,
   syncNumeroNaProvaESimulados,
 } from './helpers/question-container.helpers';
+import { DONO_SYSTEM } from '../categoria/schemas/categoria.schema';
+import { Questao } from '../questao/questao.schema';
+
+export const TEXTO_DUPLICAR_SO_DO_CURSINHO =
+  'Só dá para duplicar provas do seu cursinho.';
 import {
   atualizacoesDaProva,
   Atualizacao,
@@ -233,6 +239,89 @@ export class ProvaService {
       atual = String(s._id);
     }
     return false;
+  }
+
+  /**
+   * Duplica uma prova do cursinho (tickets/027, card 01).
+   *
+   * ⚠️ **Reaproveita, não copia:** a cópia aponta para as MESMAS questões,
+   * com os mesmos números — nada nasce no banco de questões, e corrigir uma
+   * questão vale para as duas. A ordem é de cada prova.
+   *
+   * Prova e simulado nascem pela própria fábrica do cursinho (nome, unicidade
+   * e simulado 1:1 de sempre); as questões entram nos dois containers ANTES de
+   * gravar a prova. Se algo falhar depois de o simulado existir, ele é apagado.
+   */
+  public async duplicar(
+    id: string,
+    nome: string,
+    ator?: Ator,
+  ): Promise<GetProvaDTOOutout> {
+    if (!ator?.cursinhoId) {
+      throw new ForbiddenException(TEXTO_DUPLICAR_SO_DO_CURSINHO);
+    }
+    const origem = await this.repository.getById(id);
+    if (!origem) throw new NotFoundException('Prova não encontrada.');
+    const categoria = origem.categoria;
+    // Prova oficial/ENEM (categoria do sistema) é 1:N — outra fábrica.
+    const doCursinho = !!categoria && categoria.dono !== DONO_SYSTEM;
+    if (!doCursinho || (origem.cursinhoId ?? null) !== ator.cursinhoId) {
+      throw new ForbiddenException(TEXTO_DUPLICAR_SO_DO_CURSINHO);
+    }
+
+    const factory = this.provaFactory.getFactory(categoria, origem.ano);
+    const prova = await factory.createProva({
+      edicao: origem.edicao,
+      aplicacao: origem.aplicacao,
+      ano: origem.ano,
+      categoria: String(categoria._id),
+      nome,
+      nomeSimulado: nome,
+      criadorId: ator.userId,
+      cursinhoId: ator.cursinhoId,
+      receberNovasVersoes: origem.receberNovasVersoes,
+    });
+    await factory.createSimulados(prova);
+    const simulado = prova.simulados[0];
+
+    try {
+      prova.inicialNumero = origem.inicialNumero;
+      prova.provaOrigemId = String(origem._id);
+      prova.totalQuestaoValidadas = 0;
+      for (const qc of origem.questoes ?? []) {
+        const questao = qc.questao as Questao;
+        if (!questao?._id) continue;
+        addQuestaoToContainer(prova, questao, qc.numero);
+        addQuestaoToContainer(simulado, questao, qc.numero);
+        if (questao.status === Status.Approved)
+          prova.totalQuestaoValidadas += 1;
+      }
+      revalidarBloqueado(simulado);
+      await this.simuladoRepository.updateSession(simulado);
+
+      const result = await this.repository.create(prova);
+      return {
+        _id: result._id,
+        edicao: result.edicao,
+        aplicacao: result.aplicacao,
+        ano: result.ano,
+        categoria: result.categoria.nome,
+        exame: result.categoria.exame?.nome,
+        nome: result.nome,
+        totalQuestao: result.totalQuestao,
+        totalQuestaoCadastradas: result.questoes.length,
+        totalQuestaoValidadas: result.totalQuestaoValidadas,
+        enemAreas: result.enemAreas,
+        createdAt: result.createdAt,
+        receberNovasVersoes: result.receberNovasVersoes,
+        provaOrigemId: result.provaOrigemId,
+      } as GetProvaDTOOutout;
+    } catch (error) {
+      await this.simuladoRepository
+        .delete(String(simulado._id))
+        .catch(() => undefined);
+      throw error;
+    }
   }
 
   public async create(item: CreateProvaDTOInput): Promise<GetProvaDTOOutout> {

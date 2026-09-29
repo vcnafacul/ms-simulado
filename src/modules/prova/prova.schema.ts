@@ -89,6 +89,13 @@ export class Prova extends BaseSchema {
    */
   @Prop({ type: Boolean, required: true, default: false })
   public receberNovasVersoes: boolean;
+
+  /**
+   * De qual prova esta foi duplicada (tickets/027) — liga as "irmãs" (ex.:
+   * Inglês e Espanhol). `null`/ausente = não é cópia.
+   */
+  @Prop({ type: String, required: false, default: null })
+  public provaOrigemId?: string | null;
 }
 
 export const ProvaSchema = SchemaFactory.createForClass(Prova);
