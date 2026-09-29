@@ -1,8 +1,17 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AggregatePeriodDtoInput } from 'src/shared/dtos/aggregate-period.dto.input';
 import { ConsultarHistoricoDtoInput } from './dtos/consultar-historico.dto.input';
 import { GetHistoricoDTOInput } from './dtos/get-historico.dto';
+import { ParticipantesPorCartaoDtoInput } from './dtos/participantes-por-cartao.dto.input';
 import { Historico } from './historico.schema';
 import { HistoricoService } from './historico.service';
 
@@ -10,6 +19,20 @@ import { HistoricoService } from './historico.service';
 @Controller('v1/historico')
 export class HistoricoController {
   constructor(private service: HistoricoService) {}
+
+  /**
+   * tickets/026, card 05 — quem fez os simulados de um evento presencial.
+   * POST porque leva a lista de simulados no corpo; não escreve nada.
+   */
+  @Post('participantes-por-cartao')
+  @HttpCode(200)
+  @ApiResponse({ status: 200, description: '{ simuladoId: usuarios[] }' })
+  async participantesPorCartao(@Body() dto: ParticipantesPorCartaoDtoInput) {
+    return await this.service.participantesPorCartao(
+      dto.simuladoIds,
+      dto.desde,
+    );
+  }
 
   @Get()
   @ApiResponse({
