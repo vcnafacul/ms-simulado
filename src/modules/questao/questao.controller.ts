@@ -86,11 +86,17 @@ export class QuestaoController {
     return await this.service.getSummary();
   }
 
+  // tickets/025, card 02. ⚠️ Literal antes das rotas `:id/...`.
+  @Get('contador-cursinho/:cursinhoId')
+  async getContadorCursinho(@Param('cursinhoId') cursinhoId: string) {
+    return await this.service.questoesAprovadasDoCursinho(cursinhoId);
+  }
+
   @Get('pending-by-materia')
-  async getPendingByMateria(
-    @Query('materias') materias?: string,
-  ) {
-    const materiaIds = materias ? materias.split(',').filter(Boolean) : undefined;
+  async getPendingByMateria(@Query('materias') materias?: string) {
+    const materiaIds = materias
+      ? materias.split(',').filter(Boolean)
+      : undefined;
     return await this.service.getPendingByMateria(materiaIds);
   }
 
