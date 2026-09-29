@@ -442,4 +442,38 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       })
       .exec();
   }
+
+  /**
+   * tickets/026, card 05 — `{ simuladoId → usuários }` de quem FEZ pelo
+   * cartão: com `cartaoCode` (o digital não tem), `completed` (falha e
+   * pendente não contam) e criado a partir de `desde`.
+   *
+   * ⚠️ `createdAt` vem do `BaseSchema` (default na criação), mesmo com o
+   * `timestamps: false` deste schema.
+   */
+  async participantesPorCartao(
+    simuladoIds: string[],
+    desde: Date,
+  ): Promise<Record<string, string[]>> {
+    const linhas = await this.model.aggregate<{
+      _id: Types.ObjectId;
+      usuarios: string[];
+    }>([
+      {
+        $match: {
+          simulado: { $in: simuladoIds.map((id) => new Types.ObjectId(id)) },
+          cartaoCode: { $type: 'string' },
+          status: HistoricoStatus.Completed,
+          createdAt: { $gte: desde },
+          deleted: { $ne: true },
+        },
+      },
+      { $group: { _id: '$simulado', usuarios: { $addToSet: '$usuario' } } },
+    ]);
+    const out: Record<string, string[]> = Object.fromEntries(
+      simuladoIds.map((id) => [id, []]),
+    );
+    for (const l of linhas) out[String(l._id)] = l.usuarios;
+    return out;
+  }
 }

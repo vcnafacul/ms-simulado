@@ -20,6 +20,11 @@ function toPlain(doc: unknown): any {
 export class HistoricoService {
   constructor(private repository: HistoricoRepository) {}
 
+  /** tickets/026, card 05. */
+  participantesPorCartao(simuladoIds: string[], desde: string) {
+    return this.repository.participantesPorCartao(simuladoIds, new Date(desde));
+  }
+
   async getAllbyUser(dto: GetHistoricoDTOInput) {
     const resultado = await this.repository.getAllByUser(dto);
     return {
