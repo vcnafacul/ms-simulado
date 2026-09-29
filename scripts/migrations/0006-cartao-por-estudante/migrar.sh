@@ -28,7 +28,18 @@ MODO="lista"
 [[ "${1:-}" == "--aplicar" ]] && MODO="aplicar"
 [[ "${1:-}" == "--excluir" ]] && MODO="excluir"
 
-mongosh "$MONGODB" --quiet --eval "const MODO = '${MODO}';" --eval '
+# Sem mongosh na máquina: roda o da imagem oficial do Mongo, pelo Docker.
+if command -v mongosh >/dev/null 2>&1; then
+  MONGOSH=(mongosh)
+elif command -v docker >/dev/null 2>&1; then
+  echo "(mongosh não encontrado — usando o da imagem mongo:7, pelo Docker)" >&2
+  MONGOSH=(docker run --rm -i --network host mongo:7 mongosh)
+else
+  echo "Precisa do mongosh (brew install mongosh) ou do Docker." >&2
+  exit 1
+fi
+
+"${MONGOSH[@]}" "$MONGODB" --quiet --eval "const MODO = '${MODO}';" --eval '
   const APLICAR = MODO !== "lista";
   const PESO = { completed: 4, processing: 3, awaiting_omr: 2, pending: 1, failed: 0 };
   const grupos = db.historicos.aggregate([

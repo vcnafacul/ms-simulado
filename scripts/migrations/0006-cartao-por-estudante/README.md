@@ -17,6 +17,10 @@ MONGODB='mongodb://...' bash migrar.sh --excluir  # ou: resolve APAGANDO e cria 
 
 Rodar em **homol e em prod** (prod depois do deploy da versão com o `e711453`).
 
+Sem `mongosh` instalado, o script usa o da imagem `mongo:7` pelo Docker, automaticamente.
+⚠️ O `MONGODB` tem de ser alcançável de dentro do container: com URI remota (VPS/Atlas), funciona. Com
+`localhost`, rode o script **na própria VPS** (ou use `host.docker.internal` no lugar de `localhost`, no Mac).
+
 ## O que o `--aplicar` faz
 Em cada grupo (mesmo estudante, simulado e cartão):
 - **fica** o histórico com leitura concluída (`completed` > `processing` > `awaiting_omr` > `pending` >
