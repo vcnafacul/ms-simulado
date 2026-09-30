@@ -4,6 +4,7 @@ import { QueueProducer } from 'src/shared/modules/queue/queue.producer';
 import { HistoricoRepository } from '../historico/historico.repository';
 import { HistoricoStatus } from '../historico/enums/historico-status.enum';
 import { SimuladoService } from './simulado.service';
+import { AvisoDeResultadoService } from './aviso-de-resultado.service';
 
 @Injectable()
 export class AnswerProcessorService implements OnModuleInit {
@@ -14,6 +15,7 @@ export class AnswerProcessorService implements OnModuleInit {
     private readonly simuladoService: SimuladoService,
     private readonly historicoRepository: HistoricoRepository,
     private readonly producer: QueueProducer,
+    private readonly aviso: AvisoDeResultadoService,
   ) {}
 
   async onModuleInit() {
@@ -61,6 +63,9 @@ export class AnswerProcessorService implements OnModuleInit {
       userId,
       historicoId: histId,
     });
+
+    // tickets/028: push do resultado do cartão — solto, nunca bloqueia a fila.
+    this.aviso.avisarSemEsperar(histId);
 
     this.logger.log(`Processed historico ${histId} for user ${userId}`);
   }

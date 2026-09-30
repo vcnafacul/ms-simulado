@@ -13,10 +13,14 @@ import { Simulado, SimuladoSchema } from './schemas/simulado.schema';
 import { AnswerProcessorService } from './answer-processor.service';
 import { SimuladoController } from './simulado.controller';
 import { SimuladoRepository } from './simulado.repository';
+import { EnvModule } from '../../shared/modules/env/env.module';
+import { AvisoDeResultadoService } from './aviso-de-resultado.service';
 import { SimuladoService } from './simulado.service';
 
 @Module({
   imports: [
+    // tickets/028: o AvisoDeResultadoService lê API_URL/NOTIFICACAO_SECRET.
+    EnvModule,
     MongooseModule.forFeature([
       { name: Simulado.name, schema: SimuladoSchema },
       { name: Prova.name, schema: ProvaSchema },
@@ -30,7 +34,13 @@ import { SimuladoService } from './simulado.service';
     HistoricoModule,
   ],
   controllers: [SimuladoController],
-  providers: [SimuladoService, SimuladoRepository, ProvaRepository, AnswerProcessorService],
+  providers: [
+    SimuladoService,
+    SimuladoRepository,
+    ProvaRepository,
+    AnswerProcessorService,
+    AvisoDeResultadoService,
+  ],
   exports: [SimuladoService, SimuladoRepository],
 })
 export class SimuladoModule {}
