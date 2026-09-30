@@ -28,6 +28,12 @@ export const envSchema = z.object({
   // ms-omr (Etapa 12 · A3)
   OMR_URL: z.string().url().default('http://localhost:8000'),
 
+  // Aviso à api com o resultado do cartão (tickets/028). OPCIONAIS: sem as
+  // duas, o ms não avisa — ambiente sem push não quebra nada. O segredo tem
+  // de ser IGUAL ao da api.
+  API_URL: z.string().url().optional(),
+  NOTIFICACAO_SECRET: z.string().optional(),
+
   // Caderno · card 04. Rascunho é ferramenta de quem monta a prova; liberar
   // isso por acidente em produção entregaria caderno de simulado incompleto.
   //
