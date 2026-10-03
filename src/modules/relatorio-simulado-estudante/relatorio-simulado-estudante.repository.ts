@@ -102,6 +102,13 @@ export interface SimuladoComCartao {
   cartoes: number;
   comLeituraConcluida: number;
   ultimoEnvio: Date | null;
+  /** Quando o primeiro estudante do recorte entrou — a data da aplicação. */
+  primeiroEnvio: Date | null;
+  /**
+   * Média do `aproveitamento.geral` (0..1) de quem teve leitura concluída;
+   * `null` se ninguém teve (tickets/033, card 09).
+   */
+  mediaAproveitamento: number | null;
 }
 
 /**
@@ -536,6 +543,17 @@ export class RelatorioSimuladoEstudanteRepository {
               },
             },
             ultimoEnvio: { $max: '$createdAt' },
+            primeiroEnvio: { $min: '$createdAt' },
+            // `$avg` ignora null: falho e órfão não puxam a média para baixo
+            mediaAproveitamento: {
+              $avg: {
+                $cond: [
+                  { $eq: ['$h.status', HistoricoStatus.Completed] },
+                  '$h.aproveitamento.geral',
+                  null,
+                ],
+              },
+            },
           },
         },
         { $sort: { ultimoEnvio: -1 } },
@@ -547,6 +565,11 @@ export class RelatorioSimuladoEstudanteRepository {
       cartoes: l.cartoes,
       comLeituraConcluida: l.comLeituraConcluida,
       ultimoEnvio: l.ultimoEnvio ?? null, // $max já devolve null; isto é cinto e suspensório
+      primeiroEnvio: l.primeiroEnvio ?? null,
+      mediaAproveitamento:
+        typeof l.mediaAproveitamento === 'number'
+          ? l.mediaAproveitamento
+          : null,
     }));
   }
 
