@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Patch,
+  Delete,
   Post,
   Query,
 } from '@nestjs/common';
@@ -15,6 +16,8 @@ import { CreateProvaDTOInput } from './dtos/create.dto.input';
 import { GetProvaDTOOutout } from './dtos/get-all.dto.output';
 import { Prova } from './prova.schema';
 import { ProvaService } from './prova.service';
+import { ProvaGestaoService } from './gestao/prova-gestao.service';
+import { EditarDadosProvaDTOInput } from './dtos/editar-dados.dto.input';
 import { UpdateProvaFilesDTO } from './dtos/update-files.dto.input';
 import { AplicarAtualizacoesDTOInput } from './dtos/aplicar-atualizacoes.dto.input';
 import { ReceberNovasVersoesDTOInput } from './dtos/receber-novas-versoes.dto.input';
@@ -23,7 +26,10 @@ import { Ator, AtorDaRequisicao } from 'src/shared/ator/ator';
 @ApiTags('Prova')
 @Controller('v1/prova')
 export class ProvaController {
-  constructor(private readonly service: ProvaService) {}
+  constructor(
+    private readonly service: ProvaService,
+    private readonly gestao: ProvaGestaoService,
+  ) {}
 
   @Post()
   @ApiResponse({
@@ -150,5 +156,29 @@ export class ProvaController {
     @Body() dto: UpdateProvaFilesDTO,
   ): Promise<GetProvaDTOOutout> {
     return await this.service.updateFiles(id, dto);
+  }
+
+  /**
+   * Card 41 — o cursinho corrige nome, ano, edição, aplicação e categoria da
+   * prova dele. Só o dono (`x-ator`); a permissão é checada na api.
+   */
+  @Patch(':id/dados')
+  @ApiResponse({ status: 200, description: 'edita os dados da prova' })
+  public async editarDados(
+    @Param('id') id: string,
+    @Body() dto: EditarDadosProvaDTOInput,
+    @AtorDaRequisicao() ator?: Ator,
+  ): Promise<{ nome: string }> {
+    return await this.gestao.editar(id, dto, ator);
+  }
+
+  /** Card 41 — exclusão lógica; só sem cartão enviado. */
+  @Delete(':id')
+  @ApiResponse({ status: 200, description: 'exclui a prova do cursinho' })
+  public async excluir(
+    @Param('id') id: string,
+    @AtorDaRequisicao() ator?: Ator,
+  ): Promise<{ nome: string }> {
+    return await this.gestao.excluir(id, ator);
   }
 }

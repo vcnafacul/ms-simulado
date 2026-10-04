@@ -18,6 +18,8 @@ import { Prova, ProvaSchema } from './prova.schema';
 import { ProvaService } from './prova.service';
 import { ProvaExistValidator } from './validator/prova-exist.validator';
 import { EnemService } from './services/enem_service';
+import { HistoricoModule } from '../historico/historico.module';
+import { ProvaGestaoService } from './gestao/prova-gestao.service';
 
 @Module({
   imports: [
@@ -31,6 +33,8 @@ import { EnemService } from './services/enem_service';
     MateriaModule,
     FrenteModule,
     forwardRef(() => SimuladoModule),
+    // Card 41: "alguém fez a prova" é contado no histórico.
+    HistoricoModule,
   ],
   controllers: [ProvaController],
   providers: [
@@ -40,6 +44,7 @@ import { EnemService } from './services/enem_service';
     CategoriaRepository,
     ProvaFactory,
     EnemService,
+    ProvaGestaoService,
   ],
   exports: [ProvaService, ProvaRepository],
 })
