@@ -411,6 +411,19 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       .exec() as unknown as Promise<Historico | null>;
   }
 
+  /**
+   * Card 41 — "alguém fez" a prova: qualquer histórico vivo dos simulados
+   * dela, em QUALQUER status. Pendente ou com falha também conta: é um cartão
+   * enviado, com foto no bucket e linha no relatório.
+   */
+  async contarPorSimulados(simuladoIds: string[]): Promise<number> {
+    if (!simuladoIds.length) return 0;
+    return this.model.countDocuments({
+      simulado: { $in: simuladoIds.map((id) => new Types.ObjectId(id)) },
+      deleted: { $ne: true },
+    });
+  }
+
   async findByImageKey(imageKey: string): Promise<Historico | null> {
     return this.model.findOne({ imageKey }).exec();
   }

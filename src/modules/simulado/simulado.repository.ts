@@ -127,6 +127,28 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
     }
   }
 
+  /**
+   * Card 41 — os simulados de uma prova excluída: arquivados (`deleted`,
+   * `bloqueado`) e sem questões, para não aparecerem como "simulado que usa
+   * esta questão" no banco de questões.
+   */
+  async arquivarDaProva(ids: string[]): Promise<void> {
+    if (!ids.length) return;
+    await this.model.updateMany(
+      { _id: { $in: ids.map((i) => new Types.ObjectId(i)) } },
+      { $set: { bloqueado: true, deleted: true, questoes: [] } },
+    );
+  }
+
+  /** Card 41 — renomear a prova renomeia o simulado 1:1 dela. */
+  async renomear(ids: string[], nome: string): Promise<void> {
+    if (!ids.length) return;
+    await this.model.updateMany(
+      { _id: { $in: ids.map((i) => new Types.ObjectId(i)) } },
+      { $set: { nome } },
+    );
+  }
+
   async answer(id: string): Promise<Simulado> {
     return await this.model
       .findById(id)

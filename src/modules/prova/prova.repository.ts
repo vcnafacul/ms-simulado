@@ -41,8 +41,15 @@ export class ProvaRepository extends BaseRepository<Prova> {
     });
   }
 
+  /**
+   * ⚠️ Card 41: prova excluída não conta — senão impediria para sempre
+   * excluir a categoria dela.
+   */
   async countByCategoria(categoriaId: string): Promise<number> {
-    return this.model.countDocuments({ categoria: categoriaId });
+    return this.model.countDocuments({
+      categoria: categoriaId,
+      deleted: { $ne: true },
+    });
   }
 
   async countsByCategoria(
@@ -52,6 +59,7 @@ export class ProvaRepository extends BaseRepository<Prova> {
       {
         $match: {
           categoria: { $in: categoriaIds.map((id) => new Types.ObjectId(id)) },
+          deleted: { $ne: true },
         },
       },
       { $group: { _id: '$categoria', total: { $sum: 1 } } },
@@ -98,6 +106,28 @@ export class ProvaRepository extends BaseRepository<Prova> {
       .select('nome cursinhoId categoria')
       .populate({ path: 'categoria', select: 'dono selecionavel' })
       .exec();
+  }
+
+  /** Card 41 — `deleted` é `select: false`, então não vem nas leituras. */
+  async estaExcluida(id: string): Promise<boolean> {
+    return !!(await this.model.exists({ _id: id, deleted: true }));
+  }
+
+  /** Card 41 — `$set` dos dados, nunca o documento inteiro (ver o card 05). */
+  async atualizarDados(id: string, dados: Record<string, unknown>) {
+    await this.model.updateOne({ _id: id }, { $set: dados });
+  }
+
+  /**
+   * Card 41 — exclusão lógica. As questões são DESVINCULADAS (a lista
+   * esvazia), não apagadas: a questão é compartilhada, e uma prova excluída
+   * não pode continuar contando como "prova que usa esta questão".
+   */
+  async arquivar(id: string) {
+    await this.model.updateOne(
+      { _id: id },
+      { $set: { deleted: true, questoes: [], totalQuestaoValidadas: 0 } },
+    );
   }
 
   async getById(id: string): Promise<Prova> {
@@ -147,13 +177,15 @@ export class ProvaRepository extends BaseRepository<Prova> {
     limit,
     where,
   }: GetAllWhereInput): Promise<GetAllOutput<Prova>> {
+    // Card 41: prova excluída sai das listagens (plataforma e cursinho).
+    const filtro = { ...where, deleted: { $ne: true } };
     const data = await this.model
       .find()
       .populate({ path: 'categoria', populate: { path: 'exame' } })
       .skip((page - 1) * limit)
       .limit(limit ?? Infinity)
-      .where({ ...where });
-    const totalItems = await this.model.where({ ...where }).countDocuments();
+      .where(filtro);
+    const totalItems = await this.model.where(filtro).countDocuments();
     return { data, page, limit, totalItems };
   }
 

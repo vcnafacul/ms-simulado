@@ -385,6 +385,8 @@ export class ProvaService {
   ): Promise<(Prova & ResumoDoDono) | null> {
     const prova = await this.repository.getById(id);
     if (!prova) return null;
+    // Card 41: prova excluída não é lida por id (evento, detalhe, caderno).
+    if (await this.repository.estaExcluida(id)) return null;
     return {
       ...((prova as any).toObject ? (prova as any).toObject() : prova),
       ...resumoDoDono(prova, ator),
