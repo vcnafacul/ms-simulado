@@ -1,6 +1,8 @@
 import {
   BadGatewayException,
+  BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
 } from '@nestjs/common';
@@ -8,6 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { HistoricoStatus } from '../historico/enums/historico-status.enum';
 import { CodigoFalhaInterno } from '../historico/falha/codigo-falha';
 import { HistoricoRepository } from '../historico/historico.repository';
+import { SimuladoRepository } from '../simulado/simulado.repository';
 import { RelatorioSimuladoEstudanteRepository } from '../relatorio-simulado-estudante/relatorio-simulado-estudante.repository';
 import { CriarHistoricoCartaoDtoInput } from './dtos/criar-historico-cartao.dto.input';
 import { parseSimuladoId } from './imagekey.util';
@@ -24,6 +27,13 @@ export function textoDeCartaoJaEnviado(status?: HistoricoStatus): string {
   return 'Este cartão já foi enviado para este estudante.';
 }
 
+/**
+ * ⚠️ Card 35: o cartão JÁ ESTÁ gravado (como falho) quando o OMR não responde.
+ * Mandar "tentar de novo" levaria ao 409 de "já foi enviado".
+ */
+export const TEXTO_OMR_INDISPONIVEL =
+  'O leitor de cartões está fora do ar. O cartão foi registrado: use "Reenviar" no relatório do simulado quando o serviço voltar.';
+
 @Injectable()
 export class CartaoHistoricoService {
   private readonly logger = new Logger(CartaoHistoricoService.name);
@@ -32,12 +42,14 @@ export class CartaoHistoricoService {
     private readonly historicoRepository: HistoricoRepository,
     private readonly omrHttp: OmrHttpService,
     private readonly relatorioRepository: RelatorioSimuladoEstudanteRepository,
+    private readonly simuladoRepository: SimuladoRepository,
   ) {}
 
   async criar(
     dto: CriarHistoricoCartaoDtoInput,
   ): Promise<{ historicoId: string }> {
     const simuladoId = parseSimuladoId(dto.imageKey);
+    await this.garantirSimuladoDoCursinho(simuladoId, dto.cursinhoId);
 
     const jaEnviado = await this.historicoRepository.buscarCartaoEnviado(
       dto.usuario,
@@ -83,10 +95,33 @@ export class CartaoHistoricoService {
         CodigoFalhaInterno.OmrIndisponivel,
         err instanceof Error ? err.message : String(err),
       );
-      throw new BadGatewayException('falha ao acionar o OMR');
+      throw new BadGatewayException(TEXTO_OMR_INDISPONIVEL);
     }
 
     return { historicoId };
+  }
+
+  /**
+   * Card 35: um QR lido de um simulado apagado (ou de outro cursinho) virava um
+   * histórico que nunca chegaria a relatório nenhum — e a tela dizia "QR
+   * ilegível". Simulado sem dono (da plataforma) vale para qualquer cursinho.
+   */
+  private async garantirSimuladoDoCursinho(
+    simuladoId: string,
+    cursinhoId?: string,
+  ): Promise<void> {
+    const simulado =
+      await this.simuladoRepository.buscarCursinhoDoSimulado(simuladoId);
+    if (!simulado) {
+      throw new BadRequestException(
+        'Este cartão é de um simulado que não existe mais.',
+      );
+    }
+    if (simulado.cursinhoId && simulado.cursinhoId !== cursinhoId) {
+      throw new ForbiddenException(
+        'Este cartão é de um simulado de outro cursinho.',
+      );
+    }
   }
 
   /**

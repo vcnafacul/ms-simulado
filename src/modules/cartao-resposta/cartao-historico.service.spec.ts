@@ -1,4 +1,10 @@
-import { BadGatewayException, ConflictException, Logger } from '@nestjs/common';
+import {
+  BadGatewayException,
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Logger,
+} from '@nestjs/common';
 import { CartaoHistoricoService } from './cartao-historico.service';
 import { HistoricoStatus } from '../historico/enums/historico-status.enum';
 
@@ -18,9 +24,17 @@ function setup(over: any = {}) {
       repo as any,
       omr as any,
       { registrar: jest.fn() } as any,
+      (over.simulados ?? simuladoDe(null)) as any,
     ),
     repo,
     omr,
+  };
+}
+function simuladoDe(cursinhoId: string | null, existe = true) {
+  return {
+    buscarCursinhoDoSimulado: jest
+      .fn()
+      .mockResolvedValue(existe ? { cursinhoId } : null),
   };
 }
 const DTO = {
@@ -95,6 +109,45 @@ it('omr falha: marca Failed e 502', async () => {
   );
 });
 
+it('⚠️ o 502 diz que o cartão FICOU registrado e manda usar o Reenviar', async () => {
+  const { svc } = setup({
+    omr: {
+      enviarProcessamento: jest.fn().mockRejectedValue(new Error('down')),
+    },
+  });
+  await expect(svc.criar(DTO)).rejects.toThrow(
+    /O cartão foi registrado: use "Reenviar"/,
+  );
+});
+
+describe('simulado do QR (card 35)', () => {
+  it('simulado que não existe mais: 400 próprio, sem criar', async () => {
+    const { svc, repo } = setup({ simulados: simuladoDe(null, false) });
+    await expect(svc.criar({ ...DTO, cursinhoId: 'cur-1' })).rejects.toThrow(
+      new BadRequestException(
+        'Este cartão é de um simulado que não existe mais.',
+      ),
+    );
+    expect(repo.createAwaitingOmr).not.toHaveBeenCalled();
+  });
+
+  it('simulado de outro cursinho: 403, sem criar', async () => {
+    const { svc, repo } = setup({ simulados: simuladoDe('cur-2') });
+    await expect(svc.criar({ ...DTO, cursinhoId: 'cur-1' })).rejects.toThrow(
+      new ForbiddenException('Este cartão é de um simulado de outro cursinho.'),
+    );
+    expect(repo.createAwaitingOmr).not.toHaveBeenCalled();
+  });
+
+  it('simulado do próprio cursinho ou da plataforma (sem dono): aceita', async () => {
+    for (const dono of ['cur-1', null]) {
+      const { svc, repo } = setup({ simulados: simuladoDe(dono) });
+      await svc.criar({ ...DTO, cursinhoId: 'cur-1' });
+      expect(repo.createAwaitingOmr).toHaveBeenCalled();
+    }
+  });
+});
+
 it('imageKey inválido: 400 sem criar', async () => {
   const { svc, repo } = setup();
   await expect(svc.criar({ ...DTO, imageKey: 'invalido' })).rejects.toThrow();
@@ -115,6 +168,7 @@ it('cria a linha de junção com o vínculo recebido', async () => {
     historicoRepository as any,
     omrHttp as any,
     relatorio as any,
+    simuladoDe(null) as any,
   );
 
   await svc.criar({
@@ -149,6 +203,7 @@ it('sem cursinhoId não cria linha, e avisa no log', async () => {
     historicoRepository as any,
     omrHttp as any,
     relatorio as any,
+    simuladoDe(null) as any,
   );
 
   await svc.criar({
@@ -179,6 +234,7 @@ it('falha ao criar a linha NÃO derruba o upload, mas vai para o log com o histo
     historicoRepository as any,
     omrHttp as any,
     relatorio as any,
+    simuladoDe(null) as any,
   );
 
   // o cartão é lido normalmente; só fica fora do relatório até alguém reconciliar

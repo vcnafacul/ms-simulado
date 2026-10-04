@@ -50,6 +50,22 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
     }, {});
   }
 
+  /**
+   * Só o dono. O envio de cartão confere se o simulado do QR existe e é do
+   * cursinho de quem envia — sem popular nada.
+   */
+  async buscarCursinhoDoSimulado(
+    id: string,
+  ): Promise<{ cursinhoId: string | null } | null> {
+    const simulado = await this.model
+      .findById(id)
+      .select('cursinhoId')
+      .lean()
+      .exec();
+    if (!simulado) return null;
+    return { cursinhoId: simulado.cursinhoId ?? null };
+  }
+
   async getById(id: string): Promise<Simulado | null> {
     return await this.model
       .findById(id)
