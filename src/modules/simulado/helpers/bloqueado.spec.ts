@@ -46,6 +46,22 @@ describe('calcularBloqueado', () => {
     expect(calcularBloqueado(sml)).toBe(false);
   });
 
+  it('⚠️ categoria livre sem nenhuma questão continua bloqueado (card 34)', () => {
+    const sml = simuladoOk({
+      categoria: { quantidadeTotalQuestao: null },
+      questoes: [],
+    });
+    expect(calcularBloqueado(sml)).toBe(true);
+  });
+
+  it('alvo 0 com 0 questões também não libera', () => {
+    const sml = simuladoOk({
+      categoria: { quantidadeTotalQuestao: 0 },
+      questoes: [],
+    });
+    expect(calcularBloqueado(sml)).toBe(true);
+  });
+
   it('override trata a questão em trânsito como aprovada (fluxo approvedQuestion)', () => {
     const sml = simuladoOk();
     sml.questoes[1].questao.status = Status.Pending;

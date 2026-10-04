@@ -574,6 +574,19 @@ export class RelatorioSimuladoEstudanteRepository {
   }
 
   /**
+   * Card 36 — tira o estudante do relatório quando o envio é excluído.
+   *
+   * ⚠️ `deleteMany` pelo `historico` (e não pelo `_id` da linha): é o vínculo
+   * que o gate usou, e uma linha órfã apontando para um histórico apagado
+   * apareceria como "sem leitura" em vez de "não enviou".
+   */
+  async excluirPorHistorico(historicoId: string): Promise<void> {
+    await this.model
+      .deleteMany({ historico: new Types.ObjectId(historicoId) })
+      .exec();
+  }
+
+  /**
    * A linha da junção de um histórico, dentro de um cursinho.
    *
    * ⚠️ **O filtro é o gate**: `cursinhoId` no próprio `findOne` já não encontra
