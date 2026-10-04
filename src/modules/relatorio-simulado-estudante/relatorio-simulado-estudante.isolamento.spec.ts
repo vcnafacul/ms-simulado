@@ -888,6 +888,7 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
         usuario: 'u-l1',
         simulado: SIM_L1,
         status: 'completed',
+        aproveitamento: { geral: 0.6, materias: [] },
       });
       const hFalhou = await histModel.create({
         usuario: 'u-l2',
@@ -999,6 +1000,18 @@ describe('RelatorioSimuladoEstudante — isolamento (Mongo real em memória)', (
       // dois predicados. SIM_L2 tem 1 completo e 0 falhos, e distingue.
       const l2 = r.find((s) => s.simuladoId === SIM_L2.toString());
       expect(l2!.comLeituraConcluida).toBe(1);
+    });
+
+    it('média do aproveitamento só de quem foi lido, e a data do primeiro envio (033-09)', async () => {
+      const r = await svc.listarSimulados({ cursinhoId: CUR });
+
+      const l1 = r.simulados.find((s) => s.simuladoId === SIM_L1.toString());
+      // completo 0,6; o falho e o órfão não entram (nem como zero)
+      expect(l1!.mediaAproveitamento).toBeCloseTo(0.6);
+      expect(l1!.primeiroEnvio).toEqual(T_L1);
+      // completo sem aproveitamento gravado: sem média, não 0
+      const l2 = r.simulados.find((s) => s.simuladoId === SIM_L2.toString());
+      expect(l2!.mediaAproveitamento).toBeNull();
     });
 
     it('o nome vem do Simulado, por Map — e não de um $lookup', async () => {

@@ -521,6 +521,8 @@ export class RelatorioSimuladoEstudanteService {
         cartoes: a.cartoes,
         comLeituraConcluida: a.comLeituraConcluida,
         ultimoEnvio: a.ultimoEnvio,
+        primeiroEnvio: a.primeiroEnvio,
+        mediaAproveitamento: a.mediaAproveitamento,
       })),
     };
   }
