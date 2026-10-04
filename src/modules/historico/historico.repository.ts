@@ -388,6 +388,29 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       .exec();
   }
 
+  /**
+   * Card 36 — apaga DE VERDADE o histórico de um cartão enviado para o aluno
+   * errado.
+   *
+   * ⚠️ **Hard delete, e não o `delete` do `BaseRepository`** (que só marca
+   * `deleted: true`): o índice único `cartao_por_estudante` não olha o
+   * `deleted`, e um documento só marcado impediria reenviar o cartão do mesmo
+   * estudante. Quem guarda o "o que foi apagado" é a coleção de auditoria.
+   *
+   * ⚠️ **O status entra no filtro**, e não numa checagem antes: entre a leitura
+   * e a exclusão o callback do OMR pode chegar. Leitura em andamento não casa,
+   * e a operação devolve `null` em vez de apagar algo que alguém está gravando.
+   */
+  async excluirDefinitivo(
+    id: string,
+    statusPermitidos: HistoricoStatus[],
+  ): Promise<Historico | null> {
+    return this.model
+      .findOneAndDelete({ _id: id, status: { $in: statusPermitidos } })
+      .lean()
+      .exec() as unknown as Promise<Historico | null>;
+  }
+
   async findByImageKey(imageKey: string): Promise<Historico | null> {
     return this.model.findOne({ imageKey }).exec();
   }
