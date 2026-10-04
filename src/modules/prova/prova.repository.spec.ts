@@ -210,7 +210,11 @@ describe('ProvaRepository.countByCategoria', () => {
     const total = await repo.countByCategoria('cat-123');
 
     expect(total).toBe(4);
-    expect(countDocuments).toHaveBeenCalledWith({ categoria: 'cat-123' });
+    // Card 41: prova excluída não conta (senão a categoria nunca sai).
+    expect(countDocuments).toHaveBeenCalledWith({
+      categoria: 'cat-123',
+      deleted: { $ne: true },
+    });
   });
 });
 
@@ -234,7 +238,12 @@ describe('ProvaRepository.countsByCategoria', () => {
       [catB.toString()]: 5,
     });
     expect(aggregate).toHaveBeenCalledWith([
-      { $match: { categoria: { $in: [catA, catB] } } },
+      {
+        $match: {
+          categoria: { $in: [catA, catB] },
+          deleted: { $ne: true },
+        },
+      },
       { $group: { _id: '$categoria', total: { $sum: 1 } } },
     ]);
   });

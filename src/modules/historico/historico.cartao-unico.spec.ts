@@ -97,4 +97,28 @@ describe('um cartão por estudante — Mongo real', () => {
     );
     expect(await repo.buscarCartaoEnviado('u2', String(SIM), '7')).toBeNull();
   });
+
+  describe('excluirDefinitivo (card 36)', () => {
+    const PERMITIDOS = [HistoricoStatus.Completed, HistoricoStatus.Failed];
+
+    it('⚠️ depois de excluir, o MESMO cartão pode ser enviado de novo', async () => {
+      const doc = await histModel.create(
+        cartao({ status: HistoricoStatus.Completed }),
+      );
+
+      const apagado = await repo.excluirDefinitivo(String(doc._id), PERMITIDOS);
+
+      expect(apagado).toMatchObject({ usuario: 'u1', cartaoCode: '7' });
+      await expect(histModel.create(cartao())).resolves.toBeDefined();
+    });
+
+    it('⚠️ leitura em andamento não casa: nada é apagado', async () => {
+      const doc = await histModel.create(cartao());
+
+      await expect(
+        repo.excluirDefinitivo(String(doc._id), PERMITIDOS),
+      ).resolves.toBeNull();
+      expect(await histModel.countDocuments({ _id: doc._id })).toBe(1);
+    });
+  });
 });

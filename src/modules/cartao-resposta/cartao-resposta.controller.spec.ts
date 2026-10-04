@@ -10,6 +10,7 @@ import { CartaoHistoricoService } from './cartao-historico.service';
 import { CartaoReprocessoService } from './cartao-reprocesso.service';
 import { CartaoImagemService } from './cartao-imagem.service';
 import { CartaoRespostaController } from './cartao-resposta.controller';
+import { CartaoExclusaoService } from './exclusao/cartao-exclusao.service';
 import { TemplateProvisionService } from './template-provision.service';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -28,6 +29,7 @@ describe('CartaoRespostaController', () => {
       cartaoCallback as any,
       { reprocessar: jest.fn() } as any,
       { localizar: jest.fn() } as any,
+      {} as any,
     );
     const res = await controller.getCartao('665f0c1a2b3c4d5e6f000001');
     expect(res).toBeInstanceOf(StreamableFile);
@@ -46,6 +48,7 @@ describe('CartaoRespostaController', () => {
       cartaoCallback as any,
       { reprocessar: jest.fn() } as any,
       { localizar: jest.fn() } as any,
+      {} as any,
     );
     const r = await controller.criarHistorico({
       usuario: 'u1',
@@ -68,6 +71,7 @@ describe('CartaoRespostaController', () => {
       { processar: jest.fn() } as any,
       reprocesso as any,
       { localizar: jest.fn() } as any,
+      {} as any,
     );
 
     await expect(
@@ -88,6 +92,7 @@ describe('CartaoRespostaController', () => {
       cartaoCallback as any,
       { reprocessar: jest.fn() } as any,
       { localizar: jest.fn() } as any,
+      {} as any,
     );
     const r = await controller.callback({ imageKey: 'k', respostas: [] });
     expect(cartaoCallback.processar).toHaveBeenCalledWith({
@@ -104,6 +109,7 @@ describe('CartaoRespostaController', () => {
       {} as any,
       {} as any,
       service as any,
+      {} as any,
       {} as any,
     );
 
@@ -140,6 +146,13 @@ describe('CartaoRespostaController — roteamento HTTP', () => {
   const cartaoImagem = {
     localizar: jest.fn().mockResolvedValue({ imageKey: 'cartoes/s/f.jpg' }),
   };
+  const cartaoExclusao = {
+    excluir: jest.fn().mockResolvedValue({
+      imageKey: 'cartoes/s/f.jpg',
+      usuario: 'u1',
+      simuladoId: 's1',
+    }),
+  };
 
   beforeAll(async () => {
     const mod = await Test.createTestingModule({
@@ -153,6 +166,7 @@ describe('CartaoRespostaController — roteamento HTTP', () => {
         { provide: CartaoCallbackService, useValue: { processar: jest.fn() } },
         { provide: CartaoReprocessoService, useValue: cartaoReprocesso },
         { provide: CartaoImagemService, useValue: cartaoImagem },
+        { provide: CartaoExclusaoService, useValue: cartaoExclusao },
       ],
     }).compile();
 
@@ -214,5 +228,41 @@ describe('CartaoRespostaController — roteamento HTTP', () => {
       .expect(400);
 
     expect(cartaoImagem.localizar).not.toHaveBeenCalled();
+  });
+
+  it('POST :historicoId/excluir (card 36) responde 200 e repassa cursinho e autor', async () => {
+    const { body } = await request(app.getHttpServer())
+      .post('/v1/cartao-resposta/665f0c1a2b3c4d5e6f00ab09/excluir')
+      .send({ cursinhoId: 'cur-1', excluidoPor: 'user-9' })
+      .expect(200);
+
+    expect(body).toEqual({
+      imageKey: 'cartoes/s/f.jpg',
+      usuario: 'u1',
+      simuladoId: 's1',
+    });
+    expect(cartaoExclusao.excluir).toHaveBeenCalledWith({
+      historicoId: '665f0c1a2b3c4d5e6f00ab09',
+      cursinhoId: 'cur-1',
+      excluidoPor: 'user-9',
+    });
+  });
+
+  it('⚠️ excluir sem cursinhoId ou sem autor é 400; historicoId inválido também', async () => {
+    const url = '/v1/cartao-resposta/665f0c1a2b3c4d5e6f00ab09/excluir';
+    await request(app.getHttpServer())
+      .post(url)
+      .send({ excluidoPor: 'user-9' })
+      .expect(400);
+    await request(app.getHttpServer())
+      .post(url)
+      .send({ cursinhoId: 'cur-1' })
+      .expect(400);
+    await request(app.getHttpServer())
+      .post('/v1/cartao-resposta/nao-e-id/excluir')
+      .send({ cursinhoId: 'cur-1', excluidoPor: 'user-9' })
+      .expect(400);
+
+    expect(cartaoExclusao.excluir).not.toHaveBeenCalled();
   });
 });

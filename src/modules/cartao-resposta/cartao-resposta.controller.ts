@@ -17,8 +17,10 @@ import { CartaoImagemService } from './cartao-imagem.service';
 import { CartaoReprocessoService } from './cartao-reprocesso.service';
 import { CartaoCallbackDtoInput } from './dtos/cartao-callback.dto.input';
 import { CriarHistoricoCartaoDtoInput } from './dtos/criar-historico-cartao.dto.input';
+import { ExcluirCartaoDtoInput } from './dtos/excluir-cartao.dto.input';
 import { LocalizarImagemCartaoDtoInput } from './dtos/localizar-imagem-cartao.dto.input';
 import { ReprocessarCartaoDtoInput } from './dtos/reprocessar-cartao.dto.input';
+import { CartaoExclusaoService } from './exclusao/cartao-exclusao.service';
 import { TemplateProvisionService } from './template-provision.service';
 
 @ApiTags('cartao-resposta')
@@ -30,6 +32,7 @@ export class CartaoRespostaController {
     private readonly cartaoCallback: CartaoCallbackService,
     private readonly cartaoReprocesso: CartaoReprocessoService,
     private readonly cartaoImagem: CartaoImagemService,
+    private readonly cartaoExclusao: CartaoExclusaoService,
   ) {}
 
   @Get(':simuladoId')
@@ -105,5 +108,30 @@ export class CartaoRespostaController {
       throw new BadRequestException(`historicoId inválido: ${historicoId}`);
     }
     return this.cartaoImagem.localizar(historicoId, dto.cursinhoId);
+  }
+
+  /**
+   * Card 36 — "Excluir envio" de um cartão mandado para o aluno errado.
+   *
+   * ⚠️ **POST com o `cursinhoId` no corpo**, e não DELETE: o mesmo contrato do
+   * `reprocessar` e da `imagem` (DELETE com corpo é mal suportado por proxies).
+   * A api expõe o verbo certo para a tela.
+   *
+   * Devolve a `imageKey` para a api apagar a foto no bucket.
+   */
+  @Post(':historicoId/excluir')
+  @HttpCode(200)
+  async excluir(
+    @Param('historicoId') historicoId: string,
+    @Body() dto: ExcluirCartaoDtoInput,
+  ) {
+    if (!Types.ObjectId.isValid(historicoId)) {
+      throw new BadRequestException(`historicoId inválido: ${historicoId}`);
+    }
+    return this.cartaoExclusao.excluir({
+      historicoId,
+      cursinhoId: dto.cursinhoId,
+      excluidoPor: dto.excluidoPor,
+    });
   }
 }
