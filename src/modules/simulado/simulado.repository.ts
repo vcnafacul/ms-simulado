@@ -50,6 +50,22 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
     }, {});
   }
 
+  /**
+   * Só o dono. O envio de cartão confere se o simulado do QR existe e é do
+   * cursinho de quem envia — sem popular nada.
+   */
+  async buscarCursinhoDoSimulado(
+    id: string,
+  ): Promise<{ cursinhoId: string | null } | null> {
+    const simulado = await this.model
+      .findById(id)
+      .select('cursinhoId')
+      .lean()
+      .exec();
+    if (!simulado) return null;
+    return { cursinhoId: simulado.cursinhoId ?? null };
+  }
+
   async getById(id: string): Promise<Simulado | null> {
     return await this.model
       .findById(id)
@@ -109,6 +125,28 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
     if (!existingRecord) {
       throw new NotFoundException(`Registro com ID ${id} não encontrado.`);
     }
+  }
+
+  /**
+   * Card 41 — os simulados de uma prova excluída: arquivados (`deleted`,
+   * `bloqueado`) e sem questões, para não aparecerem como "simulado que usa
+   * esta questão" no banco de questões.
+   */
+  async arquivarDaProva(ids: string[]): Promise<void> {
+    if (!ids.length) return;
+    await this.model.updateMany(
+      { _id: { $in: ids.map((i) => new Types.ObjectId(i)) } },
+      { $set: { bloqueado: true, deleted: true, questoes: [] } },
+    );
+  }
+
+  /** Card 41 — renomear a prova renomeia o simulado 1:1 dela. */
+  async renomear(ids: string[], nome: string): Promise<void> {
+    if (!ids.length) return;
+    await this.model.updateMany(
+      { _id: { $in: ids.map((i) => new Types.ObjectId(i)) } },
+      { $set: { nome } },
+    );
   }
 
   async answer(id: string): Promise<Simulado> {
