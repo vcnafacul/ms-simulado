@@ -71,7 +71,16 @@ export function calcularBloqueado(
     }
     return qc.questao.status === Status.Approved;
   });
-  return !(atingiu && todasAprovadas && todasNumeradas(simulado.questoes));
+  // ⚠️ Lista vazia não é "tudo aprovado": na categoria livre (sem alvo) um
+  // simulado com 0 questões ficava Disponível, e caderno e cartão saíam vazios
+  // (tickets-documentacao, card 34).
+  const temQuestoes = simulado.questoes.length > 0;
+  return !(
+    temQuestoes &&
+    atingiu &&
+    todasAprovadas &&
+    todasNumeradas(simulado.questoes)
+  );
 }
 
 /**
