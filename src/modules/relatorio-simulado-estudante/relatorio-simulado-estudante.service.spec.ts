@@ -5,6 +5,7 @@ const SIM = '665f0c1a2b3c4d5e6f00abc2';
 
 const linha = (over: any = {}) => ({
   usuario: 'u1',
+  simulado: '507f1f77bcf86cd799439011',
   turmaId: 't-1',
   ...over,
   // depois de `...over`: senão um `over.historico` parcial (como nos testes
@@ -71,6 +72,8 @@ describe('RelatorioSimuladoEstudanteService.consultar', () => {
 
     expect(r.linhas[0]).toEqual({
       usuario: 'u1',
+      // tickets/034: a linha diz de qual simulado é o cartão
+      simuladoId: '507f1f77bcf86cd799439011',
       turmaId: 't-1',
       historicoId: 'h1',
       status: 'completed',

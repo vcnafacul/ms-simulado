@@ -41,6 +41,13 @@ export class MateriaDoEstudanteDtoOutput {
 export class LinhaRelatorioDtoOutput {
   @ApiProperty() usuario: string;
 
+  /**
+   * De qual simulado é o cartão (tickets/034). No relatório do simulado é
+   * sempre o próprio; no da prova é o que distingue as linhas do mesmo
+   * estudante — o grão é a APLICAÇÃO, não o estudante.
+   */
+  @ApiProperty() simuladoId: string;
+
   @ApiProperty({ required: false }) turmaId?: string;
 
   /** O card 07 usa para abrir o detalhe do estudante. */

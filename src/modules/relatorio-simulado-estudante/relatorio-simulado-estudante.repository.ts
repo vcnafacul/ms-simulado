@@ -202,6 +202,29 @@ function numeroGravado(numeros: unknown): number | null {
   return unicos.length === 1 ? unicos[0] : null;
 }
 
+/**
+ * Um simulado (relatório do simulado) ou vários (relatório da prova,
+ * tickets/034). As consultas são as MESMAS nos dois casos — duplicar o
+ * pipeline por prova seria o caminho certo para as duas telas divergirem.
+ */
+export type SimuladoOuSimulados = string | string[];
+
+function filtroDeSimulado(simuladoId: SimuladoOuSimulados): {
+  simulado: Types.ObjectId | { $in: Types.ObjectId[] };
+} {
+  return Array.isArray(simuladoId)
+    ? { simulado: { $in: simuladoId.map((id) => new Types.ObjectId(id)) } }
+    : { simulado: new Types.ObjectId(simuladoId) };
+}
+
+/** As primeiras linhas da prova que importam ao relatório (tickets/034). */
+export interface ProvaDoRelatorio {
+  nome: string;
+  simuladoIds: string[];
+  /** O número de cada questão NA PROVA — o que o caderno impresso mostra. */
+  numeros: { questaoId: string; numero: number | null }[];
+}
+
 @Injectable()
 export class RelatorioSimuladoEstudanteRepository {
   private readonly logger = new Logger(
@@ -249,14 +272,14 @@ export class RelatorioSimuladoEstudanteRepository {
    * cursinhos pela rede interna e não escala.
    */
   async buscarPorRecorte(params: {
-    simuladoId: string;
+    simuladoId: SimuladoOuSimulados;
     cursinhoId: string;
     turmaId?: string;
     usuarios?: string[];
   }): Promise<LinhaComHistorico[]> {
     const filtro = {
       ...filtroDoRecorte(params),
-      simulado: new Types.ObjectId(params.simuladoId),
+      ...filtroDeSimulado(params.simuladoId),
     };
 
     return this.model
@@ -285,6 +308,77 @@ export class RelatorioSimuladoEstudanteRepository {
   }
 
   /**
+   * Quantos ESTUDANTES do cursinho têm cartão em algum destes simulados
+   * (tickets/034). ⚠️ Distintos, e não linhas: com a linha por aplicação, o
+   * mesmo estudante pode ter cartão em dois simulados da prova, e o rodapé fala
+   * de estudantes.
+   */
+  async contarEstudantesDoCursinho(
+    simuladoIds: string[],
+    cursinhoId: string,
+  ): Promise<number> {
+    const usuarios = await this.model.distinct('usuario', {
+      ...filtroDeSimulado(simuladoIds),
+      cursinhoId,
+    });
+    return usuarios.length;
+  }
+
+  /**
+   * Quais destes simulados têm linha no recorte (tickets/034) — é sobre eles
+   * que se decide se a média mistura composições diferentes.
+   */
+  async simuladosComLinha(params: {
+    simuladoIds: string[];
+    cursinhoId: string;
+    turmaId?: string;
+    usuarios?: string[];
+  }): Promise<string[]> {
+    const ids = await this.model.distinct('simulado', {
+      ...filtroDoRecorte(params),
+      ...filtroDeSimulado(params.simuladoIds),
+    });
+    return ids.map((id) => id.toString());
+  }
+
+  /**
+   * A prova e os seus simulados, sem `populate` (tickets/034).
+   *
+   * ⚠️ **`deleted` não entra no filtro**, nem dos simulados: simulado apagado
+   * que tem cartão continua no relatório, rotulado — mesma postura do
+   * `getNomesPorIds`. E a prova excluída não precisa de caso: o card 41 recusa
+   * excluir prova com cartão.
+   *
+   * ⚠️ Lê pela conexão do modelo, e não importando o `ProvaModule`: ele importa
+   * o `SimuladoModule` com `forwardRef`, e o relatório não precisa de nada além
+   * desta leitura.
+   */
+  async buscarProva(provaId: string): Promise<ProvaDoRelatorio | null> {
+    const doc = await this.model.db.collection('provas').findOne(
+      { _id: new Types.ObjectId(provaId) },
+      {
+        projection: {
+          nome: 1,
+          simulados: 1,
+          'questoes.questao': 1,
+          'questoes.numero': 1,
+        },
+      },
+    );
+    if (!doc) return null;
+    return {
+      nome: doc.nome,
+      simuladoIds: (doc.simulados ?? []).map((id: Types.ObjectId) =>
+        id.toString(),
+      ),
+      numeros: (doc.questoes ?? []).map((qc: any) => ({
+        questaoId: qc.questao?.toString(),
+        numero: qc.numero ?? null,
+      })),
+    };
+  }
+
+  /**
    * Acertos, erros e distribuição por alternativa, por questão, dentro do recorte.
    *
    * A resposta em branco chega com a chave `alternativaEstudante` AUSENTE — não
@@ -305,14 +399,14 @@ export class RelatorioSimuladoEstudanteRepository {
    * `*.isolamento.spec.ts`.
    */
   async agregarPorQuestao(params: {
-    simuladoId: string;
+    simuladoId: SimuladoOuSimulados;
     cursinhoId: string;
     turmaId?: string;
     usuarios?: string[];
   }): Promise<AgregadoDaQuestao[]> {
     const match = {
       ...filtroDoRecorte(params),
-      simulado: new Types.ObjectId(params.simuladoId),
+      ...filtroDeSimulado(params.simuladoId),
     };
 
     const marcada = { $ifNull: ['$h.respostas.alternativaEstudante', null] };
@@ -487,7 +581,7 @@ export class RelatorioSimuladoEstudanteRepository {
       alternativaCorreta: gabaritoUnico(
         l.gabaritos,
         l._id?.toString(),
-        params.simuladoId,
+        String(params.simuladoId),
         this.logger,
       ),
     }));

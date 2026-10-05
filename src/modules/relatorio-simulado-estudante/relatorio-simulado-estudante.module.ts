@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { QuestaoModule } from '../questao/questao.module';
 import { SimuladoModule } from '../simulado/simulado.module';
+import { RelatorioProvaController } from './relatorio-prova.controller';
 import { RelatorioSimuladoEstudanteController } from './relatorio-simulado-estudante.controller';
 import { RelatorioSimuladoEstudanteRepository } from './relatorio-simulado-estudante.repository';
 import { RelatorioSimuladoEstudanteService } from './relatorio-simulado-estudante.service';
@@ -25,7 +26,7 @@ import {
     */
     QuestaoModule,
   ],
-  controllers: [RelatorioSimuladoEstudanteController],
+  controllers: [RelatorioSimuladoEstudanteController, RelatorioProvaController],
   providers: [
     RelatorioSimuladoEstudanteRepository,
     RelatorioSimuladoEstudanteService,
