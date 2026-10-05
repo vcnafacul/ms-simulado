@@ -17,9 +17,14 @@ import {
   QuestaoDoRelatorioDtoOutput,
   QuestoesDoRelatorioDtoOutput,
 } from './dtos/questoes-do-relatorio.dto.output';
+import {
+  QuestoesDaProvaDtoOutput,
+  RelatorioProvaDtoOutput,
+} from './dtos/relatorio-prova.dto.output';
 import { SerieDoEstudanteDtoOutput } from './dtos/serie-do-estudante.dto.output';
 import { SimuladosComCartaoDtoOutput } from './dtos/simulados-com-cartao.dto.output';
 import {
+  AgregadoDaQuestao,
   LinhaComHistorico,
   RelatorioSimuladoEstudanteRepository,
 } from './relatorio-simulado-estudante.repository';
@@ -84,6 +89,18 @@ function ultimoCartao(linhas: LinhaComHistorico[]): Date | null {
     if (maior === null || data > maior) maior = data;
   }
   return maior;
+}
+
+/**
+ * Todos os simulados têm o mesmo conjunto de questões (tickets/034, R3).
+ * Zero ou um simulado é trivialmente "mesma composição".
+ */
+function mesmaComposicao(composicoes: Map<string, Set<string>>): boolean {
+  const [primeira, ...resto] = [...composicoes.values()];
+  if (!primeira) return true;
+  return resto.every(
+    (c) => c.size === primeira.size && [...c].every((q) => primeira.has(q)),
+  );
 }
 
 @Injectable()
@@ -212,6 +229,7 @@ export class RelatorioSimuladoEstudanteService {
     return [
       {
         usuario: l.usuario,
+        simuladoId: String(l.simulado),
         turmaId: l.turmaId,
         historicoId: h._id.toString(),
         status: h.status,
@@ -253,6 +271,31 @@ export class RelatorioSimuladoEstudanteService {
       numeros.map((n) => [n.questaoId, n.numero]),
     );
 
+    return {
+      questoes: await this.montarQuestoes(
+        agregados,
+        /*
+          ⚠️ **O gravado primeiro, o atual depois.** Uma nova versão (card 26)
+          troca no simulado a original pela sucessora, e o histórico continua
+          apontando a original — pelo número atual ela sairia sem número. O
+          atual só cobre histórico anterior ao campo.
+        */
+        (a) => a.numero ?? numeroPorQuestao.get(a.questaoId) ?? null,
+        true,
+      ),
+    };
+  }
+
+  /**
+   * O que o relatório do simulado e o da prova têm em comum na aba Questões:
+   * contadores globais, formato do DTO e ordenação. Só o NÚMERO e a decisão de
+   * discriminar mudam entre os dois.
+   */
+  private async montarQuestoes(
+    agregados: AgregadoDaQuestao[],
+    numeroDe: (a: AgregadoDaQuestao) => number | null,
+    discriminar: boolean,
+  ): Promise<QuestaoDoRelatorioDtoOutput[]> {
     /*
       ⚠️ **Depois do agregado, e não em paralelo com ele** (card 16): os ids
       saem justamente dali. Buscar as questões do simulado inteiro em paralelo
@@ -278,13 +321,7 @@ export class RelatorioSimuladoEstudanteService {
         ehVersao: false,
       };
       return {
-        /*
-          ⚠️ **O gravado primeiro, o atual depois.** Uma nova versão (card 26)
-          troca no simulado a original pela sucessora, e o histórico continua
-          apontando a original — pelo número atual ela sairia sem número. O
-          atual só cobre histórico anterior ao campo.
-        */
-        numero: a.numero ?? numeroPorQuestao.get(a.questaoId) ?? null,
+        numero: numeroDe(a),
         questaoId: a.questaoId,
         respondentes: a.respondentes,
         acertos: a.acertos,
@@ -292,7 +329,7 @@ export class RelatorioSimuladoEstudanteService {
         semLeitura: a.semLeitura,
         porAlternativa: a.porAlternativa,
         alternativaCorreta: a.alternativaCorreta,
-        discriminacao: a.discriminacao,
+        discriminacao: discriminar ? a.discriminacao : null,
         acertosGeral: g.acertos,
         baseGeral: g.quantidadeResposta,
         ehVersao: g.ehVersao,
@@ -310,7 +347,134 @@ export class RelatorioSimuladoEstudanteService {
       return a.numero - b.numero;
     });
 
-    return { questoes };
+    return questoes;
+  }
+
+  /**
+   * O relatório de uma PROVA: as linhas de todos os simulados dela (tickets/034).
+   *
+   * ⚠️ **Mesmas consultas do relatório do simulado**, com a lista de simulados
+   * no lugar de um. Uma prova com um simulado só (toda prova do cursinho hoje)
+   * devolve exatamente as linhas do relatório daquele simulado.
+   */
+  async consultarProva(params: {
+    provaId: string;
+    cursinhoId: string;
+    usuarios?: string[];
+  }): Promise<RelatorioProvaDtoOutput> {
+    const prova = await this.provaOu404(params.provaId);
+    const recorte = {
+      simuladoId: prova.simuladoIds,
+      cursinhoId: params.cursinhoId,
+      usuarios: params.usuarios,
+    };
+
+    const [linhas, total, nomes] = await Promise.all([
+      this.repository.buscarPorRecorte(recorte),
+      this.repository.contarEstudantesDoCursinho(
+        prova.simuladoIds,
+        params.cursinhoId,
+      ),
+      this.simuladoRepository.getNomesPorIds(prova.simuladoIds),
+    ]);
+
+    const cartoesPorSimulado = new Map<string, number>();
+    for (const l of linhas) {
+      const id = String(l.simulado);
+      cartoesPorSimulado.set(id, (cartoesPorSimulado.get(id) ?? 0) + 1);
+    }
+    const comCartao = [...cartoesPorSimulado.keys()];
+    const composicoes = await this.composicoes(comCartao);
+    const nomePorId = new Map(nomes.map((n) => [n.id, n.nome]));
+
+    return {
+      linhas: linhas.flatMap((l) => this.montarLinha(l, params.cursinhoId)),
+      totalEstudantesComCartaoNoCursinho: total,
+      totalDeQuestoes: prova.numeros.length,
+      provaNome: prova.nome ?? null,
+      ultimoCartaoEm: ultimoCartao(linhas),
+      // Na ordem da prova, e não na de chegada: é a ordem em que o cursinho os criou.
+      simulados: prova.simuladoIds
+        .filter((id) => cartoesPorSimulado.has(id))
+        .map((id) => ({
+          simuladoId: id,
+          // `?? null`: simulado apagado com cartão continua aparecendo (R6).
+          nome: nomePorId.get(id) ?? null,
+          cartoes: cartoesPorSimulado.get(id)!,
+          totalDeQuestoes: composicoes.get(id)!.size,
+        })),
+      mesmasQuestoes: mesmaComposicao(composicoes),
+    };
+  }
+
+  /**
+   * A aba Questões da prova (tickets/034): o agregado por questão somando todos
+   * os simulados, com o número DA PROVA.
+   *
+   * ⚠️ **Número da prova primeiro, o gravado depois** — o inverso do relatório
+   * do simulado. Lá o gravado protege a questão sucedida por uma nova versão;
+   * aqui dois simulados podem ter gravado números diferentes para a mesma
+   * questão (o `numeroGravado` já devolve `null` nesse caso), e o que o
+   * professor tem na mão é o caderno da prova.
+   *
+   * ⚠️ **Discriminação `null` quando as composições diferem** (R3): ela
+   * correlaciona acertar o item com a nota geral do aluno, e nota de provas
+   * diferentes não está na mesma escala.
+   */
+  async consultarQuestoesDaProva(params: {
+    provaId: string;
+    cursinhoId: string;
+    usuarios?: string[];
+  }): Promise<QuestoesDaProvaDtoOutput> {
+    const prova = await this.provaOu404(params.provaId);
+    const [agregados, comCartao] = await Promise.all([
+      this.repository.agregarPorQuestao({
+        simuladoId: prova.simuladoIds,
+        cursinhoId: params.cursinhoId,
+        usuarios: params.usuarios,
+      }),
+      this.repository.simuladosComLinha({
+        simuladoIds: prova.simuladoIds,
+        cursinhoId: params.cursinhoId,
+        usuarios: params.usuarios,
+      }),
+    ]);
+    const mesmasQuestoes = mesmaComposicao(await this.composicoes(comCartao));
+    const numeroNaProva = new Map(
+      prova.numeros.map((n) => [n.questaoId, n.numero]),
+    );
+
+    return {
+      questoes: await this.montarQuestoes(
+        agregados,
+        (a) => numeroNaProva.get(a.questaoId) ?? a.numero ?? null,
+        mesmasQuestoes,
+      ),
+      mesmasQuestoes,
+    };
+  }
+
+  private async provaOu404(provaId: string) {
+    const prova = await this.repository.buscarProva(provaId);
+    if (!prova) throw new NotFoundException(`prova ${provaId} não encontrada`);
+    return prova;
+  }
+
+  /** O conjunto de questões de cada simulado. */
+  private async composicoes(
+    simuladoIds: string[],
+  ): Promise<Map<string, Set<string>>> {
+    const numeros = await Promise.all(
+      simuladoIds.map((id) =>
+        this.simuladoRepository.getNumerosDasQuestoes(id),
+      ),
+    );
+    return new Map(
+      simuladoIds.map((id, i) => [
+        id,
+        new Set(numeros[i].map((n) => n.questaoId)),
+      ]),
+    );
   }
 
   /**
