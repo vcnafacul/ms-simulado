@@ -61,11 +61,15 @@ const HEADER_TITLE_FONT = 21;
 
 // Campo "Nome do Estudante": rótulo + linha de preenchimento
 const NOME_LABEL_DY = HEADER_TITLE_DY + 120;
-const NOME_LINE_DY = NOME_LABEL_DY + 72;
+// ⚠️ A linha fica ~1 cm (118px a 300 dpi) ABAIXO do rótulo, e não colada nele: o aluno escreve
+// o nome embaixo de "NOME DO ESTUDANTE:", não na frente. Os respiros de baixo (matrícula e
+// instruções) foram apertados para o cabeçalho não invadir as colunas de respostas.
+const NOME_ESPACO_ESCRITA = 118;
+const NOME_LINE_DY = NOME_LABEL_DY + 72 + NOME_ESPACO_ESCRITA;
 const NOME_LINE_W = 1250;
 
 // Campo "Matrícula (8 dígitos)": rótulo + 8 quadros separados (escrita à mão)
-const MAT_LABEL_DY = NOME_LINE_DY + 96;
+const MAT_LABEL_DY = NOME_LINE_DY + 80;
 const MAT_BOXES_DY = MAT_LABEL_DY + 50; // topo dos quadros
 const MAT_BOX_W = 70;
 const MAT_BOX_H = 88;
@@ -79,7 +83,7 @@ const BADGE_PAGE_MARGIN = 150; // vão entre o badge e a borda DIREITA da págin
 
 // Área de instruções (abaixo dos campos do aluno, à esquerda). O QR fica à direita, na mesma
 // faixa vertical — ver DEFAULT_CONFIG.qrBox. Lista com marcadores, compacta.
-const INSTR_TITLE_DY = MAT_BOXES_DY + MAT_BOX_H + 120; // abaixo dos quadros da matrícula
+const INSTR_TITLE_DY = MAT_BOXES_DY + MAT_BOX_H + 100; // abaixo dos quadros da matrícula
 const INSTR_TITLE_FONT = 13;
 const INSTR_LIST_DY = INSTR_TITLE_DY + 66;
 const INSTR_LINE_H = 54; // altura de linha da lista (px)
