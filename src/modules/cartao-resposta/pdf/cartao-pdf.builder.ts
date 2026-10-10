@@ -88,6 +88,23 @@ const INSTR_ITEM_GAP = 16; // respiro entre itens (px)
 const INSTR_BULLET_INDENT = 34; // recuo do texto após o "•" (px)
 const INSTR_MAX_CHARS = 58; // quebra de linha (mantém as instruções à esquerda do QR)
 
+// Exemplo de marcação (1º item das instruções): "Pinte o círculo inteiro:  Certo ●  Errado ⊘ ✓ ✗ ◐".
+// ⚠️ Só desenho: fica no cabeçalho, longe das coordenadas que o OMR amostra (fieldBlocks), e
+// NÃO entra no template.json — cartões já impressos continuam sendo lidos igual.
+// Os "errados" são os que falharam (ou ficaram no limite) no teste de leitura em homologação
+// (docs: projeto/relatorio-leitura-cartao): risco único e check quase nunca são lidos; X e meia
+// bolinha passaram com caneta, mas no limite. Pintar o círculo inteiro foi lido 100%.
+const EXEMPLO_TEXTO = 'Pinte o círculo inteiro:';
+const EXEMPLO_TEXTO_W = 520; // largura reservada pro texto acima (px), estimada da fonte 10.5
+const EXEMPLO_R = 20; // raio dos círculos de exemplo (px) — o mesmo das bolinhas do cartão
+const EXEMPLO_ROTULO_FONT = 9;
+// Largura dos rótulos em px (fonte 9 bold ≈ 0,55·9 pt por letra) + respiro até o 1º círculo.
+const EXEMPLO_ROTULO_W = (rotulo: string) =>
+  Math.round((rotulo.length * EXEMPLO_ROTULO_FONT * 0.55) / K) + 28;
+const EXEMPLO_PASSO = 78; // distância entre os centros dos círculos de exemplo (px)
+const EXEMPLO_GRUPO_GAP = 90; // vão entre o grupo "Certo" e o grupo "Errado" (px)
+const EXEMPLO_TRACO = '#111111';
+
 function parseRange(label: string): [number, number] {
   const m = label.match(/[a-z]+(\d+)\.\.(\d+)/i);
   if (!m) throw new Error(`range inválido: ${label}`);
@@ -309,6 +326,94 @@ function collectBubbleShapes(layout: LayoutModel): unknown[] {
   return out;
 }
 
+/**
+ * Posições (px) do exemplo de marcação, compartilhadas entre o texto (`collectLabels`) e os
+ * círculos (`collectExemploShapes`) — um lugar só, pra os dois nunca desalinharem.
+ */
+function exemploLayout(layout: LayoutModel) {
+  const hb = layout.page.headerBox;
+  const y = hb.y + INSTR_LIST_DY; // topo da linha de texto
+  const cy = y + 26; // centro vertical da linha (fonte 10.5 → ~26px abaixo do topo)
+  const textoX = hb.x + INSTR_BULLET_INDENT;
+  const certoRotuloX = textoX + EXEMPLO_TEXTO_W;
+  const certoCx = certoRotuloX + EXEMPLO_ROTULO_W('Certo:') + EXEMPLO_R;
+  const erradoRotuloX = certoCx + EXEMPLO_R + EXEMPLO_GRUPO_GAP;
+  // + R a mais: o risco do 1º "errado" passa da borda do círculo e encostaria no rótulo
+  const erradoPrimeiroCx =
+    erradoRotuloX + EXEMPLO_ROTULO_W('Errado:') + 2 * EXEMPLO_R;
+  const erradoCx = [0, 1, 2, 3].map(
+    (i) => erradoPrimeiroCx + i * EXEMPLO_PASSO,
+  );
+  return { y, cy, textoX, certoRotuloX, certoCx, erradoRotuloX, erradoCx };
+}
+
+/** Os círculos do exemplo: um pintado (certo) e quatro jeitos errados de marcar. */
+function collectExemploShapes(layout: LayoutModel): unknown[] {
+  if (!layout.page.instructionsBox) return [];
+  const ex = exemploLayout(layout);
+  const r = pt(EXEMPLO_R);
+  const cy = pt(ex.cy);
+  const circulo = (cx: number, color = 'white') => ({
+    type: 'ellipse',
+    x: cx,
+    y: cy,
+    r1: r,
+    r2: r,
+    lineWidth: 1,
+    lineColor: '#000000',
+    color,
+  });
+  const traco = (x1: number, y1: number, x2: number, y2: number) => ({
+    type: 'line',
+    x1,
+    y1,
+    x2,
+    y2,
+    lineWidth: 1.4,
+    lineColor: EXEMPLO_TRACO,
+  });
+
+  const out: unknown[] = [circulo(pt(ex.certoCx), EXEMPLO_TRACO)];
+  const [risco, check, xis, meia] = ex.erradoCx.map(pt);
+
+  // Risco único, atravessando o círculo na diagonal
+  out.push(
+    circulo(risco),
+    traco(risco - r * 1.1, cy + r * 1.1, risco + r * 1.1, cy - r * 1.1),
+  );
+  // Check (✓)
+  out.push(circulo(check), {
+    type: 'polyline',
+    lineWidth: 1.4,
+    lineColor: EXEMPLO_TRACO,
+    points: [
+      { x: check - r * 0.6, y: cy },
+      { x: check - r * 0.15, y: cy + r * 0.55 },
+      { x: check + r * 0.75, y: cy - r * 0.75 },
+    ],
+  });
+  // X
+  out.push(
+    circulo(xis),
+    traco(xis - r * 0.7, cy - r * 0.7, xis + r * 0.7, cy + r * 0.7),
+    traco(xis - r * 0.7, cy + r * 0.7, xis + r * 0.7, cy - r * 0.7),
+  );
+  // Meia bolinha: metade esquerda pintada
+  const meiaPontos = Array.from({ length: 13 }, (_, i) => {
+    const a = Math.PI / 2 + (i * Math.PI) / 12; // de cima (90°) a baixo (270°), pela esquerda
+    return { x: meia + r * Math.cos(a), y: cy - r * Math.sin(a) };
+  });
+  out.push(circulo(meia), {
+    type: 'polyline',
+    closePath: true,
+    lineWidth: 0,
+    color: EXEMPLO_TRACO,
+    points: meiaPontos,
+  });
+
+  return out;
+}
+
 // Formas do cabeçalho no canvas: linha do nome, 8 quadros da matrícula e o badge do cartão.
 function collectHeaderShapes(layout: LayoutModel): unknown[] {
   const hb = layout.page.headerBox;
@@ -477,14 +582,44 @@ function collectLabels(layout: LayoutModel, header: HeaderData): unknown[] {
       fontSize: INSTR_TITLE_FONT,
       bold: true,
     });
+    // 1º item: o texto do exemplo de marcação — os círculos são desenhados no canvas
+    // (`collectExemploShapes`), alinhados a esta linha pelo mesmo `exemploLayout`.
+    const ex = exemploLayout(layout);
+    items.push({
+      text: '•',
+      absolutePosition: { x: pt(x0), y: pt(ex.y) },
+      fontSize: INSTR_FONT,
+    });
+    items.push({
+      text: EXEMPLO_TEXTO,
+      absolutePosition: { x: pt(ex.textoX), y: pt(ex.y) },
+      fontSize: INSTR_FONT,
+      bold: true,
+    });
+    for (const [rotulo, x] of [
+      ['Certo:', ex.certoRotuloX],
+      ['Errado:', ex.erradoRotuloX],
+    ] as const) {
+      items.push({
+        text: rotulo,
+        absolutePosition: {
+          x: pt(x),
+          y: centerTextY(ex.cy, EXEMPLO_ROTULO_FONT),
+        },
+        fontSize: EXEMPLO_ROTULO_FONT,
+        bold: true,
+      });
+    }
+
+    // ⚠️ Saiu "Não faça marcas fora dos círculos": no teste, passar da borda não atrapalhou
+    // a leitura, e "pinte o círculo inteiro" já diz o que importa. Entrou "Não use lápis":
+    // a lápis a leitura ficou em 39%.
     const instrucoes = [
-      'Preencha completamente o círculo referente à alternativa escolhida.',
-      'Use caneta esferográfica de tinta preta ou azul-escura.',
+      'Use caneta esferográfica de tinta preta ou azul-escura. Não use lápis.',
       'Marque apenas uma alternativa por questão.',
-      'Não faça marcas fora dos círculos.',
       'Evite rasuras e não dobre este cartão.',
     ];
-    let y = hb.y + INSTR_LIST_DY;
+    let y = ex.y + INSTR_LINE_H + INSTR_ITEM_GAP;
     for (const item of instrucoes) {
       const lines = wrapText(item, INSTR_MAX_CHARS);
       items.push({
@@ -603,6 +738,7 @@ export async function buildCartaoPdf(
           ...collectColumnBoxes(layout),
           ...collectMatriculaDecorations(layout),
           ...collectHeaderShapes(layout),
+          ...collectExemploShapes(layout),
           ...collectBubbleShapes(layout),
         ],
         absolutePosition: { x: 0, y: 0 },
