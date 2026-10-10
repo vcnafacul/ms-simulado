@@ -61,15 +61,16 @@ const HEADER_TITLE_FONT = 21;
 
 // Campo "Nome do Estudante": rótulo + linha de preenchimento
 const NOME_LABEL_DY = HEADER_TITLE_DY + 120;
-// ⚠️ A linha fica ~1 cm (118px a 300 dpi) ABAIXO do rótulo, e não colada nele: o aluno escreve
-// o nome embaixo de "NOME DO ESTUDANTE:", não na frente. Os respiros de baixo (matrícula e
-// instruções) foram apertados para o cabeçalho não invadir as colunas de respostas.
-const NOME_ESPACO_ESCRITA = 118;
+// ⚠️ A linha fica ~0,7 cm (85px a 300 dpi) ABAIXO do rótulo, e não colada nele: o aluno escreve
+// o nome embaixo de "NOME DO ESTUDANTE:", não na frente. Logo abaixo da linha vem o rótulo da
+// matrícula, bem próximo dela; e o respiro antes das instruções foi apertado, para o cabeçalho
+// não invadir as colunas de respostas.
+const NOME_ESPACO_ESCRITA = 85;
 const NOME_LINE_DY = NOME_LABEL_DY + 72 + NOME_ESPACO_ESCRITA;
 const NOME_LINE_W = 1250;
 
 // Campo "Matrícula (8 dígitos)": rótulo + 8 quadros separados (escrita à mão)
-const MAT_LABEL_DY = NOME_LINE_DY + 80;
+const MAT_LABEL_DY = NOME_LINE_DY + 36; // bem colado na linha do nome
 const MAT_BOXES_DY = MAT_LABEL_DY + 50; // topo dos quadros
 const MAT_BOX_W = 70;
 const MAT_BOX_H = 88;
