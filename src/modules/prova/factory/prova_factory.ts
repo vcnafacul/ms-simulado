@@ -6,6 +6,7 @@ import { SimuladoService } from 'src/modules/simulado/simulado.service';
 import { CategoriaRepository } from 'src/modules/categoria/categoria.repository';
 import {
   Categoria,
+  DONO_CURSINHO,
   DONO_SYSTEM,
 } from 'src/modules/categoria/schemas/categoria.schema';
 import { ProvaRepository } from '../prova.repository';
@@ -13,6 +14,7 @@ import { EnemService } from '../services/enem_service';
 import { CustomProvaFactory } from './custom_prova_factory';
 import { Enem2010_2017Factory } from './enem_2010_2016_factory';
 import { Enem2017PlusFactory } from './enem_2017_plus_factory';
+import { EnemCursinhoFactory } from './enem_cursinho_factory';
 import { ExameName, IProvaFactory } from './types';
 
 @Injectable()
@@ -28,6 +30,23 @@ export class ProvaFactory {
   ) {}
 
   public getFactory(categoria: Categoria, ano: number): IProvaFactory {
+    /*
+      tickets/038 (R3): as "Enem Dia 1/2" compartilhadas com os cursinhos.
+      ⚠️ ANTES do teste de dono abaixo — `Cursinho !== system` as mandaria
+      para a `CustomProvaFactory` (1 simulado).
+    */
+    if (categoria.dono === DONO_CURSINHO) {
+      return new EnemCursinhoFactory(
+        this.questaoRepository,
+        this.provaRepository,
+        this.frenteRepository,
+        this.simuladoService,
+        this.simuladoRepository,
+        this.enemService,
+        categoria,
+      );
+    }
+
     /**
      * ⚠️ **`dono` entra na condição de propósito.** Toda prova de categoria de
      * cursinho gera 1 simulado — é a regra do produto.

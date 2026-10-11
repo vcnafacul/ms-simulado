@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Injectable,
   NotFoundException,
+  NotImplementedException,
 } from '@nestjs/common';
 import { ClientSession } from 'mongoose';
 import { Ator } from 'src/shared/ator/ator';
@@ -28,7 +29,10 @@ import {
   resolveQuestaoId,
   syncNumeroNaProvaESimulados,
 } from './helpers/question-container.helpers';
-import { DONO_SYSTEM } from '../categoria/schemas/categoria.schema';
+import {
+  DONO_CURSINHO,
+  DONO_SYSTEM,
+} from '../categoria/schemas/categoria.schema';
 import { Questao } from '../questao/questao.schema';
 
 export const TEXTO_DUPLICAR_SO_DO_CURSINHO =
@@ -269,6 +273,13 @@ export class ProvaService {
       throw new ForbiddenException(TEXTO_DUPLICAR_SO_DO_CURSINHO);
     }
 
+    // tickets/038: a ENEM do cursinho tem 2 simulados no Dia 1, e a cópia
+    // abaixo só preenche o primeiro. Liberada no card 03.
+    if (categoria.dono === DONO_CURSINHO) {
+      throw new NotImplementedException(
+        'Duplicar prova ENEM do cursinho ainda não está disponível.',
+      );
+    }
     const factory = this.provaFactory.getFactory(categoria, origem.ano);
     const prova = await factory.createProva({
       edicao: origem.edicao,
@@ -337,7 +348,15 @@ export class ProvaService {
     }
     // tickets/023, card 04 (R3): cursinho só cria prova em categoria dele.
     // Senão criaria uma prova protegida que nem ele compõe (R2).
-    if (item.cursinhoId && categoria.dono !== item.cursinhoId) {
+    // tickets/038 (R1): ou numa compartilhada ("Enem Dia 1/2" do cursinho) —
+    // e essas são SÓ de cursinho: sem `cursinhoId`, a prova não teria dono e
+    // ninguém a comporia.
+    const compartilhada = categoria.dono === DONO_CURSINHO;
+    if (
+      compartilhada
+        ? !item.cursinhoId
+        : item.cursinhoId && categoria.dono !== item.cursinhoId
+    ) {
       throw new ForbiddenException(
         'Use uma categoria do seu cursinho para criar a prova.',
       );
