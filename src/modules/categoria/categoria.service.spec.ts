@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CategoriaService } from './categoria.service';
-import { DONO_SYSTEM } from './schemas/categoria.schema';
+import { DONO_CURSINHO, DONO_SYSTEM } from './schemas/categoria.schema';
 
 function makeService(overrides?: {
   getById?: jest.Mock;
@@ -261,14 +261,14 @@ describe('CategoriaService.getAll (anexa contagem de uso)', () => {
       { _id: 'cat-1', nome: 'A', simuladosCount: 3, provasCount: 0 },
       { _id: 'cat-2', nome: 'B', simuladosCount: 0, provasCount: 5 },
     ]);
-    expect(simuladoRepository.countsByCategoria).toHaveBeenCalledWith([
-      'cat-1',
-      'cat-2',
-    ]);
-    expect(provaRepository.countsByCategoria).toHaveBeenCalledWith([
-      'cat-1',
-      'cat-2',
-    ]);
+    expect(simuladoRepository.countsByCategoria).toHaveBeenCalledWith(
+      ['cat-1', 'cat-2'],
+      undefined,
+    );
+    expect(provaRepository.countsByCategoria).toHaveBeenCalledWith(
+      ['cat-1', 'cat-2'],
+      undefined,
+    );
   });
 
   it('converte documento Mongoose (com toObject) antes de anexar as contagens', async () => {
@@ -330,7 +330,7 @@ describe('CategoriaService.getAll (escopo por dono)', () => {
       { countByCategoria: jest.fn(), countsByCategoria } as any,
       { countByCategoria: jest.fn(), countsByCategoria } as any,
     );
-    return { service, repository };
+    return { service, repository, countsByCategoria };
   }
 
   it('sem dono, filtra pelas categorias do sistema', async () => {
@@ -345,7 +345,7 @@ describe('CategoriaService.getAll (escopo por dono)', () => {
     });
   });
 
-  it('com dono, filtra por aquele dono', async () => {
+  it('com dono de cursinho, filtra por ele + as compartilhadas (tickets/038)', async () => {
     const { service, repository } = makeGetAllService();
 
     await service.getAll({ page: 1, limit: 10 }, 'cur-1');
@@ -353,8 +353,44 @@ describe('CategoriaService.getAll (escopo por dono)', () => {
     expect(repository.getAll).toHaveBeenCalledWith({
       page: 1,
       limit: 10,
-      where: { dono: 'cur-1' },
+      where: { dono: { $in: ['cur-1', DONO_CURSINHO] } },
     });
+  });
+
+  it('a lista do projeto NÃO traz as compartilhadas', async () => {
+    const { service, repository } = makeGetAllService();
+
+    await service.getAll({ page: 1, limit: 10 }, DONO_SYSTEM);
+
+    expect(repository.getAll).toHaveBeenCalledWith({
+      page: 1,
+      limit: 10,
+      where: { dono: DONO_SYSTEM },
+    });
+  });
+
+  it('⚠️ na lista do cursinho, as contagens de uso são só dele', async () => {
+    // A compartilhada é usada por todos: a contagem global contaria as provas
+    // dos outros cursinhos para quem está listando.
+    const { service, repository, countsByCategoria } = makeGetAllService();
+    repository.getAll.mockResolvedValue({
+      data: [{ _id: 'cat-c', dono: DONO_CURSINHO }],
+      page: 1,
+      limit: 10,
+      totalItems: 1,
+    });
+
+    await service.getAll({ page: 1, limit: 10 }, 'cur-1');
+
+    expect(countsByCategoria).toHaveBeenCalledWith(['cat-c'], 'cur-1');
+  });
+
+  it('na lista do projeto, as contagens seguem globais', async () => {
+    const { service, countsByCategoria } = makeGetAllService();
+
+    await service.getAll({ page: 1, limit: 10 });
+
+    expect(countsByCategoria).toHaveBeenCalledWith([], undefined);
   });
 });
 
@@ -530,5 +566,29 @@ describe('CategoriaService — dono', () => {
     repository.getById.mockResolvedValue({ _id: 'c1', dono: DONO_SYSTEM });
     await service.delete('c1', DONO_SYSTEM);
     expect(repository.delete).toHaveBeenCalledWith('c1');
+  });
+  describe('compartilhada com os cursinhos (tickets/038, R1)', () => {
+    it.each([
+      ['o cursinho', 'cur-A'],
+      ['o projeto', DONO_SYSTEM],
+      ['quem mandar o próprio dono "Cursinho"', DONO_CURSINHO],
+    ])('%s não exclui', async (_quem, dono) => {
+      repository.getById.mockResolvedValue({ _id: 'c1', dono: DONO_CURSINHO });
+
+      await expect(service.delete('c1', dono)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(repository.delete).not.toHaveBeenCalled();
+    });
+
+    it('ninguém cria pela rota — só o seed', async () => {
+      await expect(
+        service.add(
+          { ...(dto as object), nome: 'Enem Dia 3' } as never,
+          DONO_CURSINHO,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(repository.create).not.toHaveBeenCalled();
+    });
   });
 });
