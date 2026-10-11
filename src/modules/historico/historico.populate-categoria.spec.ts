@@ -8,6 +8,7 @@ import {
 } from '../categoria/schemas/categoria.schema';
 import { Questao, QuestaoSchema } from '../questao/questao.schema';
 import { Simulado, SimuladoSchema } from '../simulado/schemas/simulado.schema';
+import { Prova, ProvaSchema } from '../prova/prova.schema';
 import { HistoricoRepository } from './historico.repository';
 import { Historico, HistoricoSchema } from './historico.schema';
 
@@ -40,6 +41,8 @@ describe('HistoricoRepository — simulado.categoria populada (Mongo real)', () 
           { name: Simulado.name, schema: SimuladoSchema },
           { name: Categoria.name, schema: CategoriaSchema },
           { name: Questao.name, schema: QuestaoSchema },
+          // tickets/038: a lista do aluno popula a prova do cartão.
+          { name: Prova.name, schema: ProvaSchema },
         ]),
       ],
       providers: [HistoricoRepository],

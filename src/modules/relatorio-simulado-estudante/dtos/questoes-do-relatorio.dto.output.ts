@@ -105,6 +105,14 @@ export class QuestaoDoRelatorioDtoOutput {
   discriminacao: number | null;
 
   /**
+   * tickets/038 (R15): no relatório da PROVA do ENEM Dia 1 do cursinho, o idioma da questão
+   * de língua estrangeira (1–5) — `"Inglês"` ou `"Espanhol"`. Sem ele, as duas questões 1
+   * apareceriam com o mesmo número. Ausente nas demais.
+   */
+  @ApiProperty({ required: false })
+  idioma?: string;
+
+  /**
    * Quantos acertaram esta questão na BASE INTEIRA — todos os cursinhos, todas
    * as aplicações, os dois fluxos (card 16).
    *

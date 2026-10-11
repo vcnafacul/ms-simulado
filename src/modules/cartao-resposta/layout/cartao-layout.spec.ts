@@ -1,4 +1,9 @@
-import { buildLayout, DEFAULT_CONFIG } from './cartao-layout';
+import {
+  buildLayout,
+  DEFAULT_CONFIG,
+  IDIOMA_BUBBLE_VALUES,
+  IDIOMA_FIELD,
+} from './cartao-layout';
 
 describe('buildLayout', () => {
   it('matrícula: 1 fieldBlock QTYPE_INT com 8 labels m1..m8 (quando incluirMatricula)', () => {
@@ -126,5 +131,42 @@ describe('buildLayout', () => {
     const c = m.bubbleCenter('respostas_c1', 4, 2);
     expect(c.x).toBe(c1.origin[0] + 2 * c1.bubblesGap);
     expect(c.y).toBe(c1.origin[1] + 4 * c1.labelsGap);
+  });
+});
+
+describe('marcação de idioma (tickets/038 · 08)', () => {
+  const sem = buildLayout(90);
+  const com = buildLayout(90, DEFAULT_CONFIG, 1, { idioma: true });
+
+  it('sem pedir, o layout não muda (cartões de simulado)', () => {
+    expect(sem.fieldBlocks.some((b) => b.key === IDIOMA_FIELD)).toBe(false);
+  });
+
+  it('com idioma: bloco ING/ESP no FIM, e as respostas nas MESMAS coordenadas', () => {
+    expect(com.fieldBlocks.slice(0, -1)).toEqual(sem.fieldBlocks);
+    expect(com.fieldBlocks.at(-1)).toMatchObject({
+      key: IDIOMA_FIELD,
+      bubbleValues: IDIOMA_BUBBLE_VALUES,
+      direction: 'horizontal',
+    });
+  });
+
+  it('⚠️ as duas bolinhas ficam dentro dos marcadores, acima das respostas e longe do QR', () => {
+    const cfg = DEFAULT_CONFIG;
+    const near = cfg.markerInsetPx + cfg.markerSizePx / 2;
+    const r = cfg.bubbleWidthPx / 2;
+    const topoRespostas = Math.min(
+      ...com.fieldBlocks
+        .filter((b) => b.key.startsWith('respostas_c'))
+        .map((b) => b.origin[1]),
+    );
+    for (const j of [0, 1]) {
+      const c = com.bubbleCenter(IDIOMA_FIELD, 0, j);
+      expect(c.x - r).toBeGreaterThan(near);
+      expect(c.y - r).toBeGreaterThan(near);
+      expect(c.y + r).toBeLessThan(topoRespostas - 100);
+      // o rótulo ("Espanhol") vai à direita da 2ª bolinha: folga até o QR
+      expect(c.x + r).toBeLessThan(cfg.qrBox.x - 200);
+    }
   });
 });

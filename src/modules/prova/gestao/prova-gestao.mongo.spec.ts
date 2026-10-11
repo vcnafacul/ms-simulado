@@ -17,6 +17,7 @@ import {
   Simulado,
   SimuladoSchema,
 } from '../../simulado/schemas/simulado.schema';
+import { Idioma } from '../../simulado/enums/idioma.enum';
 import { SimuladoRepository } from '../../simulado/simulado.repository';
 import { ProvaRepository } from '../prova.repository';
 import { Prova, ProvaSchema } from '../prova.schema';
@@ -192,5 +193,19 @@ describe('gestão da prova do cursinho — Mongo real', () => {
     expect(
       await provaRepo.getAtivaByNomeECursinho('nome antigo', 'cur-A'),
     ).toBeNull();
+  });
+
+  it('⚠️ renomear a ENEM do cursinho mantém o idioma no nome de cada simulado (tickets/038)', async () => {
+    const ids = [];
+    for (const idioma of [Idioma.Ingles, Idioma.Espanhol, null]) {
+      ids.push(String((await criar(simulados, { nome: 'velho', idioma }))._id));
+    }
+
+    await mod.get(SimuladoRepository).renomear(ids, 'Novo');
+
+    const nomes = await Promise.all(
+      ids.map(async (id) => (await simulados.findById(id).lean())?.nome),
+    );
+    expect(nomes).toEqual(['Novo Inglês', 'Novo Espanhol', 'Novo']);
   });
 });

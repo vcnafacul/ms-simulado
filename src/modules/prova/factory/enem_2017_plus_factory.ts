@@ -16,6 +16,7 @@ import { syncNumeroNaProvaESimulados } from '../helpers/question-container.helpe
 import { ProvaRepository } from '../prova.repository';
 import { Prova } from '../prova.schema';
 import { EnemService } from '../services/enem_service';
+import { numeroLivreEnem, numerosFaltantesEnem } from './enem-numeracao';
 import { ExameName, IProvaFactory } from './types';
 
 export class Enem2017PlusFactory implements IProvaFactory {
@@ -91,30 +92,7 @@ export class Enem2017PlusFactory implements IProvaFactory {
   }
 
   public async getMissingNumbers(prova: Prova): Promise<number[]> {
-    const day1 = prova.nome.includes('Dia 1');
-    const missingQuestion = [];
-    if (day1) {
-      for (let index = prova.inicialNumero; index <= 90; index++) {
-        if (!prova.questoes.find((qc) => qc.numero === index)) {
-          missingQuestion.push(index);
-        } else {
-          if (index < 6) {
-            const hasAllQuestion =
-              prova.questoes.filter((qc) => qc.numero === index).length < 2;
-            if (hasAllQuestion) {
-              missingQuestion.push(index);
-            }
-          }
-        }
-      }
-    } else {
-      for (let index = prova.inicialNumero; index <= 180; index++) {
-        if (!prova.questoes.find((qc) => qc.numero === index)) {
-          missingQuestion.push(index);
-        }
-      }
-    }
-    return missingQuestion;
+    return numerosFaltantesEnem(prova, prova.nome.includes('Dia 1'));
   }
 
   public async verifyNumberProva(
@@ -122,15 +100,7 @@ export class Enem2017PlusFactory implements IProvaFactory {
     numberQuestion: number,
   ): Promise<boolean> {
     const prova = await this.provaRepository.getProvaWithQuestion(id);
-    if (prova.questoes.some((qc) => qc.numero === numberQuestion)) {
-      if (numberQuestion < 6) {
-        return (
-          prova.questoes.filter((qc) => qc.numero === numberQuestion).length < 2
-        );
-      }
-      return false;
-    }
-    return true;
+    return numeroLivreEnem(prova, numberQuestion);
   }
 
   public async createQuestion(question: CreateQuestaoDTOInput) {

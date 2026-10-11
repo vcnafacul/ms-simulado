@@ -94,3 +94,21 @@ describe('buildTemplateJson', () => {
     }
   });
 });
+
+describe('bloco de idioma no template (tickets/038 · 08)', () => {
+  it('valores próprios (ING/ESP) + direção, sem fieldType — o schema do OMRChecker é oneOf', () => {
+    const { templateJson } = buildTemplateJson(
+      buildLayout(90, DEFAULT_CONFIG, 1, { idioma: true }),
+    );
+    const idioma = templateJson.fieldBlocks.idioma;
+    expect(idioma).toMatchObject({
+      bubbleValues: ['ING', 'ESP'],
+      direction: 'horizontal',
+      fieldLabels: ['idioma'],
+    });
+    expect(idioma.fieldType).toBeUndefined();
+    expect(idioma.origin.every((v) => Number.isInteger(v) && v > 0)).toBe(true);
+    // as respostas seguem com o tipo pronto
+    expect(templateJson.fieldBlocks.respostas_c1.fieldType).toBe('QTYPE_MCQ5');
+  });
+});

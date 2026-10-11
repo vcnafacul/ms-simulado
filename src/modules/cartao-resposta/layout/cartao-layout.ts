@@ -52,6 +52,12 @@ export interface PageConfig {
   incluirMatricula: boolean;
   qrBox: { x: number; y: number; size: number };
   headerBox: { x: number; y: number; width: number; height: number };
+  // tickets/038: marcação de idioma (Inglês / Espanhol) do cartão DA PROVA do ENEM Dia 1 do
+  // cursinho — centro da 1ª bolha e distância até a 2ª. Fica no cabeçalho, à direita dos
+  // quadros da matrícula e na altura deles (ver o NOME/MAT_* do cartao-pdf.builder), longe dos
+  // marcadores e do QR. Só entra no layout quando pedido (`buildLayout(…, { idioma: true })`).
+  idiomaOrigin: [number, number];
+  idiomaBubblesGap: number;
 }
 
 export const DEFAULT_CONFIG: PageConfig = {
@@ -82,13 +88,28 @@ export const DEFAULT_CONFIG: PageConfig = {
   incluirMatricula: false,
   qrBox: { x: 1605, y: 437, size: 700 },
   headerBox: { x: 150, y: 150, width: 1750, height: 560 },
+  // y = headerBox.y + MAT_BOXES_DY + MAT_BOX_H/2 (= 150 + 504 + 44): no meio dos quadros da
+  // matrícula. x: à direita do 8º quadro (que termina em ~886).
+  idiomaOrigin: [1040, 698],
+  idiomaBubblesGap: 260,
 };
+
+/**
+ * Valores lidos da marcação de idioma (tickets/038). O OMRChecker devolve os valores marcados
+ * concatenados: "ING", "ESP", "INGESP" (as duas) ou "" (nenhuma). Quem decide o simulado é o
+ * callback (card 13).
+ */
+export const IDIOMA_BUBBLE_VALUES = ['ING', 'ESP'] as const;
+export const IDIOMA_FIELD = 'idioma';
 
 export type FieldType = 'QTYPE_INT' | 'QTYPE_MCQ5';
 
 export interface FieldBlockLayout {
   key: string;
-  fieldType: FieldType;
+  /** Tipo do OMRChecker — ou `bubbleValues` + `direction` (campo com valores próprios). */
+  fieldType?: FieldType;
+  bubbleValues?: readonly string[];
+  direction?: 'horizontal' | 'vertical';
   origin: [number, number];
   fieldLabels: string[];
   labelsGap: number;
@@ -112,6 +133,7 @@ export function buildLayout(
   N: number,
   cfg: PageConfig = DEFAULT_CONFIG,
   startNumero = 1,
+  opcoes: { idioma?: boolean } = {},
 ): LayoutModel {
   const markerHalf = cfg.markerSizePx / 2;
   const near = cfg.markerInsetPx + markerHalf;
@@ -202,6 +224,21 @@ export function buildLayout(
       fieldLabels: [`q${first}..${last}`],
       labelsGap: cfg.respostasLabelsGap,
       bubblesGap: cfg.respostasBubblesGap,
+    });
+  }
+
+  // tickets/038: a marcação de idioma do cartão da prova (Dia 1). ⚠️ No FIM da lista: os
+  // blocos de respostas mantêm as mesmas coordenadas do cartão do simulado.
+  if (opcoes.idioma) {
+    fieldBlocks.push({
+      key: IDIOMA_FIELD,
+      bubbleValues: IDIOMA_BUBBLE_VALUES,
+      direction: 'horizontal',
+      origin: [cfg.idiomaOrigin[0], cfg.idiomaOrigin[1]],
+      fieldLabels: [IDIOMA_FIELD],
+      // Uma linha só: o passo entre linhas não é usado, mas o schema exige positivo.
+      labelsGap: cfg.idiomaBubblesGap,
+      bubblesGap: cfg.idiomaBubblesGap,
     });
   }
 
