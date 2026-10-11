@@ -33,12 +33,18 @@ function setup(over: Partial<any> = {}) {
     putObject: jest.fn().mockResolvedValue(undefined),
     ...over.storage,
   };
+  const provas = {
+    buscarProvaDoSimulado: jest
+      .fn()
+      .mockResolvedValue(over.prova === undefined ? null : over.prova),
+  };
   const svc = new TemplateProvisionService(
     simuladoService as any,
     cartaoService as any,
     storage as any,
+    provas as any,
   );
-  return { svc, simuladoService, cartaoService, storage };
+  return { svc, simuladoService, cartaoService, storage, provas };
 }
 
 describe('TemplateProvisionService', () => {
@@ -126,5 +132,27 @@ describe('TemplateProvisionService', () => {
       undefined,
       46,
     );
+  });
+
+  describe('QR com a prova (tickets/038 · 06)', () => {
+    const qr = (cartaoService: any) =>
+      cartaoService.gerar.mock.calls[0][1].qrPayload;
+
+    it('simulado numa prova: QR com provaId + simuladoId + cartaoCode', async () => {
+      const PROVA = '665f0c1a2b3c4d5e6f00ffff';
+      const { svc, cartaoService } = setup({ prova: { _id: PROVA } });
+      await svc.obterPdf(ID);
+      expect(qr(cartaoService)).toEqual({
+        provaId: PROVA,
+        simuladoId: ID,
+        cartaoCode: '7',
+      });
+    });
+
+    it('simulado sem prova: QR como hoje, sem provaId', async () => {
+      const { svc, cartaoService } = setup();
+      await svc.obterPdf(ID);
+      expect(qr(cartaoService)).toEqual({ simuladoId: ID, cartaoCode: '7' });
+    });
   });
 });

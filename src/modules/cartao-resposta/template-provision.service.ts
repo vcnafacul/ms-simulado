@@ -6,6 +6,7 @@ import {
 import { SimuladoService } from '../simulado/simulado.service';
 import { CartaoRespostaService } from './cartao-resposta.service';
 import { StorageService } from '../../shared/storage/storage.service';
+import { ProvaRepository } from '../prova/prova.repository';
 
 const base = (id: string) => `templates/${id}`;
 export const keyTemplate = (id: string) => `${base(id)}/template.json`;
@@ -17,6 +18,7 @@ export class TemplateProvisionService {
     private readonly simuladoService: SimuladoService,
     private readonly cartaoService: CartaoRespostaService,
     private readonly storage: StorageService,
+    private readonly provas: ProvaRepository,
   ) {}
 
   async obterPdf(simuladoId: string): Promise<Buffer> {
@@ -38,6 +40,9 @@ export class TemplateProvisionService {
     const startNumero = Math.min(...numeros);
 
     const seq = await this.simuladoService.incrementarCartaoSeq(simuladoId);
+    // tickets/038 (R8a): o QR leva a prova do simulado (7 de 134 simulados em
+    // homol não estão em prova — aí vai sem).
+    const prova = await this.provas.buscarProvaDoSimulado(simuladoId);
 
     const { templateJson, configJson, pdfBuffer } =
       await this.cartaoService.gerar(
@@ -46,6 +51,7 @@ export class TemplateProvisionService {
           nomeSimulado: simulado.nome,
           simuladoId,
           qrPayload: {
+            ...(prova ? { provaId: String(prova._id) } : {}),
             simuladoId,
             cartaoCode: String(seq),
           },

@@ -83,6 +83,7 @@ export class CartaoRespostaController {
       historicoId,
       cursinhoId: dto.cursinhoId,
       imageKey: dto.imageKey,
+      provaId: dto.provaId,
       simuladoId: dto.simuladoId,
       cartaoCode: dto.cartaoCode,
       // O relógio entra pela borda: o serviço é puro quanto a tempo, e o rate

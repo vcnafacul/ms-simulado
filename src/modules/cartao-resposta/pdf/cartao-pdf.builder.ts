@@ -8,9 +8,12 @@ import pdfMake = require('pdfmake');
 import { LayoutModel } from '../layout/cartao-layout';
 
 // Payload mínimo do QR (só o que o api precisa) — quanto menor, menos denso e mais fácil de
-// ler numa foto. O api valida apenas simuladoId + cartaoCode.
+// ler numa foto.
+// tickets/038 (R8a): todo cartão leva a prova (`provaId`, quando o simulado está numa); o do
+// simulado leva também o `simuladoId`; o cartão DA PROVA leva só a prova.
 export interface QrPayload {
-  simuladoId: string;
+  provaId?: string;
+  simuladoId?: string;
   cartaoCode: string;
 }
 export interface HeaderData {
