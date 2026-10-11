@@ -1,3 +1,4 @@
+import { DONO_CURSINHO } from '../../categoria/schemas/categoria.schema';
 import {
   BadRequestException,
   ConflictException,
@@ -8,6 +9,7 @@ import { Status } from '../../questao/enums/status.enum';
 import {
   ProvaGestaoService,
   TEXTO_CARTAO_EMITIDO,
+  TEXTO_CATEGORIA_ENEM_CURSINHO,
   TEXTO_CATEGORIA_INVALIDA,
   TEXTO_JA_FEITA_CATEGORIA,
   TEXTO_JA_FEITA_EXCLUIR,
@@ -216,6 +218,48 @@ describe('ProvaGestaoService (card 41)', () => {
         m.service.editar('p1', { categoria: 'cat-x' }, ATOR),
       ).rejects.toThrow(TEXTO_CATEGORIA_INVALIDA);
       expect(m.provas.atualizarDados).not.toHaveBeenCalled();
+    });
+
+    describe('ENEM do cursinho (tickets/038)', () => {
+      it('trocar PARA a compartilhada → 400', async () => {
+        const m = montar({
+          categoria: { _id: 'cat-x', dono: DONO_CURSINHO, selecionavel: true },
+        });
+        await expect(
+          m.service.editar('p1', { categoria: 'cat-x' }, ATOR),
+        ).rejects.toThrow(TEXTO_CATEGORIA_INVALIDA);
+        expect(m.provas.atualizarDados).not.toHaveBeenCalled();
+      });
+
+      it('⚠️ trocar DE a compartilhada → 400: ela define os simulados da prova', async () => {
+        const m = montar({
+          prova: provaDe({
+            categoria: {
+              _id: 'cat-enem',
+              dono: DONO_CURSINHO,
+              selecionavel: true,
+            },
+          }),
+        });
+        await expect(
+          m.service.editar('p1', { categoria: 'cat-b' }, ATOR),
+        ).rejects.toThrow(TEXTO_CATEGORIA_ENEM_CURSINHO);
+        expect(m.provas.atualizarDados).not.toHaveBeenCalled();
+      });
+
+      it('renomear a ENEM do cursinho continua liberado', async () => {
+        const m = montar({
+          prova: provaDe({
+            categoria: {
+              _id: 'cat-enem',
+              dono: DONO_CURSINHO,
+              selecionavel: true,
+            },
+          }),
+        });
+        await m.service.editar('p1', { nome: 'Outro nome' }, ATOR);
+        expect(m.simulados.renomear).toHaveBeenCalledWith(['s1'], 'Outro nome');
+      });
     });
 
     it('⚠️ categoria com cartão enviado → 409; com cartão gerado → 409', async () => {

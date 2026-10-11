@@ -25,9 +25,17 @@ function setup(over: any = {}) {
       omr as any,
       { registrar: jest.fn() } as any,
       (over.simulados ?? simuladoDe(null)) as any,
+      (over.provas ?? provasDe()) as any,
     ),
     repo,
     omr,
+  };
+}
+/** tickets/038: por padrão, o simulado não está em prova nenhuma. */
+function provasDe(o: { doSimulado?: unknown; paraCartao?: unknown } = {}) {
+  return {
+    buscarProvaDoSimulado: jest.fn().mockResolvedValue(o.doSimulado ?? null),
+    buscarParaCartao: jest.fn().mockResolvedValue(o.paraCartao ?? null),
   };
 }
 function simuladoDe(cursinhoId: string | null, existe = true) {
@@ -169,6 +177,7 @@ it('cria a linha de junção com o vínculo recebido', async () => {
     omrHttp as any,
     relatorio as any,
     simuladoDe(null) as any,
+    provasDe() as any,
   );
 
   await svc.criar({
@@ -204,6 +213,7 @@ it('sem cursinhoId não cria linha, e avisa no log', async () => {
     omrHttp as any,
     relatorio as any,
     simuladoDe(null) as any,
+    provasDe() as any,
   );
 
   await svc.criar({
@@ -235,6 +245,7 @@ it('falha ao criar a linha NÃO derruba o upload, mas vai para o log com o histo
     omrHttp as any,
     relatorio as any,
     simuladoDe(null) as any,
+    provasDe() as any,
   );
 
   // o cartão é lido normalmente; só fica fora do relatório até alguém reconciliar
@@ -287,5 +298,183 @@ describe('tentativaId (card 14)', () => {
     expect(a.repo.createAwaitingOmr.mock.calls[0][0].tentativaId).not.toBe(
       b.repo.createAwaitingOmr.mock.calls[0][0].tentativaId,
     );
+  });
+});
+
+describe('cartão ligado à prova (tickets/038 · 06)', () => {
+  const SIM = '665f0c1a2b3c4d5e6f00abc1';
+  const SIM2 = '665f0c1a2b3c4d5e6f00abc2';
+  const PROVA = '665f0c1a2b3c4d5e6f00ffff';
+  const daProva = (simulados: string[], cursinhoId: string | null = 'cur-1') =>
+    provasDe({ paraCartao: { _id: PROVA, cursinhoId, simulados } });
+
+  it('QR antigo (só a imageKey): mesmo resultado de hoje, agora com a prova do simulado', async () => {
+    const { svc, repo } = setup({
+      provas: provasDe({ doSimulado: { _id: PROVA } }),
+    });
+    await svc.criar(DTO);
+    expect(repo.createAwaitingOmr).toHaveBeenCalledWith(
+      expect.objectContaining({
+        simuladoId: SIM,
+        provaId: PROVA,
+        cartaoDaProva: false,
+      }),
+    );
+  });
+
+  it('QR novo do simulado (provaId + simuladoId): idem', async () => {
+    const { svc, repo } = setup({
+      provas: provasDe({ doSimulado: { _id: PROVA } }),
+    });
+    await svc.criar({ ...DTO, simuladoId: SIM, provaId: PROVA });
+    expect(repo.createAwaitingOmr).toHaveBeenCalledWith(
+      expect.objectContaining({ simuladoId: SIM, provaId: PROVA }),
+    );
+  });
+
+  it('simulado sem prova: funciona, prova vazia', async () => {
+    const { svc, repo } = setup();
+    await svc.criar({ ...DTO, simuladoId: SIM });
+    expect(repo.createAwaitingOmr).toHaveBeenCalledWith(
+      expect.objectContaining({ simuladoId: SIM, provaId: null }),
+    );
+  });
+
+  it('QR com simulado de OUTRA prova → 400 e não cria', async () => {
+    const { svc, repo } = setup({
+      provas: provasDe({ doSimulado: { _id: 'outra' } }),
+    });
+    await expect(
+      svc.criar({ ...DTO, simuladoId: SIM, provaId: PROVA }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.createAwaitingOmr).not.toHaveBeenCalled();
+  });
+
+  it('cartão da prova com 1 simulado: resolve no envio e grava a junção', async () => {
+    const registrar = jest.fn();
+    const repo = {
+      buscarCartaoDaProvaEnviado: jest.fn().mockResolvedValue(null),
+      createAwaitingOmr: jest.fn().mockResolvedValue({ _id: 'h1' }),
+      marcarFalha: jest.fn(),
+    };
+    const svc = new CartaoHistoricoService(
+      repo as any,
+      { enviarProcessamento: jest.fn() } as any,
+      { registrar } as any,
+      simuladoDe(null) as any,
+      daProva([SIM]) as any,
+    );
+    await svc.criar({
+      usuario: 'u1',
+      imageKey: `cartoes/${PROVA}/i.jpg`,
+      cartaoCode: '3',
+      provaId: PROVA,
+      cursinhoId: 'cur-1',
+    });
+    expect(repo.createAwaitingOmr).toHaveBeenCalledWith(
+      expect.objectContaining({
+        simuladoId: SIM,
+        provaId: PROVA,
+        cartaoDaProva: true,
+      }),
+    );
+    expect(registrar).toHaveBeenCalledWith(
+      expect.objectContaining({ simuladoId: SIM }),
+    );
+  });
+
+  it('cartão da prova com 2 simulados: simulado vazio, linha AGUARDANDO no relatório (card 13)', async () => {
+    const registrar = jest.fn();
+    const registrarAguardando = jest.fn();
+    const repo = {
+      buscarCartaoDaProvaEnviado: jest.fn().mockResolvedValue(null),
+      createAwaitingOmr: jest.fn().mockResolvedValue({ _id: 'h1' }),
+      marcarFalha: jest.fn(),
+    };
+    const omr = { enviarProcessamento: jest.fn() };
+    const svc = new CartaoHistoricoService(
+      repo as any,
+      omr as any,
+      { registrar, registrarAguardando } as any,
+      simuladoDe(null) as any,
+      daProva([SIM, SIM2]) as any,
+    );
+    await svc.criar({
+      usuario: 'u1',
+      imageKey: `cartoes/${PROVA}/i.jpg`,
+      cartaoCode: '3',
+      provaId: PROVA,
+      cursinhoId: 'cur-1',
+      turmaId: 't-1',
+    });
+    expect(repo.createAwaitingOmr).toHaveBeenCalledWith(
+      expect.objectContaining({ simuladoId: null, cartaoDaProva: true }),
+    );
+    expect(registrar).not.toHaveBeenCalled();
+    expect(registrarAguardando).toHaveBeenCalledWith({
+      historicoId: 'h1',
+      provaId: PROVA,
+      usuario: 'u1',
+      cursinhoId: 'cur-1',
+      turmaId: 't-1',
+    });
+    expect(omr.enviarProcessamento).toHaveBeenCalled();
+  });
+
+  it('⚠️ segundo cartão da prova para o mesmo aluno → 409 (R10)', async () => {
+    const repo = {
+      buscarCartaoDaProvaEnviado: jest
+        .fn()
+        .mockResolvedValue({ status: HistoricoStatus.Completed }),
+      createAwaitingOmr: jest.fn(),
+    };
+    const svc = new CartaoHistoricoService(
+      repo as any,
+      {} as any,
+      {} as any,
+      simuladoDe(null) as any,
+      daProva([SIM, SIM2]) as any,
+    );
+    await expect(
+      svc.criar({
+        usuario: 'u1',
+        imageKey: `cartoes/${PROVA}/i.jpg`,
+        cartaoCode: '9',
+        provaId: PROVA,
+        cursinhoId: 'cur-1',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(repo.createAwaitingOmr).not.toHaveBeenCalled();
+  });
+
+  it('prova de outro cursinho → 403; prova inexistente → 400', async () => {
+    const outro = setup({ provas: daProva([SIM], 'cur-B') });
+    await expect(
+      outro.svc.criar({
+        ...DTO,
+        imageKey: `cartoes/${PROVA}/i.jpg`,
+        provaId: PROVA,
+        cursinhoId: 'cur-1',
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    const sumiu = setup({ provas: provasDe() });
+    await expect(
+      sumiu.svc.criar({
+        ...DTO,
+        imageKey: `cartoes/${PROVA}/i.jpg`,
+        provaId: PROVA,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('caminho da foto diferente do QR → 400 (o OMR leria com o template errado)', async () => {
+    const { svc } = setup({ provas: daProva([SIM]) });
+    await expect(svc.criar({ ...DTO, provaId: PROVA })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    await expect(
+      svc.criar({ ...DTO, simuladoId: SIM2 }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

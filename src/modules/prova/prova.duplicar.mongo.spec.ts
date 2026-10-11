@@ -1,8 +1,4 @@
-import {
-  ForbiddenException,
-  HttpException,
-  NotImplementedException,
-} from '@nestjs/common';
+import { ForbiddenException, HttpException } from '@nestjs/common';
 import { getModelToken, MongooseModule } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
 import { MongoMemoryServer } from 'mongodb-memory-server';
@@ -22,6 +18,8 @@ import { Historico, HistoricoSchema } from '../historico/historico.schema';
 import { Simulado, SimuladoSchema } from '../simulado/schemas/simulado.schema';
 import { SimuladoRepository } from '../simulado/simulado.repository';
 import { CustomProvaFactory } from './factory/custom_prova_factory';
+import { EnemCursinhoFactory } from './factory/enem_cursinho_factory';
+import { Idioma } from '../simulado/enums/idioma.enum';
 import { Prova, ProvaSchema } from './prova.schema';
 import { ProvaRepository } from './prova.repository';
 import { ProvaService } from './prova.service';
@@ -69,13 +67,23 @@ describe('duplicar prova — Mongo real', () => {
     const questaoRepo = mod.get(QuestaoRepository);
     const fabrica = {
       getFactory: (categoria: Categoria) =>
-        new CustomProvaFactory(
-          questaoRepo,
-          provaRepo,
-          {} as never,
-          simuladoRepo,
-          categoria,
-        ),
+        categoria.dono === DONO_CURSINHO
+          ? new EnemCursinhoFactory(
+              questaoRepo,
+              provaRepo,
+              {} as never,
+              {} as never,
+              simuladoRepo,
+              {} as never,
+              categoria,
+            )
+          : new CustomProvaFactory(
+              questaoRepo,
+              provaRepo,
+              {} as never,
+              simuladoRepo,
+              categoria,
+            ),
     };
     service = new ProvaService(
       fabrica as never,
@@ -215,21 +223,102 @@ describe('duplicar prova — Mongo real', () => {
     );
   });
 
-  it('ENEM do cursinho (tickets/038) → 501 até o card 03, e nenhum simulado sobra', async () => {
-    const { origem } = await montarOrigem();
-    const prova = await provas.collection.findOne({
-      _id: new Types.ObjectId(origem),
-    });
-    await categorias.collection.updateOne(
-      { _id: prova!.categoria },
-      { $set: { dono: DONO_CURSINHO, custom: false } },
-    );
-    const simuladosAntes = await simulados.countDocuments();
+  describe('ENEM do cursinho Dia 1 (tickets/038, R4)', () => {
+    /**
+     * Origem: Inglês no 1 (só no simulado Inglês), Espanhol no 1 (só no
+     * Espanhol), História no 6 (nos dois).
+     */
+    const montarEnem = async () => {
+      const exame = (
+        await exames.collection.insertOne({ nome: 'ENEM' } as never)
+      ).insertedId;
+      const categoria = (
+        await categorias.collection.insertOne({
+          nome: 'Enem Dia 1',
+          dono: DONO_CURSINHO,
+          custom: false,
+          selecionavel: true,
+          exame,
+          quantidadeTotalQuestao: 90,
+        } as never)
+      ).insertedId;
+      const ids: Types.ObjectId[] = [];
+      for (let i = 0; i < 3; i++) {
+        ids.push(
+          (
+            await questoes.collection.insertOne({
+              status: Status.Approved,
+              enunciado: `q${i}`,
+            } as never)
+          ).insertedId,
+        );
+      }
+      const [qIng, qEsp, qHist] = ids;
+      const sim = async (idioma: Idioma, qs: [Types.ObjectId, number][]) =>
+        (
+          await simulados.collection.insertOne({
+            nome: `Origem ${idioma}`,
+            idioma,
+            categoria,
+            questoes: qs.map(([questao, numero]) => ({ questao, numero })),
+          } as never)
+        ).insertedId;
+      const simIng = await sim(Idioma.Ingles, [
+        [qIng, 1],
+        [qHist, 6],
+      ]);
+      const simEsp = await sim(Idioma.Espanhol, [
+        [qEsp, 1],
+        [qHist, 6],
+      ]);
+      const origem = (
+        await provas.collection.insertOne({
+          nome: `Origem ${new Types.ObjectId()}`,
+          categoria,
+          cursinhoId: 'A',
+          criadorId: 'quem-criou',
+          questoes: [
+            { questao: qIng, numero: 1 },
+            { questao: qEsp, numero: 1 },
+            { questao: qHist, numero: 6 },
+          ],
+          simulados: [simIng, simEsp],
+          totalQuestaoValidadas: 3,
+          inicialNumero: 1,
+          enemAreas: ['Linguagens', 'Ciências Humanas'],
+        } as never)
+      ).insertedId;
+      return { origem: String(origem), qIng, qEsp, qHist };
+    };
 
-    await expect(
-      service.duplicar(origem, 'Cópia ENEM', ator()),
-    ).rejects.toThrow(NotImplementedException);
-    expect(await simulados.countDocuments()).toBe(simuladosAntes);
+    it('⚠️ 2 simulados, cada questão no simulado do seu idioma, mesmos números', async () => {
+      const { origem, qIng, qEsp, qHist } = await montarEnem();
+
+      const r = await service.duplicar(origem, 'Cópia ENEM', ator());
+
+      const copia = await provas.collection.findOne({ _id: r._id as never });
+      expect(copia!.questoes).toHaveLength(3);
+      const sims = await simulados.collection
+        .find({ _id: { $in: copia!.simulados } })
+        .toArray();
+      const conteudo = (idioma: Idioma) =>
+        sims
+          .find((s) => s.idioma === idioma)!
+          .questoes.map((q: any) => [String(q.questao), q.numero]);
+      expect(sims.map((s) => s.nome).sort()).toEqual([
+        'Cópia ENEM Espanhol',
+        'Cópia ENEM Inglês',
+      ]);
+      expect(conteudo(Idioma.Ingles)).toEqual([
+        [String(qIng), 1],
+        [String(qHist), 6],
+      ]);
+      expect(conteudo(Idioma.Espanhol)).toEqual([
+        [String(qEsp), 1],
+        [String(qHist), 6],
+      ]);
+      expect(r).toMatchObject({ totalQuestao: 95, provaOrigemId: origem });
+    });
   });
 
   it('nome já usado no cursinho → 409, e nenhum simulado sobra', async () => {

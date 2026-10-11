@@ -3,11 +3,11 @@ import {
   ConflictException,
   HttpException,
   HttpStatus,
-  NotImplementedException,
 } from '@nestjs/common';
 import { FrenteRepository } from 'src/modules/frente/frente.repository';
 import { Frente } from 'src/modules/frente/frente.schema';
 import { CreateQuestaoDTOInput } from 'src/modules/questao/dtos/create.dto.input';
+import { UpdateDTOInput } from 'src/modules/questao/dtos/update.dto.input';
 import { EnemArea } from 'src/modules/questao/enums/enem-area.enum';
 import { QuestaoRepository } from 'src/modules/questao/questao.repository';
 import { Questao } from 'src/modules/questao/questao.schema';
@@ -17,6 +17,10 @@ import { Simulado } from 'src/modules/simulado/schemas/simulado.schema';
 import { SimuladoRepository } from 'src/modules/simulado/simulado.repository';
 import { SimuladoService } from 'src/modules/simulado/simulado.service';
 import { CreateProvaDTOInput } from '../dtos/create.dto.input';
+import {
+  resolveQuestaoId,
+  syncNumeroNaProvaESimulados,
+} from '../helpers/question-container.helpers';
 import { ProvaRepository } from '../prova.repository';
 import { Prova } from '../prova.schema';
 import { validarAreaNaProva } from '../services/area-da-prova';
@@ -179,13 +183,163 @@ export class EnemCursinhoFactory implements IProvaFactory {
     }
   }
 
-  // Card 03 da série: editar e vincular seguem o mesmo roteamento por idioma.
-  public async updateQuestion(): Promise<void> {
-    throw new NotImplementedException(TEXTO_AINDA_NAO);
+  /**
+   * Editar questão (card 03): trocar a frente (Inglês ↔ Espanhol ↔ matéria
+   * comum) ou o número move a questão para os simulados que o idioma manda.
+   *
+   * ⚠️ O destino é calculado do zero — os simulados do idioma novo — e
+   * comparado com onde a questão ESTÁ, em vez de deduzir pela frente antiga
+   * (como a 2017+). Assim uma questão fora do lugar (ex.: dado legado) também
+   * é consertada ao salvar.
+   */
+  public async updateQuestion(question: UpdateDTOInput): Promise<void> {
+    const questao = await this.questaoRepository.getByIdToUpdate(question._id);
+    const [frenteIngles, frenteEspanhol] = await this.frentesDeIdioma();
+    await this.enemService.validate(
+      question,
+      frenteIngles,
+      frenteEspanhol,
+      1,
+      ULTIMA_IDIOMATICA,
+    );
+
+    // ⚠️ tickets/023, card 17: a prova de saída é a informada, quando a
+    // questão está nela — nunca "a primeira que achar".
+    const provaToLeaveId = await this.questaoRepository.findProvaDeSaida(
+      question._id,
+      question.prova,
+    );
+    const provaToEnter = await this.provaRepository.getById(question.prova);
+    // ⚠️ Tudo que recusa vem ANTES de qualquer escrita.
+    validarAreaNaProva(provaToEnter, question.enemArea);
+    const idioma = this.idiomaDaFrente(
+      question.frente1,
+      frenteIngles,
+      frenteEspanhol,
+    );
+    this.recusarIdiomaRepetido(
+      provaToEnter,
+      question.numero,
+      idioma,
+      [frenteIngles, frenteEspanhol],
+      question._id,
+    );
+    const destino = simuladosDoIdioma(provaToEnter, idioma);
+    const changeProva =
+      !!provaToLeaveId && provaToLeaveId !== provaToEnter._id.toString();
+    const oldProva = changeProva
+      ? await this.provaRepository.getById(provaToLeaveId)
+      : null;
+
+    const id = String(question._id);
+    const estaEm = (s: Simulado) =>
+      (s.questoes ?? []).some((qc) => resolveQuestaoId(qc) === id);
+    const naProva = provaToEnter.questoes.some(
+      (qc) => resolveQuestaoId(qc) === id,
+    );
+    const sair = provaToEnter.simulados.filter(
+      (s) => estaEm(s) && !destino.includes(s),
+    );
+    const entrar = destino.filter((s) => !estaEm(s));
+
+    const session = await this.questaoRepository.startSession();
+    session.startTransaction();
+    try {
+      if (oldProva) {
+        await this.simuladoService.removeQuestionSimulados(
+          oldProva.simulados,
+          questao,
+          session,
+        );
+        await this.provaRepository.removeQuestion(
+          provaToLeaveId,
+          questao,
+          session,
+        );
+      }
+      await this.simuladoService.removeQuestionSimulados(
+        sair,
+        questao,
+        session,
+      );
+      await this.simuladoService.addQuestionSimulados(
+        entrar,
+        questao,
+        question.numero,
+        session,
+      );
+      if (!naProva) {
+        await this.provaRepository.addQuestion(
+          question.prova,
+          questao,
+          question.numero,
+          session,
+        );
+      }
+      await this.questaoRepository.updateQuestion(question);
+      // Número sincronizado DENTRO da transação (prova + simulados).
+      if (question.numero != null) {
+        await syncNumeroNaProvaESimulados(
+          this.provaRepository,
+          this.simuladoRepository,
+          question.prova,
+          question._id,
+          question.numero,
+          session,
+        );
+      }
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   }
 
-  public async addQuestaoExistenteAProva(): Promise<void> {
-    throw new NotImplementedException(TEXTO_AINDA_NAO);
+  /** Vincular questão do banco (Etapas 9/11): mesmo roteamento por idioma. */
+  public async addQuestaoExistenteAProva(
+    questaoId: string,
+    provaId: string,
+    numero: number,
+  ): Promise<void> {
+    const questao = await this.questaoRepository.getByIdToUpdate(questaoId);
+    const [frenteIngles, frenteEspanhol] = await this.frentesDeIdioma();
+    const frente1 = frenteId(questao);
+    await this.enemService.validate(
+      { numero, frente1, enemArea: questao.enemArea } as UpdateDTOInput,
+      frenteIngles,
+      frenteEspanhol,
+      1,
+      ULTIMA_IDIOMATICA,
+    );
+
+    const prova = await this.provaRepository.getById(provaId);
+    validarAreaNaProva(prova, questao.enemArea);
+    const idioma = this.idiomaDaFrente(frente1, frenteIngles, frenteEspanhol);
+    this.recusarIdiomaRepetido(prova, numero, idioma, [
+      frenteIngles,
+      frenteEspanhol,
+    ]);
+    const simulados = simuladosDoIdioma(prova, idioma);
+
+    const session = await this.questaoRepository.startSession();
+    session.startTransaction();
+    try {
+      await this.simuladoService.addQuestionSimulados(
+        simulados,
+        questao,
+        numero,
+        session,
+      );
+      await this.provaRepository.addQuestion(provaId, questao, numero, session);
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   }
 
   // --- auxiliares ---
@@ -221,11 +375,14 @@ export class EnemCursinhoFactory implements IProvaFactory {
     numero: number | undefined,
     idioma: Idioma | null,
     [frenteIngles, frenteEspanhol]: [Frente, Frente],
+    // Na edição, a própria questão não conta como repetida.
+    ignorarId?: string,
   ): void {
     if (!idioma || numero == null) return;
     const repetida = prova.questoes.some(
       (qc) =>
         qc.numero === numero &&
+        resolveQuestaoId(qc) !== String(ignorarId) &&
         this.idiomaDaFrente(
           frenteId(qc.questao as Questao),
           frenteIngles,
@@ -239,9 +396,6 @@ export class EnemCursinhoFactory implements IProvaFactory {
     }
   }
 }
-
-export const TEXTO_AINDA_NAO =
-  'Editar ou vincular questão na prova ENEM do cursinho ainda não está disponível.';
 
 /** `frente1` populada (documento) ou só o id. */
 function frenteId(questao?: Questao | null): string | undefined {

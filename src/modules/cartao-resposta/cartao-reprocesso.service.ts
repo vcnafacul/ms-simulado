@@ -37,6 +37,7 @@ export class CartaoReprocessoService {
     historicoId: string;
     cursinhoId: string;
     imageKey?: string;
+    provaId?: string;
     simuladoId?: string;
     cartaoCode?: string;
     agora: Date;
@@ -135,11 +136,23 @@ export class CartaoReprocessoService {
    * relatório fica convincentemente errado.
    */
   private recusarSeOutroCartao(
-    historico: { simulado: unknown; cartaoCode?: string },
-    params: { simuladoId?: string; cartaoCode?: string },
+    historico: {
+      simulado?: unknown;
+      prova?: unknown;
+      cartaoDaProva?: boolean;
+      cartaoCode?: string;
+    },
+    params: { provaId?: string; simuladoId?: string; cartaoCode?: string },
   ): void {
-    const simuladoDoHistorico = String(historico.simulado);
-    if (params.simuladoId !== simuladoDoHistorico) {
+    /*
+      tickets/038: o cartão DA PROVA não tem simulado no QR (e o histórico pode
+      nem ter simulado ainda) — a conferência é pela prova.
+    */
+    if (historico.cartaoDaProva) {
+      if (params.simuladoId || params.provaId !== String(historico.prova)) {
+        throw new BadRequestException('a foto enviada é de outra prova');
+      }
+    } else if (params.simuladoId !== String(historico.simulado)) {
       throw new BadRequestException('a foto enviada é de outro simulado');
     }
     if (params.cartaoCode !== historico.cartaoCode) {

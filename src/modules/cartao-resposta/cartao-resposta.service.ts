@@ -26,8 +26,9 @@ export class CartaoRespostaService {
     header: HeaderData,
     cfg: PageConfig = DEFAULT_CONFIG,
     startNumero = 1,
+    opcoes: { idioma?: boolean } = {},
   ): Promise<CartaoArtefatos> {
-    const layout = buildLayout(N, cfg, startNumero);
+    const layout = buildLayout(N, cfg, startNumero, opcoes);
     const { templateJson, configJson } = buildTemplateJson(layout);
     const pdfBuffer = await buildCartaoPdf(layout, header);
     return {

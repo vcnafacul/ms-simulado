@@ -35,6 +35,21 @@ export class CartaoRespostaController {
     private readonly cartaoExclusao: CartaoExclusaoService,
   ) {}
 
+  /**
+   * Cartão DA PROVA (tickets/038). ⚠️ Dois segmentos (`prova/:provaId`): não colide com o
+   * `:simuladoId` abaixo, que tem um só.
+   */
+  @Get('prova/:provaId')
+  @Header('Content-Type', 'application/pdf')
+  async getCartaoDaProva(
+    @Param('provaId') provaId: string,
+  ): Promise<StreamableFile> {
+    if (!Types.ObjectId.isValid(provaId)) {
+      throw new BadRequestException(`provaId inválido: ${provaId}`);
+    }
+    return new StreamableFile(await this.provision.obterPdfDaProva(provaId));
+  }
+
   @Get(':simuladoId')
   @Header('Content-Type', 'application/pdf')
   async getCartao(
@@ -83,6 +98,7 @@ export class CartaoRespostaController {
       historicoId,
       cursinhoId: dto.cursinhoId,
       imageKey: dto.imageKey,
+      provaId: dto.provaId,
       simuladoId: dto.simuladoId,
       cartaoCode: dto.cartaoCode,
       // O relógio entra pela borda: o serviço é puro quanto a tempo, e o rate

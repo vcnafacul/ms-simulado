@@ -89,14 +89,15 @@ export async function syncNumeroNaProvaESimulados(
   if (updateNumeroNoContainer(prova, questaoId, numero)) {
     await provaRepository.update(prova, session);
   }
-  await Promise.all(
-    (prova.simulados ?? []).map(async (sml) => {
-      if (updateNumeroNoContainer(sml, questaoId, numero)) {
-        revalidarBloqueado(sml);
-        await simuladoRepository.update(sml, session);
-      }
-    }),
-  );
+  // ⚠️ Em sequência, nunca `Promise.all`: dentro de uma transação, duas
+  // operações ao mesmo tempo na mesma sessão são recusadas pelo Mongo ("Given
+  // transaction number N+1 … does not match any in-progress transactions").
+  for (const sml of prova.simulados ?? []) {
+    if (updateNumeroNoContainer(sml, questaoId, numero)) {
+      revalidarBloqueado(sml);
+      await simuladoRepository.update(sml, session);
+    }
+  }
 }
 
 /**

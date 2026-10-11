@@ -22,6 +22,8 @@ import {
 } from './exclusao/cartao-excluido.schema';
 import { CartaoExcluidoRepository } from './exclusao/cartao-excluido.repository';
 import { CartaoExclusaoService } from './exclusao/cartao-exclusao.service';
+import { Prova, ProvaSchema } from '../prova/prova.schema';
+import { ProvaRepository } from '../prova/prova.repository';
 
 @Module({
   imports: [
@@ -35,6 +37,9 @@ import { CartaoExclusaoService } from './exclusao/cartao-exclusao.service';
     QuestaoModule,
     MongooseModule.forFeature([
       { name: CartaoExcluido.name, schema: CartaoExcluidoSchema },
+      // tickets/038: o cartão é ligado à prova. Registrado aqui (e não pelo
+      // ProvaModule) para não fechar ciclo com o SimuladoModule.
+      { name: Prova.name, schema: ProvaSchema },
     ]),
   ],
   controllers: [CartaoRespostaController],
@@ -49,6 +54,7 @@ import { CartaoExclusaoService } from './exclusao/cartao-exclusao.service';
     CartaoVarreduraService,
     CartaoExcluidoRepository,
     CartaoExclusaoService,
+    ProvaRepository,
   ],
   exports: [CartaoRespostaService],
 })
