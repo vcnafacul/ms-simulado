@@ -45,8 +45,11 @@ export class LinhaRelatorioDtoOutput {
    * De qual simulado é o cartão (tickets/034). No relatório do simulado é
    * sempre o próprio; no da prova é o que distingue as linhas do mesmo
    * estudante — o grão é a APLICAÇÃO, não o estudante.
+   *
+   * ⚠️ `null` só no relatório da PROVA, no cartão da prova ainda sem simulado (tickets/038):
+   * aguardando a leitura, ou com falha antes de o idioma ser lido.
    */
-  @ApiProperty() simuladoId: string;
+  @ApiProperty({ nullable: true }) simuladoId: string | null;
 
   @ApiProperty({ required: false }) turmaId?: string;
 
