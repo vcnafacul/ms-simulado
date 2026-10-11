@@ -1,4 +1,8 @@
-import { ForbiddenException, HttpException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  HttpException,
+  NotImplementedException,
+} from '@nestjs/common';
 import { getModelToken, MongooseModule } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
 import { MongoMemoryServer } from 'mongodb-memory-server';
@@ -7,6 +11,7 @@ import { Ator } from 'src/shared/ator/ator';
 import {
   Categoria,
   CategoriaSchema,
+  DONO_CURSINHO,
   DONO_SYSTEM,
 } from '../categoria/schemas/categoria.schema';
 import { Exame, ExameSchema } from '../exame/exame.schema';
@@ -208,6 +213,23 @@ describe('duplicar prova — Mongo real', () => {
     await expect(service.duplicar(doB.origem, 'X', undefined)).rejects.toThrow(
       ForbiddenException,
     );
+  });
+
+  it('ENEM do cursinho (tickets/038) → 501 até o card 03, e nenhum simulado sobra', async () => {
+    const { origem } = await montarOrigem();
+    const prova = await provas.collection.findOne({
+      _id: new Types.ObjectId(origem),
+    });
+    await categorias.collection.updateOne(
+      { _id: prova!.categoria },
+      { $set: { dono: DONO_CURSINHO, custom: false } },
+    );
+    const simuladosAntes = await simulados.countDocuments();
+
+    await expect(
+      service.duplicar(origem, 'Cópia ENEM', ator()),
+    ).rejects.toThrow(NotImplementedException);
+    expect(await simulados.countDocuments()).toBe(simuladosAntes);
   });
 
   it('nome já usado no cursinho → 409, e nenhum simulado sobra', async () => {
