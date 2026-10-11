@@ -96,6 +96,13 @@ export class Prova extends BaseSchema {
    */
   @Prop({ type: String, required: false, default: null })
   public provaOrigemId?: string | null;
+
+  /**
+   * Contador do cartão DA PROVA (#001, #002…) — tickets/038, R11. O cartão de
+   * cada simulado segue com o `simulado.cartaoSeq`.
+   */
+  @Prop({ required: false, default: 0 })
+  public cartaoSeq?: number;
 }
 
 export const ProvaSchema = SchemaFactory.createForClass(Prova);

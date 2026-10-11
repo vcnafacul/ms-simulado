@@ -69,7 +69,15 @@ export interface SimuladoParaCaderno {
     /** `null` em categoria custom, que tem quantidade livre */
     quantidadeTotalQuestao?: number | null;
   };
-  questoes: { questao: QuestaoParaCaderno; numero: number | null }[];
+  questoes: {
+    questao: QuestaoParaCaderno;
+    numero: number | null;
+    /**
+     * tickets/038: título de bloco impresso antes da questão quando muda (ex.: "Língua
+     * estrangeira — Inglês"). Só o caderno da prova usa.
+     */
+    secao?: string | null;
+  }[];
 }
 
 /** As cinco letras, na ordem em que são impressas. */

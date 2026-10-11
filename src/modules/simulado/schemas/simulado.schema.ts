@@ -3,6 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { BaseSchema } from 'src/shared/base/base.schema';
 import { Categoria } from '../../categoria/schemas/categoria.schema';
+import { Idioma } from '../enums/idioma.enum';
 import {
   QuestaoNaContainer,
   QuestaoNaContainerSchema,
@@ -57,6 +58,22 @@ export class Simulado extends BaseSchema {
   @Prop({ required: false, default: 0 })
   @ApiProperty({ required: false })
   public cartaoSeq?: number;
+
+  /**
+   * Só nos simulados do Dia 1 da prova ENEM do cursinho (tickets/038): qual
+   * idioma de 1–5 o simulado tem. `null` em todos os outros.
+   *
+   * ⚠️ `null` dentro do `enum`: com `default: null` e o enum só com os
+   * valores, o Mongoose recusa todo create sem o campo.
+   */
+  @Prop({
+    type: String,
+    enum: [...Object.values(Idioma), null],
+    required: false,
+    default: null,
+  })
+  @ApiProperty({ enum: Idioma, required: false, nullable: true })
+  public idioma?: Idioma | null;
 }
 
 export const SimuladoSchema = SchemaFactory.createForClass(Simulado);

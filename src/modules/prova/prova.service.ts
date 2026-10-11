@@ -15,6 +15,7 @@ import { CategoriaRepository } from '../categoria/categoria.repository';
 import { EnemArea } from '../questao/enums/enem-area.enum';
 import { Status } from '../questao/enums/status.enum';
 import { QuestaoRepository } from '../questao/questao.repository';
+import { Simulado } from '../simulado/schemas/simulado.schema';
 import { SimuladoRepository } from '../simulado/simulado.repository';
 import { CreateProvaDTOInput } from './dtos/create.dto.input';
 import { GetProvaDTOOutout } from './dtos/get-all.dto.output';
@@ -28,7 +29,10 @@ import {
   resolveQuestaoId,
   syncNumeroNaProvaESimulados,
 } from './helpers/question-container.helpers';
-import { DONO_SYSTEM } from '../categoria/schemas/categoria.schema';
+import {
+  DONO_CURSINHO,
+  DONO_SYSTEM,
+} from '../categoria/schemas/categoria.schema';
 import { Questao } from '../questao/questao.schema';
 
 export const TEXTO_DUPLICAR_SO_DO_CURSINHO =
@@ -282,22 +286,34 @@ export class ProvaService {
       receberNovasVersoes: origem.receberNovasVersoes,
     });
     await factory.createSimulados(prova);
-    const simulado = prova.simulados[0];
+    const simulados = prova.simulados;
 
     try {
       prova.inicialNumero = origem.inicialNumero;
       prova.provaOrigemId = String(origem._id);
       prova.totalQuestaoValidadas = 0;
+      /*
+        tickets/038 (R4): a ENEM do cursinho tem 2 simulados no Dia 1. Cada
+        questão vai para os simulados da cópia cujo par na origem (mesmo
+        `idioma`) a contém — a cópia repete o roteamento da origem sem
+        recalculá-lo. Com 1 simulado (prova do cursinho de sempre), todas as
+        questões da prova entram nele, como antes.
+      */
+      const destinos = destinosDaCopia(origem, simulados);
       for (const qc of origem.questoes ?? []) {
         const questao = qc.questao as Questao;
         if (!questao?._id) continue;
         addQuestaoToContainer(prova, questao, qc.numero);
-        addQuestaoToContainer(simulado, questao, qc.numero);
+        for (const simulado of destinos(String(questao._id))) {
+          addQuestaoToContainer(simulado, questao, qc.numero);
+        }
         if (questao.status === Status.Approved)
           prova.totalQuestaoValidadas += 1;
       }
-      revalidarBloqueado(simulado);
-      await this.simuladoRepository.updateSession(simulado);
+      for (const simulado of simulados) {
+        revalidarBloqueado(simulado);
+        await this.simuladoRepository.updateSession(simulado);
+      }
 
       const result = await this.repository.create(prova);
       return {
@@ -317,9 +333,11 @@ export class ProvaService {
         provaOrigemId: result.provaOrigemId,
       } as GetProvaDTOOutout;
     } catch (error) {
-      await this.simuladoRepository
-        .delete(String(simulado._id))
-        .catch(() => undefined);
+      for (const simulado of simulados) {
+        await this.simuladoRepository
+          .delete(String(simulado._id))
+          .catch(() => undefined);
+      }
       throw error;
     }
   }
@@ -337,7 +355,15 @@ export class ProvaService {
     }
     // tickets/023, card 04 (R3): cursinho só cria prova em categoria dele.
     // Senão criaria uma prova protegida que nem ele compõe (R2).
-    if (item.cursinhoId && categoria.dono !== item.cursinhoId) {
+    // tickets/038 (R1): ou numa compartilhada ("Enem Dia 1/2" do cursinho) —
+    // e essas são SÓ de cursinho: sem `cursinhoId`, a prova não teria dono e
+    // ninguém a comporia.
+    const compartilhada = categoria.dono === DONO_CURSINHO;
+    if (
+      compartilhada
+        ? !item.cursinhoId
+        : item.cursinhoId && categoria.dono !== item.cursinhoId
+    ) {
       throw new ForbiddenException(
         'Use uma categoria do seu cursinho para criar a prova.',
       );
@@ -574,4 +600,27 @@ export class ProvaService {
       receberNovasVersoes: prova.receberNovasVersoes,
     } as GetProvaDTOOutout;
   }
+}
+
+/**
+ * Para cada questão da origem, os simulados da cópia em que ela entra
+ * (tickets/038, R4): os pares (mesmo `idioma`) dos simulados da origem que a
+ * contêm. Com um simulado só na cópia, todas entram nele (comportamento da
+ * 027, que copia a lista da prova).
+ */
+export function destinosDaCopia(
+  origem: Pick<Prova, 'simulados'>,
+  copia: Simulado[],
+): (questaoId: string) => Simulado[] {
+  if (copia.length === 1) return () => copia;
+  const daOrigem = (origem.simulados ?? []) as Simulado[];
+  const par = (s: Simulado) =>
+    copia.find((c) => (c.idioma ?? null) === (s.idioma ?? null));
+  return (questaoId) =>
+    daOrigem
+      .filter((s) =>
+        (s.questoes ?? []).some((qc) => resolveQuestaoId(qc) === questaoId),
+      )
+      .map(par)
+      .filter((s): s is Simulado => !!s);
 }

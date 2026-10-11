@@ -23,6 +23,8 @@ import { HeaderData } from '../pdf/cartao-pdf.builder';
 
 interface CartaoConfigFile {
   n?: number;
+  /** tickets/038: inclui a marcação de idioma (cartão da prova do ENEM Dia 1 do cursinho). */
+  idioma?: boolean;
   header?: HeaderData;
   layout?: Partial<PageConfig>;
 }
@@ -70,7 +72,8 @@ function warnIfOverflow(templateJson: {
   fieldBlocks: Record<
     string,
     {
-      fieldType: string;
+      fieldType?: string;
+      bubbleValues?: string[];
       origin: [number, number];
       fieldLabels: string[];
       labelsGap: number;
@@ -81,7 +84,8 @@ function warnIfOverflow(templateJson: {
   const [pw, ph] = templateJson.pageDimensions;
   const [bw, bh] = templateJson.bubbleDimensions;
   for (const [key, b] of Object.entries(templateJson.fieldBlocks)) {
-    const nValues = b.fieldType === 'QTYPE_INT' ? 10 : 5;
+    const nValues =
+      b.bubbleValues?.length ?? (b.fieldType === 'QTYPE_INT' ? 10 : 5);
     const m = b.fieldLabels[0].match(/[a-z]+(\d+)\.\.(\d+)/i);
     const nLabels = m ? parseInt(m[2], 10) - parseInt(m[1], 10) + 1 : 1;
     // QTYPE_INT: valores descem (bubblesGap), labels atravessam (labelsGap); MCQ5 é o inverso.
@@ -126,7 +130,9 @@ async function main() {
   const layout: PageConfig = { ...DEFAULT_CONFIG, ...(cfgFile.layout ?? {}) };
 
   const service = new CartaoRespostaService();
-  const art = await service.gerar(N, header, layout);
+  const art = await service.gerar(N, header, layout, 1, {
+    idioma: cfgFile.idioma === true,
+  });
   warnIfOverflow(art.templateJson);
 
   fs.writeFileSync(

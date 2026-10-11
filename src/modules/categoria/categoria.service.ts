@@ -13,8 +13,15 @@ import { SimuladoRepository } from '../simulado/simulado.repository';
 import { ProvaRepository } from '../prova/prova.repository';
 import { CreateCategoriaDTOInput } from './dtos/create.dto.input';
 import { CategoriaOutputDTO } from './dtos/categoria-output.dto';
-import { Categoria, DONO_SYSTEM } from './schemas/categoria.schema';
+import {
+  Categoria,
+  DONO_CURSINHO,
+  DONO_SYSTEM,
+} from './schemas/categoria.schema';
 import { CategoriaRepository } from './categoria.repository';
+
+export const TEXTO_CATEGORIA_COMPARTILHADA =
+  'Esta categoria é da plataforma e vale para todos os cursinhos: não pode ser criada, alterada ou excluída.';
 
 @Injectable()
 export class CategoriaService {
@@ -36,6 +43,10 @@ export class CategoriaService {
     dto: CreateCategoriaDTOInput,
     dono: string = DONO_SYSTEM,
   ): Promise<Categoria> {
+    // As compartilhadas nascem só pelo seed (tickets/038, R1).
+    if (dono === DONO_CURSINHO) {
+      throw new ForbiddenException(TEXTO_CATEGORIA_COMPARTILHADA);
+    }
     const nomeAplicado = dto.nome ?? this.gerarNomeAuto(dto);
 
     // colisão ANTES do pattern: nomes seedados (ex.: "Enem Dia 1") não seguem
@@ -107,10 +118,23 @@ export class CategoriaService {
      * aqui vazaria as categorias de um cursinho para os outros no dia em que
      * alguém esquecesse de passar o parâmetro.
      */
-    const result = await this.repository.getAll({ ...param, where: { dono } });
+    /*
+      tickets/038 (R1): a lista de um cursinho traz também as compartilhadas
+      (`dono = Cursinho`); a do projeto (`system`) não.
+    */
+    const doCursinho = dono !== DONO_SYSTEM && dono !== DONO_CURSINHO;
+    const where = doCursinho
+      ? { dono: { $in: [dono, DONO_CURSINHO] } }
+      : { dono };
+    const result = await this.repository.getAll({ ...param, where });
     return {
       ...result,
-      data: await this.attachUsageCounts(result.data),
+      // ⚠️ Escopada pelo cursinho: a compartilhada é usada por todos, e a
+      // contagem global diria a um cursinho quantas provas os outros têm.
+      data: await this.attachUsageCounts(
+        result.data,
+        doCursinho ? dono : undefined,
+      ),
     };
   }
 
@@ -118,6 +142,11 @@ export class CategoriaService {
     const categoria = await this.repository.getById(id);
     if (!categoria) {
       throw new NotFoundException(`Categoria ${id} não encontrada`);
+    }
+
+    // Compartilhada com todos os cursinhos: ninguém exclui, nem o projeto.
+    if (categoria.dono === DONO_CURSINHO) {
+      throw new ForbiddenException(TEXTO_CATEGORIA_COMPARTILHADA);
     }
 
     /**
@@ -146,11 +175,12 @@ export class CategoriaService {
 
   private async attachUsageCounts(
     categorias: Categoria[],
+    cursinhoId?: string,
   ): Promise<CategoriaOutputDTO[]> {
     const ids = categorias.map((c) => c._id.toString());
     const [simuladoCounts, provaCounts] = await Promise.all([
-      this.simuladoRepository.countsByCategoria(ids),
-      this.provaRepository.countsByCategoria(ids),
+      this.simuladoRepository.countsByCategoria(ids, cursinhoId),
+      this.provaRepository.countsByCategoria(ids, cursinhoId),
     ]);
     return categorias.map((categoria) => {
       const plain =

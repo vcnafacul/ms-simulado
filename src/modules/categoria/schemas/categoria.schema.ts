@@ -14,6 +14,18 @@ import { Exame } from '../../exame/exame.schema';
  */
 export const DONO_SYSTEM = 'system';
 
+/**
+ * Dono das categorias **compartilhadas com todos os cursinhos** (tickets/038,
+ * R1): seedadas pela plataforma ("Enem Dia 1" e "Enem Dia 2"), mas compostas
+ * por cada cursinho na própria prova.
+ *
+ * - aparecem na lista de TODO cursinho e não na do projeto;
+ * - ninguém cria, edita ou exclui por rota — só o seed;
+ * - não protegem a prova (`provaProtegida`): a prova continua do cursinho que
+ *   a criou.
+ */
+export const DONO_CURSINHO = 'Cursinho';
+
 @Schema({ timestamps: true, versionKey: false })
 export class Categoria extends BaseSchema {
   // ⚠️ O `unique` saiu daqui: a unicidade agora é composta com `dono`, no

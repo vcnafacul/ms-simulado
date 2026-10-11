@@ -33,18 +33,33 @@ const ESPACO_MINIMO = '\\needspace{10\\baselineskip}';
 
 export function gerarCaderno(
   simulado: SimuladoParaCaderno,
-  opts: { draft: boolean },
+  opts: {
+    draft: boolean;
+    /**
+     * tickets/038: o caderno da prova do ENEM Dia 1 imprime 1–5 de Inglês, 1–5 de Espanhol e
+     * 6–90 — a ordem vem montada, e ordenar por número intercalaria as duas línguas.
+     */
+    manterOrdem?: boolean;
+  },
 ): CadernoGerado {
   const avisos: string[] = [];
   const coletor = new ColetorDeImagens();
 
-  const selecionadas = selecionar(simulado, opts.draft, avisos);
+  const selecionadas = selecionar(
+    simulado,
+    opts.draft,
+    avisos,
+    opts.manterOrdem === true,
+  );
   const questoesIncluidas = selecionadas.map(({ numero }) => numero);
 
+  let secaoAtual: string | null = null;
   const blocos = selecionadas.length
-    ? selecionadas.map(({ questao, numero }) =>
-        blocoDaQuestao(questao, numero, coletor, avisos),
-      )
+    ? selecionadas.map(({ questao, numero, secao }) => {
+        const titulo = secao && secao !== secaoAtual ? blocoDeSecao(secao) : '';
+        secaoAtual = secao ?? null;
+        return titulo + blocoDaQuestao(questao, numero, coletor, avisos);
+      })
     : [blocoMarcadorDeVazio(avisos)];
 
   // ⚠️ O bloco de avisos é montado DEPOIS de os blocos de questão rodarem,
@@ -113,25 +128,47 @@ function gerarMetadados(
  * No modo rascunho, filtra o que ainda não pode ser impresso. No normal, tudo
  * entra: o gate de "este simulado pode ser gerado?" é do card 04, não daqui.
  */
+type Selecionada = {
+  questao: QuestaoParaCaderno;
+  numero: number;
+  secao?: string | null;
+};
+
 function selecionar(
   simulado: SimuladoParaCaderno,
   draft: boolean,
   avisos: string[],
-): { questao: QuestaoParaCaderno; numero: number }[] {
-  return simulado.questoes
-    .filter((q): q is { questao: QuestaoParaCaderno; numero: number } => {
-      if (q.numero == null) {
-        // No rascunho, questão sem número é esperado e silencioso. No modo
-        // normal é anomalia: `todasNumeradas` (simulado/helpers/bloqueado.ts)
-        // impede um simulado assim de ser liberado, então chegar aqui quer
-        // dizer que algo destravou. Some da prova de um jeito ou de outro — mas
-        // sumir CALADO é o que não pode.
-        if (!draft) avisos.push('uma questão sem número ficou de fora');
-        return false;
-      }
-      return draft ? q.questao.status === Status.Approved : true;
-    })
-    .sort((a, b) => a.numero - b.numero);
+  manterOrdem: boolean,
+): Selecionada[] {
+  const filtradas = simulado.questoes.filter((q): q is Selecionada => {
+    if (q.numero == null) {
+      // No rascunho, questão sem número é esperado e silencioso. No modo
+      // normal é anomalia: `todasNumeradas` (simulado/helpers/bloqueado.ts)
+      // impede um simulado assim de ser liberado, então chegar aqui quer
+      // dizer que algo destravou. Some da prova de um jeito ou de outro — mas
+      // sumir CALADO é o que não pode.
+      if (!draft) avisos.push('uma questão sem número ficou de fora');
+      return false;
+    }
+    return draft ? q.questao.status === Status.Approved : true;
+  });
+  return manterOrdem
+    ? filtradas
+    : filtradas.sort((a, b) => a.numero - b.numero);
+}
+
+/**
+ * Título de bloco (tickets/038) — ex.: "Língua estrangeira — Inglês".
+ *
+ * ⚠️ `\uplevel` é o comando do exam.cls para texto DENTRO do ambiente `questions` sem virar
+ * item da lista; texto solto ali seria lido como parte da questão anterior.
+ */
+function blocoDeSecao(secao: string): string {
+  return [
+    '\\needspace{12\\baselineskip}',
+    `\\uplevel{\\vspace{1ex}\\textbf{${escaparForaDaMatematica(secao.toUpperCase())}}\\par}`,
+    '',
+  ].join('\n');
 }
 
 /**

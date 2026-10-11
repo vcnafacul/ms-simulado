@@ -250,3 +250,47 @@ describe('tentativaId no reprocesso (card 14)', () => {
     );
   });
 });
+
+describe('reenvio do cartão DA PROVA (tickets/038 · 06)', () => {
+  const PROVA = '665f0c1a2b3c4d5e6f00ffff';
+  const historicoDaProva = {
+    _id: 'h1',
+    status: 'failed',
+    cartaoCode: '7',
+    simulado: null as string | null,
+    prova: PROVA,
+    cartaoDaProva: true,
+    imageKey: `cartoes/${PROVA}/velha.jpg`,
+  };
+
+  it('a foto nova é da mesma prova → aceita', async () => {
+    const { svc, historicoRepository } = montar({
+      historico: historicoDaProva,
+    });
+    await svc.reprocessar(
+      pedido({
+        simuladoId: undefined,
+        provaId: PROVA,
+        imageKey: `cartoes/${PROVA}/nova.jpg`,
+      }),
+    );
+    expect(historicoRepository.reabrirParaOmr).toHaveBeenCalled();
+  });
+
+  it('foto de outra prova, ou de um cartão de simulado → 400', async () => {
+    const outra = montar({ historico: historicoDaProva });
+    await expect(
+      outra.svc.reprocessar(
+        pedido({ simuladoId: undefined, provaId: '665f0c1a2b3c4d5e6f00eeee' }),
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    const deSimulado = montar({ historico: historicoDaProva });
+    await expect(
+      deSimulado.svc.reprocessar(pedido({ provaId: PROVA })),
+    ).rejects.toThrow(BadRequestException);
+    expect(
+      deSimulado.historicoRepository.reabrirParaOmr,
+    ).not.toHaveBeenCalled();
+  });
+});

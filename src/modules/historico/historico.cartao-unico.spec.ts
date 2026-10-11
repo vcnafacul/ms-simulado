@@ -60,7 +60,7 @@ describe('um cartão por estudante — Mongo real', () => {
   it('o índice existe, com o nome', async () => {
     const indices = await histModel.collection.indexes();
 
-    expect(indices.map((i) => i.name)).toContain('cartao_por_estudante');
+    expect(indices.map((i) => i.name)).toContain('cartao_por_estudante_v2');
   });
 
   it('⚠️ o mesmo cartão para a mesma pessoa é recusado pelo banco — mesmo falho', async () => {

@@ -1,5 +1,8 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import { DONO_SYSTEM } from '../categoria/schemas/categoria.schema';
+import {
+  DONO_CURSINHO,
+  DONO_SYSTEM,
+} from '../categoria/schemas/categoria.schema';
 import { ProvaService } from './prova.service';
 
 /**
@@ -67,5 +70,23 @@ describe('ProvaService.create — categoria da prova de cursinho (023 · 04)', (
       NotFoundException,
     );
     expect(escritas()).toBe(0);
+  });
+
+  describe('compartilhada "Enem Dia 1/2" do cursinho (tickets/038)', () => {
+    it('qualquer cursinho cria nela', async () => {
+      for (const cursinhoId of ['A', 'B']) {
+        const { service, escritas } = montar({ dono: DONO_CURSINHO });
+        await service.create(dto({ cursinhoId }));
+        expect(escritas()).toBe(3);
+      }
+    });
+
+    it('⚠️ sem cursinho (admin) → 403: a prova não teria dono para compor', async () => {
+      const { service, escritas } = montar({ dono: DONO_CURSINHO });
+      await expect(
+        service.create(dto({ cursinhoId: null })),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(escritas()).toBe(0);
+    });
   });
 });
