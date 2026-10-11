@@ -1,7 +1,10 @@
 import { LayoutModel } from '../layout/cartao-layout';
 
 export interface OmrFieldBlock {
-  fieldType: 'QTYPE_INT' | 'QTYPE_MCQ5';
+  // Um ou outro (schema do OMRChecker): tipo pronto, ou valores próprios + direção.
+  fieldType?: 'QTYPE_INT' | 'QTYPE_MCQ5';
+  bubbleValues?: string[];
+  direction?: 'horizontal' | 'vertical';
   origin: [number, number];
   fieldLabels: string[];
   labelsGap: number;
@@ -46,7 +49,12 @@ export function buildTemplateJson(layout: LayoutModel): {
   const fieldBlocks: Record<string, OmrFieldBlock> = {};
   for (const b of layout.fieldBlocks) {
     fieldBlocks[b.key] = {
-      fieldType: b.fieldType,
+      ...(b.fieldType
+        ? { fieldType: b.fieldType }
+        : {
+            bubbleValues: [...(b.bubbleValues ?? [])],
+            direction: b.direction ?? 'horizontal',
+          }),
       origin: [
         Math.round(b.origin[0] - near - halfW),
         Math.round(b.origin[1] - near - halfH),

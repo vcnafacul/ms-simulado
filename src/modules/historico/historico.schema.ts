@@ -18,9 +18,36 @@ export class Historico extends BaseSchema {
   @ApiProperty()
   public ano: number;
 
+  /**
+   * ⚠️ **Pode faltar** (tickets/038, R9): no cartão DA PROVA do ENEM Dia 1 do
+   * cursinho, o simulado só é conhecido no callback do OMR, pelo idioma
+   * marcado. Até lá o histórico tem só a `prova`.
+   */
   @Prop({ ref: Simulado.name, type: Types.ObjectId })
-  @ApiProperty()
-  public simulado: Simulado;
+  @ApiProperty({ required: false, nullable: true })
+  public simulado?: Simulado | null;
+
+  /**
+   * A prova do cartão (tickets/038, R8a/R9). Preenchida em todo cartão cujo
+   * simulado está numa prova — e em todo cartão DA PROVA. `null`/ausente:
+   * simulado digital, histórico antigo sem a migração 0007, ou simulado que não
+   * está em prova nenhuma.
+   *
+   * ⚠️ Ref por nome (string): importar o `Prova` aqui fecha um ciclo de imports
+   * (prova → simulado → … → histórico).
+   */
+  @Prop({ ref: 'Prova', type: Types.ObjectId, required: false, default: null })
+  @ApiProperty({ required: false, nullable: true })
+  public prova?: Types.ObjectId | null;
+
+  /**
+   * `true` só no cartão impresso pela PROVA (um cartão para os simulados dela,
+   * tickets/038). É o que separa as duas regras de "um cartão por estudante":
+   * por prova aqui, por simulado no cartão do simulado (R10).
+   */
+  @Prop({ type: Boolean, required: false })
+  @ApiProperty({ required: false })
+  public cartaoDaProva?: boolean;
 
   @Prop({ type: [Object] })
   @ApiProperty()
@@ -125,11 +152,36 @@ HistoricoSchema.index(
  * ⚠️ `name` explícito — ver o `caderno-template.schema.ts`: sem nome, um
  * conflito de índice some calado no `autoIndex`.
  */
+/*
+ * ⚠️ tickets/038: `prova` entrou na chave (v2). Com o simulado vazio até o
+ * callback, dois cartões DA PROVA do mesmo aluno em provas diferentes (os dois
+ * "#001", porque o contador é por prova) colidiam em `{usuario, null, "001"}`.
+ * No cartão do simulado nada muda: a prova é função do simulado. A migração
+ * 0007 apaga o `cartao_por_estudante` (v1) e cria este.
+ */
 HistoricoSchema.index(
-  { usuario: 1, simulado: 1, cartaoCode: 1 },
+  { usuario: 1, simulado: 1, prova: 1, cartaoCode: 1 },
   {
     unique: true,
-    name: 'cartao_por_estudante',
+    name: 'cartao_por_estudante_v2',
     partialFilterExpression: { cartaoCode: { $type: 'string' } },
+  },
+);
+
+/**
+ * ⚠️ **Um cartão da PROVA por estudante** (tickets/038, R10): não dá para
+ * mandar um cartão de Inglês e outro de Espanhol para o mesmo aluno na mesma
+ * prova. Parcial em `cartaoDaProva: true` — o cartão do simulado segue a regra
+ * de cima (por simulado), porque nas provas da plataforma o aluno pode fazer
+ * dois simulados da mesma prova.
+ *
+ * ⚠️ Criado pela migração 0007, e não só pelo `autoIndex` (que falha calado).
+ */
+HistoricoSchema.index(
+  { usuario: 1, prova: 1 },
+  {
+    unique: true,
+    name: 'cartao_da_prova_por_estudante',
+    partialFilterExpression: { cartaoDaProva: true },
   },
 );

@@ -186,7 +186,12 @@ export class ProvaGestaoService {
       folha impressa tem o layout da categoria antiga, e a leitura de uma
       folha com 90 bolhas num template de 45 sairia errada.
     */
-    if (await this.historicos.contarPorSimulados(this.simuladoIds(prova))) {
+    if (
+      await this.historicos.contarPorSimulados(
+        this.simuladoIds(prova),
+        idDe(prova),
+      )
+    ) {
       throw new ConflictException(TEXTO_JA_FEITA_CATEGORIA);
     }
     const simulados = (prova.simulados ?? []) as Simulado[];
@@ -223,7 +228,12 @@ export class ProvaGestaoService {
 
   async excluir(id: string, ator?: Ator): Promise<{ nome: string }> {
     const prova = await this.provaDoAtor(id, ator);
-    if (await this.historicos.contarPorSimulados(this.simuladoIds(prova))) {
+    if (
+      await this.historicos.contarPorSimulados(
+        this.simuladoIds(prova),
+        idDe(prova),
+      )
+    ) {
       throw new ConflictException(TEXTO_JA_FEITA_EXCLUIR);
     }
     await this.provas.arquivar(id);
