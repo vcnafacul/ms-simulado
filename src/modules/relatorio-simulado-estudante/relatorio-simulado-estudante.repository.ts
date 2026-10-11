@@ -267,6 +267,65 @@ export class RelatorioSimuladoEstudanteRepository {
   }
 
   /**
+   * tickets/038: o cartão DA PROVA ainda sem simulado (ENEM Dia 1 do cursinho). A linha nasce
+   * no envio, com a prova, para o reenvio/baixar foto/excluir funcionarem antes da leitura —
+   * todos buscam a linha pelo `historico` (`buscarPorHistorico`).
+   */
+  async registrarAguardando(data: {
+    historicoId: string;
+    provaId: string;
+    usuario: string;
+    cursinhoId: string;
+    turmaId?: string;
+  }): Promise<void> {
+    await this.model.create({
+      historico: new Types.ObjectId(data.historicoId),
+      prova: new Types.ObjectId(data.provaId),
+      usuario: data.usuario,
+      cursinhoId: data.cursinhoId,
+      turmaId: data.turmaId,
+      aguardandoSimulado: true,
+    });
+  }
+
+  /**
+   * tickets/038: o callback disse o simulado do cartão da prova. A linha do histórico vai para
+   * ele (mesmo upsert do `registrar`: se o aluno já tinha linha naquele simulado, ela passa a
+   * apontar para este histórico) e qualquer outra linha do histórico sai — a aguardando, ou a
+   * de outro simulado, se um reenvio trocou o idioma.
+   *
+   * Sem linha nenhuma (envio sem cursinho), não faz nada.
+   */
+  async moverParaSimulado(
+    historicoId: string,
+    simuladoId: string,
+  ): Promise<void> {
+    const historico = new Types.ObjectId(historicoId);
+    const linha = (await this.model.findOne({ historico }).lean().exec()) as {
+      usuario: string;
+      cursinhoId: string;
+      turmaId?: string;
+    } | null;
+    if (!linha) return;
+    await this.registrar({
+      historicoId,
+      simuladoId,
+      usuario: linha.usuario,
+      cursinhoId: linha.cursinhoId,
+      turmaId: linha.turmaId,
+    });
+    await this.model
+      .deleteMany({
+        historico,
+        $or: [
+          { aguardandoSimulado: true },
+          { simulado: { $ne: new Types.ObjectId(simuladoId) } },
+        ],
+      })
+      .exec();
+  }
+
+  /**
    * As linhas de um simulado dentro de um recorte. O recorte é imposto AQUI, no
    * Mongo — trazer tudo e filtrar do outro lado transporta dados de outros
    * cursinhos pela rede interna e não escala.
@@ -284,6 +343,29 @@ export class RelatorioSimuladoEstudanteRepository {
 
     return this.model
       .find(filtro)
+      .sort({ usuario: 1 })
+      .populate({ path: 'historico', select: CAMPOS_DO_HISTORICO })
+      .lean()
+      .exec() as unknown as Promise<LinhaComHistorico[]>;
+  }
+
+  /**
+   * tickets/038: as linhas AGUARDANDO SIMULADO de uma prova no recorte — o cartão da prova que
+   * ainda não foi lido, ou que falhou antes de o idioma ser lido. Mesmo recorte e mesmo
+   * populate do `buscarPorRecorte`, para virarem linha do relatório pelo mesmo caminho.
+   */
+  async buscarAguardandoDaProva(params: {
+    provaId: string;
+    cursinhoId: string;
+    turmaId?: string;
+    usuarios?: string[];
+  }): Promise<LinhaComHistorico[]> {
+    return this.model
+      .find({
+        ...filtroDoRecorte(params),
+        prova: new Types.ObjectId(params.provaId),
+        aguardandoSimulado: true,
+      })
       .sort({ usuario: 1 })
       .populate({ path: 'historico', select: CAMPOS_DO_HISTORICO })
       .lean()

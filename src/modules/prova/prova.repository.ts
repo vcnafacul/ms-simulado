@@ -84,6 +84,27 @@ export class ProvaRepository extends BaseRepository<Prova> {
   }
 
   /**
+   * O mínimo da prova para receber um cartão (tickets/038, R8a): dono e os ids
+   * dos simulados, na ordem da prova. Prova excluída = `null`.
+   */
+  async buscarParaCartao(id: string): Promise<{
+    _id: Types.ObjectId;
+    cursinhoId?: string | null;
+    simulados: Types.ObjectId[];
+  } | null> {
+    if (!Types.ObjectId.isValid(id)) return null;
+    return (await this.model
+      .findOne({ _id: new Types.ObjectId(id), deleted: { $ne: true } })
+      .select('_id cursinhoId simulados')
+      .lean()
+      .exec()) as unknown as {
+      _id: Types.ObjectId;
+      cursinhoId?: string | null;
+      simulados: Types.ObjectId[];
+    } | null;
+  }
+
+  /**
    * A prova (viva) que contém o simulado — tickets/038 (R8a). Em homol, todo
    * simulado está em no máximo uma prova; se houver mais de uma, devolve a mais
    * antiga, para ser estável.

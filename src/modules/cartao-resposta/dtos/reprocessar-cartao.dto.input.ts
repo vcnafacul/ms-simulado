@@ -19,7 +19,14 @@ export class ReprocessarCartaoDtoInput {
   @IsNotEmpty()
   imageKey?: string;
 
-  /** Do QR da foto nova. Obrigatório quando há `imageKey`. */
+  /** Do QR da foto nova — cartão da prova (tickets/038). */
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  provaId?: string;
+
+  /** Do QR da foto nova. Obrigatório quando há `imageKey` (cartão do simulado). */
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()

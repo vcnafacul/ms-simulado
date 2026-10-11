@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsMongoId, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CriarHistoricoCartaoDtoInput {
   @ApiProperty() @IsString() @IsNotEmpty() usuario: string;
@@ -14,6 +14,23 @@ export class CriarHistoricoCartaoDtoInput {
   @IsOptional()
   @IsString()
   cursinhoId?: string;
+
+  /**
+   * Do QR (tickets/038, R8a). Os dois são opcionais para aceitar a api antiga
+   * (que só manda a `imageKey`, com o simulado no caminho):
+   * - `simuladoId` presente → cartão do simulado;
+   * - só `provaId` → cartão DA PROVA;
+   * - nenhum → o id vem da `imageKey` e é um simulado (QR antigo).
+   */
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsMongoId()
+  provaId?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsMongoId()
+  simuladoId?: string;
 
   /** Ausente quando o estudante não tem turma — a linha é criada mesmo assim. */
   @ApiProperty({ required: false })

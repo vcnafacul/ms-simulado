@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -16,6 +17,10 @@ import { avisosDosLogos, LogosDoCaderno, temLogo } from './logos';
 import { nomeDoArquivo } from './nome-do-arquivo';
 import { CadernoTemplateService } from './template/caderno-template.service';
 import { montarZip } from './zip';
+import { ProvaRepository } from '../prova/prova.repository';
+import { DONO_CURSINHO } from '../categoria/schemas/categoria.schema';
+import { Simulado } from '../simulado/schemas/simulado.schema';
+import { montarCadernoDaProva } from './gerador/caderno-da-prova';
 
 /**
  * O caminho completo: portão → gerador → resolvedor → avisos → zip.
@@ -40,14 +45,13 @@ export class CadernoService {
     private readonly resolver: ResolverDeImagens,
     private readonly env: EnvService,
     private readonly template: CadernoTemplateService,
+    private readonly provas: ProvaRepository,
   ) {}
 
   async gerarZip(
     simuladoId: string,
     opts: { draft: boolean; logos?: LogosDoCaderno },
   ): Promise<{ nome: string; buffer: Buffer; avisos: number }> {
-    const inicio = Date.now();
-
     if (opts.draft && !this.env.get('CADERNO_DRAFT_ENABLED')) {
       throw new ForbiddenException('geração de rascunho desabilitada');
     }
@@ -61,12 +65,75 @@ export class CadernoService {
       throw new ConflictException(MENSAGEM_BLOQUEADO);
     }
 
+    return this.empacotar(
+      simuladoId,
+      simulado as unknown as SimuladoParaCaderno,
+      opts,
+    );
+  }
+
+  /**
+   * Caderno DA PROVA (tickets/038, R5/R6) — Enem Dia 1/2 do cursinho. Dia 1: 1–5 Inglês, 1–5
+   * Espanhol e 6–90, com o título de cada língua; Dia 2: 91–180. Só com TODOS os simulados
+   * prontos. Sem rascunho.
+   */
+  async gerarZipDaProva(
+    provaId: string,
+    opts: { logos?: LogosDoCaderno },
+  ): Promise<{ nome: string; buffer: Buffer; avisos: number }> {
+    const prova = await this.provas.getById(provaId);
+    if (!prova || (prova as { deleted?: boolean }).deleted) {
+      throw new NotFoundException('prova não encontrada');
+    }
+    if (prova.categoria?.dono !== DONO_CURSINHO) {
+      throw new BadRequestException(
+        'O caderno da prova existe só para as provas Enem Dia 1 e Enem Dia 2 do cursinho.',
+      );
+    }
+    const ids = ((prova.simulados ?? []) as Simulado[]).map((s) =>
+      String(s._id),
+    );
+    // ⚠️ Pelo SimuladoService: é ele que popula as questões com o que o
+    // gerador precisa (o `getById` da prova não traz o texto pronto).
+    const simulados = (
+      await Promise.all(ids.map((id) => this.simuladoService.getById(id)))
+    ).filter((s): s is Simulado => !!s);
+    if (!simulados.length || simulados.some((s) => s.bloqueado !== false)) {
+      throw new ConflictException(
+        'Todos os simulados da prova precisam estar completos para gerar o caderno da prova.',
+      );
+    }
+
+    const conteudo = montarCadernoDaProva(
+      {
+        nome: prova.nome,
+        categoria:
+          prova.categoria as unknown as SimuladoParaCaderno['categoria'],
+      },
+      simulados as unknown as Parameters<typeof montarCadernoDaProva>[1],
+    );
+    return this.empacotar(provaId, conteudo, {
+      draft: false,
+      logos: opts.logos,
+      manterOrdem: true,
+    });
+  }
+
+  private async empacotar(
+    id: string,
+    simulado: SimuladoParaCaderno,
+    opts: { draft: boolean; logos?: LogosDoCaderno; manterOrdem?: boolean },
+  ): Promise<{ nome: string; buffer: Buffer; avisos: number }> {
+    const inicio = Date.now();
+    const simuladoId = id;
+
     // Sem versão publicada isto lança 503, e é para lançar: não existe
     // fallback ao disco. Ver o card 10.
     const templatePublicado = await this.template.publicada();
 
-    const caderno = gerarCaderno(simulado as unknown as SimuladoParaCaderno, {
+    const caderno = gerarCaderno(simulado, {
       draft: opts.draft,
+      manterOrdem: opts.manterOrdem,
     });
 
     let resolucao;
