@@ -4,6 +4,7 @@ import { ClientSession, Model, Types } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllInput } from 'src/shared/base/interfaces/get-all.input';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
+import { Idioma } from './enums/idioma.enum';
 import { Simulado } from './schemas/simulado.schema';
 
 @Injectable()
@@ -144,12 +145,23 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
   }
 
   /** Card 41 — renomear a prova renomeia o simulado 1:1 dela. */
+  /**
+   * ⚠️ tickets/038: o simulado com `idioma` mantém o sufixo ("<nome> Inglês",
+   * "<nome> Espanhol") — sem isso os dois do Dia 1 ficariam com o mesmo nome.
+   */
   async renomear(ids: string[], nome: string): Promise<void> {
     if (!ids.length) return;
+    const _id = { $in: ids.map((i) => new Types.ObjectId(i)) };
     await this.model.updateMany(
-      { _id: { $in: ids.map((i) => new Types.ObjectId(i)) } },
+      { _id, idioma: { $nin: Object.values(Idioma) } },
       { $set: { nome } },
     );
+    for (const idioma of Object.values(Idioma)) {
+      await this.model.updateMany(
+        { _id, idioma },
+        { $set: { nome: `${nome} ${idioma}` } },
+      );
+    }
   }
 
   async answer(id: string): Promise<Simulado> {

@@ -2,7 +2,6 @@ import {
   BadRequestException,
   ConflictException,
   HttpException,
-  NotImplementedException,
 } from '@nestjs/common';
 import { Types } from 'mongoose';
 import {
@@ -50,6 +49,9 @@ function make(categoria = DIA1, prova: Record<string, unknown> = {}) {
   const questaoRepository = {
     startSession: jest.fn().mockResolvedValue(session),
     create: jest.fn(async (q) => ({ ...q, _id: 'q-nova' })),
+    getByIdToUpdate: jest.fn(),
+    findProvaDeSaida: jest.fn(),
+    updateQuestion: jest.fn(),
   };
   const provaRepository = {
     getAtivaByNomeECursinho: jest.fn().mockResolvedValue(null),
@@ -67,15 +69,21 @@ function make(categoria = DIA1, prova: Record<string, unknown> = {}) {
     }),
     getProvaWithQuestion: jest.fn(),
     addQuestion: jest.fn(),
+    removeQuestion: jest.fn(),
+    update: jest.fn(),
   };
   const frenteRepository = {
     getByFilter: jest.fn(async ({ nome }) =>
       nome === Idioma.Ingles ? ING : nome === Idioma.Espanhol ? ESP : null,
     ),
   };
-  const simuladoService = { addQuestionSimulados: jest.fn() };
+  const simuladoService = {
+    addQuestionSimulados: jest.fn(),
+    removeQuestionSimulados: jest.fn(),
+  };
   const simuladoRepository = {
     create: jest.fn(async (s) => ({ ...s, _id: `sim-${s.nome}` })),
+    update: jest.fn(),
   };
   const factory = new EnemCursinhoFactory(
     questaoRepository as any,
@@ -381,15 +389,175 @@ describe('EnemCursinhoFactory — numeração', () => {
   });
 });
 
-describe('EnemCursinhoFactory — editar/vincular ficam para o card 03', () => {
-  it('501 em vez de rotear errado', async () => {
-    const { factory } = make(DIA1);
-    await expect(factory.updateQuestion()).rejects.toThrow(
-      NotImplementedException,
+describe('EnemCursinhoFactory.updateQuestion (card 03)', () => {
+  /** Prova Dia 1 com Q no(s) simulado(s) dado(s), no número dado. */
+  const montar = (
+    em: ('ing' | 'esp')[],
+    numero: number,
+    frenteAtual: { _id: Types.ObjectId } | string = ING,
+  ) => {
+    const Q = {
+      _id: 'q1',
+      frente1: frenteAtual,
+      enemArea: EnemArea.Linguagens,
+    };
+    const qc = { questao: Q, numero };
+    const ing = { ...SIM_ING, questoes: em.includes('ing') ? [qc] : [] };
+    const esp = { ...SIM_ESP, questoes: em.includes('esp') ? [qc] : [] };
+    const ctx = make(DIA1, { simulados: [ing, esp], questoes: [qc] });
+    ctx.questaoRepository.getByIdToUpdate.mockResolvedValue(Q);
+    ctx.questaoRepository.findProvaDeSaida.mockResolvedValue('p1');
+    return { ...ctx, Q };
+  };
+  const ids = (m: jest.Mock) =>
+    m.mock.calls.flatMap(([sims]) => sims.map((x: { _id: string }) => x._id));
+  const editar = (ctx: ReturnType<typeof montar>, o: object) =>
+    ctx.factory.updateQuestion({ _id: 'q1', prova: 'p1', ...o } as any);
+
+  it('Inglês → Espanhol no 2: sai do Inglês, entra no Espanhol', async () => {
+    const ctx = montar(['ing'], 2);
+    await editar(ctx, {
+      numero: 2,
+      frente1: ESP._id.toString(),
+      enemArea: EnemArea.Linguagens,
+    });
+    expect(ids(ctx.simuladoService.removeQuestionSimulados)).toEqual(['s-ing']);
+    expect(ids(ctx.simuladoService.addQuestionSimulados)).toEqual(['s-esp']);
+    expect(ctx.provaRepository.addQuestion).not.toHaveBeenCalled();
+    expect(ctx.questaoRepository.updateQuestion).toHaveBeenCalled();
+    expect(ctx.session.commitTransaction).toHaveBeenCalled();
+  });
+
+  it('3 → 40 com matéria comum: passa a estar nos dois', async () => {
+    const ctx = montar(['ing'], 3);
+    await editar(ctx, {
+      numero: 40,
+      frente1: HIST,
+      enemArea: EnemArea.CienciasHumanas,
+    });
+    expect(ids(ctx.simuladoService.removeQuestionSimulados)).toEqual([]);
+    expect(ids(ctx.simuladoService.addQuestionSimulados)).toEqual(['s-esp']);
+  });
+
+  it('comum → Inglês no 4: sai do Espanhol, fica no Inglês', async () => {
+    const ctx = montar(['ing', 'esp'], 40, HIST);
+    await editar(ctx, {
+      numero: 4,
+      frente1: ING._id.toString(),
+      enemArea: EnemArea.Linguagens,
+    });
+    expect(ids(ctx.simuladoService.removeQuestionSimulados)).toEqual(['s-esp']);
+    expect(ids(ctx.simuladoService.addQuestionSimulados)).toEqual([]);
+  });
+
+  it('só o texto muda: nenhum simulado mexido', async () => {
+    const ctx = montar(['ing'], 2);
+    await editar(ctx, {
+      numero: 2,
+      frente1: ING._id.toString(),
+      enemArea: EnemArea.Linguagens,
+    });
+    expect(ids(ctx.simuladoService.removeQuestionSimulados)).toEqual([]);
+    expect(ids(ctx.simuladoService.addQuestionSimulados)).toEqual([]);
+  });
+
+  it('⚠️ a própria questão não conta como "idioma repetido" no número dela', async () => {
+    const ctx = montar(['ing'], 2);
+    await expect(
+      editar(ctx, {
+        numero: 2,
+        frente1: ING._id.toString(),
+        enemArea: EnemArea.Linguagens,
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('idioma fora de 1 a 5 → recusa sem escrever', async () => {
+    const ctx = montar(['ing'], 2);
+    await expect(
+      editar(ctx, {
+        numero: 30,
+        frente1: ING._id.toString(),
+        enemArea: EnemArea.Linguagens,
+      }),
+    ).rejects.toBeInstanceOf(HttpException);
+    expect(ctx.questaoRepository.startSession).not.toHaveBeenCalled();
+  });
+
+  it('vindo de outra prova: sai de todos os simulados dela e entra na prova', async () => {
+    const ctx = montar([], 0);
+    ctx.provaRepository.getById.mockImplementation(async (id: string) =>
+      id === 'p1'
+        ? {
+            _id: 'p1',
+            nome: 'P',
+            categoria: DIA1,
+            enemAreas: [EnemArea.Linguagens, EnemArea.CienciasHumanas],
+            simulados: [
+              { ...SIM_ING, questoes: [] },
+              { ...SIM_ESP, questoes: [] },
+            ],
+            questoes: [],
+          }
+        : { _id: 'p0', simulados: [{ _id: 's-velho', questoes: [] }] },
     );
-    await expect(factory.addQuestaoExistenteAProva()).rejects.toThrow(
-      NotImplementedException,
+    ctx.questaoRepository.findProvaDeSaida.mockResolvedValue('p0');
+    await editar(ctx, {
+      numero: 3,
+      frente1: ESP._id.toString(),
+      enemArea: EnemArea.Linguagens,
+    });
+    expect(ids(ctx.simuladoService.removeQuestionSimulados)).toEqual([
+      's-velho',
+    ]);
+    expect(ctx.provaRepository.removeQuestion).toHaveBeenCalledWith(
+      'p0',
+      ctx.Q,
+      ctx.session,
     );
+    expect(ids(ctx.simuladoService.addQuestionSimulados)).toEqual(['s-esp']);
+    expect(ctx.provaRepository.addQuestion).toHaveBeenCalledWith(
+      'p1',
+      ctx.Q,
+      3,
+      ctx.session,
+    );
+  });
+});
+
+describe('EnemCursinhoFactory.addQuestaoExistenteAProva (card 03)', () => {
+  const vincular = async (frente1: unknown, numero: number, area: EnemArea) => {
+    const ctx = make(DIA1);
+    const Q = { _id: 'q9', frente1, enemArea: area };
+    ctx.questaoRepository.getByIdToUpdate.mockResolvedValue(Q);
+    await ctx.factory.addQuestaoExistenteAProva('q9', 'p1', numero);
+    return ctx;
+  };
+  const destino = (ctx: ReturnType<typeof make>) =>
+    ctx.simuladoService.addQuestionSimulados.mock.calls[0][0].map(
+      (s: { _id: string }) => s._id,
+    );
+
+  it('Espanhol no 4 → só no Espanhol', async () => {
+    const ctx = await vincular({ _id: ESP._id }, 4, EnemArea.Linguagens);
+    expect(destino(ctx)).toEqual(['s-esp']);
+    expect(ctx.provaRepository.addQuestion).toHaveBeenCalledWith(
+      'p1',
+      expect.anything(),
+      4,
+      ctx.session,
+    );
+  });
+
+  it('matéria comum no 50 → nos dois', async () => {
+    const ctx = await vincular({ _id: HIST }, 50, EnemArea.CienciasHumanas);
+    expect(destino(ctx)).toEqual(['s-ing', 's-esp']);
+  });
+
+  it('matéria comum no 2 → recusa (1 a 5 é só idioma)', async () => {
+    await expect(
+      vincular({ _id: HIST }, 2, EnemArea.Linguagens),
+    ).rejects.toBeInstanceOf(HttpException);
   });
 });
 

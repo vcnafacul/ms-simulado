@@ -8,7 +8,10 @@ import {
 import { Ator } from 'src/shared/ator/ator';
 import { AuditLogService } from '../../auditLog/auditLog.service';
 import { CategoriaRepository } from '../../categoria/categoria.repository';
-import { Categoria } from '../../categoria/schemas/categoria.schema';
+import {
+  Categoria,
+  DONO_CURSINHO,
+} from '../../categoria/schemas/categoria.schema';
 import { HistoricoRepository } from '../../historico/historico.repository';
 import { revalidarBloqueado } from '../../simulado/helpers/bloqueado';
 import { Simulado } from '../../simulado/schemas/simulado.schema';
@@ -27,6 +30,8 @@ export const TEXTO_JA_FEITA_CATEGORIA =
   'Não dá para trocar a categoria: alunos já enviaram cartões desta prova.';
 export const TEXTO_CARTAO_EMITIDO =
   'Não dá para trocar a categoria: o cartão-resposta desta prova já foi gerado.';
+export const TEXTO_CATEGORIA_ENEM_CURSINHO =
+  'A categoria de uma prova ENEM do cursinho não pode ser trocada: ela define os simulados da prova.';
 export const TEXTO_CATEGORIA_INVALIDA =
   'Use uma categoria do seu cursinho que esteja em uso.';
 export const TEXTO_JA_FEITA_EXCLUIR =
@@ -158,6 +163,15 @@ export class ProvaGestaoService {
     categoriaId: string,
     ator: Ator,
   ): Promise<Categoria> {
+    /*
+      tickets/038: a categoria compartilhada decide quantos simulados a prova
+      tem (2 no Dia 1, 1 no Dia 2) e o roteamento por idioma. Trocar de ou
+      para ela deixaria a prova com os simulados da outra regra. Para a
+      compartilhada como DESTINO, a regra do dono abaixo já recusa.
+    */
+    if ((prova.categoria as Categoria)?.dono === DONO_CURSINHO) {
+      throw new BadRequestException(TEXTO_CATEGORIA_ENEM_CURSINHO);
+    }
     const categoria = await this.categorias.getVivaById(categoriaId);
     if (
       !categoria ||
