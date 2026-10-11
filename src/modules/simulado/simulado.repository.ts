@@ -32,14 +32,17 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
     return doc?.cartaoSeq ?? 0;
   }
 
+  /** Com `cursinhoId`, conta só os daquele cursinho (tickets/038, R1). */
   async countsByCategoria(
     categoriaIds: string[],
+    cursinhoId?: string,
   ): Promise<Record<string, number>> {
     const rows = await this.model.aggregate([
       {
         $match: {
           categoria: { $in: categoriaIds.map((id) => new Types.ObjectId(id)) },
           deleted: { $ne: true },
+          ...(cursinhoId ? { cursinhoId } : {}),
         },
       },
       { $group: { _id: '$categoria', total: { $sum: 1 } } },

@@ -1,5 +1,8 @@
 import { Ator } from 'src/shared/ator/ator';
-import { DONO_SYSTEM } from '../../categoria/schemas/categoria.schema';
+import {
+  DONO_CURSINHO,
+  DONO_SYSTEM,
+} from '../../categoria/schemas/categoria.schema';
 import {
   motivoParaNaoComporProva,
   podeComporProva,
@@ -93,5 +96,28 @@ describe('podeComporProva (023 · 03)', () => {
       cursinhoId: null,
       podeComporProva: true,
     });
+  });
+});
+
+describe('categoria compartilhada "Cursinho" (tickets/038, R1)', () => {
+  const PAc = { cursinhoId: 'A', categoria: catDe(DONO_CURSINHO) };
+
+  it('não protege a prova', () => {
+    expect(provaProtegida(catDe(DONO_CURSINHO))).toBe(false);
+  });
+
+  it('o cursinho dono da prova compõe; outro cursinho e o admin, não', () => {
+    expect(podeComporProva(PAc, A)).toBe(true);
+    expect(podeComporProva(PAc, B)).toBe(false);
+    expect(podeComporProva(PAc, Adm)).toBe(false);
+  });
+
+  it('o outro cursinho lê o motivo de "outro cursinho", não de "oficial"', () => {
+    expect(motivoParaNaoComporProva(PAc, B)).toBe(TEXTO_OUTRO_CURSINHO);
+  });
+
+  it('as da plataforma seguem protegidas', () => {
+    expect(provaProtegida(catDe(DONO_SYSTEM))).toBe(true);
+    expect(podeComporProva(PAs, A)).toBe(false);
   });
 });

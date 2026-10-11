@@ -16,7 +16,12 @@ type ProvaComDono = {
   receberNovasVersoes?: boolean | null;
 };
 
-/** Categoria da plataforma ou fora de uso: a prova é oficial. */
+/**
+ * Categoria da plataforma ou fora de uso: a prova é oficial.
+ *
+ * ⚠️ `dono = Cursinho` (tickets/038, R1) **não** protege: a categoria é da
+ * plataforma, mas a prova é do cursinho que a criou — vale o `cursinhoId`.
+ */
 export function provaProtegida(categoria?: CategoriaDaProva | null): boolean {
   return (
     (categoria?.dono ?? DONO_SYSTEM) === DONO_SYSTEM ||

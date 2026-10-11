@@ -18,6 +18,7 @@
     "limpar:referencias-vazias": "ts-node scripts/limpar-referencias-vazias.ts",
     "repatriar:imagens": "ts-node scripts/repatriar-imagens.ts",
     "seed:template-caderno": "ts-node scripts/seed-template-caderno.ts",
+    "seed:categorias-enem-cursinho": "ts-node scripts/seed-categorias-enem-cursinho.ts",
     "cartao:preview": "ts-node src/modules/cartao-resposta/scripts/gerar-amostra.ts",
     "clone:env": "bash scripts/clone-env/clone-env.sh",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
