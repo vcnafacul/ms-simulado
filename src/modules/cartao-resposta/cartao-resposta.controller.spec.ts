@@ -142,6 +142,10 @@ describe('CartaoRespostaController', () => {
  */
 describe('CartaoRespostaController — roteamento HTTP', () => {
   let app: INestApplication;
+  const provision = {
+    obterPdf: jest.fn().mockResolvedValue(Buffer.from('SIM')),
+    obterPdfDaProva: jest.fn().mockResolvedValue(Buffer.from('PROVA')),
+  };
   const cartaoReprocesso = { reprocessar: jest.fn() };
   const cartaoImagem = {
     localizar: jest.fn().mockResolvedValue({ imageKey: 'cartoes/s/f.jpg' }),
@@ -158,10 +162,7 @@ describe('CartaoRespostaController — roteamento HTTP', () => {
     const mod = await Test.createTestingModule({
       controllers: [CartaoRespostaController],
       providers: [
-        {
-          provide: TemplateProvisionService,
-          useValue: { obterPdf: jest.fn() },
-        },
+        { provide: TemplateProvisionService, useValue: provision },
         { provide: CartaoHistoricoService, useValue: { criar: jest.fn() } },
         { provide: CartaoCallbackService, useValue: { processar: jest.fn() } },
         { provide: CartaoReprocessoService, useValue: cartaoReprocesso },
@@ -264,5 +265,42 @@ describe('CartaoRespostaController — roteamento HTTP', () => {
       .expect(400);
 
     expect(cartaoExclusao.excluir).not.toHaveBeenCalled();
+  });
+
+  describe('cartão da prova (tickets/038 · 08)', () => {
+    it('GET prova/:provaId chega ao handler da PROVA, não ao do simulado', async () => {
+      const { body } = await request(app.getHttpServer())
+        .get('/v1/cartao-resposta/prova/665f0c1a2b3c4d5e6f00ffff')
+        .buffer(true)
+        .parse((res: any, cb: any) => {
+          const partes: Buffer[] = [];
+          res.on('data', (c: Buffer) => partes.push(c));
+          res.on('end', () => cb(null, Buffer.concat(partes)));
+        })
+        .expect(200)
+        .expect('Content-Type', /pdf/);
+      expect(body.toString()).toBe('PROVA');
+      expect(provision.obterPdfDaProva).toHaveBeenCalledWith(
+        '665f0c1a2b3c4d5e6f00ffff',
+      );
+      expect(provision.obterPdf).not.toHaveBeenCalled();
+    });
+
+    it('GET :simuladoId segue no handler do simulado', async () => {
+      await request(app.getHttpServer())
+        .get('/v1/cartao-resposta/665f0c1a2b3c4d5e6f00abcd')
+        .expect(200);
+      expect(provision.obterPdf).toHaveBeenCalledWith(
+        '665f0c1a2b3c4d5e6f00abcd',
+      );
+      expect(provision.obterPdfDaProva).not.toHaveBeenCalled();
+    });
+
+    it('provaId inválido → 400', async () => {
+      await request(app.getHttpServer())
+        .get('/v1/cartao-resposta/prova/nao-e-id')
+        .expect(400);
+      expect(provision.obterPdfDaProva).not.toHaveBeenCalled();
+    });
   });
 });
