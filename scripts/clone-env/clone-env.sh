@@ -8,6 +8,7 @@
 #   npm run clone:env -- --yes        # pula confirmação
 #   npm run clone:env -- --keep-dump  # mantém o archive.gz
 #   npm run clone:env -- --no-validate
+#   npm run clone:env -- --so-replica  # só converte o clone existente em replica set
 #
 # Requer: Docker + jq. Nenhuma tool Mongo no host (roda tudo em containers mongo:7).
 set -euo pipefail
@@ -21,11 +22,13 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 : "${CLONE_NETWORK:=mssimulado-clone-net}"
 : "${CLONE_MONGO_IMAGE:=mongo:7}"
 : "${SLEEP_BETWEEN_OPS:=1}"
+: "${CLONE_REPLSET:=rs0}"
 
 # ---- flags ----
 ASSUME_YES=0
 KEEP_DUMP=0
 RUN_VALIDATE=1
+SO_REPLICA=0
 
 # Rede de segurança: em qualquer saída, remove o dump temporário (salvo --keep-dump).
 cleanup_on_exit() { [ "$KEEP_DUMP" -eq 1 ] && return 0; [ -n "${DUMP_DIR:-}" ] && rm -rf "$DUMP_DIR"; return 0; }
@@ -95,13 +98,20 @@ do_dump() {
   echo "  dump em $DUMP_DIR/archive.gz"
 }
 
-recreate_local() {
-  echo "→ Recriando Mongo local (wipe & reload)..."
+# Sobe o container como REPLICA SET de um nó só (rs0) e espera ele virar primário.
+#
+# ⚠️ Replica set, e não standalone: o ms-simulado usa transação (criar/editar questão,
+# vincular, card 13 da série 038) e o Mongo standalone recusa com "Transaction numbers are only
+# allowed on a replica set member or mongos". Um nó só basta.
+#
+# ⚠️ Todo cliente conecta com `directConnection=true`: o membro se anuncia como
+# `localhost:27017`, que de fora do container (porta 27018) e de outro container não é ele.
+# Com a conexão direta o driver não tenta descobrir os membros.
+start_container() {
   docker rm -f "$CLONE_CONTAINER_NAME" >/dev/null 2>&1 || true
-  docker volume rm "${CLONE_CONTAINER_NAME}-data" >/dev/null 2>&1 || true
   docker run -d --name "$CLONE_CONTAINER_NAME" --network "$CLONE_NETWORK" \
     -p "$CLONE_PORT:27017" -v "${CLONE_CONTAINER_NAME}-data:/data/db" \
-    "$CLONE_MONGO_IMAGE" >/dev/null
+    "$CLONE_MONGO_IMAGE" --replSet "$CLONE_REPLSET" --bind_ip_all >/dev/null
   printf "  aguardando o Mongo local subir"
   local tries=0
   until docker exec "$CLONE_CONTAINER_NAME" mongosh --quiet --eval 'db.runCommand({ping:1}).ok' 2>/dev/null | grep -q 1; do
@@ -114,12 +124,37 @@ recreate_local() {
     printf "."; sleep 1
   done
   echo " ok"
+
+  # Idempotente: num volume que já foi replica set, o `rs.initiate` falharia — só confere.
+  docker exec "$CLONE_CONTAINER_NAME" mongosh --quiet --eval "
+    try { rs.status(); } catch (e) {
+      rs.initiate({ _id: '$CLONE_REPLSET', members: [{ _id: 0, host: 'localhost:27017' }] });
+    }" >/dev/null
+  printf "  aguardando o replica set eleger o primário"
+  tries=0
+  until docker exec "$CLONE_CONTAINER_NAME" mongosh --quiet --eval 'db.hello().isWritablePrimary' 2>/dev/null | grep -q true; do
+    tries=$((tries + 1))
+    if [ "$tries" -ge 60 ]; then
+      echo "" >&2
+      echo "❌ Replica set sem primário após 60s. Veja: docker logs $CLONE_CONTAINER_NAME" >&2
+      exit 1
+    fi
+    printf "."; sleep 1
+  done
+  echo " ok"
+}
+
+recreate_local() {
+  echo "→ Recriando Mongo local (wipe & reload)..."
+  docker rm -f "$CLONE_CONTAINER_NAME" >/dev/null 2>&1 || true
+  docker volume rm "${CLONE_CONTAINER_NAME}-data" >/dev/null 2>&1 || true
+  start_container
 }
 
 do_restore() {
   echo "→ Restore no Mongo local..."
   docker run --rm --network "$CLONE_NETWORK" -v "$DUMP_DIR:/dump" "$CLONE_MONGO_IMAGE" \
-    mongorestore --uri="mongodb://$CLONE_CONTAINER_NAME:27017" \
+    mongorestore --uri="mongodb://$CLONE_CONTAINER_NAME:27017/?directConnection=true" \
     --archive=/dump/archive.gz --gzip --drop
 }
 
@@ -138,12 +173,30 @@ main() {
       --yes) ASSUME_YES=1;;
       --keep-dump) KEEP_DUMP=1;;
       --no-validate) RUN_VALIDATE=0;;
+      --so-replica) SO_REPLICA=1;;
       *) echo "flag desconhecida: $arg" >&2; exit 1;;
     esac
   done
   command -v docker >/dev/null || { echo "❌ Docker não encontrado." >&2; exit 1; }
   command -v jq >/dev/null || { echo "❌ jq não encontrado." >&2; exit 1; }
   load_env
+
+  # Converte um clone que já existe (standalone) em replica set, SEM baixar de novo: recria só
+  # o container, em cima do mesmo volume de dados.
+  if [ "$SO_REPLICA" -eq 1 ]; then
+    docker volume inspect "${CLONE_CONTAINER_NAME}-data" >/dev/null 2>&1 || {
+      echo "❌ Não há clone para converter (volume ${CLONE_CONTAINER_NAME}-data). Rode sem --so-replica." >&2
+      exit 1
+    }
+    docker network create "$CLONE_NETWORK" >/dev/null 2>&1 || true
+    echo "→ Convertendo o clone local em replica set (dados mantidos)..."
+    start_container
+    echo ""
+    echo "✅ Clone em replica set. No .env do ms-simulado:"
+    echo "     MONGODB=mongodb://localhost:$CLONE_PORT/<db>?directConnection=true"
+    exit 0
+  fi
+
   parse_source
   guard_not_local
   confirm
@@ -154,14 +207,14 @@ main() {
   if [ "$RUN_VALIDATE" -eq 1 ]; then
     bash "$SCRIPT_DIR/validate.sh" \
       "$SOURCE_MONGODB" \
-      "mongodb://$CLONE_CONTAINER_NAME:27017/$SRC_DB" \
+      "mongodb://$CLONE_CONTAINER_NAME:27017/$SRC_DB?directConnection=true" \
       "$SLEEP_BETWEEN_OPS"
   fi
   cleanup_dump
   echo ""
   echo "✅ Clone pronto."
   echo "   Aponte o ms-simulado para o clone editando o .env:"
-  echo "     MONGODB=mongodb://localhost:$CLONE_PORT/$SRC_DB"
+  echo "     MONGODB=mongodb://localhost:$CLONE_PORT/$SRC_DB?directConnection=true"
 }
 
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then main "$@"; fi
