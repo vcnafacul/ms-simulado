@@ -18,45 +18,15 @@
  */
 import 'dotenv/config';
 import mongoose from 'mongoose';
-import type { Db } from 'mongodb';
+import {
+  INDICE_ANTIGO,
+  INDICE_AGUARDANDO,
+  INDICE_NOVO,
+  migrar0008,
+} from '../../../src/migracoes/migracoes/0008-juncao-aguardando-simulado';
 
-export const COLECAO = 'relatoriosimuladoestudantes';
-export const INDICE_ANTIGO = 'simulado_1_cursinhoId_1_usuario_1';
-export const INDICE_NOVO = 'juncao_por_estudante';
-export const INDICE_AGUARDANDO = 'prova_1_cursinhoId_1';
-
-export async function migrar0008(
-  db: Db,
-  aplicar: boolean,
-): Promise<{ antigo: boolean; novo: boolean; aguardando: boolean }> {
-  const col = db.collection(COLECAO);
-  if (aplicar) {
-    await col.createIndex(
-      { simulado: 1, cursinhoId: 1, usuario: 1 },
-      {
-        unique: true,
-        name: INDICE_NOVO,
-        partialFilterExpression: { simulado: { $type: 'objectId' } },
-      },
-    );
-    if ((await col.indexes()).some((i) => i.name === INDICE_ANTIGO)) {
-      await col.dropIndex(INDICE_ANTIGO);
-    }
-    await col.createIndex(
-      { prova: 1, cursinhoId: 1 },
-      {
-        name: INDICE_AGUARDANDO,
-        partialFilterExpression: { aguardandoSimulado: true },
-      },
-    );
-  }
-  const nomes = (await col.indexes()).map((i) => i.name);
-  return {
-    antigo: nomes.includes(INDICE_ANTIGO),
-    novo: nomes.includes(INDICE_NOVO),
-    aguardando: nomes.includes(INDICE_AGUARDANDO),
-  };
-}
+export { COLECAO } from '../../../src/migracoes/migracoes/0008-juncao-aguardando-simulado';
+export { migrar0008 };
 
 async function run(): Promise<void> {
   const uri = process.env.MONGODB;
