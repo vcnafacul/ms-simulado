@@ -466,6 +466,13 @@ export class HistoricoRepository extends BaseRepository<Historico> {
     return this.model.findOne({ imageKey }).exec();
   }
 
+  /** tickets/038: o simulado do cartão da prova, decidido no callback. */
+  async definirSimulado(id: string, simuladoId: string): Promise<void> {
+    await this.model
+      .findByIdAndUpdate(id, { simulado: new Types.ObjectId(simuladoId) })
+      .exec();
+  }
+
   async prepararParaProcessamento(
     id: string,
     rawRespostas: unknown[],

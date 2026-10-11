@@ -54,6 +54,22 @@ export class SimuladoRepository extends BaseRepository<Simulado> {
     }, {});
   }
 
+  /** tickets/038: o idioma de cada simulado (callback do cartão da prova). */
+  async buscarIdiomas(
+    ids: string[],
+  ): Promise<{ id: string; idioma: string | null }[]> {
+    const docs = (await this.model
+      .find({ _id: { $in: ids.map((i) => new Types.ObjectId(i)) } })
+      .select('_id idioma')
+      .lean()
+      .exec()) as unknown as { _id: Types.ObjectId; idioma?: string | null }[];
+    // Na ordem pedida (a da prova), e não na que o Mongo devolveu.
+    const porId = new Map(docs.map((d) => [String(d._id), d.idioma ?? null]));
+    return ids
+      .filter((i) => porId.has(i))
+      .map((i) => ({ id: i, idioma: porId.get(i)! }));
+  }
+
   /**
    * Só o dono. O envio de cartão confere se o simulado do QR existe e é do
    * cursinho de quem envia — sem popular nada.
