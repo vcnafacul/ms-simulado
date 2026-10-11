@@ -31,13 +31,23 @@ npm run clone:env                   # lê .env, confirma, clona
 npm run clone:env -- --yes          # pula a confirmação (automação)
 npm run clone:env -- --keep-dump    # mantém o archive.gz do dump
 npm run clone:env -- --no-validate  # pula a contagem de validação
+npm run clone:env -- --so-replica   # converte o clone que já existe em replica set, sem baixar de novo
 ```
+
+⚠️ **O Mongo local sobe como replica set de um nó só (`rs0`).** O ms-simulado usa transação
+(criar/editar questão, vincular, callback do cartão), e um Mongo standalone recusa com
+`Transaction numbers are only allowed on a replica set member or mongos`. Clone antigo
+(standalone): `--so-replica` recria só o container, mantendo os dados.
 
 Ao final, o script imprime a URI local. Aponte o ms-simulado para o clone editando o `.env`:
 
 ```bash
-MONGODB=mongodb://localhost:27018/simulado
+MONGODB=mongodb://localhost:27018/simulado?directConnection=true
 ```
+
+⚠️ **`directConnection=true` é obrigatório**: o membro do replica set se anuncia como
+`localhost:27017` (a porta de dentro do container). Sem a conexão direta, o driver tenta
+descobrir os membros e procura o Mongo na porta errada.
 
 ## Variáveis
 
@@ -49,6 +59,7 @@ MONGODB=mongodb://localhost:27018/simulado
 | `CLONE_NETWORK` | `mssimulado-clone-net` | rede Docker dedicada |
 | `CLONE_MONGO_IMAGE` | `mongo:7` | imagem (server + tools) |
 | `SLEEP_BETWEEN_OPS` | `1` | throttle entre chamadas ao remoto (segundos) |
+| `CLONE_REPLSET` | `rs0` | nome do replica set local |
 
 ## Troubleshooting
 
