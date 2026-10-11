@@ -1,5 +1,8 @@
 # Migração 0007 — histórico com prova (tickets/038, card 05)
 
+> ✅ **Roda sozinha no deploy** do ms-simulado (homol e prod), antes do app subir — ver `src/migracoes`. O que já
+> rodou num ambiente fica na coleção `_migracoes` do banco. O comando abaixo serve para rodar à mão (local).
+
 **Por quê:** o cartão passa a ser ligado à **prova** (R8a/R9). Os históricos de cartão novos já nascem com
 `prova`; esta migração preenche os antigos e cria o índice "um cartão da prova por estudante" (R10).
 

@@ -1,5 +1,8 @@
 # Migração 0008 — junção com linha "aguardando simulado" (tickets/038, card 13)
 
+> ✅ **Roda sozinha no deploy** do ms-simulado (homol e prod), antes do app subir — ver `src/migracoes`. O que já
+> rodou num ambiente fica na coleção `_migracoes` do banco. O comando abaixo serve para rodar à mão (local).
+
 **Por quê:** o cartão DA PROVA do ENEM Dia 1 do cursinho só sabe o simulado no callback (pelo idioma marcado). A
 linha do relatório (`relatoriosimuladoestudantes`) nasce no envio sem simulado, com a `prova`, para o cartão já poder
 ser reenviado, baixado ou excluído. O índice único `{simulado, cursinhoId, usuario}` de hoje (sem nome, não parcial)

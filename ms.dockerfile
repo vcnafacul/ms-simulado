@@ -19,4 +19,7 @@ ENV NODE_ENV=$NODE_ENV
 
 EXPOSE 3000
 
-CMD ["./node_modules/pm2/bin/pm2-runtime", "main.js", "--name", "msSimulado"]
+# Antes do app, as migrações que faltam neste ambiente e os seeds (src/migracoes). Se uma
+# migração falhar, o app NÃO sobe — melhor o deploy falhar à vista do que o ms rodar contra um
+# banco pela metade. O que já rodou fica na coleção `_migracoes` do próprio banco.
+CMD ["sh", "-c", "node migracoes/rodar.js && exec ./node_modules/pm2/bin/pm2-runtime main.js --name msSimulado"]

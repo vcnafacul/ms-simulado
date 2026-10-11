@@ -15,13 +15,8 @@
  *    lembra depois — e é justamente a versão que o "restaurar" traz de volta.
  */
 import 'dotenv/config';
-import * as fs from 'fs';
-import * as path from 'path';
 import mongoose from 'mongoose';
-import { lintarTemplate } from '../src/modules/caderno/template/template-lint';
-
-const DIR = path.join(__dirname, '../src/modules/caderno/templates/v1');
-const COLECAO = 'cadernotemplates';
+import { semearTemplateCaderno } from '../src/migracoes/seeds/template-caderno';
 
 async function run(): Promise<void> {
   const uri = process.env.MONGODB;
@@ -29,49 +24,13 @@ async function run(): Promise<void> {
     console.error('❌ Variável de ambiente MONGODB não definida.');
     process.exit(1);
   }
-
-  const arquivos = {
-    'main.tex': fs.readFileSync(path.join(DIR, 'main.tex'), 'utf-8'),
-    'preambulo.tex': fs.readFileSync(path.join(DIR, 'preambulo.tex'), 'utf-8'),
-  };
-
-  const lint = lintarTemplate(arquivos);
-  if (lint.podePublicar === false) {
-    console.error('❌ O template do repo não passa no lint:');
-    lint.erros.forEach((e) => console.error(`   - ${e}`));
-    process.exit(1);
-  }
-  lint.avisos.forEach((a) => console.warn(`⚠️  ${a}`));
-
   await mongoose.connect(uri);
   const db = mongoose.connection.db;
   if (!db) {
     console.error('❌ Falha ao obter a conexão do banco.');
     process.exit(1);
   }
-
-  const existentes = await db.collection(COLECAO).countDocuments();
-  if (existentes > 0) {
-    console.log(`✓ Já existem ${existentes} versão(ões). Nada a fazer.`);
-    await mongoose.disconnect();
-    return;
-  }
-
-  const agora = new Date();
-  await db.collection(COLECAO).insertOne({
-    versao: 1,
-    status: 'publicada',
-    arquivos,
-    criadorId: 'system',
-    publicadaEm: agora,
-    notas: 'seed do repo',
-    origemVersao: null,
-    deleted: false,
-    createdAt: agora,
-    updatedAt: agora,
-  });
-
-  console.log('✓ Versão 1 inserida como publicada.');
+  console.log(`✓ ${await semearTemplateCaderno(db)}`);
   await mongoose.disconnect();
 }
 
