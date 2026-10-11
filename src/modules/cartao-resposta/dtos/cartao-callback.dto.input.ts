@@ -65,4 +65,13 @@ export class CartaoCallbackDtoInput {
   @IsOptional()
   @IsString()
   tentativaId?: string;
+
+  /**
+   * tickets/038 (R13): os demais campos do template, crus — ex.: `{ idioma: "ESP" }` no cartão
+   * da prova do ENEM Dia 1 do cursinho. Opcional: o ms-omr antigo não manda.
+   */
+  @ApiProperty({ required: false, type: Object })
+  @IsOptional()
+  @IsObject()
+  campos?: Record<string, string>;
 }

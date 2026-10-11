@@ -359,3 +359,141 @@ describe('guarda por tentativaId (card 14)', () => {
     expect(queueProducer.publish).toHaveBeenCalled();
   });
 });
+
+describe('cartão DA PROVA — o callback escolhe o simulado pelo idioma (tickets/038 · 13)', () => {
+  const PROVA = '665f0c1a2b3c4d5e6f00ffff';
+  const montar = (historico: object) => {
+    const historicoRepository = {
+      findByImageKey: jest.fn().mockResolvedValue({
+        _id: 'h1',
+        simulado: null,
+        prova: PROVA,
+        cartaoDaProva: true,
+        ...historico,
+      }),
+      marcarFalha: jest.fn(),
+      prepararParaProcessamento: jest.fn(),
+      definirSimulado: jest.fn(),
+    };
+    const simuladoRepository = {
+      buscarIdiomas: jest.fn().mockResolvedValue([
+        { id: 's-ing', idioma: 'Inglês' },
+        { id: 's-esp', idioma: 'Espanhol' },
+      ]),
+      answer: jest.fn().mockResolvedValue({
+        questoes: [{ numero: 1, questao: { _id: 'idq1' } }],
+      }),
+    };
+    const provaRepository = {
+      buscarParaCartao: jest
+        .fn()
+        .mockResolvedValue({ _id: PROVA, simulados: ['s-ing', 's-esp'] }),
+    };
+    const relatorioRepository = { moverParaSimulado: jest.fn() };
+    const queueProducer = { publish: jest.fn() };
+    const svc = new CartaoCallbackService(
+      historicoRepository as any,
+      simuladoRepository as any,
+      queueProducer as any,
+      provaRepository as any,
+      relatorioRepository as any,
+    );
+    return {
+      svc,
+      historicoRepository,
+      simuladoRepository,
+      relatorioRepository,
+      queueProducer,
+    };
+  };
+  const respostas = [{ questao: '1', alternativaEstudante: 'A' }];
+
+  it('Espanhol → simulado Espanhol: grava no histórico, move a linha e corrige nele', async () => {
+    const m = montar({});
+    await m.svc.processar({
+      imageKey: 'k',
+      respostas,
+      campos: { idioma: 'ESP' },
+    });
+
+    expect(m.historicoRepository.definirSimulado).toHaveBeenCalledWith(
+      'h1',
+      's-esp',
+    );
+    expect(m.relatorioRepository.moverParaSimulado).toHaveBeenCalledWith(
+      'h1',
+      's-esp',
+    );
+    expect(m.simuladoRepository.answer).toHaveBeenCalledWith('s-esp');
+    expect(m.queueProducer.publish).toHaveBeenCalled();
+  });
+
+  it.each([
+    ['Inglês', 'ING'],
+    ['nenhuma marcada', ''],
+    ['as duas', 'INGESP'],
+    ['ms-omr antigo (sem campos)', undefined],
+  ])('%s → Inglês (padrão)', async (_, idioma) => {
+    const m = montar({});
+    await m.svc.processar({
+      imageKey: 'k',
+      respostas,
+      ...(idioma === undefined ? {} : { campos: { idioma } }),
+    });
+    expect(m.simuladoRepository.answer).toHaveBeenCalledWith('s-ing');
+  });
+
+  it('reenvio com o OUTRO idioma: troca o simulado do histórico e a linha', async () => {
+    const m = montar({ simulado: 's-ing' });
+    await m.svc.processar({
+      imageKey: 'k',
+      respostas,
+      campos: { idioma: 'ESP' },
+    });
+    expect(m.historicoRepository.definirSimulado).toHaveBeenCalledWith(
+      'h1',
+      's-esp',
+    );
+    expect(m.relatorioRepository.moverParaSimulado).toHaveBeenCalledWith(
+      'h1',
+      's-esp',
+    );
+  });
+
+  it('mesmo idioma de antes: não regrava', async () => {
+    const m = montar({ simulado: 's-ing' });
+    await m.svc.processar({
+      imageKey: 'k',
+      respostas,
+      campos: { idioma: 'ING' },
+    });
+    expect(m.historicoRepository.definirSimulado).not.toHaveBeenCalled();
+    expect(m.simuladoRepository.answer).toHaveBeenCalledWith('s-ing');
+  });
+
+  it('⚠️ leitura que falha antes do idioma: failed, com a prova e SEM simulado', async () => {
+    const m = montar({});
+    await m.svc.processar({
+      imageKey: 'k',
+      falha: { motivo: 'cartao_nao_detectado' },
+    });
+    expect(m.historicoRepository.marcarFalha).toHaveBeenCalledWith(
+      'h1',
+      'cartao_nao_detectado',
+      undefined,
+    );
+    expect(m.historicoRepository.definirSimulado).not.toHaveBeenCalled();
+    expect(m.relatorioRepository.moverParaSimulado).not.toHaveBeenCalled();
+  });
+
+  it('o cartão do simulado segue igual: não consulta a prova', async () => {
+    const m = montar({ cartaoDaProva: undefined, simulado: { _id: 's1' } });
+    await m.svc.processar({
+      imageKey: 'k',
+      respostas,
+      campos: { idioma: 'ESP' },
+    });
+    expect(m.simuladoRepository.answer).toHaveBeenCalledWith('s1');
+    expect(m.simuladoRepository.buscarIdiomas).not.toHaveBeenCalled();
+  });
+});

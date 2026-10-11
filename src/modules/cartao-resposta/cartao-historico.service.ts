@@ -107,6 +107,8 @@ export class CartaoHistoricoService {
     */
     if (alvo.simuladoId) {
       await this.vincularAoCursinho(historicoId, alvo.simuladoId, dto);
+    } else {
+      await this.vincularAguardando(historicoId, alvo.provaId!, dto);
     }
 
     try {
@@ -198,6 +200,34 @@ export class CartaoHistoricoService {
     if (simulado.cursinhoId && simulado.cursinhoId !== cursinhoId) {
       throw new ForbiddenException(
         'Este cartão é de um simulado de outro cursinho.',
+      );
+    }
+  }
+
+  /** tickets/038 (card 13): mesma tolerância a falha do `vincularAoCursinho`. */
+  private async vincularAguardando(
+    historicoId: string,
+    provaId: string,
+    dto: { usuario: string; cursinhoId?: string; turmaId?: string },
+  ): Promise<void> {
+    if (!dto.cursinhoId) {
+      this.logger.warn(
+        `histórico ${historicoId} criado SEM cursinhoId — ficará fora de todo relatório de cursinho`,
+      );
+      return;
+    }
+    try {
+      await this.relatorioRepository.registrarAguardando({
+        historicoId,
+        provaId,
+        usuario: dto.usuario,
+        cursinhoId: dto.cursinhoId,
+        turmaId: dto.turmaId,
+      });
+    } catch (err) {
+      this.logger.error(
+        `histórico ${historicoId} criado mas NÃO vinculado ao cursinho ${dto.cursinhoId}: ` +
+          (err instanceof Error ? err.message : String(err)),
       );
     }
   }

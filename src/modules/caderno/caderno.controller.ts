@@ -76,6 +76,28 @@ export class CadernoController {
    * ⚠️ Mesma restrição de param do GET, pelo mesmo motivo: sem ela o literal
    * `template` das rotas do `CadernoTemplateController` casa aqui.
    */
+  /**
+   * Caderno DA PROVA (tickets/038). ⚠️ Dois segmentos (`prova/:provaId`): não casa com o
+   * `:simuladoId` de um segmento, nem com o literal `template`.
+   */
+  @Post('prova/:provaId([0-9a-fA-F]{24})')
+  @Header('Content-Type', 'application/zip')
+  async postCadernoDaProva(
+    @Param('provaId') provaId: string,
+    @Res({ passthrough: true }) res: Response,
+    @Body() corpo?: CadernoDtoInput,
+  ): Promise<StreamableFile> {
+    const { nome, buffer, avisos } = await this.caderno.gerarZipDaProva(
+      provaId,
+      { logos: decodificarLogos(corpo?.logos) },
+    );
+    res.set({
+      'Content-Disposition': `attachment; filename="${nome}"`,
+      'X-Caderno-Avisos': String(avisos),
+    });
+    return new StreamableFile(buffer);
+  }
+
   @Post(':simuladoId([0-9a-fA-F]{24})')
   @Header('Content-Type', 'application/zip')
   async postCaderno(

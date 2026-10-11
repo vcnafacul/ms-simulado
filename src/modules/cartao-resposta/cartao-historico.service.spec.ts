@@ -383,8 +383,9 @@ describe('cartão ligado à prova (tickets/038 · 06)', () => {
     );
   });
 
-  it('cartão da prova com 2 simulados: simulado vazio, junção fica para o callback', async () => {
+  it('cartão da prova com 2 simulados: simulado vazio, linha AGUARDANDO no relatório (card 13)', async () => {
     const registrar = jest.fn();
+    const registrarAguardando = jest.fn();
     const repo = {
       buscarCartaoDaProvaEnviado: jest.fn().mockResolvedValue(null),
       createAwaitingOmr: jest.fn().mockResolvedValue({ _id: 'h1' }),
@@ -394,7 +395,7 @@ describe('cartão ligado à prova (tickets/038 · 06)', () => {
     const svc = new CartaoHistoricoService(
       repo as any,
       omr as any,
-      { registrar } as any,
+      { registrar, registrarAguardando } as any,
       simuladoDe(null) as any,
       daProva([SIM, SIM2]) as any,
     );
@@ -404,11 +405,19 @@ describe('cartão ligado à prova (tickets/038 · 06)', () => {
       cartaoCode: '3',
       provaId: PROVA,
       cursinhoId: 'cur-1',
+      turmaId: 't-1',
     });
     expect(repo.createAwaitingOmr).toHaveBeenCalledWith(
       expect.objectContaining({ simuladoId: null, cartaoDaProva: true }),
     );
     expect(registrar).not.toHaveBeenCalled();
+    expect(registrarAguardando).toHaveBeenCalledWith({
+      historicoId: 'h1',
+      provaId: PROVA,
+      usuario: 'u1',
+      cursinhoId: 'cur-1',
+      turmaId: 't-1',
+    });
     expect(omr.enviarProcessamento).toHaveBeenCalled();
   });
 
