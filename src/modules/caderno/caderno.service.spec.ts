@@ -423,8 +423,17 @@ describe('caderno DA PROVA (tickets/038 · 09)', () => {
 
     const ordem = [...tex.matchAll(/enunciado (\w+)/g)].map((m) => m[1]);
     expect(ordem).toEqual(['i1', 'i2', 'e1', 'e2', 'c6', 'c7']);
-    const posIng = tex.indexOf('LÍNGUA ESTRANGEIRA — INGLÊS');
-    const posEsp = tex.indexOf('LÍNGUA ESTRANGEIRA — ESPANHOL');
+    const posIng = tex.indexOf(
+      'LÍNGUA ESTRANGEIRA: INGLÊS — QUESTÕES DE 01 A 05',
+    );
+    const posEsp = tex.indexOf(
+      'LÍNGUA ESTRANGEIRA: ESPANHOL — QUESTÕES DE 01 A 05',
+    );
+    // e a seção do ENEM antes da 6ª questão, uma vez só
+    const ling = 'LINGUAGENS, CÓDIGOS E SUAS TECNOLOGIAS — QUESTÕES DE 06 A 45';
+    expect(tex.indexOf(ling)).toBeGreaterThan(tex.indexOf('enunciado e2'));
+    expect(tex.indexOf(ling)).toBeLessThan(tex.indexOf('enunciado c6'));
+    expect(tex.split(ling)).toHaveLength(2);
     expect(posIng).toBeGreaterThan(-1);
     expect(posEsp).toBeGreaterThan(tex.indexOf('enunciado i2'));
     expect(posEsp).toBeLessThan(tex.indexOf('enunciado e1'));
