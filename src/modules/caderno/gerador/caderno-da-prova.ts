@@ -10,6 +10,12 @@ import { SimuladoParaCaderno } from './tipos';
  * uma com o título do bloco, e depois as comuns — 1–5 Inglês, 1–5 Espanhol, 6–90, como no
  * caderno do ENEM. Sem idioma (Dia 2), é o simulado único, por número.
  */
+/*
+ * ⚠️ Os campos são lidos UM A UM (`questao`, `numero`), e nunca com `{ ...qc }`: os simulados
+ * chegam do banco como documentos do Mongoose, e espalhar um subdocumento copia o estado
+ * interno dele, não os campos — `numero` sumia, toda questão era descartada como "sem número"
+ * e o caderno da prova saía com "[Este simulado não tem nenhuma questão elegível…]".
+ */
 export interface SimuladoDaProva {
   idioma?: string | null;
   questoes: SimuladoParaCaderno['questoes'];
@@ -40,14 +46,15 @@ export function montarCadernoDaProva(
       .filter((qc) => !comum(qc.questao))
       .sort(porNumero)
       .map((qc) => ({
-        ...qc,
+        questao: qc.questao,
+        numero: qc.numero,
         secao: s.idioma ? `Língua estrangeira — ${s.idioma}` : null,
       })),
   );
   const comuns = (simulados[0]?.questoes ?? [])
     .filter((qc) => comum(qc.questao))
     .sort(porNumero)
-    .map((qc) => ({ ...qc, secao: null }));
+    .map((qc) => ({ questao: qc.questao, numero: qc.numero, secao: null }));
 
   return {
     nome: prova.nome,
