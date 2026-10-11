@@ -60,13 +60,15 @@ const montar = (over: any = {}) => {
         },
     ),
   };
+  const provas = { getById: jest.fn(async () => over.prova ?? null) };
   const service = new CadernoService(
     simuladoService as any,
     resolver as any,
     env as any,
     templateService as any,
+    provas as any,
   );
-  return { service, simuladoService, resolver, env, templateService };
+  return { service, simuladoService, resolver, env, templateService, provas };
 };
 
 describe('CadernoService — o portão', () => {
@@ -364,5 +366,122 @@ describe('gerarZip — logos', () => {
     expect(logoVnfIndex).not.toBe(-1);
     expect(imagemIndex).not.toBe(-1);
     expect(logoVnfIndex).toBeLessThan(imagemIndex);
+  });
+});
+
+describe('caderno DA PROVA (tickets/038 · 09)', () => {
+  const q = (id: string, numero: number) => ({
+    numero,
+    questao: {
+      _id: id,
+      status: 1,
+      textoQuestao: `enunciado ${id}`,
+      pergunta: 'P',
+      textoAlternativaA: 'a',
+      textoAlternativaB: 'b',
+      textoAlternativaC: 'c',
+      textoAlternativaD: 'd',
+      textoAlternativaE: 'e',
+    },
+  });
+  const comuns = [q('c6', 6), q('c7', 7)];
+  const ING = {
+    _id: 's-ing',
+    idioma: 'Inglês',
+    bloqueado: false,
+    questoes: [q('i1', 1), q('i2', 2), ...comuns],
+  };
+  const ESP = {
+    _id: 's-esp',
+    idioma: 'Espanhol',
+    bloqueado: false,
+    questoes: [q('e2', 2), q('e1', 1), ...comuns],
+  };
+  const prova = (o: object = {}) => ({
+    _id: 'p1',
+    nome: '1º ENEM',
+    categoria: { nome: 'Enem Dia 1', duracao: 330, dono: 'Cursinho' },
+    simulados: [{ _id: 's-ing' }, { _id: 's-esp' }],
+    ...o,
+  });
+  const montarProva = (
+    o: { prova?: object; ing?: object; esp?: object } = {},
+  ) => {
+    const m = montar({ prova: prova(o.prova) });
+    m.simuladoService.getById = jest.fn(async (id: string) =>
+      id === 's-ing' ? { ...ING, ...o.ing } : { ...ESP, ...o.esp },
+    ) as any;
+    return m;
+  };
+  const conteudoDoZip = async (buffer: Buffer) =>
+    (await JSZip.loadAsync(buffer)).file('conteudo.tex')!.async('string');
+
+  it('⚠️ Dia 1: 1–2 de Inglês, 1–2 de Espanhol e só depois as comuns, com o título de cada língua', async () => {
+    const { service } = montarProva();
+    const { buffer } = await service.gerarZipDaProva('p1', {});
+    const tex = await conteudoDoZip(buffer);
+
+    const ordem = [...tex.matchAll(/enunciado (\w+)/g)].map((m) => m[1]);
+    expect(ordem).toEqual(['i1', 'i2', 'e1', 'e2', 'c6', 'c7']);
+    const posIng = tex.indexOf(
+      'LÍNGUA ESTRANGEIRA: INGLÊS — QUESTÕES DE 01 A 05',
+    );
+    const posEsp = tex.indexOf(
+      'LÍNGUA ESTRANGEIRA: ESPANHOL — QUESTÕES DE 01 A 05',
+    );
+    // e a seção do ENEM antes da 6ª questão, uma vez só
+    const ling = 'LINGUAGENS, CÓDIGOS E SUAS TECNOLOGIAS — QUESTÕES DE 06 A 45';
+    expect(tex.indexOf(ling)).toBeGreaterThan(tex.indexOf('enunciado e2'));
+    expect(tex.indexOf(ling)).toBeLessThan(tex.indexOf('enunciado c6'));
+    expect(tex.split(ling)).toHaveLength(2);
+    expect(posIng).toBeGreaterThan(-1);
+    expect(posEsp).toBeGreaterThan(tex.indexOf('enunciado i2'));
+    expect(posEsp).toBeLessThan(tex.indexOf('enunciado e1'));
+    // a numeração da segunda língua recomeça no 1
+    expect(tex).toContain('\\setcounter{question}{0}');
+  });
+
+  it('Dia 2: o simulado único, por número, sem títulos', async () => {
+    const d2 = {
+      _id: 's-d2',
+      idioma: null as string | null,
+      bloqueado: false,
+      questoes: [q('m92', 92), q('m91', 91)],
+    };
+    const m = montar({
+      prova: prova({
+        categoria: { nome: 'Enem Dia 2', duracao: 300, dono: 'Cursinho' },
+        simulados: [{ _id: 's-d2' }],
+      }),
+    });
+    m.simuladoService.getById = jest.fn(async () => d2) as any;
+    const tex = await conteudoDoZip(
+      (await m.service.gerarZipDaProva('p1', {})).buffer,
+    );
+    expect([...tex.matchAll(/enunciado (\w+)/g)].map((x) => x[1])).toEqual([
+      'm91',
+      'm92',
+    ]);
+    expect(tex).not.toContain('LÍNGUA ESTRANGEIRA');
+  });
+
+  it('simulado incompleto → 409', async () => {
+    const { service } = montarProva({ esp: { bloqueado: true } });
+    await expect(service.gerarZipDaProva('p1', {})).rejects.toThrow(
+      ConflictException,
+    );
+  });
+
+  it('prova que não é Enem do cursinho → 400; inexistente → 404', async () => {
+    const outra = montarProva({
+      prova: { categoria: { nome: 'X', duracao: 1, dono: 'cur-1' } },
+    });
+    await expect(outra.service.gerarZipDaProva('p1', {})).rejects.toThrow(
+      'só para as provas Enem Dia 1 e Enem Dia 2',
+    );
+    const { service } = montar();
+    await expect(service.gerarZipDaProva('p1', {})).rejects.toThrow(
+      NotFoundException,
+    );
   });
 });

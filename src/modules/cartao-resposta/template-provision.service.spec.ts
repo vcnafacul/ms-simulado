@@ -1,5 +1,7 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import {
+  TEXTO_SIMULADOS_INCOMPLETOS,
+  TEXTO_SO_ENEM_DO_CURSINHO,
   TemplateProvisionService,
   keyTemplate,
   keyConfig,
@@ -37,6 +39,8 @@ function setup(over: Partial<any> = {}) {
     buscarProvaDoSimulado: jest
       .fn()
       .mockResolvedValue(over.prova === undefined ? null : over.prova),
+    getById: jest.fn().mockResolvedValue(over.provaCompleta ?? null),
+    incrementarCartaoSeq: jest.fn().mockResolvedValue(4),
   };
   const svc = new TemplateProvisionService(
     simuladoService as any,
@@ -153,6 +157,91 @@ describe('TemplateProvisionService', () => {
       const { svc, cartaoService } = setup();
       await svc.obterPdf(ID);
       expect(qr(cartaoService)).toEqual({ simuladoId: ID, cartaoCode: '7' });
+    });
+  });
+
+  describe('cartão DA PROVA (tickets/038 · 08)', () => {
+    const PROVA = '665f0c1a2b3c4d5e6f00ffff';
+    const faixa = (de: number, ate: number) =>
+      Array.from({ length: ate - de + 1 }, (_, i) => ({ numero: de + i }));
+    const sim = (
+      idioma: string | null,
+      bloqueado = false,
+      questoes = faixa(1, 90),
+    ) => ({
+      idioma,
+      bloqueado,
+      questoes,
+    });
+    const provaDia1 = (o: object = {}) => ({
+      _id: PROVA,
+      nome: '1º ENEM Dia 1',
+      categoria: { dono: 'Cursinho' },
+      simulados: [sim('Inglês'), sim('Espanhol')],
+      ...o,
+    });
+
+    it('Dia 1: 90 questões a partir do 1, com idioma; QR só com a prova e o contador DA PROVA', async () => {
+      const { svc, cartaoService, provas, simuladoService, storage } = setup({
+        provaCompleta: provaDia1(),
+      });
+      const pdf = await svc.obterPdfDaProva(PROVA);
+
+      expect(pdf.toString()).toBe('PDF');
+      expect(provas.incrementarCartaoSeq).toHaveBeenCalledWith(PROVA);
+      expect(simuladoService.incrementarCartaoSeq).not.toHaveBeenCalled();
+      expect(cartaoService.gerar).toHaveBeenCalledWith(
+        90,
+        expect.objectContaining({
+          nomeSimulado: '1º ENEM Dia 1',
+          qrPayload: { provaId: PROVA, cartaoCode: '4' },
+        }),
+        undefined,
+        1,
+        { idioma: true },
+      );
+      expect(storage.putObject).toHaveBeenCalledWith(
+        keyTemplate(PROVA),
+        expect.any(String),
+        'application/json',
+      );
+    });
+
+    it('Dia 2: 91–180, sem idioma', async () => {
+      const { svc, cartaoService } = setup({
+        provaCompleta: provaDia1({
+          simulados: [sim(null, false, faixa(91, 180))],
+        }),
+      });
+      await svc.obterPdfDaProva(PROVA);
+      const [n, , , inicio, opcoes] = cartaoService.gerar.mock.calls[0];
+      expect([n, inicio, opcoes]).toEqual([90, 91, { idioma: false }]);
+    });
+
+    it('simulado incompleto → 409 com o motivo, sem gastar número', async () => {
+      const { svc, provas, cartaoService } = setup({
+        provaCompleta: provaDia1({
+          simulados: [sim('Inglês'), sim('Espanhol', true)],
+        }),
+      });
+      await expect(svc.obterPdfDaProva(PROVA)).rejects.toThrow(
+        TEXTO_SIMULADOS_INCOMPLETOS,
+      );
+      expect(provas.incrementarCartaoSeq).not.toHaveBeenCalled();
+      expect(cartaoService.gerar).not.toHaveBeenCalled();
+    });
+
+    it('prova que não é Enem do cursinho → 400; inexistente → 404', async () => {
+      const outra = setup({
+        provaCompleta: provaDia1({ categoria: { dono: 'cur-1' } }),
+      });
+      await expect(outra.svc.obterPdfDaProva(PROVA)).rejects.toThrow(
+        TEXTO_SO_ENEM_DO_CURSINHO,
+      );
+      const sumiu = setup();
+      await expect(sumiu.svc.obterPdfDaProva(PROVA)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
     });
   });
 });

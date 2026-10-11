@@ -325,4 +325,139 @@ describe('relatório da prova (tickets/034) — Mongo real', () => {
     expect(r.totalEstudantesComCartaoNoCursinho).toBe(0);
     expect(r.simulados).toEqual([]);
   });
+
+  describe('ENEM Dia 1 do cursinho (tickets/038 · 14)', () => {
+    const [QI1, QE1, QC] = [0, 1, 2].map(() => new Types.ObjectId());
+    const [S_ING, S_ESP, P_ENEM] = [0, 1, 2].map(() => new Types.ObjectId());
+    let relModel: Model<RelatorioSimuladoEstudante>;
+    let histModel: Model<Historico>;
+
+    beforeAll(async () => {
+      relModel = mod.get(getModelToken(RelatorioSimuladoEstudante.name));
+      histModel = mod.get(getModelToken(Historico.name));
+      const conn: Connection = mod.get(getConnectionToken());
+      const sim = (
+        _id: Types.ObjectId,
+        nome: string,
+        idioma: string,
+        qs: [Types.ObjectId, number][],
+      ) =>
+        conn.collection('simulados').insertOne({
+          _id,
+          nome,
+          idioma,
+          questoes: qs.map(([questao, numero]) => ({ questao, numero })),
+        });
+      await sim(S_ING, 'ENEM Inglês', 'Inglês', [
+        [QI1, 1],
+        [QC, 6],
+      ]);
+      await sim(S_ESP, 'ENEM Espanhol', 'Espanhol', [
+        [QE1, 1],
+        [QC, 6],
+      ]);
+      await conn.collection('provas').insertOne({
+        _id: P_ENEM,
+        nome: 'ENEM do cursinho',
+        simulados: [S_ING, S_ESP],
+        questoes: [
+          { questao: QI1, numero: 1 },
+          { questao: QE1, numero: 1 },
+          { questao: QC, numero: 6 },
+        ],
+      });
+
+      const lido = async (
+        usuario: string,
+        simulado: Types.ObjectId,
+        q1: Types.ObjectId,
+      ) => {
+        const h = await histModel.create({
+          usuario,
+          simulado,
+          prova: P_ENEM,
+          cartaoDaProva: true,
+          status: 'completed',
+          aproveitamento: { geral: 1, materias: [] },
+          respostas: [
+            {
+              questao: q1,
+              numero: 1,
+              alternativaEstudante: 'A',
+              alternativaCorreta: 'A',
+            },
+            {
+              questao: QC,
+              numero: 6,
+              alternativaEstudante: 'A',
+              alternativaCorreta: 'A',
+            },
+          ],
+        });
+        await relModel.create({
+          historico: h._id,
+          simulado,
+          usuario,
+          cursinhoId: CURSINHO,
+        });
+      };
+      await lido('ing', S_ING, QI1);
+      await lido('esp', S_ESP, QE1);
+
+      // Cartão da prova que falhou antes de o idioma ser lido: sem simulado.
+      const falhou = await histModel.create({
+        usuario: 'falhou',
+        simulado: null,
+        prova: P_ENEM,
+        cartaoDaProva: true,
+        status: 'failed',
+        falha: { codigo: 'cartao_nao_detectado' },
+      });
+      await relModel.create({
+        historico: falhou._id,
+        prova: P_ENEM,
+        usuario: 'falhou',
+        cursinhoId: CURSINHO,
+        aguardandoSimulado: true,
+      });
+    });
+
+    it('⚠️ o cartão sem simulado (falhou antes do idioma) aparece, sem simulado', async () => {
+      const r = await service.consultarProva({
+        provaId: P_ENEM.toString(),
+        cursinhoId: CURSINHO,
+      });
+      const linha = r.linhas.find((l) => l.usuario === 'falhou')!;
+      expect(linha).toMatchObject({ simuladoId: null, status: 'failed' });
+      expect(r.linhas.map((l) => l.usuario).sort()).toEqual([
+        'esp',
+        'falhou',
+        'ing',
+      ]);
+      // a lista de simulados com cartão conta só os lidos
+      expect(r.simulados.map((s) => s.cartoes)).toEqual([1, 1]);
+    });
+
+    it('outro cursinho não vê a linha aguardando', async () => {
+      const r = await service.consultarProva({
+        provaId: P_ENEM.toString(),
+        cursinhoId: 'cursinho-2',
+      });
+      expect(r.linhas).toEqual([]);
+    });
+
+    it('aba Questões: as duas questões 1 com o idioma, Inglês antes de Espanhol, e a comum sem', async () => {
+      const r = await service.consultarQuestoesDaProva({
+        provaId: P_ENEM.toString(),
+        cursinhoId: CURSINHO,
+      });
+      expect(r.questoes.map((q) => [q.numero, q.idioma ?? null])).toEqual([
+        [1, 'Inglês'],
+        [1, 'Espanhol'],
+        [6, null],
+      ]);
+      // a comum soma os dois simulados
+      expect(r.questoes[2].respondentes).toBe(2);
+    });
+  });
 });

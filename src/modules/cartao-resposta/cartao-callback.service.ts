@@ -4,6 +4,10 @@ import { CodigoFalhaInterno } from '../historico/falha/codigo-falha';
 import { HistoricoRepository } from '../historico/historico.repository';
 import { Alternativa } from '../questao/enums/alternativa.enum';
 import { SimuladoRepository } from '../simulado/simulado.repository';
+import { Historico } from '../historico/historico.schema';
+import { ProvaRepository } from '../prova/prova.repository';
+import { simuladoPelaLeitura } from '../prova/factory/simulado-pela-leitura';
+import { RelatorioSimuladoEstudanteRepository } from '../relatorio-simulado-estudante/relatorio-simulado-estudante.repository';
 
 const ALTERNATIVAS: ReadonlySet<string> = new Set<string>(
   Object.values(Alternativa),
@@ -16,6 +20,8 @@ interface CartaoCallbackInput {
   /** ⚠️ `null` é um valor REAL aqui: o ms-omr manda `"tentativaId": null`
    * quando o job não tem token. Ver a guarda em `processar`. */
   tentativaId?: string | null;
+  /** tickets/038: os demais campos lidos (ex.: `idioma`). */
+  campos?: Record<string, string> | null;
 }
 
 @Injectable()
@@ -26,6 +32,9 @@ export class CartaoCallbackService {
     private readonly historicoRepository: HistoricoRepository,
     private readonly simuladoRepository: SimuladoRepository,
     private readonly queueProducer: QueueProducer,
+    // tickets/038: o cartão da prova escolhe o simulado no callback.
+    private readonly provaRepository?: ProvaRepository,
+    private readonly relatorioRepository?: RelatorioSimuladoEstudanteRepository,
   ) {}
 
   async processar(input: CartaoCallbackInput): Promise<void> {
@@ -94,9 +103,8 @@ export class CartaoCallbackService {
       return;
     }
 
-    const simuladoId =
-      (historico.simulado as any)?._id?.toString() ??
-      historico.simulado.toString();
+    const simuladoId = await this.simuladoDoHistorico(historico, histId, input);
+    if (!simuladoId) return;
     const simulado = await this.simuladoRepository.answer(simuladoId);
     if (!simulado) {
       this.logger.warn(
@@ -153,5 +161,60 @@ export class CartaoCallbackService {
       rawRespostas,
     );
     await this.queueProducer.publish('stream:simulado:answers', { histId });
+  }
+
+  /**
+   * O simulado em que a leitura vai ser corrigida.
+   *
+   * - cartão do simulado (o de sempre): o do histórico;
+   * - cartão DA PROVA (tickets/038, R8/R9): decidido AQUI, pelo idioma lido — a cada callback,
+   *   e não só no primeiro: um reenvio com a foto nova pode ter o outro idioma. Grava no
+   *   histórico e move a linha do relatório para ele.
+   *
+   * `null` = não dá para corrigir; o histórico já foi marcado como falho.
+   */
+  private async simuladoDoHistorico(
+    historico: Historico,
+    histId: string,
+    input: CartaoCallbackInput,
+  ): Promise<string | null> {
+    const atual = historico.simulado
+      ? (historico.simulado as any)?._id?.toString() ??
+        historico.simulado.toString()
+      : null;
+    if (!historico.cartaoDaProva || !historico.prova || !this.provaRepository) {
+      if (atual) return atual;
+      await this.historicoRepository.marcarFalha(
+        histId,
+        CodigoFalhaInterno.SimuladoNaoEncontrado,
+        'histórico sem simulado',
+      );
+      return null;
+    }
+
+    const prova = await this.provaRepository.buscarParaCartao(
+      String(historico.prova),
+    );
+    const ids = (prova?.simulados ?? []).map(String);
+    const escolhido = simuladoPelaLeitura(
+      await this.simuladoRepository.buscarIdiomas(ids),
+      input.campos?.idioma,
+    );
+    if (!escolhido) {
+      this.logger.warn(
+        `callback ${input.imageKey}: a prova ${String(historico.prova)} não tem simulado para o idioma "${input.campos?.idioma ?? ''}"`,
+      );
+      await this.historicoRepository.marcarFalha(
+        histId,
+        CodigoFalhaInterno.SimuladoNaoEncontrado,
+        'a prova não tem simulado para o idioma lido',
+      );
+      return null;
+    }
+    if (escolhido !== atual) {
+      await this.historicoRepository.definirSimulado(histId, escolhido);
+      await this.relatorioRepository?.moverParaSimulado(histId, escolhido);
+    }
+    return escolhido;
   }
 }

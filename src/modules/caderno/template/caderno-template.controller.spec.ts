@@ -428,7 +428,7 @@ describe('a rota /template não é engolida pelo :simuladoId', () => {
     restaurar: jest.fn(),
     descartarRascunho: jest.fn(),
   };
-  const servicoCaderno = { gerarZip: jest.fn() };
+  const servicoCaderno = { gerarZip: jest.fn(), gerarZipDaProva: jest.fn() };
 
   beforeAll(async () => {
     const modulo = await Test.createTestingModule({
@@ -489,5 +489,22 @@ describe('a rota /template não é engolida pelo :simuladoId', () => {
       .expect(404);
     expect(servicoCaderno.gerarZip).not.toHaveBeenCalled();
     expect(servicoTemplate.publicada).not.toHaveBeenCalled();
+  });
+
+  it('POST prova/:provaId chega no caderno DA PROVA (tickets/038), não no do simulado', async () => {
+    servicoCaderno.gerarZipDaProva.mockResolvedValue({
+      nome: 'prova.zip',
+      buffer: Buffer.from('ZIP'),
+      avisos: 0,
+    });
+    await request(app.getHttpServer())
+      .post('/v1/caderno/prova/65ecc850a528b39d273e7900')
+      .send({})
+      .expect(201);
+    expect(servicoCaderno.gerarZipDaProva).toHaveBeenCalledWith(
+      '65ecc850a528b39d273e7900',
+      { logos: {} },
+    );
+    expect(servicoCaderno.gerarZip).not.toHaveBeenCalled();
   });
 });

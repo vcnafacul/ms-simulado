@@ -229,7 +229,8 @@ export class RelatorioSimuladoEstudanteService {
     return [
       {
         usuario: l.usuario,
-        simuladoId: String(l.simulado),
+        // tickets/038: a linha aguardando simulado (cartão da prova) não tem simulado ainda.
+        simuladoId: l.simulado ? String(l.simulado) : null,
         turmaId: l.turmaId,
         historicoId: h._id.toString(),
         status: h.status,
@@ -369,8 +370,14 @@ export class RelatorioSimuladoEstudanteService {
       usuarios: params.usuarios,
     };
 
-    const [linhas, total, nomes] = await Promise.all([
+    const [doSimulado, aguardando, total, nomes] = await Promise.all([
       this.repository.buscarPorRecorte(recorte),
+      // tickets/038: o cartão da prova ainda sem simulado também é deste relatório.
+      this.repository.buscarAguardandoDaProva({
+        provaId: params.provaId,
+        cursinhoId: params.cursinhoId,
+        usuarios: params.usuarios,
+      }),
       this.repository.contarEstudantesDoCursinho(
         prova.simuladoIds,
         params.cursinhoId,
@@ -378,8 +385,9 @@ export class RelatorioSimuladoEstudanteService {
       this.simuladoRepository.getNomesPorIds(prova.simuladoIds),
     ]);
 
+    const linhas = [...doSimulado, ...aguardando];
     const cartoesPorSimulado = new Map<string, number>();
-    for (const l of linhas) {
+    for (const l of doSimulado) {
       const id = String(l.simulado);
       cartoesPorSimulado.set(id, (cartoesPorSimulado.get(id) ?? 0) + 1);
     }
@@ -443,15 +451,48 @@ export class RelatorioSimuladoEstudanteService {
     const numeroNaProva = new Map(
       prova.numeros.map((n) => [n.questaoId, n.numero]),
     );
+    const idiomaDe = await this.idiomaDasQuestoes(prova.simuladoIds);
 
-    return {
-      questoes: await this.montarQuestoes(
-        agregados,
-        (a) => numeroNaProva.get(a.questaoId) ?? a.numero ?? null,
-        mesmasQuestoes,
-      ),
+    const questoes = await this.montarQuestoes(
+      agregados,
+      (a) => numeroNaProva.get(a.questaoId) ?? a.numero ?? null,
       mesmasQuestoes,
-    };
+    );
+    for (const q of questoes) {
+      const idioma = idiomaDe.get(q.questaoId);
+      if (idioma) q.idioma = idioma;
+    }
+    // De 1 a 5 a mesma posição tem as duas línguas: Inglês antes de Espanhol.
+    const ordemDoIdioma = (q: { idioma?: string }) =>
+      q.idioma === 'Inglês' ? 0 : q.idioma === 'Espanhol' ? 1 : 2;
+    // Sem número no fim, como no `montarQuestoes`.
+    const n = (q: { numero: number | null }) => q.numero ?? Infinity;
+    questoes.sort((a, b) => n(a) - n(b) || ordemDoIdioma(a) - ordemDoIdioma(b));
+    return { questoes, mesmasQuestoes };
+  }
+
+  /**
+   * tickets/038 (R15): a questão que está SÓ no simulado de um idioma é daquele idioma (as 1–5
+   * do ENEM Dia 1 do cursinho). As comuns aos dois não ganham rótulo.
+   */
+  private async idiomaDasQuestoes(
+    simuladoIds: string[],
+  ): Promise<Map<string, string>> {
+    const comIdioma = (
+      await this.simuladoRepository.buscarIdiomas(simuladoIds)
+    ).filter((s) => s.idioma);
+    if (comIdioma.length < 2) return new Map();
+    const composicoes = await this.composicoes(comIdioma.map((s) => s.id));
+    const saida = new Map<string, string>();
+    for (const s of comIdioma) {
+      for (const questaoId of composicoes.get(s.id)!) {
+        const emOutro = comIdioma.some(
+          (o) => o.id !== s.id && composicoes.get(o.id)!.has(questaoId),
+        );
+        if (!emOutro) saida.set(questaoId, s.idioma!);
+      }
+    }
+    return saida;
   }
 
   private async provaOu404(provaId: string) {

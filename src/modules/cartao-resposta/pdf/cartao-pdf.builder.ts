@@ -5,7 +5,11 @@ import * as QRCode from 'qrcode';
 // The API is: pdfMake.setFonts(), pdfMake.setLocalAccessPolicy(), pdfMake.createPdf() → OutputDocumentServer → .getBuffer()
 // `import pdfMake = require('pdfmake')` gives the singleton with proper typing from @types/pdfmake.
 import pdfMake = require('pdfmake');
-import { LayoutModel } from '../layout/cartao-layout';
+import {
+  IDIOMA_BUBBLE_VALUES,
+  IDIOMA_FIELD,
+  LayoutModel,
+} from '../layout/cartao-layout';
 
 // Payload mínimo do QR (só o que o api precisa) — quanto menor, menos denso e mais fácil de
 // ler numa foto.
@@ -331,7 +335,51 @@ function collectBubbleShapes(layout: LayoutModel): unknown[] {
       draw(b.key, last - first + 1, 5);
     });
 
+  // tickets/038: marcação de idioma (Inglês / Espanhol) — só no cartão da prova do Dia 1.
+  if (temIdioma(layout)) {
+    draw(IDIOMA_FIELD, 1, IDIOMA_BUBBLE_VALUES.length);
+  }
+
   return out;
+}
+
+const temIdioma = (layout: LayoutModel) =>
+  layout.fieldBlocks.some((b) => b.key === IDIOMA_FIELD);
+
+// Rótulos da marcação de idioma: "LÍNGUA ESTRANGEIRA:" na linha do rótulo da matrícula (acima
+// das bolinhas) e o nome do idioma à direita de cada bolinha.
+const IDIOMA_ROTULOS = ['Inglês', 'Espanhol'];
+const IDIOMA_TITULO = 'LÍNGUA ESTRANGEIRA:';
+const IDIOMA_FONT = 11;
+
+function collectIdiomaLabels(layout: LayoutModel): unknown[] {
+  if (!temIdioma(layout)) return [];
+  const hb = layout.page.headerBox;
+  const r = layout.page.bubbleWidthPx / 2;
+  const items: unknown[] = [
+    {
+      text: IDIOMA_TITULO,
+      absolutePosition: {
+        x: pt(layout.page.idiomaOrigin[0] - r),
+        y: pt(hb.y + MAT_LABEL_DY),
+      },
+      fontSize: IDIOMA_FONT,
+      bold: true,
+    },
+  ];
+  IDIOMA_ROTULOS.forEach((rotulo, j) => {
+    const c = layout.bubbleCenter(IDIOMA_FIELD, 0, j);
+    items.push({
+      text: rotulo,
+      absolutePosition: {
+        x: pt(c.x + r + 18),
+        y: centerTextY(c.y, IDIOMA_FONT),
+      },
+      fontSize: IDIOMA_FONT,
+      bold: true,
+    });
+  });
+  return items;
 }
 
 /**
@@ -769,6 +817,7 @@ export async function buildCartaoPdf(
       },
       ...markerImages,
       ...collectLabels(layout, header),
+      ...collectIdiomaLabels(layout),
     ],
     defaultStyle: { font: 'Roboto' },
   };
