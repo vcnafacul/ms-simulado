@@ -135,7 +135,7 @@ export class CartaoReprocessoService {
    * relatório fica convincentemente errado.
    */
   private recusarSeOutroCartao(
-    historico: { simulado: unknown; cartaoCode?: string },
+    historico: { simulado?: unknown; cartaoCode?: string },
     params: { simuladoId?: string; cartaoCode?: string },
   ): void {
     const simuladoDoHistorico = String(historico.simulado);

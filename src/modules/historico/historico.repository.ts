@@ -44,6 +44,8 @@ export class HistoricoRepository extends BaseRepository<Historico> {
         select: '_id nome categoria',
         populate: CATEGORIA_DO_SIMULADO,
       })
+      // tickets/038: o cartão da prova sem simulado ainda mostra a prova.
+      .populate({ path: 'prova', select: '_id nome' })
       .exec();
 
     const totalItems = await this.model
@@ -92,13 +94,16 @@ export class HistoricoRepository extends BaseRepository<Historico> {
   }
 
   async getToPerformance(userId: string): Promise<Historico[]> {
-    return this.model
-      .find({ usuario: userId })
-      .sort({ _id: -1 })
-      .populate({
-        path: 'simulado',
-      })
-      .exec();
+    return (
+      this.model
+        // tickets/038: cartão da prova ainda sem simulado não tem desempenho.
+        .find({ usuario: userId, simulado: { $ne: null } })
+        .sort({ _id: -1 })
+        .populate({
+          path: 'simulado',
+        })
+        .exec()
+    );
   }
 
   async getTotalEntity() {
@@ -281,16 +286,41 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       .exec() as unknown as Promise<{ status: HistoricoStatus } | null>;
   }
 
+  /**
+   * O cartão DA PROVA já enviado para o estudante (tickets/038, R10) — par do
+   * `buscarCartaoEnviado`, que é por simulado.
+   */
+  async buscarCartaoDaProvaEnviado(
+    usuario: string,
+    provaId: string,
+  ): Promise<{ status: HistoricoStatus } | null> {
+    return this.model
+      .findOne(
+        { usuario, prova: new Types.ObjectId(provaId), cartaoDaProva: true },
+        { status: 1 },
+      )
+      .lean()
+      .exec() as unknown as Promise<{ status: HistoricoStatus } | null>;
+  }
+
+  /**
+   * ⚠️ `simuladoId` nulo só no cartão da prova que ainda não sabe o simulado
+   * (tickets/038): o callback o preenche.
+   */
   async createAwaitingOmr(data: {
     usuario: string;
-    simuladoId: string;
+    simuladoId: string | null;
+    provaId?: string | null;
+    cartaoDaProva?: boolean;
     imageKey: string;
     cartaoCode: string;
     tentativaId: string;
   }): Promise<Historico> {
     return this.model.create({
       usuario: data.usuario,
-      simulado: new Types.ObjectId(data.simuladoId),
+      simulado: data.simuladoId ? new Types.ObjectId(data.simuladoId) : null,
+      prova: data.provaId ? new Types.ObjectId(data.provaId) : null,
+      ...(data.cartaoDaProva ? { cartaoDaProva: true } : {}),
       imageKey: data.imageKey,
       cartaoCode: data.cartaoCode,
       tentativaId: data.tentativaId,
@@ -416,12 +446,20 @@ export class HistoricoRepository extends BaseRepository<Historico> {
    * dela, em QUALQUER status. Pendente ou com falha também conta: é um cartão
    * enviado, com foto no bucket e linha no relatório.
    */
-  async contarPorSimulados(simuladoIds: string[]): Promise<number> {
-    if (!simuladoIds.length) return 0;
-    return this.model.countDocuments({
-      simulado: { $in: simuladoIds.map((id) => new Types.ObjectId(id)) },
-      deleted: { $ne: true },
-    });
+  async contarPorSimulados(
+    simuladoIds: string[],
+    // tickets/038: o cartão da prova ainda sem simulado também é "alguém fez".
+    provaId?: string,
+  ): Promise<number> {
+    const ou: Record<string, unknown>[] = [];
+    if (simuladoIds.length) {
+      ou.push({
+        simulado: { $in: simuladoIds.map((id) => new Types.ObjectId(id)) },
+      });
+    }
+    if (provaId) ou.push({ prova: new Types.ObjectId(provaId) });
+    if (!ou.length) return 0;
+    return this.model.countDocuments({ $or: ou, deleted: { $ne: true } });
   }
 
   async findByImageKey(imageKey: string): Promise<Historico | null> {

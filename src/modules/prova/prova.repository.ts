@@ -73,6 +73,38 @@ export class ProvaRepository extends BaseRepository<Prova> {
     }, {});
   }
 
+  /** tickets/038 (R11): o próximo número do cartão DA PROVA. */
+  async incrementarCartaoSeq(id: string): Promise<number> {
+    const doc = await this.model.findByIdAndUpdate(
+      id,
+      { $inc: { cartaoSeq: 1 } },
+      { new: true },
+    );
+    return doc?.cartaoSeq ?? 0;
+  }
+
+  /**
+   * A prova (viva) que contém o simulado — tickets/038 (R8a). Em homol, todo
+   * simulado está em no máximo uma prova; se houver mais de uma, devolve a mais
+   * antiga, para ser estável.
+   */
+  async buscarProvaDoSimulado(
+    simuladoId: string,
+  ): Promise<{ _id: Types.ObjectId; cursinhoId?: string | null } | null> {
+    return (await this.model
+      .findOne({
+        simulados: new Types.ObjectId(simuladoId),
+        deleted: { $ne: true },
+      })
+      .sort({ _id: 1 })
+      .select('_id cursinhoId')
+      .lean()
+      .exec()) as unknown as {
+      _id: Types.ObjectId;
+      cursinhoId?: string | null;
+    } | null;
+  }
+
   async update(prova: Prova, session?: ClientSession) {
     await this.model.updateOne({ _id: prova._id }, prova, { session });
   }
