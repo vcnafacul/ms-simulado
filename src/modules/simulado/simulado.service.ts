@@ -135,18 +135,23 @@ export class SimuladoService {
     numero: number,
     session?: ClientSession,
   ) {
-    await Promise.all(
-      simulados.map(async (sml) => {
-        // Adiciona a nova questão (single-write em questoes).
-        addQuestaoToContainer(sml, question, numero);
+    /*
+      ⚠️ **Em sequência, nunca `Promise.all`.** Com uma `session` de transação, o
+      Mongo não aceita duas operações ao mesmo tempo na mesma sessão: a segunda
+      cai em "Given transaction number N+1 … does not match any in-progress
+      transactions". Com 1 simulado (prova do cursinho) nunca aparecia; com 2
+      (ENEM Dia 1 do cursinho) ou 5 (ENEM 2017+), sim.
+    */
+    for (const sml of simulados) {
+      // Adiciona a nova questão (single-write em questoes).
+      addQuestaoToContainer(sml, question, numero);
 
-        // Liberado só se atingiu a quantidade da categoria, todas aprovadas e
-        // todas numeradas.
-        revalidarBloqueado(sml);
+      // Liberado só se atingiu a quantidade da categoria, todas aprovadas e
+      // todas numeradas.
+      revalidarBloqueado(sml);
 
-        return await this.simuladoRepository.updateSession(sml, session);
-      }),
-    );
+      await this.simuladoRepository.updateSession(sml, session);
+    }
   }
 
   public async removeQuestionSimulados(
@@ -154,16 +159,16 @@ export class SimuladoService {
     question: Questao,
     session: ClientSession = undefined,
   ) {
-    await Promise.all(
-      simulados.map(async (sml) => {
-        const before = sml.questoes.length;
-        removeQuestaoFromContainer(sml, question._id);
-        if (sml.questoes.length !== before) {
-          sml.bloqueado = true;
-          await this.simuladoRepository.updateSession(sml, session);
-        }
-      }),
-    );
+    // ⚠️ Em sequência: ver o `addQuestionSimulados` (operações paralelas na
+    // mesma sessão de transação).
+    for (const sml of simulados) {
+      const before = sml.questoes.length;
+      removeQuestaoFromContainer(sml, question._id);
+      if (sml.questoes.length !== before) {
+        sml.bloqueado = true;
+        await this.simuladoRepository.updateSession(sml, session);
+      }
+    }
   }
 
   public async answer(

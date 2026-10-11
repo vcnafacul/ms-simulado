@@ -350,6 +350,29 @@ export class RelatorioSimuladoEstudanteRepository {
   }
 
   /**
+   * tickets/038: as linhas AGUARDANDO SIMULADO de uma prova no recorte — o cartão da prova que
+   * ainda não foi lido, ou que falhou antes de o idioma ser lido. Mesmo recorte e mesmo
+   * populate do `buscarPorRecorte`, para virarem linha do relatório pelo mesmo caminho.
+   */
+  async buscarAguardandoDaProva(params: {
+    provaId: string;
+    cursinhoId: string;
+    turmaId?: string;
+    usuarios?: string[];
+  }): Promise<LinhaComHistorico[]> {
+    return this.model
+      .find({
+        ...filtroDoRecorte(params),
+        prova: new Types.ObjectId(params.provaId),
+        aguardandoSimulado: true,
+      })
+      .sort({ usuario: 1 })
+      .populate({ path: 'historico', select: CAMPOS_DO_HISTORICO })
+      .lean()
+      .exec() as unknown as Promise<LinhaComHistorico[]>;
+  }
+
+  /**
    * Quantos cartões deste simulado o cursinho enviou. Alimenta o rodapé do
    * relatório por turma — "27 dos 30 cartões deste simulado são desta turma".
    *
