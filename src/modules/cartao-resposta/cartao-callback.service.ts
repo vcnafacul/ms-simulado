@@ -211,9 +211,15 @@ export class CartaoCallbackService {
       );
       return null;
     }
+    /*
+      ⚠️ **A linha do relatório PRIMEIRO, e sempre** (é idempotente). Antes ela só era movida
+      quando o simulado mudava, e DEPOIS de gravá-lo no histórico: se o mover falhasse, o
+      callback repetido pelo ms-omr já encontrava o simulado gravado, pulava o mover, e a linha
+      ficava presa em "aguardando" com a leitura concluída (achado em homol, 2026-10-12).
+    */
+    await this.relatorioRepository?.moverParaSimulado(histId, escolhido);
     if (escolhido !== atual) {
       await this.historicoRepository.definirSimulado(histId, escolhido);
-      await this.relatorioRepository?.moverParaSimulado(histId, escolhido);
     }
     return escolhido;
   }

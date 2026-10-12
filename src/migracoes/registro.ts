@@ -1,6 +1,7 @@
 import type { Db } from 'mongodb';
 import { migrar0007 } from './migracoes/0007-historico-prova';
 import { migrar0008 } from './migracoes/0008-juncao-aguardando-simulado';
+import { migrar0009 } from './migracoes/0009-juncao-aguardando-presa';
 import { semearCategoriasEnemCursinho } from './seeds/categorias-enem-cursinho';
 import { semearTemplateCaderno } from './seeds/template-caderno';
 
@@ -38,6 +39,12 @@ export const MIGRACOES: Passo[] = [
     descricao:
       'índice único da junção do relatório parcial em simulado; índice das linhas aguardando (tickets/038 · 13)',
     executar: (db) => migrar0008(db, true),
+  },
+  {
+    id: '0009-juncao-aguardando-presa',
+    descricao:
+      'move para o simulado as linhas do relatório presas em "aguardando" com a leitura já feita (tickets/038)',
+    executar: (db) => migrar0009(db),
   },
 ];
 

@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { Model, Types } from 'mongoose';
 import { migrar0008 } from '../../../scripts/migrations/0008-juncao-aguardando-simulado/migrar';
+import { Historico, HistoricoSchema } from '../historico/historico.schema';
 import { RelatorioSimuladoEstudanteRepository } from './relatorio-simulado-estudante.repository';
 import {
   RelatorioSimuladoEstudante,
@@ -31,6 +32,8 @@ describe('junção aguardando simulado (tickets/038 · 13) — Mongo real', () =
             name: RelatorioSimuladoEstudante.name,
             schema: RelatorioSimuladoEstudanteSchema,
           },
+          // a série popula o histórico
+          { name: Historico.name, schema: HistoricoSchema },
         ]),
       ],
       providers: [RelatorioSimuladoEstudanteRepository],
@@ -161,5 +164,56 @@ describe('junção aguardando simulado (tickets/038 · 13) — Mongo real', () =
       aguardando: true,
     });
     await col.drop();
+  });
+
+  describe('conserto achado em homol (2026-10-12)', () => {
+    const indiceAntigo = () =>
+      model.collection.createIndex(
+        { historico: 1, cursinhoId: 1 },
+        { unique: true, name: 'historico_1_cursinhoId_1' },
+      );
+    afterEach(async () => {
+      await model.collection
+        .dropIndex('historico_1_cursinhoId_1')
+        .catch(() => undefined);
+    });
+
+    it('⚠️ mover funciona com o índice único ANTIGO {historico, cursinhoId} (homol/prod)', async () => {
+      await indiceAntigo();
+      const historicoId = id();
+      const simuladoId = id();
+      await aguardando({ historicoId, turmaId: 't1' });
+
+      await expect(
+        repo.moverParaSimulado(historicoId, simuladoId),
+      ).resolves.toBeUndefined();
+
+      const linhas = await model
+        .find({ historico: new Types.ObjectId(historicoId) })
+        .lean();
+      expect(linhas.map((l) => String(l.simulado))).toEqual([simuladoId]);
+      expect(linhas[0].aguardandoSimulado).toBeUndefined();
+    });
+
+    it('a lista de simulados com cartão ignora a linha aguardando (antes: 500)', async () => {
+      const simuladoId = id();
+      await repo.registrar({
+        historicoId: id(),
+        simuladoId,
+        usuario: 'u2',
+        cursinhoId: 'c1',
+      });
+      await aguardando();
+
+      const lista = await repo.listarSimuladosComCartao({ cursinhoId: 'c1' });
+      expect(lista.map((l) => l.simuladoId)).toEqual([simuladoId]);
+    });
+
+    it('a série do estudante ignora a linha aguardando', async () => {
+      await aguardando();
+      await expect(
+        repo.serieDoEstudante({ cursinhoId: 'c1', usuario: 'u1' }),
+      ).resolves.toEqual([]);
+    });
   });
 });
