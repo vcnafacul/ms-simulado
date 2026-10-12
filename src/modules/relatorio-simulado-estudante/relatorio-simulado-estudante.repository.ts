@@ -307,6 +307,14 @@ export class RelatorioSimuladoEstudanteRepository {
       turmaId?: string;
     } | null;
     if (!linha) return;
+    /*
+      ⚠️ **Apaga ANTES de gravar.** Os bancos têm um índice único antigo `{historico,
+      cursinhoId}` (não declarado no schema, mas presente em homol e prod): gravar a linha do
+      simulado com a aguardando ainda lá violava esse índice, o mover falhava, e o callback
+      repetido pelo ms-omr já não o tentava de novo — a linha ficava presa em "aguardando" com
+      a leitura concluída. Sem transação, há um instante sem linha; o callback repetido refaz.
+    */
+    await this.model.deleteMany({ historico }).exec();
     await this.registrar({
       historicoId,
       simuladoId,
@@ -314,15 +322,6 @@ export class RelatorioSimuladoEstudanteRepository {
       cursinhoId: linha.cursinhoId,
       turmaId: linha.turmaId,
     });
-    await this.model
-      .deleteMany({
-        historico,
-        $or: [
-          { aguardandoSimulado: true },
-          { simulado: { $ne: new Types.ObjectId(simuladoId) } },
-        ],
-      })
-      .exec();
   }
 
   /**
@@ -691,7 +690,14 @@ export class RelatorioSimuladoEstudanteRepository {
     turmaId?: string;
     usuarios?: string[];
   }): Promise<SimuladoComCartao[]> {
-    const match = filtroDoRecorte(params);
+    /*
+      ⚠️ Só linhas COM simulado: a linha "aguardando simulado" do cartão da prova (tickets/038)
+      viraria um grupo `_id: null` — e o `toString()` abaixo derrubava a lista inteira (500).
+    */
+    const match = {
+      ...filtroDoRecorte(params),
+      simulado: { $type: 'objectId' },
+    };
 
     const linhas = await this.model
       .aggregate([
@@ -845,11 +851,13 @@ export class RelatorioSimuladoEstudanteRepository {
     return (linhas as unknown as LinhaComHistorico[])
       .filter(
         (l) =>
+          // tickets/038: a linha aguardando simulado não é ponto da série.
+          !!l.simulado &&
           l.historico?.status === HistoricoStatus.Completed &&
           typeof l.historico?.aproveitamento?.geral === 'number',
       )
       .map((l) => ({
-        simuladoId: l.simulado.toString(),
+        simuladoId: l.simulado!.toString(),
         aproveitamento: l.historico!.aproveitamento.geral,
         acertos: (l.historico as { acertos?: number }).acertos,
         /*

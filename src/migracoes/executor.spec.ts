@@ -33,7 +33,11 @@ describe('rodarMigracoes — Mongo real', () => {
   const passo = (
     id: string,
     executar: jest.Mock = jest.fn(async (): Promise<unknown> => 'feito'),
-  ): Passo & { executar: jest.Mock } => ({ id, descricao: `passo ${id}`, executar });
+  ): Passo & { executar: jest.Mock } => ({
+    id,
+    descricao: `passo ${id}`,
+    executar,
+  });
 
   it('roda as que faltam, em ordem, e registra; na 2ª vez não roda de novo', async () => {
     const ordem: string[] = [];

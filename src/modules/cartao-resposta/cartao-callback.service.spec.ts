@@ -460,7 +460,7 @@ describe('cartão DA PROVA — o callback escolhe o simulado pelo idioma (ticket
     );
   });
 
-  it('mesmo idioma de antes: não regrava', async () => {
+  it('mesmo idioma de antes: não regrava o histórico, mas confere a linha do relatório', async () => {
     const m = montar({ simulado: 's-ing' });
     await m.svc.processar({
       imageKey: 'k',
@@ -468,7 +468,29 @@ describe('cartão DA PROVA — o callback escolhe o simulado pelo idioma (ticket
       campos: { idioma: 'ING' },
     });
     expect(m.historicoRepository.definirSimulado).not.toHaveBeenCalled();
+    // ⚠️ achado em homol: se o 1º mover falhou, o callback repetido tem de refazê-lo
+    expect(m.relatorioRepository.moverParaSimulado).toHaveBeenCalledWith(
+      'h1',
+      's-ing',
+    );
     expect(m.simuladoRepository.answer).toHaveBeenCalledWith('s-ing');
+  });
+
+  it('⚠️ move a linha ANTES de gravar o simulado no histórico', async () => {
+    const m = montar({});
+    const ordem: string[] = [];
+    m.relatorioRepository.moverParaSimulado.mockImplementation(async () => {
+      ordem.push('mover');
+    });
+    m.historicoRepository.definirSimulado.mockImplementation(async () => {
+      ordem.push('definir');
+    });
+    await m.svc.processar({
+      imageKey: 'k',
+      respostas,
+      campos: { idioma: 'ESP' },
+    });
+    expect(ordem).toEqual(['mover', 'definir']);
   });
 
   it('⚠️ leitura que falha antes do idioma: failed, com a prova e SEM simulado', async () => {
