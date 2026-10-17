@@ -74,6 +74,17 @@ export class Simulado extends BaseSchema {
   })
   @ApiProperty({ enum: Idioma, required: false, nullable: true })
   public idioma?: Idioma | null;
+
+  /**
+   * Sobe +1 a cada anular/desanular neste simulado (tickets/042, R3). O
+   * histórico grava a revisão com que a nota foi calculada; menor que esta =
+   * divergente. Editar só a justificativa não sobe (a nota é a mesma).
+   *
+   * ⚠️ Ausente = 0. Na QUERY, usar `filtroDivergente` (o `$lt` não casa ausente).
+   */
+  @Prop({ type: Number, required: false, default: 0 })
+  @ApiProperty({ required: false })
+  public revisaoAnulacao?: number;
 }
 
 export const SimuladoSchema = SchemaFactory.createForClass(Simulado);

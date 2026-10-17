@@ -132,9 +132,40 @@ export class Historico extends BaseSchema {
   @Prop({ required: false })
   @ApiProperty({ required: false })
   public tentativaId?: string;
+
+  /**
+   * A `Simulado.revisaoAnulacao` com que esta nota foi calculada (tickets/042,
+   * R3). Menor que a do simulado = divergente.
+   *
+   * ⚠️ **Ausente em todo histórico anterior ao deploy**, e isso é o valor 0. Em
+   * código: `?? 0`. Em query: `filtroDivergente` — `$lt` NÃO casa campo ausente.
+   * Sem `default` de propósito: o default do Mongoose só existe em memória, e
+   * faria o código acreditar num campo que o banco não tem.
+   */
+  @Prop({ type: Number, required: false })
+  @ApiProperty({ required: false })
+  public revisaoAnulacao?: number;
+
+  /** Quantas questões entraram na nota: total menos as anuladas (D2). */
+  @Prop({ type: Number, required: false })
+  @ApiProperty({ required: false })
+  public totalConsiderado?: number;
+
+  /** Os números que estavam anulados quando a nota foi calculada. */
+  @Prop({ type: [Number], required: false, default: undefined })
+  @ApiProperty({ required: false, type: [Number] })
+  public numerosAnulados?: number[];
+
+  /** Quando o recálculo por anulação regravou esta nota (card 12). */
+  @Prop({ type: Date, required: false })
+  @ApiProperty({ required: false })
+  public recalculadoEm?: Date;
 }
 
 export const HistoricoSchema = SchemaFactory.createForClass(Historico);
+
+/** A contagem de divergentes por simulado (tickets/042, R3). */
+HistoricoSchema.index({ simulado: 1, revisaoAnulacao: 1 });
 
 HistoricoSchema.index(
   { imageKey: 1 },

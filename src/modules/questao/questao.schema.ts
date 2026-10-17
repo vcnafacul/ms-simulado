@@ -8,6 +8,10 @@ import { EnemArea } from './enums/enem-area.enum';
 import { Status } from './enums/status.enum';
 import { QuestaoReview } from './questao.review.schema';
 import { TipoOrigem } from './enums/tipo-origem.enum';
+import {
+  AnulacaoNaProva,
+  AnulacaoNaProvaSchema,
+} from './anulacao/anulacao.schema';
 
 /**
  * ⚠️ **`""` vira `null` nas referências** (contagem-por-materia 04). MEDIDO:
@@ -244,6 +248,25 @@ export class Questao extends QuestaoReview {
   @Prop({ type: Boolean, required: false, default: false })
   @ApiProperty({ required: false })
   public teveSucessora?: boolean;
+
+  /**
+   * Em quais provas esta questão está anulada (tickets/042, D1) — o ESPELHO.
+   *
+   * ⚠️ **Não é fonte da verdade.** A nota lê o `anulacao` do slot no container.
+   * Isto existe para o banco (selo e filtro) e para o aviso ao adicionar (D4).
+   *
+   * ⚠️ **Escrito só pelo `AnulacaoStore`**, na mesma sessão do container. Uma
+   * escrita à mão aqui é como o espelho e o container divergem.
+   */
+  @Prop({ type: [AnulacaoNaProvaSchema], required: false, default: [] })
+  @ApiProperty({ type: AnulacaoNaProva, isArray: true, required: false })
+  public anulacoes?: AnulacaoNaProva[];
 }
 
 export const QuestaoSchema = SchemaFactory.createForClass(Questao);
+
+/**
+ * O filtro "tem anulação" do banco (tickets/042, card 04):
+ * `{ 'anulacoes.provaId': { $exists } }`. Também serve à busca por prova.
+ */
+QuestaoSchema.index({ 'anulacoes.provaId': 1 });
