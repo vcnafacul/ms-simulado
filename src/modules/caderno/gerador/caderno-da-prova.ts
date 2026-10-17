@@ -86,6 +86,7 @@ export function montarCadernoDaProva(
         questao: qc.questao,
         numero: qc.numero,
         secao: s.idioma ? secaoDaLingua(s.idioma) : null,
+        anulacao: qc.anulacao,
       })),
   );
   const comuns = (simulados[0]?.questoes ?? [])
@@ -95,6 +96,8 @@ export function montarCadernoDaProva(
       questao: qc.questao,
       numero: qc.numero,
       secao: secaoDoEnem(qc.numero),
+      // tickets/042: lido campo a campo, como os outros (ver o ⚠️ acima).
+      anulacao: qc.anulacao,
     }));
 
   return {

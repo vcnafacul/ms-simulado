@@ -14,6 +14,10 @@ import type { Response } from 'express';
 import { CadernoService } from './caderno.service';
 import { CadernoDtoInput, decodificarLogos } from './dtos/logos.dto.input';
 
+/** tickets/042 (D8): a chave só vai quando confirmado — só a string exata "true". */
+const confirmacao = (q?: string) =>
+  q === 'true' ? { confirmarAnuladas: true } : {};
+
 @ApiTags('caderno')
 @Controller('v1/caderno')
 export class CadernoController {
@@ -48,12 +52,16 @@ export class CadernoController {
     @Param('simuladoId') simuladoId: string,
     @Query('draft') draft: string | undefined,
     @Res({ passthrough: true }) res: Response,
+    // tickets/042: por último, para não deslocar os parâmetros de antes.
+    @Query('confirmarAnuladas') confirmarAnuladas?: string,
   ): Promise<StreamableFile> {
     // ⚠️ Só a string exata "true". Query string chega como texto, e tratar
     // "presente" como ligado faria `?draft=false` LIGAR o rascunho — defeito
     // que aparece como uma marca d'água que ninguém pediu.
     const { nome, buffer, avisos } = await this.caderno.gerarZip(simuladoId, {
       draft: draft === 'true',
+      // tickets/042: o GET deprecated passa pelo mesmo portão — senão é bypass.
+      ...confirmacao(confirmarAnuladas),
     });
 
     res.set({
@@ -86,10 +94,15 @@ export class CadernoController {
     @Param('provaId') provaId: string,
     @Res({ passthrough: true }) res: Response,
     @Body() corpo?: CadernoDtoInput,
+    // tickets/042: por último, para não deslocar os parâmetros de antes.
+    @Query('confirmarAnuladas') confirmarAnuladas?: string,
   ): Promise<StreamableFile> {
     const { nome, buffer, avisos } = await this.caderno.gerarZipDaProva(
       provaId,
-      { logos: decodificarLogos(corpo?.logos) },
+      {
+        logos: decodificarLogos(corpo?.logos),
+        ...confirmacao(confirmarAnuladas),
+      },
     );
     res.set({
       'Content-Disposition': `attachment; filename="${nome}"`,
@@ -105,6 +118,8 @@ export class CadernoController {
     @Query('draft') draft: string | undefined,
     @Res({ passthrough: true }) res: Response,
     @Body() corpo?: CadernoDtoInput,
+    // tickets/042: por último, para não deslocar os parâmetros de antes.
+    @Query('confirmarAnuladas') confirmarAnuladas?: string,
   ): Promise<StreamableFile> {
     // ⚠️ Requisição sem corpo nenhum: o `@Body()` entrega undefined quando não há
     // body parser aplicável. O `corpo?.` existe para isto.
@@ -112,6 +127,8 @@ export class CadernoController {
     const { nome, buffer, avisos } = await this.caderno.gerarZip(simuladoId, {
       draft: draft === 'true',
       logos: decodificarLogos(corpo?.logos),
+      // tickets/042 (D8): só a string exata "true", como o `draft`.
+      ...confirmacao(confirmarAnuladas),
     });
 
     res.set({
