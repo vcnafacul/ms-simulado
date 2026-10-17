@@ -11,9 +11,16 @@ export class AnuladaDoRelatorioDtoOutput {
 export class AnulacaoDoRelatorioDtoOutput {
   @ApiProperty({
     description:
-      'linhas concluídas calculadas antes da última anulação/desanulação',
+      'linhas concluídas calculadas com outro conjunto de anuladas (card 20)',
   })
   divergentes: number;
+
+  @ApiProperty({
+    type: [Number],
+    description:
+      'números que os divergentes contaram como anulados e que agora valem (card 20)',
+  })
+  desanuladas: number[];
 
   @ApiProperty({
     required: false,

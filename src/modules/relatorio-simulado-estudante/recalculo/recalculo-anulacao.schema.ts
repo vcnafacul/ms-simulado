@@ -20,6 +20,15 @@ export class AfetadoDoRecalculo {
   @Prop() @ApiProperty() historicoId: string;
   /** `YYYY-MM` do `createdAt` do histórico — o mês do agregado da turma. */
   @Prop() @ApiProperty() mes: string;
+  /**
+   * A nota antes e depois deste recálculo (card 20): a api não avisa o aluno
+   * cuja nota voltou ao que era (anular → recalcular → desanular → recalcular).
+   * `acertosAntes` ausente = histórico antigo sem a contagem: avisa.
+   */
+  @Prop() @ApiProperty({ required: false }) acertosAntes?: number;
+  @Prop() @ApiProperty({ required: false }) totalAntes?: number;
+  @Prop() @ApiProperty() acertosDepois: number;
+  @Prop() @ApiProperty() totalDepois: number;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { estaDivergente } from './filtro-divergente';
+import { estaDivergente, numerosDoSimulado } from './filtro-divergente';
 import { HistoricoStatus } from './enums/historico-status.enum';
 import { Historico } from './historico.schema';
 import {
@@ -71,11 +71,12 @@ export class HistoricoService {
     }
     const obj: any = toPlain(historico);
     /*
-      tickets/042 (card 10): divergente = a nota foi calculada antes da última
-      anulação/desanulação do simulado. Calculado ANTES de achatar, com a
-      revisão do simulado.
+      tickets/042 (cards 10 e 20): divergente = a nota foi calculada com outro
+      conjunto de anuladas. Calculado ANTES de achatar, com os slots do simulado.
     */
-    obj.divergente = obj.simulado ? estaDivergente(obj, obj.simulado) : false;
+    obj.divergente = obj.simulado
+      ? estaDivergente(obj, numerosDoSimulado(obj.simulado))
+      : false;
     if (obj.simulado && Array.isArray(obj.simulado.questoes)) {
       // Achata pro shape antigo do client, preservando o numero do relacionamento
       // (numero vive em QuestaoNaContainer, não mais na Questao).
@@ -114,13 +115,13 @@ export class HistoricoService {
   ): Promise<boolean> {
     const h = historico as Historico & { _id: unknown };
     const simulado = h.simulado as unknown as {
-      revisaoAnulacao?: number;
+      questoes?: { numero?: number | null; anulacao?: unknown }[];
     } | null;
     if (
       h.cartaoCode ||
       h.status !== HistoricoStatus.Completed ||
       !simulado ||
-      !estaDivergente(h, simulado)
+      !estaDivergente(h, numerosDoSimulado(simulado))
     ) {
       return false;
     }
