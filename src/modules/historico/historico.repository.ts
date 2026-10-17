@@ -508,6 +508,11 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       questoesRespondidas: number;
       /** Quantas foram acertadas — contado, nunca derivado do percentual. */
       acertos: number;
+      /** tickets/042: total menos as anuladas (D2). */
+      totalConsiderado?: number;
+      numerosAnulados?: number[];
+      /** A revisão de anulação do simulado neste instante (R3). */
+      revisaoAnulacao?: number;
     },
   ): Promise<void> {
     await this.model
@@ -519,6 +524,9 @@ export class HistoricoRepository extends BaseRepository<Historico> {
         aproveitamento: data.aproveitamento,
         questoesRespondidas: data.questoesRespondidas,
         acertos: data.acertos,
+        totalConsiderado: data.totalConsiderado,
+        numerosAnulados: data.numerosAnulados,
+        revisaoAnulacao: data.revisaoAnulacao,
         rawRespostas: null,
       })
       .exec();

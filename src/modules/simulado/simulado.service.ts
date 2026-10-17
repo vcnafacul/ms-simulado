@@ -40,6 +40,7 @@ import {
   calcularAproveitamento,
   montarRespostasAproveitamento,
 } from './calcularAproveitamento';
+import { listaDeAnulados, numerosAnuladosDoContainer } from './anuladas';
 
 @Injectable()
 export class SimuladoService {
@@ -228,10 +229,35 @@ export class SimuladoService {
         simulado.questoes[0].questao._id,
       );
 
+      /*
+        ⚠️ **O número da questão NO MOMENTO da resposta.** O relatório lia o
+        número do `Simulado.questoes` de hoje — e uma nova versão (card 26)
+        troca ali o ponteiro para a sucessora: a original, que é a que o
+        histórico aponta, ficava sem número. Sai do MESMO `simulado.questoes`
+        que deu o id acima, então id e número são sempre do mesmo instante.
+      */
+      const numeroPorQuestao = new Map(
+        simulado.questoes.map((qc) => [
+          qc.questao._id.toString(),
+          qc.numero ?? null,
+        ]),
+      );
+
+      /*
+        ⚠️ tickets/042 (D2, R2): as anuladas saem do MESMO `simulado.questoes`,
+        no mesmo instante do número — por número do slot, nunca por id.
+      */
+      const numerosAnulados = numerosAnuladosDoContainer(simulado.questoes);
+
       const respostasAproveitamento = montarRespostasAproveitamento(
         simulado.questoes.map((qc) => qc.questao),
         historico.rawRespostas,
+        {
+          numeros: numerosAnulados,
+          numeroDe: (id) => numeroPorQuestao.get(id),
+        },
       );
+      const consideradas = respostasAproveitamento.filter((r) => !r.anulada);
 
       const aproveitamento = await this.criaAproveitamento(
         respostasAproveitamento,
@@ -276,7 +302,8 @@ export class SimuladoService {
         ⚠️ Não é mais gate de agregado nenhum (ver
         `user-group-aggregate.repository`): é a informação "leu 87 de 90".
       */
-      const questoesRespondidas = respostasAproveitamento.filter(
+      // ⚠️ tickets/042: só as consideradas — "x de 89", não "x de 90".
+      const questoesRespondidas = consideradas.filter(
         (r) => r.alternativaEstudante !== undefined,
       ).length;
 
@@ -292,25 +319,11 @@ export class SimuladoService {
         centenas de estudantes — medido em 824 KB por 100 linhas), então o que
         ele precisa contar tem de já estar contado no documento.
       */
-      const acertos = respostasAproveitamento.filter(
+      const acertos = consideradas.filter(
         (r) =>
           r.alternativaEstudante !== undefined &&
           r.alternativaEstudante === r.alternativaCorreta,
       ).length;
-
-      /*
-        ⚠️ **O número da questão NO MOMENTO da resposta.** O relatório lia o
-        número do `Simulado.questoes` de hoje — e uma nova versão (card 26)
-        troca ali o ponteiro para a sucessora: a original, que é a que o
-        histórico aponta, ficava sem número. Sai do MESMO `simulado.questoes`
-        que deu o id acima, então id e número são sempre do mesmo instante.
-      */
-      const numeroPorQuestao = new Map(
-        simulado.questoes.map((qc) => [
-          qc.questao._id.toString(),
-          qc.numero ?? null,
-        ]),
-      );
 
       await this.historicoRepository.completeProcessing(histId, {
         ano,
@@ -320,10 +333,16 @@ export class SimuladoService {
           numero: numeroPorQuestao.get(r.questao._id.toString()) ?? null,
           alternativaEstudante: r.alternativaEstudante,
           alternativaCorreta: r.alternativaCorreta,
+          ...(r.anulada ? { anulada: true } : {}),
         })),
         aproveitamento,
         questoesRespondidas,
         acertos,
+        totalConsiderado: consideradas.length,
+        numerosAnulados: listaDeAnulados(numerosAnulados),
+        // Nasce na revisão atual: cartão processado depois da anulação nunca
+        // aparece como divergente (R3).
+        revisaoAnulacao: simulado.revisaoAnulacao ?? 0,
       });
     } catch (err) {
       await this.historicoRepository.marcarFalha(

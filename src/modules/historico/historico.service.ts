@@ -81,7 +81,13 @@ export class HistoricoService {
       performance: historico.aproveitamento,
       timeSpent: historico.tempoRealizado,
       questionsAnswered: historico.questoesRespondidas,
-      totalQuestionsTest: historico.simulado.questoes.length,
+      // ⚠️ tickets/042: sem as anuladas. O client marca "completo" com
+      // `questionsAnswered === totalQuestionsTest`, e o `questoesRespondidas`
+      // já conta só as consideradas.
+      totalQuestionsTest:
+        historico.totalConsiderado ?? historico.simulado.questoes.length,
+      totalConsiderado: historico.totalConsiderado,
+      numerosAnulados: historico.numerosAnulados,
       testPerformance: historico.simulado.aproveitamento,
       testAttempts: historico.simulado.vezesRespondido,
       createdAt: historico.createdAt,
