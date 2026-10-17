@@ -532,28 +532,6 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       .exec();
   }
 
-  /**
-   * Alguém já tem resultado nesta prova (tickets/042, guarda D10): histórico
-   * `completed` de um simulado dela, ou o cartão DA prova (038).
-   */
-  async existeConcluidoNaProva(
-    provaId: string,
-    simuladoIds: string[],
-  ): Promise<boolean> {
-    const existe = await this.model
-      .exists({
-        status: HistoricoStatus.Completed,
-        $or: [
-          {
-            simulado: { $in: simuladoIds.map((id) => new Types.ObjectId(id)) },
-          },
-          { prova: new Types.ObjectId(provaId) },
-        ],
-      })
-      .exec();
-    return !!existe;
-  }
-
   async claimForProcessing(id: string): Promise<boolean> {
     const result = await this.model
       .findOneAndUpdate(

@@ -1,5 +1,4 @@
 import {
-  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -7,7 +6,6 @@ import {
 import { ClientSession } from 'mongoose';
 import { Ator } from 'src/shared/ator/ator';
 import { AuditLogService } from '../../auditLog/auditLog.service';
-import { HistoricoRepository } from '../../historico/historico.repository';
 import { Anulacao } from '../../questao/anulacao/anulacao.schema';
 import {
   AnulacaoRepository,
@@ -21,14 +19,11 @@ import {
 } from '../helpers/pode-compor-prova';
 import { ProvaRepository } from '../prova.repository';
 
-/**
- * ⚠️ **Guarda TEMPORÁRIA (D10), até a Fase 4.** Sem o recálculo (card 12),
- * anular em prova já aplicada deixaria notas velhas sem caminho de correção.
- * O card 12 desliga.
+/*
+ * ⚠️ A guarda D10 (recusar anular em prova já aplicada) saiu no card 12:
+ * agora a nota velha tem caminho de correção — o relatório mostra a
+ * divergência e o "Recalcular".
  */
-export const RECUSAR_ANULACAO_EM_PROVA_APLICADA = true;
-export const TEXTO_PROVA_APLICADA =
-  'Ainda não é possível anular questão em prova já aplicada.';
 
 export interface ResultadoDaAnulacao extends ResultadoDaEscrita {
   acao: 'anular' | 'desanular' | 'editarAnulacao' | 'nada';
@@ -46,7 +41,6 @@ export class AnulacaoService {
   constructor(
     private readonly provas: ProvaRepository,
     private readonly anulacoes: AnulacaoRepository,
-    private readonly historicos: HistoricoRepository,
     private readonly questoes: QuestaoRepository,
     private readonly auditLog: AuditLogService,
   ) {}
@@ -59,10 +53,8 @@ export class AnulacaoService {
   ): Promise<ResultadoDaAnulacao> {
     await this.assertPodeAnular(provaId, ator);
     const slot = await this.slotOu404(provaId, questaoId);
-    // Editar motivo/justificativa: a nota é a mesma, a revisão não sobe (R3) e
-    // a guarda D10 não se aplica.
+    // Editar motivo/justificativa: a nota é a mesma, a revisão não sobe (R3).
     const editando = !!slot.anulacao;
-    if (!editando) await this.assertProvaNaoAplicada(provaId, slot.simuladoIds);
 
     const anulacao: Anulacao = {
       motivo: dto.motivo,
@@ -111,7 +103,6 @@ export class AnulacaoService {
         simuladoIds: [],
       };
     }
-    await this.assertProvaNaoAplicada(provaId, slot.simuladoIds);
     const r = await this.emTransacao((session) =>
       this.anulacoes.limpar({
         provaId,
@@ -141,16 +132,6 @@ export class AnulacaoService {
     const slot = await this.anulacoes.slotNaProva(provaId, questaoId);
     if (!slot) throw new NotFoundException('A questão não está nesta prova.');
     return slot;
-  }
-
-  private async assertProvaNaoAplicada(provaId: string, simuladoIds: string[]) {
-    if (!RECUSAR_ANULACAO_EM_PROVA_APLICADA) return;
-    if (await this.historicos.existeConcluidoNaProva(provaId, simuladoIds)) {
-      throw new ConflictException({
-        code: 'PROVA_JA_APLICADA',
-        message: TEXTO_PROVA_APLICADA,
-      });
-    }
   }
 
   private async emTransacao<T>(
