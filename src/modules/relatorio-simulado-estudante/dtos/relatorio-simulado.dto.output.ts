@@ -1,5 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { HistoricoStatus } from '../../historico/enums/historico-status.enum';
+import {
+  AnulacaoDoRelatorioDtoOutput,
+  AnuladaDoRelatorioDtoOutput,
+} from './anulacao-do-relatorio.dto.output';
 import { FalhaDescrita } from '../../historico/falha/mapa-falha';
 
 export class FrenteDoEstudanteDtoOutput {
@@ -98,6 +102,15 @@ export class LinhaRelatorioDtoOutput {
   aproveitamentoPorMateria?: MateriaDoEstudanteDtoOutput[];
 
   @ApiProperty({ required: false }) falha?: FalhaDescrita;
+
+  /**
+   * tickets/042, card 13: a nota GRAVADA foi calculada antes da última
+   * anulação/desanulação do simulado. Só em `completed`.
+   */
+  @ApiProperty({ required: false }) divergente?: boolean;
+
+  /** Sobre quantas questões a nota gravada foi calculada (sem as anuladas). */
+  @ApiProperty({ required: false }) totalConsiderado?: number;
 }
 
 export class RelatorioSimuladoDtoOutput {
@@ -157,4 +170,13 @@ export class RelatorioSimuladoDtoOutput {
    */
   @ApiProperty({ required: true, nullable: true })
   ultimoCartaoEm: Date | null;
+
+  /** tickets/042: o total menos as anuladas — a base da análise. */
+  @ApiProperty({ required: false }) totalConsiderado?: number;
+
+  @ApiProperty({ required: false, type: [AnuladaDoRelatorioDtoOutput] })
+  anuladas?: AnuladaDoRelatorioDtoOutput[];
+
+  @ApiProperty({ required: false, type: AnulacaoDoRelatorioDtoOutput })
+  anulacao?: AnulacaoDoRelatorioDtoOutput;
 }
