@@ -351,6 +351,7 @@ export class ProvaService {
         totalQuestao: result.totalQuestao,
         totalQuestaoCadastradas: result.questoes.length,
         totalQuestaoValidadas: result.totalQuestaoValidadas,
+        totalAnuladas: result.questoes.filter((qc) => !!qc.anulacao).length,
         enemAreas: result.enemAreas,
         createdAt: result.createdAt,
         receberNovasVersoes: result.receberNovasVersoes,
@@ -409,6 +410,7 @@ export class ProvaService {
         totalQuestao: result.totalQuestao,
         totalQuestaoCadastradas: result.questoes.length,
         totalQuestaoValidadas: result.totalQuestaoValidadas,
+        totalAnuladas: result.questoes.filter((qc) => !!qc.anulacao).length,
         filename: result.filename,
         gabarito: result.gabarito,
         enemAreas: result.enemAreas,
@@ -469,6 +471,8 @@ export class ProvaService {
       totalQuestao: prova.totalQuestao,
       gabarito: prova.gabarito,
       totalQuestaoValidadas: prova.totalQuestaoValidadas,
+      // tickets/042, card 21: a coluna "Anuladas" da lista.
+      totalAnuladas: prova.questoes.filter((qc) => !!qc.anulacao).length,
       filename: prova.filename,
       enemAreas: prova.enemAreas,
       totalQuestaoCadastradas: prova.questoes.length,
@@ -617,6 +621,8 @@ export class ProvaService {
       totalQuestao: prova.totalQuestao,
       totalQuestaoCadastradas: prova.questoes.length,
       totalQuestaoValidadas: prova.totalQuestaoValidadas,
+      // tickets/042, card 21: a coluna "Anuladas" da lista.
+      totalAnuladas: prova.questoes.filter((qc) => !!qc.anulacao).length,
       filename: prova.filename,
       gabarito: prova.gabarito,
       enemAreas: prova.enemAreas,

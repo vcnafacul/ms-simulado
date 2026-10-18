@@ -44,6 +44,10 @@ export class GetProvaDTOOutout {
   @ApiProperty()
   receberNovasVersoes: boolean;
 
+  /** tickets/042, card 21: quantas questões estão anuladas nesta prova. */
+  @ApiProperty()
+  totalAnuladas: number;
+
   /** tickets/027: de qual prova esta foi duplicada. */
   @ApiProperty({ required: false, nullable: true })
   provaOrigemId?: string | null;

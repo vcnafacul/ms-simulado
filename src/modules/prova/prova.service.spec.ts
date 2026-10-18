@@ -139,6 +139,28 @@ describe('ProvaService.getAllByCursinho', () => {
     expect(result.data[0].categoria).toBe('Personalizado');
     expect(result.data[0].exame).toBe('Personalizado');
     expect(result.data[0].totalQuestaoCadastradas).toBe(0);
+    expect(result.data[0].totalAnuladas).toBe(0);
+  });
+
+  it('card 21 (042): conta as anuladas da prova', async () => {
+    const prova = makeProva('p2');
+    prova.questoes = [
+      { numero: 1 },
+      { numero: 2, anulacao: { motivo: 'outro', justificativa: 'x' } },
+      { numero: 3, anulacao: { motivo: 'outro', justificativa: 'y' } },
+    ];
+    const getAll = jest.fn().mockResolvedValue({
+      data: [prova],
+      page: 1,
+      limit: 40,
+      totalItems: 1,
+    });
+    const { service } = makeServiceWithGetAll(getAll);
+    const result = await service.getAll({ page: 1, limit: 40 });
+    expect(result.data[0]).toMatchObject({
+      totalQuestaoCadastradas: 3,
+      totalAnuladas: 2,
+    });
   });
 
   it('cursinho sem provas retorna data vazia (não lança)', async () => {
