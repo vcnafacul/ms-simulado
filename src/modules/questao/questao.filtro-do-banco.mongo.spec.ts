@@ -93,7 +93,12 @@ describe('filtro do banco de questões (043/01) — Mongo real', () => {
         categoria: CAT_ENEM_2,
         questoes: [{ questao: QC }, { questao: QA }],
       },
-      { nome: 'Fuvest', categoria: CAT_FUVEST, questoes: [{ questao: QD }] },
+      {
+        nome: 'Fuvest',
+        categoria: CAT_FUVEST,
+        ano: 2023,
+        questoes: [{ questao: QD }],
+      },
       {
         nome: 'Excluída',
         categoria: CAT_ENEM_1,
@@ -124,6 +129,16 @@ describe('filtro do banco de questões (043/01) — Mongo real', () => {
         categoria: String(CAT_PERS),
       }),
     ).toEqual([String(QF)]);
+  });
+
+  it('043/09: ano — questões das provas daquele ano; combina com exame', async () => {
+    expect(await repo.findQuestaoIdsDasProvas({ ano: 2023 })).toEqual([
+      String(QD),
+    ]);
+    expect(
+      await repo.findQuestaoIdsDasProvas({ ano: 2023, exame: String(ENEM) }),
+    ).toEqual([]);
+    expect(await repo.findQuestaoIdsDasProvas({ ano: 1999 })).toEqual([]);
   });
 
   it('categoria: só as provas daquela categoria', async () => {
@@ -187,6 +202,8 @@ describe('filtro do banco de questões (043/01) — Mongo real', () => {
       'revisoes',
     ]);
     expect(await erros({ exame: 'x' })).toEqual(['exame']);
+    expect(await erros({ ano: '2023' })).toEqual([]);
+    expect(await erros({ ano: '23' })).toEqual(['ano']);
     expect(
       await erros({ categoria: String(CAT_ENEM_1), semImagem: 'true' }),
     ).toEqual([]);
@@ -230,6 +247,16 @@ describe('QuestaoService.getAll — fiação dos filtros novos (043/01)', () => 
       reported: true,
       textClassification: true,
       imageId: { $in: [null, ''] },
+    });
+  });
+
+  it('ano sozinho também vira o conjunto (como número)', async () => {
+    const { svc, repository } = montar();
+    await svc.getAll(dto({ ano: '2023' }));
+    expect(repository.findQuestaoIdsDasProvas).toHaveBeenCalledWith({
+      exame: undefined,
+      categoria: undefined,
+      ano: 2023,
     });
   });
 

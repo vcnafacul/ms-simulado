@@ -950,6 +950,8 @@ export class QuestaoRepository extends BaseRepository<Questao> {
   async findQuestaoIdsDasProvas(filtro: {
     exame?: string;
     categoria?: string;
+    /** tickets/043, card 09. */
+    ano?: number;
   }): Promise<string[]> {
     const r = await this.provaModel
       .aggregate<{ _id: Types.ObjectId }>([
@@ -959,6 +961,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
             ...(filtro.categoria
               ? { categoria: { $in: idNosDoisFormatos(filtro.categoria) } }
               : {}),
+            ...(filtro.ano ? { ano: filtro.ano } : {}),
           },
         },
         ...(filtro.exame
