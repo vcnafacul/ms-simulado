@@ -260,3 +260,42 @@ describe('totais sem as anuladas fora do ms (042/02)', () => {
     expect(r.historicos[0].numerosAnulados).toEqual([45]);
   });
 });
+
+describe('toanswer com anulada (042/10)', () => {
+  it('a anulada vai marcada e SEM imageId; as outras, como sempre', async () => {
+    const simulado = {
+      _id: 's1',
+      nome: 'S',
+      bloqueado: false,
+      categoria: { _id: 'c1', duracao: 60 },
+      questoes: [
+        { questao: { _id: 'q1', imageId: 'img1' }, numero: 1 },
+        {
+          questao: { _id: 'q2', imageId: 'img2' },
+          numero: 2,
+          anulacao: { motivo: 'outro' },
+        },
+      ],
+    };
+    const service = new SimuladoService(
+      {
+        getAvailabilityById: jest.fn().mockResolvedValue({
+          bloqueado: false,
+          disponivelDe: null,
+          disponivelAte: null,
+        }),
+        getById: jest.fn().mockResolvedValue(simulado),
+      } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+    const r = await service.getToAnswer('s1');
+    expect(r!.questoes.map((q) => [q.anulada, q.imageId])).toEqual([
+      [false, 'img1'],
+      [true, undefined],
+    ]);
+  });
+});

@@ -1,4 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { estaDivergente, numerosDoSimulado } from './filtro-divergente';
+import { HistoricoStatus } from './enums/historico-status.enum';
+import { Historico } from './historico.schema';
+import {
+  recalcularHistorico,
+  SlotParaRecalculo,
+} from './recalculo/recalcularHistorico';
 import { AggregatePeriodDtoInput } from 'src/shared/dtos/aggregate-period.dto.input';
 import { GetHistoricoDTOInput } from './dtos/get-historico.dto';
 import { GetPerformanceHistories } from './dtos/get-perfomance-histories.dto';
@@ -18,6 +25,8 @@ function toPlain(doc: unknown): any {
 
 @Injectable()
 export class HistoricoService {
+  private readonly logger = new Logger(HistoricoService.name);
+
   constructor(private repository: HistoricoRepository) {}
 
   /** tickets/026, card 05. */
@@ -55,19 +64,87 @@ export class HistoricoService {
    * o status da origem, e a negativa chega na ponta como 404 de verdade.
    */
   async getById(id: string, usuario: string) {
-    const historico = await this.repository.getByIdAndUsuario(id, usuario);
+    let historico = await this.repository.getByIdAndUsuario(id, usuario);
     if (!historico) throw new NotFoundException('historico nao encontrado');
+    if (await this.recalcularDigitalAoAbrir(historico)) {
+      historico = await this.repository.getByIdAndUsuario(id, usuario);
+    }
     const obj: any = toPlain(historico);
+    /*
+      tickets/042 (cards 10 e 20): divergente = a nota foi calculada com outro
+      conjunto de anuladas. Calculado ANTES de achatar, com os slots do simulado.
+    */
+    obj.divergente = obj.simulado
+      ? estaDivergente(obj, numerosDoSimulado(obj.simulado))
+      : false;
     if (obj.simulado && Array.isArray(obj.simulado.questoes)) {
       // Achata pro shape antigo do client, preservando o numero do relacionamento
       // (numero vive em QuestaoNaContainer, não mais na Questao).
       obj.simulado.questoes = obj.simulado.questoes.map((qc: any) => ({
         ...qc.questao,
         numero: qc.numero,
+        // tickets/042: a anulada, com o porquê (o aluno abre e lê o motivo).
+        anulada: !!qc.anulacao,
+        ...(qc.anulacao
+          ? {
+              anulacao: {
+                motivo: qc.anulacao.motivo,
+                justificativa: qc.anulacao.justificativa,
+              },
+            }
+          : {}),
       }));
     }
     obj.falha = descreverFalha(obj.falha);
     return obj;
+  }
+
+  /**
+   * tickets/042, D11 (proposta do card 00, aberta): o histórico DIGITAL não
+   * tem relatório que mostre a divergência. Quando o aluno abre o PRÓPRIO
+   * resultado divergente, recalcula esse documento na hora — um só, barato,
+   * com a mesma função e o mesmo update condicional do recálculo em fila.
+   *
+   * ⚠️ Só o digital (`!cartaoCode`): o de cartão espera o relatório do
+   * cursinho (D6). E sem push (D7): o aluno já está vendo.
+   *
+   * @returns se regravou (aí quem chama relê).
+   */
+  private async recalcularDigitalAoAbrir(
+    historico: Historico,
+  ): Promise<boolean> {
+    const h = historico as Historico & { _id: unknown };
+    const simulado = h.simulado as unknown as {
+      questoes?: { numero?: number | null; anulacao?: unknown }[];
+    } | null;
+    if (
+      h.cartaoCode ||
+      h.status !== HistoricoStatus.Completed ||
+      !simulado ||
+      !estaDivergente(h, numerosDoSimulado(simulado))
+    ) {
+      return false;
+    }
+    const completo = await this.repository.getParaRecalculo(String(h._id));
+    const sim = completo?.simulado as unknown as {
+      revisaoAnulacao?: number;
+      questoes?: SlotParaRecalculo[];
+    } | null;
+    if (!completo || !sim?.questoes) return false;
+    const r = recalcularHistorico(
+      completo.respostas as never,
+      sim.questoes,
+      sim.revisaoAnulacao ?? 0,
+    );
+    if (!r.ok) {
+      this.logger.warn(`recálculo ao abrir ${String(h._id)}: ${r.motivo}`);
+      return false;
+    }
+    return this.repository.regravarRecalculo(
+      String(h._id),
+      sim.revisaoAnulacao ?? 0,
+      r.dados as never,
+    );
   }
 
   async getPerformance(userId: string): Promise<GetPerformanceHistories> {

@@ -34,6 +34,7 @@ import {
   DONO_SYSTEM,
 } from '../categoria/schemas/categoria.schema';
 import { Questao } from '../questao/questao.schema';
+import { AnulacaoRepository } from '../questao/anulacao/anulacao.repository';
 
 export const TEXTO_DUPLICAR_SO_DO_CURSINHO =
   'Só dá para duplicar provas do seu cursinho.';
@@ -58,6 +59,9 @@ export class ProvaService {
     private readonly simuladoRepository: SimuladoRepository,
     private readonly questaoRepository: QuestaoRepository,
     private readonly auditLogService?: AuditLogService,
+    // tickets/042 (card 04): duplicar leva o espelho das anulações. Último e
+    // opcional: os specs montam o service na mão.
+    private readonly anulacaoRepository?: AnulacaoRepository,
   ) {}
 
   /**
@@ -303,9 +307,10 @@ export class ProvaService {
       for (const qc of origem.questoes ?? []) {
         const questao = qc.questao as Questao;
         if (!questao?._id) continue;
-        addQuestaoToContainer(prova, questao, qc.numero);
+        // tickets/042: o slot anulado continua anulado na cópia.
+        addQuestaoToContainer(prova, questao, qc.numero, qc.anulacao);
         for (const simulado of destinos(String(questao._id))) {
-          addQuestaoToContainer(simulado, questao, qc.numero);
+          addQuestaoToContainer(simulado, questao, qc.numero, qc.anulacao);
         }
         if (questao.status === Status.Approved)
           prova.totalQuestaoValidadas += 1;
@@ -316,6 +321,25 @@ export class ProvaService {
       }
 
       const result = await this.repository.create(prova);
+      // Revisão da cópia = 0 (nenhuma nota calculada). O espelho ganha a prova nova.
+      await this.anulacaoRepository?.adicionarAoEspelho(
+        (origem.questoes ?? [])
+          .filter((qc) => qc.anulacao && (qc.questao as Questao)?._id)
+          .map((qc) => ({
+            questaoId: String((qc.questao as Questao)._id),
+            // ⚠️ Campos explícitos: `qc.anulacao` é subdocumento do Mongoose, e
+            // o spread dele leva os internos (`$__`, `_doc`) e perde os campos.
+            entrada: {
+              motivo: qc.anulacao!.motivo,
+              justificativa: qc.anulacao!.justificativa,
+              em: qc.anulacao!.em,
+              porUsuarioId: qc.anulacao!.porUsuarioId ?? null,
+              porCursinhoId: qc.anulacao!.porCursinhoId ?? null,
+              provaId: String(result._id),
+              numero: qc.numero ?? null,
+            },
+          })),
+      );
       return {
         _id: result._id,
         edicao: result.edicao,
