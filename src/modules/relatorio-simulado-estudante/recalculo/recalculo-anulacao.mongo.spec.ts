@@ -335,7 +335,14 @@ describe('recálculo por anulação (042/12) — Mongo real', () => {
       numerosAnulados: [2],
     });
     expect(avisos[0].afetados).toHaveLength(3);
-    expect(avisos[0].afetados[0]).toMatchObject({ mes: '2026-09' });
+    // Card 20: a nota de antes e a de depois vão no aviso.
+    expect(avisos[0].afetados[0]).toMatchObject({
+      mes: '2026-09',
+      acertosAntes: 4,
+      totalAntes: 4,
+      acertosDepois: 3,
+      totalDepois: 3,
+    });
 
     expect(await service.situacao(c.recorte)).toMatchObject({ divergentes: 0 });
     expect(await service.solicitar(c.recorte)).toMatchObject({
@@ -363,6 +370,55 @@ describe('recálculo por anulação (042/12) — Mongo real', () => {
     });
   });
 
+  const desanular = (c: Awaited<ReturnType<typeof cenario>>, numero: number) =>
+    anulacoes.limpar({
+      provaId: String(c.p),
+      questaoId: String(c.ids[numero - 1]),
+      subirRevisao: true,
+    });
+
+  it('card 20: anular → desanular SEM recálculo → nenhum divergente, nada a recalcular', async () => {
+    const c = await cenario();
+    await anular(c, 2);
+    await desanular(c, 2);
+    expect(await service.situacao(c.recorte)).toEqual({
+      divergentes: 0,
+      anulacoes: [],
+      desanuladas: [],
+    });
+    expect(await service.solicitar(c.recorte)).toMatchObject({
+      criado: false,
+      mensagem: 'Nada a recalcular.',
+    });
+  });
+
+  it('card 20: anular → recalcular → desanular → divergentes de novo, e diz que a 2 voltou a valer', async () => {
+    const c = await cenario();
+    await anular(c, 2);
+    await service.processar((await service.solicitar(c.recorte)).job!.id);
+    await desanular(c, 2);
+    expect(await service.situacao(c.recorte)).toEqual({
+      divergentes: 3,
+      anulacoes: [],
+      desanuladas: [2],
+    });
+  });
+
+  it('card 20: anular 2 → recalcular → anular 3 → desanular 3 → nenhum divergente', async () => {
+    const c = await cenario();
+    await anular(c, 2);
+    await service.processar((await service.solicitar(c.recorte)).job!.id);
+    await anular(c, 3);
+    expect(await service.situacao(c.recorte)).toMatchObject({
+      divergentes: 3,
+      desanuladas: [],
+    });
+    await desanular(c, 3);
+    expect(await service.situacao(c.recorte)).toMatchObject({
+      divergentes: 0,
+    });
+  });
+
   it('⚠️ anulação nova com o job no meio → segunda passada; no fim, zero divergentes', async () => {
     const c = await cenario();
     await anular(c, 2);
@@ -385,8 +441,16 @@ describe('recálculo por anulação (042/12) — Mongo real', () => {
       (await historicos.collection.findOne({ _id: c.hist[0] }))!
         .numerosAnulados,
     ).toEqual([2, 3]);
-    // Cada aluno uma vez no aviso, mesmo regravado nas duas passadas.
+    // Cada aluno uma vez no aviso, mesmo regravado nas duas passadas — com a
+    // nota de antes da 1ª passada e a de depois da última (card 20).
     expect(avisos[0].afetados).toHaveLength(3);
+    for (const a of avisos[0].afetados)
+      expect(a).toMatchObject({
+        acertosAntes: 4,
+        totalAntes: 4,
+        acertosDepois: 2,
+        totalDepois: 2,
+      });
   });
 
   it('histórico que não casa com o container conta como falha, e o job termina', async () => {

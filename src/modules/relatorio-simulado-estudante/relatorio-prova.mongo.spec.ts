@@ -241,12 +241,14 @@ describe('relatório da prova (tickets/034) — Mongo real', () => {
           nome: 'Simulado Inglês',
           cartoes: 1,
           totalDeQuestoes: 2,
+          totalConsiderado: 2, // tickets/042
         },
         {
           simuladoId: S2.toString(),
           nome: 'Simulado Espanhol',
           cartoes: 2,
           totalDeQuestoes: 2,
+          totalConsiderado: 2, // tickets/042
         },
       ]);
       expect(r.mesmasQuestoes).toBe(true);

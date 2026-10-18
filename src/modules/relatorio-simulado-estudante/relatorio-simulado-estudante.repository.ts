@@ -45,14 +45,17 @@ import { RelatorioSimuladoEstudante } from './relatorio-simulado-estudante.schem
  * **o próximo campo tem de ser medido de novo**, e `respostas` segue barrado.
  */
 const CAMPOS_DO_HISTORICO =
-  'status cartaoCode questoesRespondidas acertos aproveitamento falha';
+  'status cartaoCode questoesRespondidas acertos aproveitamento falha ' +
+  // tickets/042, card 13: a linha diz se está divergente e sobre quantas.
+  'revisaoAnulacao totalConsiderado numerosAnulados recalculadoEm';
 
 /**
  * ⚠️ O oposto do `CAMPOS_DO_HISTORICO`: aqui as `respostas` ENTRAM. Lá elas
  * ficam de fora porque o relatório lê centenas de linhas e nenhuma tela usa o
  * detalhe; aqui é UM estudante, e o detalhe é exatamente o que se pediu.
  */
-const CAMPOS_DO_DETALHE = 'status falha respostas';
+const CAMPOS_DO_DETALHE =
+  'status falha respostas revisaoAnulacao totalConsiderado numerosAnulados recalculadoEm';
 
 /**
  * `historico` é `| null` porque o `populate` de uma ref apagada (`Historico`
@@ -839,12 +842,16 @@ export class RelatorioSimuladoEstudanteRepository {
       simuladoId: string;
       aproveitamento: number;
       acertos?: number;
+      totalConsiderado?: number;
       em: Date;
     }[]
   > {
     const linhas = await this.model
       .find({ ...filtroDoRecorte(params), usuario: params.usuario })
-      .populate({ path: 'historico', select: 'status aproveitamento acertos' })
+      .populate({
+        path: 'historico',
+        select: 'status aproveitamento acertos totalConsiderado',
+      })
       .lean()
       .exec();
 
@@ -860,6 +867,9 @@ export class RelatorioSimuladoEstudanteRepository {
         simuladoId: l.simulado!.toString(),
         aproveitamento: l.historico!.aproveitamento.geral,
         acertos: (l.historico as { acertos?: number }).acertos,
+        // tickets/042: "50 de 89" no gráfico, quando houve anulada.
+        totalConsiderado: (l.historico as { totalConsiderado?: number })
+          .totalConsiderado,
         /*
           ⚠️ **`createdAt` da JUNÇÃO, e não do histórico.** É quando o cartão
           deste estudante entrou neste recorte — o mesmo campo que o
