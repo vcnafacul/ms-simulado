@@ -1,3 +1,4 @@
+import { ClientSession } from 'mongoose';
 import { UpdateDTOInput } from 'src/modules/questao/dtos/update.dto.input';
 import { Questao } from 'src/modules/questao/questao.schema';
 import { CreateProvaDTOInput } from '../dtos/create.dto.input';
@@ -15,6 +16,7 @@ export interface IProvaFactory {
     questaoId: string,
     provaId: string,
     numero: number,
+    dentroDaTransacao?: (session: ClientSession) => Promise<void>,
   ) => Promise<void>;
 }
 

@@ -94,9 +94,7 @@ describe('Enem2010_2017Factory.verifyNumberProva (Regra C — idiomáticas 91-95
 
   it('idiomático (91-95) com 1 ocorrência → true', async () => {
     const { factory } = makeFactory(
-      jest
-        .fn()
-        .mockResolvedValue({ questoes: [{ numero: 92, questao: {} }] }),
+      jest.fn().mockResolvedValue({ questoes: [{ numero: 92, questao: {} }] }),
     );
     expect(await factory.verifyNumberProva('p1', 92)).toBe(true);
   });
@@ -115,9 +113,7 @@ describe('Enem2010_2017Factory.verifyNumberProva (Regra C — idiomáticas 91-95
 
   it('não-idiomático ocupado → false', async () => {
     const { factory } = makeFactory(
-      jest
-        .fn()
-        .mockResolvedValue({ questoes: [{ numero: 100, questao: {} }] }),
+      jest.fn().mockResolvedValue({ questoes: [{ numero: 100, questao: {} }] }),
     );
     expect(await factory.verifyNumberProva('p1', 100)).toBe(false);
   });

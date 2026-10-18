@@ -35,6 +35,33 @@ import { montarCadernoDaProva } from './gerador/caderno-da-prova';
 
 const MENSAGEM_BLOQUEADO =
   'simulado não está pronto (questões pendentes ou incompletas)';
+import {
+  listaDeAnulados,
+  numerosAnuladosDoContainer,
+} from '../simulado/anuladas';
+
+/**
+ * tickets/042 (D8): caderno com questão anulada só sai com confirmação — o
+ * client mostra o modal "A prova tem 1 questão anulada (45)" e reenvia com
+ * `confirmarAnuladas=true`.
+ */
+export function exigirConfirmacaoDasAnuladas(
+  simulados: { questoes: { numero: number | null; anulacao?: unknown }[] }[],
+  confirmado?: boolean,
+): void {
+  if (confirmado) return;
+  const numeros = new Set<number>();
+  for (const s of simulados) {
+    for (const n of numerosAnuladosDoContainer(s.questoes)) numeros.add(n);
+  }
+  if (!numeros.size) return;
+  const lista = listaDeAnulados(numeros);
+  throw new ConflictException({
+    code: 'CADERNO_COM_ANULADAS',
+    numeros: lista,
+    message: `A prova tem ${lista.length} questão(ões) anulada(s) (${lista.join(', ')}).`,
+  });
+}
 
 @Injectable()
 export class CadernoService {
@@ -50,7 +77,12 @@ export class CadernoService {
 
   async gerarZip(
     simuladoId: string,
-    opts: { draft: boolean; logos?: LogosDoCaderno },
+    opts: {
+      draft: boolean;
+      logos?: LogosDoCaderno;
+      /** tickets/042 (D8): quem pediu já viu o modal das anuladas. */
+      confirmarAnuladas?: boolean;
+    },
   ): Promise<{ nome: string; buffer: Buffer; avisos: number }> {
     if (opts.draft && !this.env.get('CADERNO_DRAFT_ENABLED')) {
       throw new ForbiddenException('geração de rascunho desabilitada');
@@ -63,6 +95,10 @@ export class CadernoService {
     // features que recusam pelo mesmo motivo não podem divergir no texto.
     if (simulado.bloqueado && !opts.draft) {
       throw new ConflictException(MENSAGEM_BLOQUEADO);
+    }
+    // O rascunho não pergunta: é de quem está montando a prova, e mostra o selo.
+    if (!opts.draft) {
+      exigirConfirmacaoDasAnuladas([simulado], opts.confirmarAnuladas);
     }
 
     return this.empacotar(
@@ -79,7 +115,7 @@ export class CadernoService {
    */
   async gerarZipDaProva(
     provaId: string,
-    opts: { logos?: LogosDoCaderno },
+    opts: { logos?: LogosDoCaderno; confirmarAnuladas?: boolean },
   ): Promise<{ nome: string; buffer: Buffer; avisos: number }> {
     const prova = await this.provas.getById(provaId);
     if (!prova || (prova as { deleted?: boolean }).deleted) {
@@ -103,6 +139,8 @@ export class CadernoService {
         'Todos os simulados da prova precisam estar completos para gerar o caderno da prova.',
       );
     }
+
+    exigirConfirmacaoDasAnuladas(simulados, opts.confirmarAnuladas);
 
     const conteudo = montarCadernoDaProva(
       {

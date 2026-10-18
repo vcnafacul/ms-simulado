@@ -28,4 +28,11 @@ export class GetPerformanceHistory {
 
   @ApiProperty()
   public createdAt?: Date;
+
+  /** tickets/042: total sem as anuladas. Ausente em histórico antigo. */
+  @ApiProperty({ required: false })
+  public totalConsiderado?: number;
+
+  @ApiProperty({ required: false, type: [Number] })
+  public numerosAnulados?: number[];
 }

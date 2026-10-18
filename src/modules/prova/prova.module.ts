@@ -12,6 +12,8 @@ import {
 } from '../categoria/schemas/categoria.schema';
 import { CategoriaRepository } from '../categoria/categoria.repository';
 import { ProvaFactory } from './factory/prova_factory';
+import { AnulacaoController } from './anulacao/anulacao.controller';
+import { AnulacaoService } from './anulacao/anulacao.service';
 import { ProvaController } from './prova.controller';
 import { ProvaRepository } from './prova.repository';
 import { Prova, ProvaSchema } from './prova.schema';
@@ -36,7 +38,7 @@ import { ProvaGestaoService } from './gestao/prova-gestao.service';
     // Card 41: "alguém fez a prova" é contado no histórico.
     HistoricoModule,
   ],
-  controllers: [ProvaController],
+  controllers: [ProvaController, AnulacaoController],
   providers: [
     ProvaService,
     ProvaRepository,
@@ -45,6 +47,7 @@ import { ProvaGestaoService } from './gestao/prova-gestao.service';
     ProvaFactory,
     EnemService,
     ProvaGestaoService,
+    AnulacaoService,
   ],
   exports: [ProvaService, ProvaRepository],
 })

@@ -1,3 +1,4 @@
+import { ClientSession } from 'mongoose';
 import { validarAreaNaProva } from '../services/area-da-prova';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { FrenteRepository } from 'src/modules/frente/frente.repository';
@@ -296,6 +297,11 @@ export class Enem2017PlusFactory implements IProvaFactory {
     questaoId: string,
     provaId: string,
     numero: number,
+    /**
+     * tickets/042 (card 04): roda DENTRO da transação, antes do commit — a
+     * questão entra já anulada, ou não entra.
+     */
+    dentroDaTransacao?: (session: ClientSession) => Promise<void>,
   ): Promise<void> {
     const questao = await this.questaoRepository.getByIdToUpdate(questaoId);
     const [frenteIngles, frenteEspanhol] = await Promise.all([
@@ -347,6 +353,7 @@ export class Enem2017PlusFactory implements IProvaFactory {
         session,
       );
       await this.provaRepository.addQuestion(provaId, questao, numero, session);
+      if (dentroDaTransacao) await dentroDaTransacao(session);
       await session.commitTransaction();
     } catch (error) {
       await session.abortTransaction();

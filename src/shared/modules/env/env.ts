@@ -34,6 +34,10 @@ export const envSchema = z.object({
   API_URL: z.string().url().optional(),
   NOTIFICACAO_SECRET: z.string().optional(),
 
+  // tickets/042, card 12: pausa entre lotes de 50 no recálculo por anulação —
+  // 500 históricos não viram um pico no Mongo.
+  RECALCULO_PAUSA_MS: z.coerce.number().int().min(0).default(200),
+
   // Caderno · card 04. Rascunho é ferramenta de quem monta a prova; liberar
   // isso por acidente em produção entregaria caderno de simulado incompleto.
   //

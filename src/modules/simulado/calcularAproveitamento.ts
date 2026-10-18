@@ -26,8 +26,15 @@ import { vinculosDaQuestao } from './vinculosDaQuestao';
  * `frente1` no drill-down.
  */
 export function calcularAproveitamento(
-  respostas: RespostaAproveitamento[],
+  todas: RespostaAproveitamento[],
 ): AproveitamentoHistorico {
+  /*
+    ⚠️ **A anulada sai da conta inteira** (tickets/042, D2): numerador e
+    denominador, no geral, na matéria e na frente. Não é "ponto para todos" —
+    50 de 89, nunca 51 de 90. Filtrar AQUI, antes de tudo, é o que faz matéria
+    ou frente que só tinha anuladas sumir em vez de virar 0%.
+  */
+  const respostas = todas.filter((r) => !r.anulada);
   /*
     Uma passada só: para cada resposta, cada MATÉRIA que ela toca ganha um
     acerto e um total (uma vez), e cada FRENTE também. O código antigo fazia três varreduras e um
@@ -129,8 +136,16 @@ export function calcularAproveitamento(
 export function montarRespostasAproveitamento(
   questoes: Questao[],
   rawRespostas: { questao: unknown; alternativaEstudante?: unknown }[],
+  anuladas?: {
+    numeros: ReadonlySet<number>;
+    /** O número da questão NO container de onde `questoes` saiu. */
+    numeroDe: (questaoId: string) => number | null | undefined;
+  },
 ): RespostaAproveitamento[] {
   return questoes.map((questao) => {
+    // ⚠️ Pelo número do slot, nunca pelo id (tickets/042, R2).
+    const numero = anuladas?.numeroDe(questao._id.toString());
+    const anulada = numero != null && !!anuladas?.numeros.has(numero);
     /*
       ⚠️ `String(...)`: no `rawRespostas` o id vem como string, mas no
       `respostas` gravado (que o recálculo lê) vem como ObjectId — medido no
@@ -145,6 +160,7 @@ export function montarRespostasAproveitamento(
       alternativaCorreta: questao.alternativa,
       materia: questao.materia,
       frente: questao.frente1,
+      ...(anulada ? { anulada: true } : {}),
     };
   });
 }

@@ -20,6 +20,7 @@ import { Historico } from '../historico/historico.schema';
 import { EstadoParaExclusao, STATUS_EXCLUIVEIS } from './exclusaoDaQuestao';
 import { NoDaLinhagem } from './linhagemDaQuestao';
 import { resumoDoDono } from '../prova/helpers/pode-compor-prova';
+import { moverEspelho } from './anulacao/anulacao.repository';
 
 /** Uma questão vista pela cadeia de versões (tickets/023, card 13). */
 export interface QuestaoDaCadeia {
@@ -545,6 +546,15 @@ export class QuestaoRepository extends BaseRepository<Questao> {
         .updateMany({ ...filtro, _id: { $nin: bloqueados } }, update, opcoes)
         .exec(),
     ]);
+    // tickets/042: o slot ficou anulado nas provas que trocaram; o espelho vai
+    // junto para a sucessora.
+    await moverEspelho(
+      this.model,
+      de,
+      para,
+      recebem.map((p) => String(p._id)),
+    );
+
     const simuladosMantidos = bloqueados.length
       ? await this.simuladoModel.countDocuments({
           ...filtro,
@@ -675,6 +685,8 @@ export class QuestaoRepository extends BaseRepository<Questao> {
         opcoes,
       )
       .exec();
+    // tickets/042: a anulação ficou no slot; o espelho acompanha a troca.
+    await moverEspelho(this.model, de, para, [String(provaId)], session);
     return r.modifiedCount;
   }
 
@@ -908,7 +920,9 @@ export class QuestaoRepository extends BaseRepository<Questao> {
           congelada: { $ne: true },
         },
         {
-          $set: { deleted: true },
+          // tickets/042: questão excluída não carrega "anulada em" de prova
+          // nenhuma (só chega aqui órfã; o que sobrar é de prova excluída).
+          $set: { deleted: true, anulacoes: [] },
           $unset: { origem: '', tipoOrigem: '' },
         },
       )
