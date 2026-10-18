@@ -151,7 +151,11 @@ export class RelatorioSimuladoEstudanteService {
 
   /** O bloco `anulacao` do resumo — o aviso de "relatório desatualizado". */
   private resumoDaAnulacao(a: AnulacaoNoRelatorio) {
-    return { divergentes: a.divergentes, jobAtivo: a.jobAtivo };
+    return {
+      divergentes: a.divergentes,
+      desanuladas: a.desanuladas,
+      jobAtivo: a.jobAtivo,
+    };
   }
 
   async consultar(params: {
@@ -307,7 +311,9 @@ export class RelatorioSimuladoEstudanteService {
         */
         divergente: linhaDivergente(
           h,
-          l.simulado ? anulacao.revisao.get(String(l.simulado)) : undefined,
+          l.simulado
+            ? anulacao.numerosPorSimulado.get(String(l.simulado))
+            : undefined,
           leituraConcluida,
         ),
         totalConsiderado: leituraConcluida ? h.totalConsiderado : undefined,
@@ -726,7 +732,7 @@ export class RelatorioSimuladoEstudanteService {
       // tickets/042, card 13/16.
       divergente: linhaDivergente(
         h,
-        anulacao.revisao.get(params.simuladoId),
+        anulacao.numerosPorSimulado.get(params.simuladoId),
         h.status === HistoricoStatus.Completed,
       ),
       totalConsiderado: h.totalConsiderado,

@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, PipelineStage, Types } from 'mongoose';
 import { HistoricoStatus } from '../../historico/enums/historico-status.enum';
-import { filtroDivergente } from '../../historico/filtro-divergente';
+import {
+  filtroDivergente,
+  numerosDoSimulado,
+} from '../../historico/filtro-divergente';
 import { Simulado } from '../../simulado/schemas/simulado.schema';
 import { RelatorioSimuladoEstudante } from '../relatorio-simulado-estudante.schema';
 
@@ -11,14 +14,26 @@ export interface HistoricoDivergente {
   usuario: string;
   createdAt?: Date;
   respostas: unknown[];
+  /** A nota de antes — o push "nota atualizada" compara com a de depois (card 20). */
+  acertos?: number;
+  totalConsiderado?: number;
+}
+
+/** O estado de anulação de um simulado que as consultas usam. */
+export interface AnulacaoDoSimulado {
+  /** Revisão atual: `0` = nunca anulou nada (atalho, sem consulta). */
+  revisao: number;
+  /** As anuladas de agora, ordenadas — o lado "atual" da divergência. */
+  numeros: number[];
 }
 
 /**
  * As consultas da divergência (tickets/042, R3) — sobre as LINHAS do relatório
  * de um cursinho, para o recálculo pegar exatamente o que o relatório mostra.
  *
- * ⚠️ Sempre pelo `filtroDivergente` (`$not: { $gte }`): histórico anterior a
- * esta série não tem `revisaoAnulacao`, e o `$lt` o deixaria de fora.
+ * ⚠️ Sempre pelo `filtroDivergente` (card 20): divergente é o histórico
+ * calculado com OUTRO conjunto de anuladas — não "revisão atrás". Anular e
+ * desanular sem recálculo no meio não deixa ninguém divergente.
  */
 @Injectable()
 export class DivergenciaRepository {
@@ -31,9 +46,8 @@ export class DivergenciaRepository {
   private pipeline(
     simuladoId: string,
     cursinhoId: string,
-    alvo: number,
+    numeros: readonly number[],
   ): PipelineStage[] {
-    const divergente = filtroDivergente(alvo) as { revisaoAnulacao: unknown };
     return [
       { $match: { simulado: new Types.ObjectId(simuladoId), cursinhoId } },
       {
@@ -48,7 +62,7 @@ export class DivergenciaRepository {
       {
         $match: {
           'h.status': HistoricoStatus.Completed,
-          'h.revisaoAnulacao': divergente.revisaoAnulacao,
+          ...filtroDivergente(numeros, 'h.'),
         },
       },
     ];
@@ -57,12 +71,12 @@ export class DivergenciaRepository {
   async contar(
     simuladoId: string,
     cursinhoId: string,
-    alvo: number,
+    anulacao: AnulacaoDoSimulado,
   ): Promise<number> {
-    if (alvo <= 0) return 0;
+    if (anulacao.revisao <= 0) return 0;
     const [r] = await this.linhas
       .aggregate([
-        ...this.pipeline(simuladoId, cursinhoId, alvo),
+        ...this.pipeline(simuladoId, cursinhoId, anulacao.numeros),
         { $count: 'n' },
       ])
       .exec();
@@ -73,14 +87,14 @@ export class DivergenciaRepository {
   async lote(
     simuladoId: string,
     cursinhoId: string,
-    alvo: number,
+    anulacao: AnulacaoDoSimulado,
     depoisDe: Types.ObjectId | null,
     limite: number,
   ): Promise<HistoricoDivergente[]> {
-    if (alvo <= 0) return [];
+    if (anulacao.revisao <= 0) return [];
     return this.linhas
       .aggregate([
-        ...this.pipeline(simuladoId, cursinhoId, alvo),
+        ...this.pipeline(simuladoId, cursinhoId, anulacao.numeros),
         ...(depoisDe ? [{ $match: { 'h._id': { $gt: depoisDe } } }] : []),
         { $sort: { 'h._id': 1 } },
         { $limit: limite },
@@ -90,10 +104,33 @@ export class DivergenciaRepository {
             usuario: '$h.usuario',
             createdAt: '$h.createdAt',
             respostas: '$h.respostas',
+            acertos: '$h.acertos',
+            totalConsiderado: '$h.totalConsiderado',
           },
         },
       ])
       .exec();
+  }
+
+  /**
+   * Os números anulados com que os divergentes foram calculados (união). O que
+   * não está anulado agora "voltou a valer" — o aviso do relatório diz isso, e
+   * não "foi anulada" (card 20).
+   */
+  async numerosDosDivergentes(
+    simuladoId: string,
+    cursinhoId: string,
+    anulacao: AnulacaoDoSimulado,
+  ): Promise<number[]> {
+    if (anulacao.revisao <= 0) return [];
+    const r = await this.linhas
+      .aggregate([
+        ...this.pipeline(simuladoId, cursinhoId, anulacao.numeros),
+        { $unwind: '$h.numerosAnulados' },
+        { $group: { _id: '$h.numerosAnulados' } },
+      ])
+      .exec();
+    return r.map((x: { _id: number }) => x._id).sort((a, b) => a - b);
   }
 
   /** O simulado com as questões populadas como o `processAnswer` as conta. */
@@ -128,4 +165,12 @@ export class DivergenciaRepository {
       .lean()
       .exec();
   }
+}
+
+/** O estado leve de um simulado (`estadoDosSimulados`) → o que as consultas usam. */
+export function anulacaoDoSimulado(s: {
+  revisaoAnulacao?: number;
+  questoes?: { numero?: number | null; anulacao?: unknown }[];
+}): AnulacaoDoSimulado {
+  return { revisao: s.revisaoAnulacao ?? 0, numeros: numerosDoSimulado(s) };
 }

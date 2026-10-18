@@ -11,7 +11,10 @@ import {
 import { listaDeAnulados } from '../../simulado/anuladas';
 import { RelatorioSimuladoEstudanteRepository } from '../relatorio-simulado-estudante.repository';
 import { AvisoDoRecalculoService } from './aviso-do-recalculo.service';
-import { DivergenciaRepository } from './divergencia.repository';
+import {
+  anulacaoDoSimulado,
+  DivergenciaRepository,
+} from './divergencia.repository';
 import {
   AfetadoDoRecalculo,
   chaveDoRecorte,
@@ -40,6 +43,11 @@ export interface SituacaoDoRecorte {
   divergentes: number;
   /** As anuladas AGORA nos simulados do recorte — o texto do aviso. */
   anulacoes: AnulacaoDoRecorte[];
+  /**
+   * Números que os divergentes contaram como anulados e que agora VALEM (card
+   * 20): o aviso diz "voltou a valer", e não "foi anulada".
+   */
+  desanuladas: number[];
 }
 
 /** `YYYY-MM` em São Paulo: o mês em que o aluno fez a prova, para o agregado da turma. */
@@ -94,12 +102,24 @@ export class RecalculoAnulacaoService {
     );
     let divergentes = 0;
     const anulacoes = new Map<number, AnulacaoDoRecorte>();
+    const desanuladas = new Set<number>();
     for (const s of estado) {
-      divergentes += await this.divergencia.contar(
+      const anulacao = anulacaoDoSimulado(s);
+      const n = await this.divergencia.contar(
         String(s._id),
         recorte.cursinhoId,
-        s.revisaoAnulacao ?? 0,
+        anulacao,
       );
+      divergentes += n;
+      if (n > 0) {
+        const agora = new Set(anulacao.numeros);
+        for (const num of await this.divergencia.numerosDosDivergentes(
+          String(s._id),
+          recorte.cursinhoId,
+          anulacao,
+        ))
+          if (!agora.has(num)) desanuladas.add(num);
+      }
       for (const qc of s.questoes ?? []) {
         if (qc.anulacao && qc.numero != null && !anulacoes.has(qc.numero)) {
           anulacoes.set(qc.numero, {
@@ -113,6 +133,7 @@ export class RecalculoAnulacaoService {
     return {
       divergentes,
       anulacoes: [...anulacoes.values()].sort((a, b) => a.numero - b.numero),
+      desanuladas: [...desanuladas].sort((a, b) => a - b),
     };
   }
 
@@ -324,7 +345,8 @@ export class RecalculoAnulacaoService {
     for (const s of estado) {
       const simuladoId = String(s._id);
       // Cada item recalcula para a revisão ATUAL (R6), lida no começo do simulado.
-      const alvo = s.revisaoAnulacao ?? 0;
+      const anulacao = anulacaoDoSimulado(s);
+      const alvo = anulacao.revisao;
       if (alvo <= 0) continue;
       const sim = await this.divergencia.simuladoParaRecalculo(simuladoId);
       const slots = (sim?.questoes ?? []) as unknown as SlotParaRecalculo[];
@@ -333,7 +355,7 @@ export class RecalculoAnulacaoService {
         const lote = await this.divergencia.lote(
           simuladoId,
           cursinhoId,
-          alvo,
+          anulacao,
           cursor,
           TAMANHO_DO_LOTE,
         );
@@ -365,6 +387,10 @@ export class RecalculoAnulacaoService {
               usuario: h.usuario,
               historicoId: String(h._id),
               mes: mesDe(h.createdAt),
+              acertosAntes: h.acertos,
+              totalAntes: h.totalConsiderado ?? h.respostas?.length,
+              acertosDepois: r.dados.acertos,
+              totalDepois: r.dados.totalConsiderado,
             });
           }
         }
@@ -400,11 +426,25 @@ export class RecalculoAnulacaoService {
       (job.provaId && (await this.relatorio.buscarProva(job.provaId))?.nome) ||
       (await this.divergencia.estadoDosSimulados(job.simuladoIds))[0]?.nome ||
       'Simulado';
-    // Um histórico por aluno pode aparecer em duas passadas: o primeiro basta.
-    const vistos = new Set<string>();
-    const afetados = job.afetados.filter(
-      (a) => !vistos.has(a.historicoId) && vistos.add(a.historicoId),
-    );
+    /*
+      Um histórico pode aparecer em duas passadas: um item por histórico, com a
+      nota de ANTES da primeira e a de DEPOIS da última (card 20).
+    */
+    const porHistorico = new Map<string, AfetadoDoRecalculo>();
+    for (const a of job.afetados) {
+      const visto = porHistorico.get(a.historicoId);
+      porHistorico.set(
+        a.historicoId,
+        visto
+          ? {
+              ...visto,
+              acertosDepois: a.acertosDepois,
+              totalDepois: a.totalDepois,
+            }
+          : { ...a },
+      );
+    }
+    const afetados = [...porHistorico.values()];
     const ok = await this.aviso.avisar({
       jobId,
       provaNome: nome.slice(0, 200),
