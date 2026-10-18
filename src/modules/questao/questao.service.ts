@@ -21,6 +21,7 @@ import { ProvaService } from '../prova/prova.service';
 import { SimuladoService } from '../simulado/simulado.service';
 import { CreateQuestaoDTOInput } from './dtos/create.dto.input';
 import { QuestaoAllDTO } from './dtos/questao.all.dto.output';
+import { condicoesDoFiltro } from './filtro-do-banco';
 import { QuestaoDTOInput } from './dtos/questao.dto.input';
 import { UpdateClassificacaoDTOInput } from './dtos/update-classificacao.dto.input';
 import { UpdateContentDTOInput } from './dtos/update-content.dto.input';
@@ -230,6 +231,10 @@ export class QuestaoService {
     enemArea,
     reported,
     anulada,
+    exame,
+    categoria,
+    revisoes,
+    semImagem,
     sortColumn = 'updatedAt',
     sortOrder = 'desc',
   }: QuestaoDTOInput): Promise<GetAllOutput<QuestaoAllDTO>> {
@@ -257,7 +262,17 @@ export class QuestaoService {
     if (prova) {
       ordemIds = await this.repository.findQuestaoIdsByProva(prova);
       where['_id'] = { $in: ordemIds };
+    } else if (exame || categoria) {
+      // tickets/043: com prova, ela vence (já está dentro do exame/categoria).
+      where['_id'] = {
+        $in: await this.repository.findQuestaoIdsDasProvas({
+          exame,
+          categoria,
+        }),
+      };
     }
+    // tickets/043: revisões em "e" e "sem imagem".
+    Object.assign(where, condicoesDoFiltro({ revisoes, semImagem }));
     if (enemArea) where['enemArea'] = enemArea;
     // tickets/042, card 04: o filtro do banco, sobre o espelho.
     if (anulada === 'somente' || anulada === 'esconder') {
