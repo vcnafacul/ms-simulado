@@ -937,6 +937,44 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       .exec();
   }
 
+  /**
+   * tickets/043: as questões das provas de uma categoria e/ou de um exame (o
+   * exame vem pela categoria da prova). Prova excluída fica de fora.
+   */
+  async findQuestaoIdsDasProvas(filtro: {
+    exame?: string;
+    categoria?: string;
+  }): Promise<string[]> {
+    const r = await this.provaModel
+      .aggregate<{ _id: Types.ObjectId }>([
+        {
+          $match: {
+            deleted: { $ne: true },
+            ...(filtro.categoria
+              ? { categoria: new Types.ObjectId(filtro.categoria) }
+              : {}),
+          },
+        },
+        ...(filtro.exame
+          ? [
+              {
+                $lookup: {
+                  from: 'categorias',
+                  localField: 'categoria',
+                  foreignField: '_id',
+                  as: 'cat',
+                },
+              },
+              { $match: { 'cat.exame': new Types.ObjectId(filtro.exame) } },
+            ]
+          : []),
+        { $unwind: '$questoes' },
+        { $group: { _id: '$questoes.questao' } },
+      ])
+      .exec();
+    return r.map((x) => String(x._id));
+  }
+
   async findQuestaoIdsByProva(provaId: string): Promise<string[]> {
     const prova = await this.provaModel
       .findById(provaId)
