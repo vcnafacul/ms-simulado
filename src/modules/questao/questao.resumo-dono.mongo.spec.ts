@@ -178,4 +178,30 @@ describe('resumo do dono nas provas — Mongo real', () => {
     });
     expect(pb.questoes).toHaveLength(1); // campo que a tela já usava
   });
+
+  it('tickets/043 · 06: categoriaDoMeuCursinho só na categoria própria do cursinho de quem pede', async () => {
+    const Q2 = (await questoes.collection.insertOne({ status: 0 } as never))
+      .insertedId;
+    const PC = await prova('PC', Q2, await cat('Cursinho'), {
+      cursinhoId: 'B',
+    });
+    const flag = async (quem?: Ator) =>
+      Object.fromEntries(
+        (await service.getInfos(quem)).provas.map((p: any) => [
+          String(p._id),
+          p.categoriaDoMeuCursinho,
+        ]),
+      );
+    const deB = await flag(ator({ cursinhoId: 'B', editorCursinho: true }));
+    expect([deB[PB], deB[PA], deB[PP], deB[PC]]).toEqual([
+      true,
+      false,
+      false, // system
+      false, // compartilhada (dono "Cursinho"), mesmo numa prova do B
+    ]);
+    const adm = await flag(ator({ admin: true }));
+    expect(Object.values(adm).every((v) => v === false)).toBe(true);
+    const ninguem = await flag(undefined);
+    expect(Object.values(ninguem).every((v) => v === false)).toBe(true);
+  });
 });

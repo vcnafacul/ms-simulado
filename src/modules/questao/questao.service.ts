@@ -398,6 +398,9 @@ export class QuestaoService {
       data: todas.data.map((p) => ({
         ...((p as any).toObject ? (p as any).toObject() : p),
         ...resumoDoDono(p, ator),
+        // tickets/043, card 06: o filtro do banco só lista, entre as categorias
+        // de cursinho, as do cursinho de quem pede.
+        categoriaDoMeuCursinho: categoriaDoCursinhoDoAtor(p, ator),
       })),
     };
     const exames = await this.exameRepository.getAll(param);
@@ -1351,4 +1354,17 @@ export class QuestaoService {
 
     return await this.auditLogService.getByEntityId(id);
   }
+}
+
+/**
+ * A categoria da prova é do cursinho de quem pede (tickets/043, card 06)? Só
+ * categoria própria de cursinho — `system` e `Cursinho` (compartilhada) não
+ * contam. Sem cursinho no ator (admin da plataforma), nunca.
+ */
+export function categoriaDoCursinhoDoAtor(
+  prova: { categoria?: unknown },
+  ator?: { cursinhoId?: string | null },
+): boolean {
+  const dono = (prova.categoria as { dono?: string } | null | undefined)?.dono;
+  return !!ator?.cursinhoId && !!dono && dono === ator.cursinhoId;
 }
