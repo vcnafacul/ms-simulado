@@ -940,6 +940,12 @@ export class QuestaoRepository extends BaseRepository<Questao> {
   /**
    * tickets/043: as questões das provas de uma categoria e/ou de um exame (o
    * exame vem pela categoria da prova). Prova excluída fica de fora.
+   *
+   * ⚠️ **O id é comparado nos DOIS formatos, ObjectId e texto** (043/08). Os
+   * schemas declaram `type: Types.ObjectId` (a classe do BSON, não o
+   * SchemaType), o que o Mongoose trata como `Mixed`: o valor é gravado como
+   * chega. As categorias criadas pela tela têm `exame` em TEXTO, as do seed em
+   * ObjectId — comparar só com ObjectId deixava "Personalizado" vazio.
    */
   async findQuestaoIdsDasProvas(filtro: {
     exame?: string;
@@ -951,7 +957,7 @@ export class QuestaoRepository extends BaseRepository<Questao> {
           $match: {
             deleted: { $ne: true },
             ...(filtro.categoria
-              ? { categoria: new Types.ObjectId(filtro.categoria) }
+              ? { categoria: { $in: idNosDoisFormatos(filtro.categoria) } }
               : {}),
           },
         },
@@ -965,7 +971,11 @@ export class QuestaoRepository extends BaseRepository<Questao> {
                   as: 'cat',
                 },
               },
-              { $match: { 'cat.exame': new Types.ObjectId(filtro.exame) } },
+              {
+                $match: {
+                  'cat.exame': { $in: idNosDoisFormatos(filtro.exame) },
+                },
+              },
             ]
           : []),
         { $unwind: '$questoes' },
@@ -1110,4 +1120,9 @@ export class QuestaoRepository extends BaseRepository<Questao> {
       { $sort: { count: -1 } },
     ]);
   }
+}
+
+/** O mesmo id como ObjectId e como texto — ver `findQuestaoIdsDasProvas`. */
+function idNosDoisFormatos(id: string): (Types.ObjectId | string)[] {
+  return [new Types.ObjectId(id), id];
 }

@@ -52,13 +52,15 @@ describe('filtro do banco de questões (043/01) — Mongo real', () => {
   const CAT_ENEM_1 = new Types.ObjectId();
   const CAT_ENEM_2 = new Types.ObjectId();
   const CAT_FUVEST = new Types.ObjectId();
+  const PERSONALIZADO = new Types.ObjectId();
+  const CAT_PERS = new Types.ObjectId();
   const q = async (extra: object = {}) =>
     (await questoes.collection.insertOne({ status: 0, ...extra } as never))
       .insertedId;
   const ids = (xs: unknown[]) => xs.map(String).sort();
 
   let QA: Types.ObjectId, QB: Types.ObjectId, QC: Types.ObjectId;
-  let QD: Types.ObjectId, QE: Types.ObjectId;
+  let QD: Types.ObjectId, QE: Types.ObjectId, QF: Types.ObjectId;
   beforeAll(async () => {
     await mod
       .get(getModelToken(Prova.name))
@@ -67,6 +69,8 @@ describe('filtro do banco de questões (043/01) — Mongo real', () => {
         { _id: CAT_ENEM_1, nome: 'Dia 1', exame: ENEM },
         { _id: CAT_ENEM_2, nome: 'Dia 2', exame: ENEM },
         { _id: CAT_FUVEST, nome: '1ª fase', exame: FUVEST },
+        // 043/08: categoria criada pela tela — `exame` gravado em TEXTO.
+        { _id: CAT_PERS, nome: 'Teste OMR', exame: String(PERSONALIZADO) },
       ]);
     QA = await q({
       textClassification: true,
@@ -77,6 +81,7 @@ describe('filtro do banco de questões (043/01) — Mongo real', () => {
     QC = await q({ reported: true, imageId: '' });
     QD = await q({}); // sem imageId nenhum (questão antiga)
     QE = await q({ textClassification: true, reported: true });
+    QF = await q({});
     await provas.collection.insertMany([
       {
         nome: 'Enem D1',
@@ -95,6 +100,11 @@ describe('filtro do banco de questões (043/01) — Mongo real', () => {
         deleted: true,
         questoes: [{ questao: QE }],
       },
+      {
+        nome: 'Teste OMR_20261003',
+        categoria: CAT_PERS,
+        questoes: [{ questao: QF }],
+      },
     ] as never);
   });
 
@@ -102,6 +112,18 @@ describe('filtro do banco de questões (043/01) — Mongo real', () => {
     expect(
       ids(await repo.findQuestaoIdsDasProvas({ exame: String(ENEM) })),
     ).toEqual(ids([QA, QB, QC]));
+  });
+
+  it('⚠️ 043/08: exame gravado em TEXTO na categoria (criada pela tela) também casa', async () => {
+    expect(
+      await repo.findQuestaoIdsDasProvas({ exame: String(PERSONALIZADO) }),
+    ).toEqual([String(QF)]);
+    expect(
+      await repo.findQuestaoIdsDasProvas({
+        exame: String(PERSONALIZADO),
+        categoria: String(CAT_PERS),
+      }),
+    ).toEqual([String(QF)]);
   });
 
   it('categoria: só as provas daquela categoria', async () => {
@@ -136,7 +158,7 @@ describe('filtro do banco de questões (043/01) — Mongo real', () => {
     const achadas = await questoes
       .find(condicoesDoFiltro({ semImagem: 'true' }))
       .lean();
-    expect(ids(achadas.map((x) => x._id))).toEqual(ids([QB, QC, QD, QE]));
+    expect(ids(achadas.map((x) => x._id))).toEqual(ids([QB, QC, QD, QE, QF]));
   });
 
   it('revisões + sem imagem combinam em "e"', async () => {
