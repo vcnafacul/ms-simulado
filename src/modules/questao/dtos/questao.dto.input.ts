@@ -77,6 +77,12 @@ export class QuestaoDTOInput extends GetAllDtoInput {
   @IsMongoId()
   exame?: string;
 
+  /** tickets/043, card 09: questões das provas deste ano. */
+  @ApiProperty({ required: false, example: '2023' })
+  @IsOptional()
+  @Matches(/^\d{4}$/, { message: 'ano deve ter 4 dígitos' })
+  ano?: string;
+
   /** tickets/043: questões das provas desta categoria. */
   @ApiProperty({ required: false })
   @IsOptional()

@@ -233,6 +233,7 @@ export class QuestaoService {
     anulada,
     exame,
     categoria,
+    ano,
     revisoes,
     semImagem,
     sortColumn = 'updatedAt',
@@ -262,12 +263,13 @@ export class QuestaoService {
     if (prova) {
       ordemIds = await this.repository.findQuestaoIdsByProva(prova);
       where['_id'] = { $in: ordemIds };
-    } else if (exame || categoria) {
-      // tickets/043: com prova, ela vence (já está dentro do exame/categoria).
+    } else if (exame || categoria || ano) {
+      // tickets/043: com prova, ela vence (já está dentro do exame/categoria/ano).
       where['_id'] = {
         $in: await this.repository.findQuestaoIdsDasProvas({
           exame,
           categoria,
+          ano: ano ? Number(ano) : undefined,
         }),
       };
     }
