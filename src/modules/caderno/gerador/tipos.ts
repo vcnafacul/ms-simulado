@@ -77,6 +77,11 @@ export interface SimuladoParaCaderno {
      * estrangeira — Inglês"). Só o caderno da prova usa.
      */
     secao?: string | null;
+    /**
+     * tickets/042 (D8): a questão está anulada neste slot. Sai no mesmo número,
+     * com o selo "QUESTÃO ANULADA: não responda". Só a presença importa.
+     */
+    anulacao?: unknown;
   }[];
 }
 

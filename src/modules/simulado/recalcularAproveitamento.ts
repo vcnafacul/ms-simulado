@@ -52,6 +52,8 @@ export function recalcularAproveitamento(
     alternativaEstudante?: unknown;
     alternativaCorreta?: unknown;
   }[],
+  /** tickets/042: os números anulados agora, e como achar o número de cada questão. */
+  anuladas?: Parameters<typeof montarRespostasAproveitamento>[2],
 ): { novo: AproveitamentoHistorico; mudou: boolean } {
   /*
     ⚠️ **O gabarito é o GRAVADO, não o de hoje.** O `montarRespostas...` usa o
@@ -66,16 +68,19 @@ export function recalcularAproveitamento(
       .filter((r) => r.alternativaCorreta !== undefined)
       .map((r) => [String(r.questao), r.alternativaCorreta]),
   );
-  const entradas = montarRespostasAproveitamento(questoes, respostas).map(
-    (e) =>
-      gabaritoGravado.has(e.questao._id.toString())
-        ? {
-            ...e,
-            alternativaCorreta: gabaritoGravado.get(
-              e.questao._id.toString(),
-            ) as never,
-          }
-        : e,
+  const entradas = montarRespostasAproveitamento(
+    questoes,
+    respostas,
+    anuladas,
+  ).map((e) =>
+    gabaritoGravado.has(e.questao._id.toString())
+      ? {
+          ...e,
+          alternativaCorreta: gabaritoGravado.get(
+            e.questao._id.toString(),
+          ) as never,
+        }
+      : e,
   );
   const novo = calcularAproveitamento(entradas);
   return { novo, mudou: canonico(novo) !== canonico(gravado) };

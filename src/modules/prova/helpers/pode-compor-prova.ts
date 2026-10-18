@@ -58,6 +58,21 @@ export function podeComporDono(
   return false;
 }
 
+/**
+ * Quem pode ANULAR uma questão nesta prova (tickets/042, D3-aberta, saída a).
+ *
+ * ⚠️ **Não é o mesmo que compor.** Anular é curadoria do banco global: a
+ * plataforma (admin do projeto) anula em qualquer prova, inclusive na de um
+ * cursinho — o que `podeComporDono` recusa (só libera admin com `dono === null`).
+ * O cursinho continua só nas dele, e nunca em prova oficial.
+ *
+ * ⚠️ Se a decisão mudar para "seguir 023", basta trocar por `podeComporProva`.
+ */
+export function podeAnularNaProva(prova: ProvaComDono, ator?: Ator): boolean {
+  if (!ator) return false;
+  return podeComporProva(prova, ator) || ator.admin === true;
+}
+
 export const TEXTO_OUTRO_CURSINHO =
   'Esta prova pertence a outro cursinho. Você pode ver, mas não alterar as questões dela.';
 export const TEXTO_OFICIAL =

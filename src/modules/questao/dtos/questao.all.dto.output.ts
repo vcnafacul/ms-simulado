@@ -27,4 +27,11 @@ export class QuestaoAllDTO {
 
   @ApiProperty()
   public updatedAt: Date;
+
+  /** tickets/042: anulada em alguma prova (o espelho). */
+  @ApiProperty({ required: false })
+  public anulada?: boolean;
+
+  @ApiProperty({ required: false })
+  public qtdAnulacoes?: number;
 }

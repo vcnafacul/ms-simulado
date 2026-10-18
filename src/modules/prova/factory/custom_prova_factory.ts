@@ -1,3 +1,4 @@
+import { ClientSession } from 'mongoose';
 import { BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { CreateQuestaoDTOInput } from 'src/modules/questao/dtos/create.dto.input';
 import { UpdateDTOInput } from 'src/modules/questao/dtos/update.dto.input';
@@ -125,6 +126,11 @@ export class CustomProvaFactory implements IProvaFactory {
     questaoId: string,
     provaId: string,
     numero: number,
+    /**
+     * tickets/042 (card 04): roda DENTRO da transação, antes do commit — a
+     * questão entra já anulada, ou não entra.
+     */
+    dentroDaTransacao?: (session: ClientSession) => Promise<void>,
   ): Promise<void> {
     const questao = await this.questaoRepository.getByIdToUpdate(questaoId);
     const provaToEnter = await this.provaRepository.getById(provaId);
@@ -140,6 +146,7 @@ export class CustomProvaFactory implements IProvaFactory {
         session,
       );
       await this.provaRepository.addQuestion(provaId, questao, numero, session);
+      if (dentroDaTransacao) await dentroDaTransacao(session);
       await session.commitTransaction();
     } catch (error) {
       await session.abortTransaction();

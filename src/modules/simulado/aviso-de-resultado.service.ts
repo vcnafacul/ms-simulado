@@ -63,7 +63,8 @@ export class AvisoDeResultadoService {
       // A api aceita até 200 (DTO): nome maior viraria 400 e o push não sairia.
       simulado: (simulado?.nome ?? 'Simulado').slice(0, 200),
       ...numerosDoResultado({
-        total: simulado?.questoes?.length ?? 0,
+        // ⚠️ tickets/042: sem as anuladas — "50 de 89", nunca "50 de 90".
+        total: h.totalConsiderado ?? simulado?.questoes?.length ?? 0,
         acertos: h.acertos ?? 0,
         questoesRespondidas: h.questoesRespondidas ?? 0,
       }),

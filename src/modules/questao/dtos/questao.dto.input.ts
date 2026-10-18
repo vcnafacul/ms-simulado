@@ -1,10 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsIn,
-  IsNumberString,
-  IsOptional,
-  IsString,
-} from 'class-validator';
+import { IsIn, IsNumberString, IsOptional, IsString } from 'class-validator';
 import { GetAllDtoInput } from 'src/shared/dtos/get-all.dto.input';
 import { Status } from '../enums/status.enum';
 
@@ -46,6 +41,12 @@ export class QuestaoDTOInput extends GetAllDtoInput {
   @IsOptional()
   @IsIn(['true'])
   reported?: 'true';
+
+  /** tickets/042, card 04: `todas` (padrão), `esconder` ou `somente` as anuladas. */
+  @ApiProperty({ required: false, enum: ['todas', 'esconder', 'somente'] })
+  @IsOptional()
+  @IsIn(['todas', 'esconder', 'somente'])
+  anulada?: 'todas' | 'esconder' | 'somente';
 
   /** Coluna para ordenação. Ordena por "updatedAt" (padrão). */
   @ApiProperty({ enum: QUESTAO_SORT_COLUMNS, default: 'updatedAt' })

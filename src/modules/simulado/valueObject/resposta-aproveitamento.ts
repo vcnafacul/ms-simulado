@@ -9,4 +9,9 @@ export interface RespostaAproveitamento {
   alternativaCorreta: Alternativa;
   materia: Materia;
   frente: Frente;
+  /**
+   * Fora da análise (tickets/042, D2): sai do numerador E do denominador no
+   * geral, na matéria e na frente.
+   */
+  anulada?: boolean;
 }

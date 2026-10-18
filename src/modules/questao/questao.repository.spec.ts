@@ -631,7 +631,8 @@ describe('QuestaoRepository — exclusão (card 33)', () => {
 
     expect(model.updateOne).toHaveBeenCalledTimes(1);
     expect(model.updateOne.mock.calls[0][1]).toEqual({
-      $set: { deleted: true },
+      // tickets/042: a excluída não carrega "anulada em".
+      $set: { deleted: true, anulacoes: [] },
       $unset: { origem: '', tipoOrigem: '' },
     });
   });

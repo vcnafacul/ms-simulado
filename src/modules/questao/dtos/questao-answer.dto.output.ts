@@ -22,6 +22,11 @@ export class QuestaoAnswerDTOOutput {
   @ApiProperty({ nullable: true })
   public numero: number | null;
 
-  @ApiProperty()
-  public imageId: string;
+  /** tickets/042 (D5): ausente em cliente/servidor antigo = válida. */
+  @ApiProperty({ required: false })
+  public anulada?: boolean;
+
+  /** Sem imagem quando anulada. */
+  @ApiProperty({ required: false })
+  public imageId?: string;
 }

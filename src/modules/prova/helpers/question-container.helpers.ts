@@ -2,6 +2,7 @@ import { ClientSession, Types } from 'mongoose';
 import { revalidarBloqueado } from '../../simulado/helpers/bloqueado';
 import { Questao } from '../../questao/questao.schema';
 import { QuestaoNaContainer } from '../schemas/questao-na-container.schema';
+import type { Anulacao } from '../../questao/anulacao/anulacao.schema';
 
 interface QuestaoContainer {
   questoes: QuestaoNaContainer[];
@@ -17,8 +18,12 @@ export function addQuestaoToContainer(
   container: QuestaoContainer,
   questao: Questao,
   numero: number | null,
+  /** tickets/042: o slot já nasce anulado (duplicar prova). */
+  anulacao?: Anulacao,
 ): void {
-  container.questoes.push({ questao, numero });
+  container.questoes.push(
+    anulacao ? { questao, numero, anulacao } : { questao, numero },
+  );
 }
 
 /**

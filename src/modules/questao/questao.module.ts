@@ -29,6 +29,7 @@ import { QuestaoController } from './questao.controller';
 import { QuestaoRepository } from './questao.repository';
 import { Questao, QuestaoSchema } from './questao.schema';
 import { QuestaoService } from './questao.service';
+import { AnulacaoRepository } from './anulacao/anulacao.repository';
 
 @Module({
   imports: [
@@ -60,8 +61,9 @@ import { QuestaoService } from './questao.service';
     ProvaFactory,
     EnemService,
     ContadorCursinhoRepository,
+    AnulacaoRepository,
   ],
   controllers: [QuestaoController],
-  exports: [QuestaoService, QuestaoRepository],
+  exports: [QuestaoService, QuestaoRepository, AnulacaoRepository],
 })
 export class QuestaoModule {}

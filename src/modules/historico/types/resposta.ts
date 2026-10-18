@@ -27,4 +27,12 @@ export class Resposta {
   @Prop()
   @ApiProperty({ enum: Alternativa })
   alternativaCorreta: Alternativa;
+
+  /**
+   * A questão estava anulada quando esta nota foi calculada (tickets/042).
+   * Fica fora do numerador e do denominador (D2). Ausente = considerada.
+   */
+  @Prop({ type: Boolean, required: false })
+  @ApiProperty({ required: false })
+  anulada?: boolean;
 }

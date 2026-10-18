@@ -7,6 +7,7 @@ import { AggregatePeriodDtoInput } from 'src/shared/dtos/aggregate-period.dto.in
 import { AggregateHistoricoDtoOutput } from './dtos/aggregate-historico.dto.output';
 import { AggregatePeriodByTypeDtoOutput } from './dtos/aggregate-period-by-type.dto.output';
 import { GetHistoricoDTOInput } from './dtos/get-historico.dto';
+import { filtroAtrasDaRevisao } from './filtro-divergente';
 import { HistoricoStatus } from './enums/historico-status.enum';
 import { buildFullSeriesHistorico } from './handle/build-full-series-historico';
 import { buildFullSeriesHistoricoByType } from './handle/build-full-seriesH-historico-by-type';
@@ -81,6 +82,55 @@ export class HistoricoRepository extends BaseRepository<Historico> {
         populate: [{ path: 'questoes.questao' }, CATEGORIA_DO_SIMULADO],
       })
       .exec();
+  }
+
+  /**
+   * O histórico com o simulado populado como o recálculo precisa (tickets/042):
+   * frentes com a matéria, e o gabarito — mesma carga do
+   * `SimuladoRepository.answer`, para o recálculo contar como o processamento.
+   */
+  async getParaRecalculo(id: string): Promise<Historico | null> {
+    return this.model
+      .findById(id)
+      .populate({
+        path: 'simulado',
+        populate: {
+          path: 'questoes.questao',
+          populate: [
+            { path: 'frente1', populate: { path: 'materia' } },
+            { path: 'frente2', populate: { path: 'materia' } },
+            { path: 'frente3', populate: { path: 'materia' } },
+            { path: 'materia' },
+          ],
+          select: '+alternativa',
+        },
+      })
+      .exec();
+  }
+
+  /**
+   * Grava o recálculo só se o histórico ainda estiver concluído e atrás da
+   * revisão `alvo` (tickets/042, R3/R4). ⚠️ Condicional de propósito: um
+   * `processAnswer` que terminou no meio já gravou a revisão atual e vence.
+   *
+   * @returns se a escrita pegou.
+   */
+  async regravarRecalculo(
+    id: string,
+    alvo: number,
+    dados: Record<string, unknown>,
+  ): Promise<boolean> {
+    const r = await this.model
+      .updateOne(
+        {
+          _id: new Types.ObjectId(id),
+          status: HistoricoStatus.Completed,
+          ...filtroAtrasDaRevisao(alvo),
+        },
+        { $set: dados },
+      )
+      .exec();
+    return r.modifiedCount === 1;
   }
 
   override async getById(id: string): Promise<Historico> {
@@ -508,6 +558,11 @@ export class HistoricoRepository extends BaseRepository<Historico> {
       questoesRespondidas: number;
       /** Quantas foram acertadas — contado, nunca derivado do percentual. */
       acertos: number;
+      /** tickets/042: total menos as anuladas (D2). */
+      totalConsiderado?: number;
+      numerosAnulados?: number[];
+      /** A revisão de anulação do simulado neste instante (R3). */
+      revisaoAnulacao?: number;
     },
   ): Promise<void> {
     await this.model
@@ -519,6 +574,9 @@ export class HistoricoRepository extends BaseRepository<Historico> {
         aproveitamento: data.aproveitamento,
         questoesRespondidas: data.questoesRespondidas,
         acertos: data.acertos,
+        totalConsiderado: data.totalConsiderado,
+        numerosAnulados: data.numerosAnulados,
+        revisaoAnulacao: data.revisaoAnulacao,
         rawRespostas: null,
       })
       .exec();

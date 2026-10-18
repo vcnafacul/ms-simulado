@@ -563,7 +563,8 @@ describe('QuestaoService.adicionarEmProva', () => {
 
     await service.adicionarEmProva('q1', 'p1', 5);
 
-    expect(addFn).toHaveBeenCalledWith('q1', 'p1', 5);
+    // tickets/042: sem anulação a gravar, o gancho da transação vai vazio.
+    expect(addFn).toHaveBeenCalledWith('q1', 'p1', 5, undefined);
     expect(auditLogService.create).toHaveBeenCalled();
   });
 });

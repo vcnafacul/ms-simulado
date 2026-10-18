@@ -115,8 +115,9 @@ describe('HistoricoService.getById (achata simulado.questoes)', () => {
 
     // Achata pro shape do client preservando o numero do relacionamento (qc.numero).
     expect(result.simulado.questoes).toEqual([
-      { _id: 'q1', textoQuestao: 'a', numero: 1 },
-      { _id: 'q2', textoQuestao: 'b', numero: 2 },
+      // tickets/042: `anulada` em cada questão.
+      { _id: 'q1', textoQuestao: 'a', numero: 1, anulada: false },
+      { _id: 'q2', textoQuestao: 'b', numero: 2, anulada: false },
     ]);
   });
 
