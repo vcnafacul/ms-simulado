@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { FilterQuery, Model, Types } from 'mongoose';
 import { BaseRepository } from 'src/shared/base/base.repository';
 import { GetAllOutput } from 'src/shared/base/interfaces/get-all.output';
 import { AggregatePeriodDtoInput } from 'src/shared/dtos/aggregate-period.dto.input';
@@ -156,8 +156,9 @@ export class HistoricoRepository extends BaseRepository<Historico> {
     );
   }
 
-  async getTotalEntity() {
-    return this.model.find({ deletedAt: null }).count();
+  /** `filtro` opcional: o recorte do monitoramento por cursinho (tickets/044, card 04). */
+  async getTotalEntity(filtro: FilterQuery<Historico> = {}) {
+    return this.model.find({ deletedAt: null, ...filtro }).count();
   }
 
   /**
@@ -169,12 +170,13 @@ export class HistoricoRepository extends BaseRepository<Historico> {
    * incompleto — e o erro crescia junto com a adoção da feature. Mesma decisão
    * do agregado da turma; ver o docblock em `user-group-aggregate.repository`.
    */
-  async entityCompleted() {
+  async entityCompleted(filtro: FilterQuery<Historico> = {}) {
     const result: { total: number }[] = await this.model.aggregate([
       {
         $match: {
           deletedAt: null,
           status: HistoricoStatus.Completed,
+          ...filtro,
         },
       },
       {
@@ -187,11 +189,15 @@ export class HistoricoRepository extends BaseRepository<Historico> {
     return result[0]?.total ?? 0;
   }
 
-  async aggregateByPeriod({ groupBy }: AggregatePeriodDtoInput) {
+  async aggregateByPeriod(
+    { groupBy }: AggregatePeriodDtoInput,
+    filtro: FilterQuery<Historico> = {},
+  ) {
     const format =
       groupBy === 'day' ? '%Y-%m-%d' : groupBy === 'month' ? '%Y-%m' : '%Y';
 
     const result = await this.model.aggregate([
+      ...recorte(filtro),
       { $addFields: { created_at: { $toDate: '$_id' } } },
       {
         $group: {
@@ -231,13 +237,15 @@ export class HistoricoRepository extends BaseRepository<Historico> {
     );
   }
 
-  async aggregateByPeriodAndTipo({
-    groupBy,
-  }: AggregatePeriodDtoInput): Promise<AggregatePeriodByTypeDtoOutput[]> {
+  async aggregateByPeriodAndTipo(
+    { groupBy }: AggregatePeriodDtoInput,
+    filtro: FilterQuery<Historico> = {},
+  ): Promise<AggregatePeriodByTypeDtoOutput[]> {
     const format =
       groupBy === 'day' ? '%Y-%m-%d' : groupBy === 'month' ? '%Y-%m' : '%Y';
 
     const result = await this.model.aggregate([
+      ...recorte(filtro),
       // gera created_at com base no ObjectId
       { $addFields: { created_at: { $toDate: '$_id' } } },
 
@@ -615,4 +623,9 @@ export class HistoricoRepository extends BaseRepository<Historico> {
     for (const l of linhas) out[String(l._id)] = l.usuarios;
     return out;
   }
+}
+
+/** `$match` no início do pipeline só quando há recorte: sem ele, o pipeline de hoje. */
+function recorte(filtro: FilterQuery<Historico>) {
+  return Object.keys(filtro).length > 0 ? [{ $match: filtro }] : [];
 }
