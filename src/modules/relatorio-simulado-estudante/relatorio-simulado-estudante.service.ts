@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { HistoricoStatus } from '../historico/enums/historico-status.enum';
 import { MateriaAproveitamento } from '../historico/types/aproveitamento';
 import { descreverFalha } from '../historico/falha/mapa-falha';
@@ -103,6 +108,14 @@ function mesmaComposicao(composicoes: Map<string, Set<string>>): boolean {
   );
 }
 
+import { DivergenciaRepository } from './recalculo/divergencia.repository';
+import { RecalculoAnulacaoService } from './recalculo/recalculo-anulacao.service';
+import {
+  AnulacaoNoRelatorio,
+  linhaDivergente,
+  montarAnulacaoNoRelatorio,
+  SEM_ANULACAO,
+} from './recalculo/anulacao-no-relatorio';
 @Injectable()
 export class RelatorioSimuladoEstudanteService {
   private readonly logger = new Logger(RelatorioSimuladoEstudanteService.name);
@@ -112,7 +125,38 @@ export class RelatorioSimuladoEstudanteService {
     private readonly simuladoRepository: SimuladoRepository,
     /** Só para os contadores globais da questão (card 16). */
     private readonly questaoRepository: QuestaoRepository,
+    // tickets/042, card 13. Opcionais e por último: os specs montam o
+    // service na mão com os três de antes, e sem eles não há anulação.
+    @Optional() private readonly recalculo?: RecalculoAnulacaoService,
+    @Optional() private readonly divergencia?: DivergenciaRepository,
   ) {}
+
+  /**
+   * tickets/042, card 13: as anuladas do recorte, a revisão de cada simulado
+   * e a divergência (só consulta — o relatório nunca "corrige na hora").
+   */
+  private async anulacaoDoRecorte(
+    simuladoIds: string[],
+    cursinhoId: string,
+  ): Promise<AnulacaoNoRelatorio> {
+    if (!this.recalculo || !this.divergencia || !simuladoIds.length) {
+      return SEM_ANULACAO;
+    }
+    const [estado, consulta] = await Promise.all([
+      this.divergencia.estadoDosSimulados(simuladoIds),
+      this.recalculo.consultar({ simuladoIds, cursinhoId }),
+    ]);
+    return montarAnulacaoNoRelatorio(estado as never, consulta);
+  }
+
+  /** O bloco `anulacao` do resumo — o aviso de "relatório desatualizado". */
+  private resumoDaAnulacao(a: AnulacaoNoRelatorio) {
+    return {
+      divergentes: a.divergentes,
+      desanuladas: a.desanuladas,
+      jobAtivo: a.jobAtivo,
+    };
+  }
 
   async consultar(params: {
     simuladoId: string;
@@ -121,7 +165,7 @@ export class RelatorioSimuladoEstudanteService {
     /** A turma ATUAL, quando o chamador a resolve. Ver card 18. */
     usuarios?: string[];
   }): Promise<RelatorioSimuladoDtoOutput> {
-    const [linhas, total, numeros, nomes] = await Promise.all([
+    const [linhas, total, numeros, nomes, anulacao] = await Promise.all([
       this.repository.buscarPorRecorte(params),
       // do CURSINHO, não da turma: é o denominador do rodapé
       this.repository.contarDoCursinho(params.simuladoId, params.cursinhoId),
@@ -149,15 +193,22 @@ export class RelatorioSimuladoEstudanteService {
         tem cartão precisa continuar aparecendo com nome.
       */
       this.simuladoRepository.getNomesPorIds([params.simuladoId]),
+      this.anulacaoDoRecorte([params.simuladoId], params.cursinhoId),
     ]);
 
     return {
       // `flatMap`: uma linha órfã vira `[]` e some, sem derrubar as demais —
       // ver `montarLinha`.
-      linhas: linhas.flatMap((l) => this.montarLinha(l, params.cursinhoId)),
+      linhas: linhas.flatMap((l) =>
+        this.montarLinha(l, params.cursinhoId, anulacao),
+      ),
       totalEstudantesComCartaoNoCursinho: total,
       // ⚠️ `0` quando o simulado não existe mais: a tela mostra só o percentual.
       totalDeQuestoes: numeros.length,
+      // tickets/042, card 13: "90 questões · 1 anulada · análise sobre 89".
+      totalConsiderado: numeros.length - anulacao.anuladas.length,
+      anuladas: anulacao.anuladas,
+      anulacao: this.resumoDaAnulacao(anulacao),
       /*
         ⚠️ **`null` quando o simulado foi apagado depois do vínculo** — o mesmo
         caso que o `listarSimuladosComCartao` já trata, e pelo mesmo motivo: os
@@ -198,6 +249,7 @@ export class RelatorioSimuladoEstudanteService {
   private montarLinha(
     l: LinhaComHistorico,
     cursinhoId: string,
+    anulacao: AnulacaoNoRelatorio = SEM_ANULACAO,
   ): LinhaRelatorioDtoOutput[] {
     const h = l.historico;
     if (!h) {
@@ -253,6 +305,18 @@ export class RelatorioSimuladoEstudanteService {
           ? enxugarMaterias(aproveitamento.materias)
           : undefined,
         falha: descreverFalha(h.falha),
+        /*
+          tickets/042, card 13: a nota GRAVADA, marcada. O relatório nunca
+          corrige na hora — quem corrige é o Recalcular (card 12).
+        */
+        divergente: linhaDivergente(
+          h,
+          l.simulado
+            ? anulacao.numerosPorSimulado.get(String(l.simulado))
+            : undefined,
+          leituraConcluida,
+        ),
+        totalConsiderado: leituraConcluida ? h.totalConsiderado : undefined,
       },
     ];
   }
@@ -263,9 +327,10 @@ export class RelatorioSimuladoEstudanteService {
     turmaId?: string;
     usuarios?: string[];
   }): Promise<QuestoesDoRelatorioDtoOutput> {
-    const [agregados, numeros] = await Promise.all([
+    const [agregados, numeros, anulacao] = await Promise.all([
       this.repository.agregarPorQuestao(params),
       this.simuladoRepository.getNumerosDasQuestoes(params.simuladoId),
+      this.anulacaoDoRecorte([params.simuladoId], params.cursinhoId),
     ]);
 
     const numeroPorQuestao = new Map(
@@ -282,8 +347,11 @@ export class RelatorioSimuladoEstudanteService {
           atual só cobre histórico anterior ao campo.
         */
         (a) => a.numero ?? numeroPorQuestao.get(a.questaoId) ?? null,
-        true,
+        // tickets/042: com divergentes, a nota geral mistura escalas.
+        !anulacao.divergentes,
+        anulacao,
       ),
+      semDiscriminacao: anulacao.divergentes ? 'divergente' : null,
     };
   }
 
@@ -296,6 +364,7 @@ export class RelatorioSimuladoEstudanteService {
     agregados: AgregadoDaQuestao[],
     numeroDe: (a: AgregadoDaQuestao) => number | null,
     discriminar: boolean,
+    anulacao: AnulacaoNoRelatorio = SEM_ANULACAO,
   ): Promise<QuestaoDoRelatorioDtoOutput[]> {
     /*
       ⚠️ **Depois do agregado, e não em paralelo com ele** (card 16): os ids
@@ -321,16 +390,29 @@ export class RelatorioSimuladoEstudanteService {
         quantidadeResposta: 0,
         ehVersao: false,
       };
+      const numero = numeroDe(a);
+      // tickets/042: pelo número do slot (a nova versão troca o id).
+      const anulada =
+        numero != null ? anulacao.porNumero.get(numero) : undefined;
       return {
-        numero: numeroDe(a),
+        numero,
         questaoId: a.questaoId,
+        ...(anulada
+          ? {
+              anulada: true,
+              motivoAnulacao: anulada.motivo,
+              justificativaAnulacao: anulada.justificativa,
+            }
+          : {}),
         respondentes: a.respondentes,
         acertos: a.acertos,
         erros: a.erros,
         semLeitura: a.semLeitura,
         porAlternativa: a.porAlternativa,
         alternativaCorreta: a.alternativaCorreta,
-        discriminacao: discriminar ? a.discriminacao : null,
+        // A anulada fica na tabela (dá para ver por que foi anulada), mas
+        // fora da análise: sem discriminação.
+        discriminacao: discriminar && !anulada ? a.discriminacao : null,
         acertosGeral: g.acertos,
         baseGeral: g.quantidadeResposta,
         ehVersao: g.ehVersao,
@@ -370,7 +452,7 @@ export class RelatorioSimuladoEstudanteService {
       usuarios: params.usuarios,
     };
 
-    const [doSimulado, aguardando, total, nomes] = await Promise.all([
+    const [doSimulado, aguardando, total, nomes, anulacao] = await Promise.all([
       this.repository.buscarPorRecorte(recorte),
       // tickets/038: o cartão da prova ainda sem simulado também é deste relatório.
       this.repository.buscarAguardandoDaProva({
@@ -383,6 +465,7 @@ export class RelatorioSimuladoEstudanteService {
         params.cursinhoId,
       ),
       this.simuladoRepository.getNomesPorIds(prova.simuladoIds),
+      this.anulacaoDoRecorte(prova.simuladoIds, params.cursinhoId),
     ]);
 
     const linhas = [...doSimulado, ...aguardando];
@@ -396,9 +479,15 @@ export class RelatorioSimuladoEstudanteService {
     const nomePorId = new Map(nomes.map((n) => [n.id, n.nome]));
 
     return {
-      linhas: linhas.flatMap((l) => this.montarLinha(l, params.cursinhoId)),
+      linhas: linhas.flatMap((l) =>
+        this.montarLinha(l, params.cursinhoId, anulacao),
+      ),
       totalEstudantesComCartaoNoCursinho: total,
       totalDeQuestoes: prova.numeros.length,
+      // tickets/042, card 13.
+      totalConsiderado: prova.numeros.length - anulacao.anuladas.length,
+      anuladas: anulacao.anuladas,
+      anulacao: this.resumoDaAnulacao(anulacao),
       provaNome: prova.nome ?? null,
       ultimoCartaoEm: ultimoCartao(linhas),
       // Na ordem da prova, e não na de chegada: é a ordem em que o cursinho os criou.
@@ -410,6 +499,10 @@ export class RelatorioSimuladoEstudanteService {
           nome: nomePorId.get(id) ?? null,
           cartoes: cartoesPorSimulado.get(id)!,
           totalDeQuestoes: composicoes.get(id)!.size,
+          // tickets/042: a comparação entre aplicações usa o considerado.
+          totalConsiderado:
+            composicoes.get(id)!.size -
+            (anulacao.quantasPorSimulado.get(id) ?? 0),
         })),
       mesmasQuestoes: mesmaComposicao(composicoes),
     };
@@ -435,7 +528,7 @@ export class RelatorioSimuladoEstudanteService {
     usuarios?: string[];
   }): Promise<QuestoesDaProvaDtoOutput> {
     const prova = await this.provaOu404(params.provaId);
-    const [agregados, comCartao] = await Promise.all([
+    const [agregados, comCartao, anulacao] = await Promise.all([
       this.repository.agregarPorQuestao({
         simuladoId: prova.simuladoIds,
         cursinhoId: params.cursinhoId,
@@ -446,6 +539,7 @@ export class RelatorioSimuladoEstudanteService {
         cursinhoId: params.cursinhoId,
         usuarios: params.usuarios,
       }),
+      this.anulacaoDoRecorte(prova.simuladoIds, params.cursinhoId),
     ]);
     const mesmasQuestoes = mesmaComposicao(await this.composicoes(comCartao));
     const numeroNaProva = new Map(
@@ -456,7 +550,8 @@ export class RelatorioSimuladoEstudanteService {
     const questoes = await this.montarQuestoes(
       agregados,
       (a) => numeroNaProva.get(a.questaoId) ?? a.numero ?? null,
-      mesmasQuestoes,
+      mesmasQuestoes && !anulacao.divergentes,
+      anulacao,
     );
     for (const q of questoes) {
       const idioma = idiomaDe.get(q.questaoId);
@@ -468,7 +563,15 @@ export class RelatorioSimuladoEstudanteService {
     // Sem número no fim, como no `montarQuestoes`.
     const n = (q: { numero: number | null }) => q.numero ?? Infinity;
     questoes.sort((a, b) => n(a) - n(b) || ordemDoIdioma(a) - ordemDoIdioma(b));
-    return { questoes, mesmasQuestoes };
+    return {
+      questoes,
+      mesmasQuestoes,
+      semDiscriminacao: anulacao.divergentes
+        ? 'divergente'
+        : !mesmasQuestoes
+          ? 'composicao'
+          : null,
+    };
   }
 
   /**
@@ -553,9 +656,10 @@ export class RelatorioSimuladoEstudanteService {
     }
 
     const h = linha.historico;
-    const numeros = await this.simuladoRepository.getNumerosDasQuestoes(
-      params.simuladoId,
-    );
+    const [numeros, anulacao] = await Promise.all([
+      this.simuladoRepository.getNumerosDasQuestoes(params.simuladoId),
+      this.anulacaoDoRecorte([params.simuladoId], params.cursinhoId),
+    ]);
     const numeroPorQuestao = new Map(
       numeros.map((n) => [n.questaoId, n.numero]),
     );
@@ -579,13 +683,28 @@ export class RelatorioSimuladoEstudanteService {
             ? ResultadoDaQuestao.Acerto
             : ResultadoDaQuestao.Erro;
 
+      // ⚠️ O gravado primeiro — mesma regra do `consultarQuestoes`.
+      const numero = r.numero ?? numeroPorQuestao.get(questaoId) ?? null;
+      const agora = numero != null ? anulacao.porNumero.get(numero) : undefined;
       return {
-        // ⚠️ O gravado primeiro — mesma regra do `consultarQuestoes`.
-        numero: r.numero ?? numeroPorQuestao.get(questaoId) ?? null,
+        numero,
         questaoId,
         alternativaEstudante: marcada,
         alternativaCorreta: r.alternativaCorreta,
         resultado,
+        /*
+          tickets/042: `anulada` = fora da nota GRAVADA; `anulacao` = o porquê,
+          se está anulada AGORA (divergente: anulada agora, ainda na nota).
+        */
+        ...(r.anulada ? { anulada: true } : {}),
+        ...(agora
+          ? {
+              anulacao: {
+                motivo: agora.motivo,
+                justificativa: agora.justificativa,
+              },
+            }
+          : {}),
       };
     });
 
@@ -610,6 +729,15 @@ export class RelatorioSimuladoEstudanteService {
           ? descreverFalha(h.falha)
           : undefined,
       respostas,
+      // tickets/042, card 13/16.
+      divergente: linhaDivergente(
+        h,
+        anulacao.numerosPorSimulado.get(params.simuladoId),
+        h.status === HistoricoStatus.Completed,
+      ),
+      totalConsiderado: h.totalConsiderado,
+      numerosAnulados: h.numerosAnulados,
+      recalculadoEm: h.recalculadoEm,
     };
   }
 
@@ -695,6 +823,8 @@ export class RelatorioSimuladoEstudanteService {
         nome: nomePorId.get(p.simuladoId) ?? null,
         aproveitamento: p.aproveitamento,
         acertos: p.acertos,
+        // tickets/042: "50 de 89" quando houve anulada.
+        totalConsiderado: p.totalConsiderado,
         em: p.em.toISOString(),
         mediaDoRecorte: medias[i].media,
         baseDoRecorte: medias[i].base,

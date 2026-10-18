@@ -7,6 +7,7 @@ import { AggregatePeriodDtoInput } from 'src/shared/dtos/aggregate-period.dto.in
 import { AggregateHistoricoDtoOutput } from './dtos/aggregate-historico.dto.output';
 import { AggregatePeriodByTypeDtoOutput } from './dtos/aggregate-period-by-type.dto.output';
 import { GetHistoricoDTOInput } from './dtos/get-historico.dto';
+import { filtroAtrasDaRevisao } from './filtro-divergente';
 import { HistoricoStatus } from './enums/historico-status.enum';
 import { buildFullSeriesHistorico } from './handle/build-full-series-historico';
 import { buildFullSeriesHistoricoByType } from './handle/build-full-seriesH-historico-by-type';
@@ -81,6 +82,55 @@ export class HistoricoRepository extends BaseRepository<Historico> {
         populate: [{ path: 'questoes.questao' }, CATEGORIA_DO_SIMULADO],
       })
       .exec();
+  }
+
+  /**
+   * O histórico com o simulado populado como o recálculo precisa (tickets/042):
+   * frentes com a matéria, e o gabarito — mesma carga do
+   * `SimuladoRepository.answer`, para o recálculo contar como o processamento.
+   */
+  async getParaRecalculo(id: string): Promise<Historico | null> {
+    return this.model
+      .findById(id)
+      .populate({
+        path: 'simulado',
+        populate: {
+          path: 'questoes.questao',
+          populate: [
+            { path: 'frente1', populate: { path: 'materia' } },
+            { path: 'frente2', populate: { path: 'materia' } },
+            { path: 'frente3', populate: { path: 'materia' } },
+            { path: 'materia' },
+          ],
+          select: '+alternativa',
+        },
+      })
+      .exec();
+  }
+
+  /**
+   * Grava o recálculo só se o histórico ainda estiver concluído e atrás da
+   * revisão `alvo` (tickets/042, R3/R4). ⚠️ Condicional de propósito: um
+   * `processAnswer` que terminou no meio já gravou a revisão atual e vence.
+   *
+   * @returns se a escrita pegou.
+   */
+  async regravarRecalculo(
+    id: string,
+    alvo: number,
+    dados: Record<string, unknown>,
+  ): Promise<boolean> {
+    const r = await this.model
+      .updateOne(
+        {
+          _id: new Types.ObjectId(id),
+          status: HistoricoStatus.Completed,
+          ...filtroAtrasDaRevisao(alvo),
+        },
+        { $set: dados },
+      )
+      .exec();
+    return r.modifiedCount === 1;
   }
 
   override async getById(id: string): Promise<Historico> {
@@ -480,28 +530,6 @@ export class HistoricoRepository extends BaseRepository<Historico> {
     await this.model
       .findByIdAndUpdate(id, { rawRespostas, status: HistoricoStatus.Pending })
       .exec();
-  }
-
-  /**
-   * Alguém já tem resultado nesta prova (tickets/042, guarda D10): histórico
-   * `completed` de um simulado dela, ou o cartão DA prova (038).
-   */
-  async existeConcluidoNaProva(
-    provaId: string,
-    simuladoIds: string[],
-  ): Promise<boolean> {
-    const existe = await this.model
-      .exists({
-        status: HistoricoStatus.Completed,
-        $or: [
-          {
-            simulado: { $in: simuladoIds.map((id) => new Types.ObjectId(id)) },
-          },
-          { prova: new Types.ObjectId(provaId) },
-        ],
-      })
-      .exec();
-    return !!existe;
   }
 
   async claimForProcessing(id: string): Promise<boolean> {

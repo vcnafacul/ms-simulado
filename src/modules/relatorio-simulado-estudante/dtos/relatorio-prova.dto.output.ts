@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { LinhaRelatorioDtoOutput } from './relatorio-simulado.dto.output';
+import {
+  AnulacaoDoRelatorioDtoOutput,
+  AnuladaDoRelatorioDtoOutput,
+  SemDiscriminacao,
+  SEM_DISCRIMINACAO,
+} from './anulacao-do-relatorio.dto.output';
 import { QuestaoDoRelatorioDtoOutput } from './questoes-do-relatorio.dto.output';
 
 /** Um simulado da prova que tem cartão no recorte (tickets/034). */
@@ -13,6 +19,9 @@ export class SimuladoDoRelatorioDtoOutput {
   @ApiProperty() cartoes: number;
 
   @ApiProperty() totalDeQuestoes: number;
+
+  /** tickets/042: sem as anuladas deste simulado. */
+  @ApiProperty({ required: false }) totalConsiderado?: number;
 }
 
 /**
@@ -52,6 +61,15 @@ export class RelatorioProvaDtoOutput {
    */
   @ApiProperty()
   mesmasQuestoes: boolean;
+
+  /** tickets/042, card 13. */
+  @ApiProperty({ required: false }) totalConsiderado?: number;
+
+  @ApiProperty({ required: false, type: [AnuladaDoRelatorioDtoOutput] })
+  anuladas?: AnuladaDoRelatorioDtoOutput[];
+
+  @ApiProperty({ required: false, type: AnulacaoDoRelatorioDtoOutput })
+  anulacao?: AnulacaoDoRelatorioDtoOutput;
 }
 
 export class QuestoesDaProvaDtoOutput {
@@ -61,4 +79,8 @@ export class QuestoesDaProvaDtoOutput {
   /** Ver `RelatorioProvaDtoOutput.mesmasQuestoes`. `false` ⇒ discriminação `null`. */
   @ApiProperty()
   mesmasQuestoes: boolean;
+
+  /** tickets/042: `divergente` ou `composicao` quando a discriminação veio `null`. */
+  @ApiProperty({ required: false, nullable: true, enum: SEM_DISCRIMINACAO })
+  semDiscriminacao?: SemDiscriminacao | null;
 }

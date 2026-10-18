@@ -145,6 +145,7 @@ describe('SimuladoService.getToAnswer (gate de disponibilidade)', () => {
     expect(result!.questoes).toEqual([
       {
         _id: 'q1',
+        anulada: false, // tickets/042
         enemArea: 'Mat',
         frente1: { _id: 'f1' },
         frente2: null,
