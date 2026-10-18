@@ -3,7 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { Model, Types } from 'mongoose';
 import { Historico, HistoricoSchema } from '../../historico/historico.schema';
-import { filtroDivergente } from '../../historico/filtro-divergente';
+import { filtroAtrasDaRevisao } from '../../historico/filtro-divergente';
 import { Prova, ProvaSchema } from '../../prova/prova.schema';
 import {
   Simulado,
@@ -223,7 +223,7 @@ describe('AnulacaoRepository — Mongo real', () => {
     ).toBe(false);
   });
 
-  it('⚠️ filtroDivergente casa histórico SEM o campo e com revisão menor', async () => {
+  it('⚠️ filtroAtrasDaRevisao casa histórico SEM o campo e com revisão menor', async () => {
     const simulado = new Types.ObjectId();
     await historicos.collection.insertMany([
       { simulado, usuario: 'sem-campo' },
@@ -233,7 +233,7 @@ describe('AnulacaoRepository — Mongo real', () => {
     ] as never);
 
     const achados = await historicos.collection
-      .find({ simulado, ...filtroDivergente(1) })
+      .find({ simulado, ...filtroAtrasDaRevisao(1) })
       .toArray();
     expect(achados.map((h) => h.usuario).sort()).toEqual(['sem-campo', 'zero']);
 

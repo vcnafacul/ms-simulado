@@ -45,6 +45,10 @@ export class PontoDaSerieDtoOutput {
   @ApiProperty({ required: true, nullable: true })
   mediaDoRecorte: number | null;
 
+  /** tickets/042: sobre quantas questões (sem as anuladas). */
+  @ApiProperty({ required: false })
+  totalConsiderado?: number;
+
   /**
    * Quantos estudantes entraram na média daquele ponto.
    *

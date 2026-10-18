@@ -1,4 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
+import {
+  SemDiscriminacao,
+  SEM_DISCRIMINACAO,
+} from './anulacao-do-relatorio.dto.output';
 
 export class QuestaoDoRelatorioDtoOutput {
   /**
@@ -165,9 +169,25 @@ export class QuestaoDoRelatorioDtoOutput {
    * questão antiga e somar os números.
    */
   @ApiProperty() ehVersao: boolean;
+
+  /**
+   * tickets/042, card 13: anulada nesta prova. Fica na tabela (dá para ver
+   * por que foi anulada), mas FORA da análise: sem discriminação, fora da
+   * média — o texto é "fora da análise", nunca "acerto".
+   */
+  @ApiProperty({ required: false }) anulada?: boolean;
+  @ApiProperty({ required: false }) motivoAnulacao?: string;
+  @ApiProperty({ required: false }) justificativaAnulacao?: string;
 }
 
 export class QuestoesDoRelatorioDtoOutput {
   @ApiProperty({ type: [QuestaoDoRelatorioDtoOutput] })
   questoes: QuestaoDoRelatorioDtoOutput[];
+
+  /**
+   * tickets/042: por que a discriminação veio `null` em todas — `divergente`
+   * (notas de antes e depois da anulação misturadas). `null` = calculada.
+   */
+  @ApiProperty({ required: false, nullable: true, enum: SEM_DISCRIMINACAO })
+  semDiscriminacao?: SemDiscriminacao | null;
 }
