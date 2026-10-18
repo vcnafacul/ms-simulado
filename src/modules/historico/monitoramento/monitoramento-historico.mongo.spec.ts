@@ -16,6 +16,10 @@ import { SimuladosDoCursinhoRepository } from './simulados-do-cursinho.repositor
 /**
  * tickets/044, card 04 — simulados do cursinho no Monitoramento. Mongo real: o
  * recorte é `$match` em pipeline, e o `simulado` do histórico pode estar em texto.
+ *
+ * ⚠️ Banco próprio (`dbName`): no CI o `MONGODB_TEST_URI` é um Mongo só para a
+ * suíte inteira, e outros specs deixam históricos lá — a contagem sem filtro
+ * deste arquivo dava 8 em vez de 5 (ms#289).
  */
 describe('MonitoramentoHistoricoService (044/04) — Mongo real', () => {
   let mongo: MongoMemoryServer | undefined;
@@ -60,7 +64,7 @@ describe('MonitoramentoHistoricoService (044/04) — Mongo real', () => {
       (mongo = await MongoMemoryServer.create()).getUri();
     mod = await Test.createTestingModule({
       imports: [
-        MongooseModule.forRoot(uri),
+        MongooseModule.forRoot(uri, { dbName: `monitoramento-${Date.now()}` }),
         MongooseModule.forFeature([
           { name: Historico.name, schema: HistoricoSchema },
           { name: Simulado.name, schema: SimuladoSchema },
@@ -95,6 +99,7 @@ describe('MonitoramentoHistoricoService (044/04) — Mongo real', () => {
   }, 60000);
 
   afterAll(async () => {
+    await histModel?.db.dropDatabase();
     await mod?.close();
     await mongo?.stop();
   });
