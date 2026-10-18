@@ -234,7 +234,7 @@ export class QuestaoService {
     exame,
     categoria,
     revisoes,
-    comImagem,
+    semImagem,
     sortColumn = 'updatedAt',
     sortOrder = 'desc',
   }: QuestaoDTOInput): Promise<GetAllOutput<QuestaoAllDTO>> {
@@ -271,8 +271,8 @@ export class QuestaoService {
         }),
       };
     }
-    // tickets/043: revisões em "e" e "só com imagem".
-    Object.assign(where, condicoesDoFiltro({ revisoes, comImagem }));
+    // tickets/043: revisões em "e" e "sem imagem".
+    Object.assign(where, condicoesDoFiltro({ revisoes, semImagem }));
     if (enemArea) where['enemArea'] = enemArea;
     // tickets/042, card 04: o filtro do banco, sobre o espelho.
     if (anulada === 'somente' || anulada === 'esconder') {

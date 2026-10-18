@@ -94,11 +94,11 @@ export class QuestaoDTOInput extends GetAllDtoInput {
   })
   revisoes?: string;
 
-  /** tickets/043: só as que têm imagem da questão (`imageId`). */
+  /** tickets/043: só as que NÃO têm imagem da questão (`imageId`). */
   @ApiProperty({ required: false, enum: ['true'] })
   @IsOptional()
   @IsIn(['true'])
-  comImagem?: 'true';
+  semImagem?: 'true';
 
   /** Coluna para ordenação. Ordena por "updatedAt" (padrão). */
   @ApiProperty({ enum: QUESTAO_SORT_COLUMNS, default: 'updatedAt' })

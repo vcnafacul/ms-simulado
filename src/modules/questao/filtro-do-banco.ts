@@ -3,22 +3,22 @@
  * função pura para o teste rodar a MESMA consulta contra o Mongo.
  *
  * - `revisoes`: flags separadas por vírgula, todas `true` ("e").
- * - `comImagem`: ⚠️ `$nin` sozinho casa documento SEM o campo; o `$exists` é o
- *   que tira as questões antigas sem `imageId`.
+ * - `semImagem`: questões sem imagem da questão — `imageId` nulo, vazio ou
+ *   AUSENTE (o `$in: [null]` casa o campo ausente; homol tem questões assim).
  */
 export function condicoesDoFiltro({
   revisoes,
-  comImagem,
+  semImagem,
 }: {
   revisoes?: string;
-  comImagem?: 'true';
+  semImagem?: 'true';
 }): Record<string, unknown> {
   const where: Record<string, unknown> = {};
   for (const flag of (revisoes ?? '').split(',').filter(Boolean)) {
     where[flag] = true;
   }
-  if (comImagem === 'true') {
-    where['imageId'] = { $exists: true, $nin: [null, ''] };
+  if (semImagem === 'true') {
+    where['imageId'] = { $in: [null, ''] };
   }
   return where;
 }

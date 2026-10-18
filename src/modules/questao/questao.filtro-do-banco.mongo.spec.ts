@@ -132,11 +132,23 @@ describe('filtro do banco de questões (043/01) — Mongo real', () => {
     expect(ids(so.map((x) => x._id))).toEqual(ids([QA, QC, QE]));
   });
 
-  it('⚠️ só com imagem: nulo, vazio e SEM o campo ficam de fora', async () => {
+  it('⚠️ sem imagem: nulo, vazio e SEM o campo entram; quem tem imagem fica de fora', async () => {
     const achadas = await questoes
-      .find(condicoesDoFiltro({ comImagem: 'true' }))
+      .find(condicoesDoFiltro({ semImagem: 'true' }))
       .lean();
-    expect(ids(achadas.map((x) => x._id))).toEqual(ids([QA]));
+    expect(ids(achadas.map((x) => x._id))).toEqual(ids([QB, QC, QD, QE]));
+  });
+
+  it('revisões + sem imagem combinam em "e"', async () => {
+    const achadas = await questoes
+      .find(
+        condicoesDoFiltro({
+          revisoes: 'textClassification,reported',
+          semImagem: 'true',
+        }),
+      )
+      .lean();
+    expect(ids(achadas.map((x) => x._id))).toEqual(ids([QE]));
   });
 
   it('DTO: revisões só aceita os nomes conhecidos; exame/categoria são ObjectId', async () => {
@@ -154,7 +166,7 @@ describe('filtro do banco de questões (043/01) — Mongo real', () => {
     ]);
     expect(await erros({ exame: 'x' })).toEqual(['exame']);
     expect(
-      await erros({ categoria: String(CAT_ENEM_1), comImagem: 'true' }),
+      await erros({ categoria: String(CAT_ENEM_1), semImagem: 'true' }),
     ).toEqual([]);
   });
 });
@@ -184,7 +196,7 @@ describe('QuestaoService.getAll — fiação dos filtros novos (043/01)', () => 
         exame: 'ex',
         categoria: 'cat',
         revisoes: 'reported,textClassification',
-        comImagem: 'true',
+        semImagem: 'true',
       }),
     );
     expect(repository.findQuestaoIdsDasProvas).toHaveBeenCalledWith({
@@ -195,7 +207,7 @@ describe('QuestaoService.getAll — fiação dos filtros novos (043/01)', () => 
       _id: { $in: ['e1', 'e2'] },
       reported: true,
       textClassification: true,
-      imageId: { $exists: true, $nin: [null, ''] },
+      imageId: { $in: [null, ''] },
     });
   });
 
