@@ -55,10 +55,13 @@ export function gerarCaderno(
 
   let secaoAtual: string | null = null;
   const blocos = selecionadas.length
-    ? selecionadas.map(({ questao, numero, secao }) => {
+    ? selecionadas.map(({ questao, numero, secao, anulada }) => {
         const titulo = secao && secao !== secaoAtual ? blocoDeSecao(secao) : '';
         secaoAtual = secao ?? null;
-        return titulo + blocoDaQuestao(questao, numero, coletor, avisos);
+        return (
+          titulo +
+          blocoDaQuestao(questao, numero, coletor, avisos, anulada === true)
+        );
       })
     : [blocoMarcadorDeVazio(avisos)];
 
@@ -132,6 +135,7 @@ type Selecionada = {
   questao: QuestaoParaCaderno;
   numero: number;
   secao?: string | null;
+  anulada?: boolean;
 };
 
 function selecionar(
@@ -140,7 +144,7 @@ function selecionar(
   avisos: string[],
   manterOrdem: boolean,
 ): Selecionada[] {
-  const filtradas = simulado.questoes.filter((q): q is Selecionada => {
+  const filtradas = simulado.questoes.filter((q) => {
     if (q.numero == null) {
       // No rascunho, questão sem número é esperado e silencioso. No modo
       // normal é anomalia: `todasNumeradas` (simulado/helpers/bloqueado.ts)
@@ -152,9 +156,25 @@ function selecionar(
     }
     return draft ? q.questao.status === Status.Approved : true;
   });
-  return manterOrdem
-    ? filtradas
-    : filtradas.sort((a, b) => a.numero - b.numero);
+  /*
+    ⚠️ Campo a campo, nunca `{ ...q }`: `q` é subdocumento do Mongoose, e o
+    spread copia o estado interno, não os campos (ver `caderno-da-prova.ts`).
+  */
+  const selecionadas: Selecionada[] = filtradas.map((q) => {
+    const anulada = !!q.anulacao;
+    // tickets/042 (D8): sai no mesmo número, com o selo — e o professor é avisado.
+    if (anulada) avisos.push(`questão ${q.numero} anulada: impressa com selo`);
+    return {
+      questao: q.questao,
+      numero: q.numero as number,
+      secao: q.secao,
+      anulada,
+    };
+  });
+  const ordenadas = manterOrdem
+    ? selecionadas
+    : selecionadas.sort((a, b) => a.numero - b.numero);
+  return ordenadas;
 }
 
 /**
@@ -225,11 +245,22 @@ function prepararParaOMolde(latex: string): string {
   return limpo.startsWith('[') ? `{}${limpo}` : limpo;
 }
 
+/**
+ * O selo da questão anulada (tickets/042, D8): uma caixa com borda, sem fundo
+ * (a prova é impressa em P&B), antes do enunciado. O texto é fixo, mas passa
+ * pelo mesmo escape de tudo o que vai para o `.tex`.
+ */
+export const TEXTO_DO_SELO = 'QUESTÃO ANULADA: não responda';
+function seloDeAnulada(): string {
+  return `\\noindent\\fbox{\\textbf{${escaparForaDaMatematica(TEXTO_DO_SELO)}}}\\par`;
+}
+
 function blocoDaQuestao(
   questao: QuestaoParaCaderno,
   numero: number,
   coletor: ColetorDeImagens,
   avisos: string[],
+  anulada = false,
 ): string {
   const converter = (texto: string | undefined): string =>
     textoParaLatex(texto, coletor, (m) =>
@@ -260,7 +291,9 @@ function blocoDaQuestao(
     // número da questão e o enunciado. Com a quebra, o caso de texto fica
     // igual (uma quebra simples é só um espaço em LaTeX) e o caso de figura
     // sai na forma idiomática.
-    `\\question\n${enunciado}`,
+    anulada
+      ? `\\question\n${seloDeAnulada()}\n${enunciado}`
+      : `\\question\n${enunciado}`,
     '',
     pergunta,
     '\\begin{choices}',

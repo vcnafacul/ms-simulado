@@ -23,6 +23,7 @@ import { Idioma } from '../simulado/enums/idioma.enum';
 import { Prova, ProvaSchema } from './prova.schema';
 import { ProvaRepository } from './prova.repository';
 import { ProvaService } from './prova.service';
+import { AnulacaoRepository } from '../questao/anulacao/anulacao.repository';
 
 /**
  * tickets/027, card 01 — duplicar prova do cursinho, Mongo real.
@@ -55,7 +56,12 @@ describe('duplicar prova — Mongo real', () => {
           { name: Historico.name, schema: HistoricoSchema },
         ]),
       ],
-      providers: [ProvaRepository, QuestaoRepository, SimuladoRepository],
+      providers: [
+        ProvaRepository,
+        QuestaoRepository,
+        SimuladoRepository,
+        AnulacaoRepository,
+      ],
     }).compile();
     provas = mod.get(getModelToken(Prova.name));
     simulados = mod.get(getModelToken(Simulado.name));
@@ -91,6 +97,8 @@ describe('duplicar prova — Mongo real', () => {
       {} as never,
       simuladoRepo,
       questaoRepo,
+      undefined,
+      mod.get(AnulacaoRepository),
     );
   }, 120000);
 
@@ -351,5 +359,41 @@ describe('duplicar prova — Mongo real', () => {
     ).toBe(antes);
     expect(await provas.countDocuments({ nome: 'Vai falhar' })).toBe(0);
     falha.mockRestore();
+  });
+
+  it('⚠️ tickets/042: o slot anulado continua anulado na cópia, com espelho e revisão 0', async () => {
+    const { origem, ids, sim } = await montarOrigem();
+    const anulacao = {
+      motivo: 'sem_alternativa_correta',
+      justificativa: 'Gabarito errado na origem.',
+      em: new Date(),
+      porUsuarioId: 'u',
+      porCursinhoId: 'A',
+    };
+    await provas.collection.updateOne(
+      { _id: new Types.ObjectId(origem) },
+      { $set: { 'questoes.1.anulacao': anulacao } },
+    );
+    await simulados.collection.updateOne(
+      { _id: sim },
+      { $set: { 'questoes.1.anulacao': anulacao, revisaoAnulacao: 4 } },
+    );
+
+    const r = await service.duplicar(origem, 'Cópia anulada', ator());
+
+    const copia = await provas.collection.findOne({ _id: r._id as never });
+    expect(copia!.questoes[1].anulacao).toMatchObject({
+      motivo: 'sem_alternativa_correta',
+    });
+    expect(copia!.questoes[0].anulacao).toBeUndefined();
+    const simCopia = await simulados.collection.findOne({
+      _id: copia!.simulados[0],
+    });
+    expect(simCopia!.questoes[1].anulacao).toBeDefined();
+    expect(simCopia!.revisaoAnulacao ?? 0).toBe(0);
+    const q = await questoes.collection.findOne({ _id: ids[1] });
+    expect(q!.anulacoes).toEqual([
+      expect.objectContaining({ provaId: String(r._id), numero: 2 }),
+    ]);
   });
 });

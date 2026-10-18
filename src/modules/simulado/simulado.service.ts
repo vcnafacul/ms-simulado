@@ -380,7 +380,10 @@ export class SimuladoService {
             frente3: qc.questao.frente3,
             materia: qc.questao.materia,
             numero: qc.numero,
-            imageId: qc.questao.imageId,
+            // tickets/042 (D5): o aluno não vê a anulada — sem imagem, e a
+            // tela a marca e pula. A resposta que vier nela é ignorada (02).
+            anulada: !!qc.anulacao,
+            imageId: qc.anulacao ? undefined : qc.questao.imageId,
           })),
           inicio: inicio,
           duracao: simulado.categoria.duracao,

@@ -73,6 +73,12 @@ import { ProvaContendo, QuestaoRepository } from './questao.repository';
 import { Questao } from './questao.schema';
 import { ContadorCursinhoRepository } from '../contador-cursinho/contador-cursinho.repository';
 
+import {
+  AnulacaoRepository,
+  AnulacaoDaQuestao,
+} from './anulacao/anulacao.repository';
+import { Anulacao } from './anulacao/anulacao.schema';
+import { EntradaComAnulacaoDTO } from './dtos/entrada-com-anulacao.dto';
 @Injectable()
 export class QuestaoService {
   private readonly logger = new Logger(QuestaoService.name);
@@ -90,7 +96,54 @@ export class QuestaoService {
     // tickets/025, card 02. Último e opcional: os specs montam o service
     // na mão com os 9 de antes.
     private readonly contadorCursinho?: ContadorCursinhoRepository,
+    // tickets/042, card 04. Opcional pelo mesmo motivo.
+    private readonly anulacaoRepository?: AnulacaoRepository,
   ) {}
+
+  /**
+   * As anulações da questão em outras provas (tickets/042, D4).
+   */
+  public async anulacoesDaQuestao(id: string): Promise<AnulacaoDaQuestao[]> {
+    return (await this.anulacaoRepository?.daQuestao(id)) ?? [];
+  }
+
+  /**
+   * ⚠️ **O aviso do D4**: questão já anulada em alguma prova, sem `modo` →
+   * 409 `QUESTAO_ANULADA` com as provas e as justificativas (o modal do
+   * client). Questão nunca anulada passa direto, sem `modo`.
+   *
+   * @returns a anulação a gravar quando `modo: 'anulada'`.
+   */
+  private async conferirEntradaDeAnulada(
+    questaoId: string,
+    entrada: EntradaComAnulacaoDTO | undefined,
+    ator?: Ator,
+  ): Promise<{ anulacoes: AnulacaoDaQuestao[]; anulacao?: Anulacao }> {
+    if (entrada?.modo === 'anulada' && !entrada.anulacao) {
+      throw new BadRequestException(
+        'Para adicionar como anulada, informe o motivo e a justificativa.',
+      );
+    }
+    const anulacoes = await this.anulacoesDaQuestao(questaoId);
+    if (anulacoes.length && !entrada?.modo) {
+      throw new ConflictException({
+        code: 'QUESTAO_ANULADA',
+        message: `Esta questão foi anulada em ${anulacoes.length} prova(s).`,
+        anulacoes,
+      });
+    }
+    if (entrada?.modo !== 'anulada') return { anulacoes };
+    return {
+      anulacoes,
+      anulacao: {
+        motivo: entrada.anulacao!.motivo,
+        justificativa: entrada.anulacao!.justificativa,
+        em: new Date(),
+        porUsuarioId: ator?.userId ?? null,
+        porCursinhoId: ator?.cursinhoId ?? null,
+      },
+    };
+  }
 
   public async create(
     item: CreateQuestaoDTOInput,
@@ -176,6 +229,7 @@ export class QuestaoService {
     prova,
     enemArea,
     reported,
+    anulada,
     sortColumn = 'updatedAt',
     sortOrder = 'desc',
   }: QuestaoDTOInput): Promise<GetAllOutput<QuestaoAllDTO>> {
@@ -205,6 +259,12 @@ export class QuestaoService {
       where['_id'] = { $in: ordemIds };
     }
     if (enemArea) where['enemArea'] = enemArea;
+    // tickets/042, card 04: o filtro do banco, sobre o espelho.
+    if (anulada === 'somente' || anulada === 'esconder') {
+      (where as Record<string, unknown>)['anulacoes.provaId'] = {
+        $exists: anulada === 'somente',
+      };
+    }
 
     const questoes = await this.repository.getAll({
       page,
@@ -226,6 +286,9 @@ export class QuestaoService {
       materia: questao.materia?.nome,
       status: questao.status,
       updatedAt: questao.updatedAt,
+      // tickets/042: selo "Anulada em N provas" no banco.
+      anulada: (questao.anulacoes?.length ?? 0) > 0,
+      qtdAnulacoes: questao.anulacoes?.length ?? 0,
     }));
 
     return {
@@ -469,17 +532,61 @@ export class QuestaoService {
    * prova de onde a fábrica vai tirar a questão.
    */
   public async updateQuestionDaRota(question: UpdateDTOInput, ator?: Ator) {
+    let saida: string | undefined;
+    let anulacao: Anulacao | undefined;
     if (question.prova) {
       await this.provaService.assertPodeComporProva(question.prova, ator);
-      const saida = await this.repository.findProvaDeSaida(
+      saida = await this.repository.findProvaDeSaida(
         question._id,
         question.prova,
       );
       if (saida && saida !== question.prova.toString()) {
         await this.provaService.assertPodeComporProva(saida, ator);
+        // tickets/042, D4: trocar de prova é entrar numa prova nova.
+        ({ anulacao } = await this.conferirEntradaDeAnulada(
+          question._id,
+          { modo: question.modo, anulacao: question.anulacao },
+          ator,
+        ));
       }
     }
-    await this.updateQuestion(question);
+    // `modo`/`anulacao` são da rota, não da questão: não vão para a fábrica.
+    const semEntrada = { ...question } as UpdateDTOInput;
+    delete semEntrada.modo;
+    delete semEntrada.anulacao;
+    await this.updateQuestion(semEntrada);
+    const trocou = !!saida && saida !== question.prova?.toString();
+    if (trocou && this.anulacaoRepository) {
+      /*
+        ⚠️ Fora da transação da fábrica (as 4 `updateQuestion` não recebem o
+        gancho): o slot da prova de saída já saiu com a anulação; aqui sai a
+        entrada do espelho, e a anulação na prova nova é gravada na transação
+        do próprio `AnulacaoRepository`. Uma falha aqui deixa a questão na
+        prova nova SEM anular — visível na tela, e corrigível anulando.
+      */
+      await this.anulacaoRepository.limparEspelho(question._id, saida!);
+      if (anulacao) {
+        const session = await this.repository.startSession();
+        session.startTransaction();
+        try {
+          await this.anulacaoRepository.gravar(
+            {
+              provaId: String(question.prova),
+              questaoId: question._id,
+              subirRevisao: false,
+              session,
+            },
+            anulacao,
+          );
+          await session.commitTransaction();
+        } catch (error) {
+          await session.abortTransaction();
+          throw error;
+        } finally {
+          session.endSession();
+        }
+      }
+    }
   }
 
   public async updateQuestion(question: UpdateDTOInput) {
@@ -523,6 +630,8 @@ export class QuestaoService {
         session,
       );
       await this.provaRepository.removeQuestion(provaId, questao, session);
+      // tickets/042: a anulação saiu com o slot; o espelho sai junto.
+      await this.anulacaoRepository?.limparEspelho(questaoId, provaId, session);
       if (questao.provaBase?.toString() === provaId) {
         await this.repository.setProvaBase(questaoId, null, session);
       }
@@ -574,6 +683,7 @@ export class QuestaoService {
     numero: number,
     userId?: string,
     ator?: Ator,
+    entrada?: EntradaComAnulacaoDTO,
   ): Promise<void> {
     await this.provaService.assertPodeComporProva(provaId, ator);
     const prova = await this.provaRepository.getById(provaId);
@@ -594,7 +704,26 @@ export class QuestaoService {
         `Número ${numero} indisponível nesta prova.`,
       );
     }
-    await factory.addQuestaoExistenteAProva(questaoId, provaId, numero);
+    // ⚠️ Depois das validações baratas e ANTES de qualquer escrita.
+    const { anulacoes, anulacao } = await this.conferirEntradaDeAnulada(
+      questaoId,
+      entrada,
+      ator,
+    );
+    await factory.addQuestaoExistenteAProva(
+      questaoId,
+      provaId,
+      numero,
+      // Entra já anulada, na MESMA transação: ou entra anulada, ou não entra.
+      // Revisão não sobe: nenhuma nota foi calculada com esta questão aqui.
+      anulacao
+        ? (session) =>
+            this.anulacaoRepository!.gravar(
+              { provaId, questaoId, subirRevisao: false, session },
+              anulacao,
+            ).then(() => undefined)
+        : undefined,
+    );
     await this.auditLogService.create({
       user: ator?.userId ?? userId,
       entityId: questaoId,
@@ -604,6 +733,18 @@ export class QuestaoService {
         provaId,
         numero,
         cursinhoId: ator?.cursinhoId ?? null,
+        ...(anulacoes.length
+          ? {
+              modo: entrada?.modo,
+              anulacoesExistentes: anulacoes.length,
+              ...(anulacao
+                ? {
+                    motivo: anulacao.motivo,
+                    justificativa: anulacao.justificativa,
+                  }
+                : {}),
+            }
+          : {}),
       }),
     });
   }

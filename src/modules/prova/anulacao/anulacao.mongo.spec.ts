@@ -262,41 +262,25 @@ describe('Anular/desanular questão na prova (042/03)', () => {
     expect(audit.create).not.toHaveBeenCalled();
   });
 
-  it('⚠️ guarda D10: prova com resultado → 409 ao anular e ao desanular; editar passa', async () => {
-    const { P, sims, url } = await cenario();
-    const srv = app.getHttpServer();
-    await request(srv).put(url).set(HEADER_ATOR, DO_C1).send(corpo).expect(200);
+  it('card 12: prova já aplicada aceita anular — nada é processado (D6)', async () => {
+    const { sims, url } = await cenario();
     await historicos.collection.insertOne({
       simulado: sims[0],
       status: HistoricoStatus.Completed,
     } as never);
-
-    const r = await request(srv)
-      .delete(url)
-      .set(HEADER_ATOR, DO_C1)
-      .expect(409);
-    expect(r.body.message).toBe(
-      'Ainda não é possível anular questão em prova já aplicada.',
-    );
-    await request(srv)
+    await request(app.getHttpServer())
       .put(url)
       .set(HEADER_ATOR, DO_C1)
-      .send({ ...corpo, justificativa: 'Editada depois da aplicação.' })
-      .expect(200);
-
-    // Cartão DA prova (038), ainda sem simulado, também conta.
-    const outra = await cenario();
-    await historicos.collection.insertOne({
-      prova: outra.P,
-      simulado: null,
-      status: HistoricoStatus.Completed,
-    } as never);
-    await request(srv)
-      .put(outra.url)
-      .set(HEADER_ATOR, DO_C1)
       .send(corpo)
-      .expect(409);
-    expect(String(P)).not.toBe(String(outra.P));
+      .expect(200);
+    await request(app.getHttpServer())
+      .delete(url)
+      .set(HEADER_ATOR, DO_C1)
+      .expect(200);
+    expect(await revisao(sims[0])).toBe(2);
+    // O histórico não foi tocado: a nota só muda quando alguém recalcular.
+    const h = await historicos.collection.findOne({ simulado: sims[0] });
+    expect(h!.revisaoAnulacao).toBeUndefined();
   });
 
   it('histórico ainda não concluído não trava', async () => {

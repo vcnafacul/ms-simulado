@@ -100,6 +100,13 @@ export class QuestaoController {
     return await this.service.getPendingByMateria(materiaIds);
   }
 
+  /** tickets/042, card 04: em quais provas está anulada, e por quê. */
+  @Get(':id/anulacoes')
+  @ApiResponse({ status: 200, description: 'anulações da questão por prova' })
+  public async getAnulacoes(@Param('id') id: string) {
+    return await this.service.anulacoesDaQuestao(id);
+  }
+
   @Get(':id/logs')
   @ApiResponse({
     status: 200,
@@ -258,6 +265,7 @@ export class QuestaoController {
       body.numero,
       body.userId,
       ator,
+      { modo: body.modo, anulacao: body.anulacao },
     );
   }
 
