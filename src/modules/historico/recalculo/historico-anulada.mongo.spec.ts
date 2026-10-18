@@ -58,7 +58,13 @@ describe('histórico com anulada (042/10) — Mongo real', () => {
 
   /** 3 questões (1, 2, 3); a 2 anulada no simulado (revisão 1). Aluno acertou as 3. */
   async function cenario(
-    o: { cartao?: boolean; revisaoDoHistorico?: number } = {},
+    o: {
+      cartao?: boolean;
+      revisaoDoHistorico?: number;
+      numerosDoHistorico?: number[];
+      /** Card 20: a 2 foi anulada e desanulada (revisão 2, nada anulado). */
+      desanulada?: boolean;
+    } = {},
   ) {
     const m = (
       await mod
@@ -90,11 +96,11 @@ describe('histórico com anulada (042/10) — Mongo real', () => {
     const s = (
       await simulados.collection.insertOne({
         nome: 'S',
-        revisaoAnulacao: 1,
+        revisaoAnulacao: o.desanulada ? 2 : 1,
         questoes: ids.map((questao, i) => ({
           questao,
           numero: i + 1,
-          ...(i === 1 ? { anulacao } : {}),
+          ...(i === 1 && !o.desanulada ? { anulacao } : {}),
         })),
       } as never)
     ).insertedId;
@@ -106,6 +112,9 @@ describe('histórico com anulada (042/10) — Mongo real', () => {
         ...(o.cartao ? { cartaoCode: '001' } : {}),
         ...(o.revisaoDoHistorico !== undefined
           ? { revisaoAnulacao: o.revisaoDoHistorico }
+          : {}),
+        ...(o.numerosDoHistorico
+          ? { numerosAnulados: o.numerosDoHistorico }
           : {}),
         respostas: ids.map((questao, i) => ({
           questao,
@@ -150,11 +159,39 @@ describe('histórico com anulada (042/10) — Mongo real', () => {
     expect(r.recalculadoEm).toBeUndefined();
   });
 
-  it('em dia (revisão atual) → não divergente, nada é regravado', async () => {
-    const { h } = await cenario({ revisaoDoHistorico: 1 });
+  it('em dia (mesmas anuladas) → não divergente, nada é regravado', async () => {
+    const { h } = await cenario({
+      revisaoDoHistorico: 1,
+      numerosDoHistorico: [2],
+    });
     const r = await service.getById(String(h), 'aluno');
     expect(r).toMatchObject({ divergente: false, acertos: 3 });
     expect(r.recalculadoEm).toBeUndefined();
+  });
+
+  it('card 20: anulada e desanulada sem recálculo → não divergente, nada é regravado', async () => {
+    // Histórico de antes da anulação (sem os campos); simulado na revisão 2.
+    const { h } = await cenario({ desanulada: true });
+    const r = await service.getById(String(h), 'aluno');
+    expect(r).toMatchObject({ divergente: false, acertos: 3 });
+    expect(r.recalculadoEm).toBeUndefined();
+  });
+
+  it('card 20: recalculado com a anulada e depois desanulada → divergente de novo', async () => {
+    const { h } = await cenario({
+      desanulada: true,
+      revisaoDoHistorico: 1,
+      numerosDoHistorico: [2],
+    });
+    const r = await service.getById(String(h), 'aluno');
+    // Digital: recalcula ao abrir e volta a contar a 2.
+    expect(r).toMatchObject({
+      divergente: false,
+      totalConsiderado: 3,
+      numerosAnulados: [],
+      revisaoAnulacao: 2,
+    });
+    expect(r.recalculadoEm).toBeInstanceOf(Date);
   });
 
   it('regravarRecalculo é condicional: só concluído e atrás do alvo', async () => {

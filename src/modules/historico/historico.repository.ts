@@ -7,7 +7,7 @@ import { AggregatePeriodDtoInput } from 'src/shared/dtos/aggregate-period.dto.in
 import { AggregateHistoricoDtoOutput } from './dtos/aggregate-historico.dto.output';
 import { AggregatePeriodByTypeDtoOutput } from './dtos/aggregate-period-by-type.dto.output';
 import { GetHistoricoDTOInput } from './dtos/get-historico.dto';
-import { filtroDivergente } from './filtro-divergente';
+import { filtroAtrasDaRevisao } from './filtro-divergente';
 import { HistoricoStatus } from './enums/historico-status.enum';
 import { buildFullSeriesHistorico } from './handle/build-full-series-historico';
 import { buildFullSeriesHistoricoByType } from './handle/build-full-seriesH-historico-by-type';
@@ -125,7 +125,7 @@ export class HistoricoRepository extends BaseRepository<Historico> {
         {
           _id: new Types.ObjectId(id),
           status: HistoricoStatus.Completed,
-          ...filtroDivergente(alvo),
+          ...filtroAtrasDaRevisao(alvo),
         },
         { $set: dados },
       )
@@ -530,28 +530,6 @@ export class HistoricoRepository extends BaseRepository<Historico> {
     await this.model
       .findByIdAndUpdate(id, { rawRespostas, status: HistoricoStatus.Pending })
       .exec();
-  }
-
-  /**
-   * Alguém já tem resultado nesta prova (tickets/042, guarda D10): histórico
-   * `completed` de um simulado dela, ou o cartão DA prova (038).
-   */
-  async existeConcluidoNaProva(
-    provaId: string,
-    simuladoIds: string[],
-  ): Promise<boolean> {
-    const existe = await this.model
-      .exists({
-        status: HistoricoStatus.Completed,
-        $or: [
-          {
-            simulado: { $in: simuladoIds.map((id) => new Types.ObjectId(id)) },
-          },
-          { prova: new Types.ObjectId(provaId) },
-        ],
-      })
-      .exec();
-    return !!existe;
   }
 
   async claimForProcessing(id: string): Promise<boolean> {

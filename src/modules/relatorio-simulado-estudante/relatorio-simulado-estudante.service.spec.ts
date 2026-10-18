@@ -81,6 +81,7 @@ describe('RelatorioSimuladoEstudanteService.consultar', () => {
       questoesRespondidas: 90,
       aproveitamentoGeral: 0.72,
       falha: undefined,
+      divergente: false, // tickets/042
     });
     expect(r.totalEstudantesComCartaoNoCursinho).toBe(30);
   });
