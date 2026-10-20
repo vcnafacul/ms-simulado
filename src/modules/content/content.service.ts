@@ -90,6 +90,10 @@ export class ContentService {
       id,
       status,
       status === StatusContent.Rejected ? motivo : undefined,
+      // Chamador antigo sem userId: aprova, mas fica sem aprovador.
+      status === StatusContent.Approved && userId
+        ? { userId, em: new Date() }
+        : undefined,
     );
 
     if (userId) {
