@@ -6,7 +6,7 @@ import { ContentFileHistoryService } from '../content-file-history/content-file-
 import { FileHistorySource } from '../content-file-history/content-file-history.schema';
 import { CreateFileContentDTOInput } from './dtos/create-file-content.dto.input';
 import { FileContentRepository } from './file-content.repository';
-import { FileContent } from './file-content.schema';
+import { FileContent, TipoFileContent } from './file-content.schema';
 
 @Injectable()
 export class FileContentService {
@@ -17,6 +17,15 @@ export class FileContentService {
   ) {}
 
   async create(data: CreateFileContentDTOInput): Promise<FileContent> {
+    if (
+      data.tipo === TipoFileContent.Video &&
+      (data.fileKey || data.originalName)
+    ) {
+      throw new HttpException(
+        'Conteúdo em vídeo não tem arquivo',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
     const content = await this.contentRepository.getById(data.content);
     if (!content) {
       throw new HttpException(
@@ -49,6 +58,15 @@ export class FileContentService {
   async createStandalone(
     data: CreateFileContentDTOInput,
   ): Promise<FileContent> {
+    if (
+      data.tipo === TipoFileContent.Video &&
+      (data.fileKey || data.originalName)
+    ) {
+      throw new HttpException(
+        'Conteúdo em vídeo não tem arquivo',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
     const content = await this.contentRepository.getById(data.content);
     if (!content) {
       throw new HttpException(
