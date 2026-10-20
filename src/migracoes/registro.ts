@@ -2,6 +2,7 @@ import type { Db } from 'mongodb';
 import { migrar0007 } from './migracoes/0007-historico-prova';
 import { migrar0008 } from './migracoes/0008-juncao-aguardando-simulado';
 import { migrar0009 } from './migracoes/0009-juncao-aguardando-presa';
+import { migrar0010 } from './migracoes/0010-tipo-do-file-content';
 import { semearCategoriasEnemCursinho } from './seeds/categorias-enem-cursinho';
 import { semearTemplateCaderno } from './seeds/template-caderno';
 
@@ -45,6 +46,12 @@ export const MIGRACOES: Passo[] = [
     descricao:
       'move para o simulado as linhas do relatório presas em "aguardando" com a leitura já feita (tickets/038)',
     executar: (db) => migrar0009(db),
+  },
+  {
+    id: '0010-tipo-do-file-content',
+    descricao:
+      'tipo "documento" nos FileContent anteriores ao conteúdo em vídeo (tickets/049 · 01)',
+    executar: (db) => migrar0010(db),
   },
 ];
 
