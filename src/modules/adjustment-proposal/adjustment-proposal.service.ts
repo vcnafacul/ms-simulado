@@ -79,7 +79,10 @@ export class AdjustmentProposalService {
         );
 
         content.file = new Types.ObjectId(proposal.file as any);
-        content.lastEditedBy = dto.reviewedBy;
+        // ⚠️ Quem fez o material é o autor da proposta; quem aprovou fica em
+        // `proposal.reviewedBy`. Gravar o revisor aqui fazia a tela dizer
+        // "Última edição por <quem aprovou>".
+        content.lastEditedBy = proposal.author;
         content.lastEditedAt = new Date();
         await this.contentRepository.update(content);
 

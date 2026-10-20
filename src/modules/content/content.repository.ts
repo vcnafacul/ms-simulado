@@ -108,6 +108,44 @@ export class ContentRepository extends BaseRepository<Content> {
       .sort({ order: 1 });
   }
 
+  /**
+   * ⚠️ `$unset` explícito: o `update` do `BaseRepository` faz
+   * `updateOne(filtro, entidade)`, e o Mongoose descarta chave `undefined` —
+   * `content.file = undefined` + `update(content)` deixaria o arquivo lá.
+   */
+  async resetarParaPendenteDeEnvio(id: string): Promise<void> {
+    await this.model.updateOne(
+      { _id: id },
+      {
+        $set: { status: StatusContent.Pending_Upload },
+        $unset: { file: 1, rejectionReason: 1 },
+      },
+    );
+  }
+
+  /**
+   * Troca o status e cuida do motivo: grava em `Rejected`, apaga nos outros.
+   * ⚠️ `$unset`, pelo mesmo motivo do reset — `undefined` no `update()` não
+   * remove nada.
+   */
+  async mudarStatus(
+    id: string,
+    status: StatusContent,
+    rejectionReason?: string,
+  ): Promise<void> {
+    await this.model.updateOne(
+      { _id: id },
+      rejectionReason
+        ? { $set: { status, rejectionReason } }
+        : { $set: { status }, $unset: { rejectionReason: 1 } },
+    );
+  }
+
+  /** Arquivo novo apaga o motivo da rejeição anterior: a demanda recomeça. */
+  async limparMotivoDaRejeicao(id: string): Promise<void> {
+    await this.model.updateOne({ _id: id }, { $unset: { rejectionReason: 1 } });
+  }
+
   async getNextOrder(subjectId: string): Promise<number> {
     const last = await this.model
       .findOne({ subject: subjectId, deleted: { $ne: true } })

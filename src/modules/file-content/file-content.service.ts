@@ -33,6 +33,8 @@ export class FileContentService {
     content.lastEditedBy = data.uploadedBy;
     content.lastEditedAt = new Date();
     await this.contentRepository.update(content);
+    // Reenvio depois de uma rejeição: o motivo antigo não vale mais.
+    await this.contentRepository.limparMotivoDaRejeicao(String(content._id));
 
     await this.contentFileHistoryService.create({
       content: content as any,

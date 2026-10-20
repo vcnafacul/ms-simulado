@@ -42,6 +42,17 @@ export class Content extends BaseSchema {
   @Prop({ required: false })
   @ApiProperty({ required: false })
   public lastEditedAt?: Date;
+
+  /**
+   * Por que a demanda foi rejeitada. Só existe enquanto `status` é
+   * `Rejected`: aprovar, resetar ou enviar arquivo novo apaga.
+   *
+   * ⚠️ Campo no documento, não consulta ao `AuditLog`: a tela lê o motivo
+   * junto com a demanda; o log continua sendo a trilha de quem/quando.
+   */
+  @Prop({ required: false })
+  @ApiProperty({ required: false })
+  public rejectionReason?: string;
 }
 
 export const ContentSchema = SchemaFactory.createForClass(Content);

@@ -16,6 +16,7 @@ import { ContentService } from './content.service';
 import { CreateContentDTOInput } from './dtos/create-content.dto.input';
 import { GetAllContentDtoInput } from './dtos/get-all-content.dto.input';
 import { GetBySubjectDtoInput } from './dtos/get-by-subject.dto.input';
+import { ResetContentDtoInput } from './dtos/reset-content.dto.input';
 import { UpdateStatusDTOInput } from './dtos/update-status.dto.input';
 import { SnapshotContentStatus } from './snapshot/snapshot-content-status.schema';
 
@@ -154,8 +155,11 @@ export class ContentController {
     status: 200,
     description: 'conteúdo resetado para pendente de upload',
   })
-  async reset(@Param('id') id: string): Promise<void> {
-    return await this.service.reset(id);
+  async reset(
+    @Param('id') id: string,
+    @Body() body: ResetContentDtoInput,
+  ): Promise<void> {
+    return await this.service.reset(id, body.userId);
   }
 
   @Delete(':id')
