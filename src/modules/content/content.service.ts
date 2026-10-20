@@ -76,8 +76,21 @@ export class ContentService {
         HttpStatus.NOT_FOUND,
       );
     }
-    content.status = status;
-    await this.repository.update(content);
+    const motivo = message?.trim();
+    // ⚠️ Rejeitar sem dizer por quê deixava quem enviou sem saber o que
+    // corrigir — o log gravava só "Status alterado para 2".
+    if (status === StatusContent.Rejected && !motivo) {
+      throw new HttpException(
+        'Informe o motivo da rejeição.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    await this.repository.mudarStatus(
+      id,
+      status,
+      status === StatusContent.Rejected ? motivo : undefined,
+    );
 
     if (userId) {
       await this.auditLogService.create({
@@ -85,7 +98,8 @@ export class ContentService {
         entityId: id,
         entityType: 'Content',
         changes: JSON.stringify({
-          message: message || `Status alterado para ${status}`,
+          status,
+          message: motivo || `Status alterado para ${status}`,
         }),
       });
     }
