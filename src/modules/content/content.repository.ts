@@ -108,6 +108,21 @@ export class ContentRepository extends BaseRepository<Content> {
       .sort({ order: 1 });
   }
 
+  /**
+   * ⚠️ `$unset` explícito: o `update` do `BaseRepository` faz
+   * `updateOne(filtro, entidade)`, e o Mongoose descarta chave `undefined` —
+   * `content.file = undefined` + `update(content)` deixaria o arquivo lá.
+   */
+  async resetarParaPendenteDeEnvio(id: string): Promise<void> {
+    await this.model.updateOne(
+      { _id: id },
+      {
+        $set: { status: StatusContent.Pending_Upload },
+        $unset: { file: 1 },
+      },
+    );
+  }
+
   async getNextOrder(subjectId: string): Promise<number> {
     const last = await this.model
       .findOne({ subject: subjectId, deleted: { $ne: true } })
