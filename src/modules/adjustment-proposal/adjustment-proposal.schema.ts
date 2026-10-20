@@ -31,6 +31,11 @@ export class AdjustmentProposal extends BaseSchema {
   @Prop({ required: false })
   @ApiProperty({ required: false })
   public reviewedBy?: string;
+
+  /** Quando foi revisada (aprovada ou recusada). `updatedAt` não serve: o `update()` não o atualiza. */
+  @Prop({ required: false })
+  @ApiProperty({ required: false })
+  public reviewedAt?: Date;
 }
 
 export const AdjustmentProposalSchema =

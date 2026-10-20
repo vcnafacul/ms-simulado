@@ -53,6 +53,20 @@ export class Content extends BaseSchema {
   @Prop({ required: false })
   @ApiProperty({ required: false })
   public rejectionReason?: string;
+
+  /**
+   * Quem aprovou e quando. Só existe enquanto `status` é `Approved`:
+   * rejeitar, resetar ou enviar arquivo novo apaga (tickets/050, D1).
+   * Gravado aqui, não derivado do `AuditLog`: a listagem e o cabeçalho leem
+   * direto; o log continua como trilha.
+   */
+  @Prop({ required: false })
+  @ApiProperty({ required: false })
+  public approvedBy?: string;
+
+  @Prop({ required: false })
+  @ApiProperty({ required: false })
+  public approvedAt?: Date;
 }
 
 export const ContentSchema = SchemaFactory.createForClass(Content);

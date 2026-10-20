@@ -69,5 +69,27 @@ describe('AdjustmentProposalService#review — aprovação', () => {
       expect.objectContaining({ uploadedBy: 'autora' }),
     );
     expect(session.commitTransaction).toHaveBeenCalled();
+    expect(proposalRepo.update.mock.calls[0][0].reviewedAt).toBeInstanceOf(Date);
+  });
+
+  it('recusar também grava reviewedBy e reviewedAt, sem tocar o conteúdo', async () => {
+    contentRepo.update.mockClear();
+    proposalRepo.update.mockClear();
+    proposalRepo.getById.mockResolvedValueOnce({
+      ...proposta,
+      status: ProposalStatus.Pending,
+    });
+
+    await service.review(String(proposta._id), {
+      status: ProposalStatus.Rejected,
+      reviewedBy: 'revisor',
+    });
+
+    expect(contentRepo.update).not.toHaveBeenCalled();
+    expect(proposalRepo.update.mock.calls[0][0]).toMatchObject({
+      status: ProposalStatus.Rejected,
+      reviewedBy: 'revisor',
+    });
+    expect(proposalRepo.update.mock.calls[0][0].reviewedAt).toBeInstanceOf(Date);
   });
 });

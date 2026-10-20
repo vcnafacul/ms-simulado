@@ -96,6 +96,7 @@ export class AdjustmentProposalService {
 
         proposal.status = ProposalStatus.Approved;
         proposal.reviewedBy = dto.reviewedBy;
+        proposal.reviewedAt = new Date();
         await this.repository.update(proposal);
 
         await session.commitTransaction();
@@ -108,6 +109,7 @@ export class AdjustmentProposalService {
     } else {
       proposal.status = ProposalStatus.Rejected;
       proposal.reviewedBy = dto.reviewedBy;
+      proposal.reviewedAt = new Date();
       await this.repository.update(proposal);
     }
 

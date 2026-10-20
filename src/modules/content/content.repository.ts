@@ -118,13 +118,14 @@ export class ContentRepository extends BaseRepository<Content> {
       { _id: id },
       {
         $set: { status: StatusContent.Pending_Upload },
-        $unset: { file: 1, rejectionReason: 1 },
+        $unset: { file: 1, rejectionReason: 1, approvedBy: 1, approvedAt: 1 },
       },
     );
   }
 
   /**
-   * Troca o status e cuida do motivo: grava em `Rejected`, apaga nos outros.
+   * Troca o status e cuida do que vai junto: o motivo só existe em
+   * `Rejected`; o aprovador (`approvedBy`/`approvedAt`) só em `Approved`.
    * ⚠️ `$unset`, pelo mesmo motivo do reset — `undefined` no `update()` não
    * remove nada.
    */
@@ -132,18 +133,31 @@ export class ContentRepository extends BaseRepository<Content> {
     id: string,
     status: StatusContent,
     rejectionReason?: string,
+    aprovador?: { userId: string; em: Date },
   ): Promise<void> {
-    await this.model.updateOne(
-      { _id: id },
-      rejectionReason
-        ? { $set: { status, rejectionReason } }
-        : { $set: { status }, $unset: { rejectionReason: 1 } },
-    );
+    const set: Record<string, unknown> = { status };
+    const unset: Record<string, 1> = {};
+    if (status === StatusContent.Rejected && rejectionReason) {
+      set.rejectionReason = rejectionReason;
+    } else {
+      unset.rejectionReason = 1;
+    }
+    if (status === StatusContent.Approved && aprovador) {
+      set.approvedBy = aprovador.userId;
+      set.approvedAt = aprovador.em;
+    } else {
+      unset.approvedBy = 1;
+      unset.approvedAt = 1;
+    }
+    await this.model.updateOne({ _id: id }, { $set: set, $unset: unset });
   }
 
-  /** Arquivo novo apaga o motivo da rejeição anterior: a demanda recomeça. */
+  /** Arquivo novo apaga o motivo da rejeição e o aprovador: a demanda recomeça. */
   async limparMotivoDaRejeicao(id: string): Promise<void> {
-    await this.model.updateOne({ _id: id }, { $unset: { rejectionReason: 1 } });
+    await this.model.updateOne(
+      { _id: id },
+      { $unset: { rejectionReason: 1, approvedBy: 1, approvedAt: 1 } },
+    );
   }
 
   async getNextOrder(subjectId: string): Promise<number> {
