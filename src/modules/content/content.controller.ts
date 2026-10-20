@@ -15,6 +15,7 @@ import { Content } from './content.schema';
 import { ContentService } from './content.service';
 import { CreateContentDTOInput } from './dtos/create-content.dto.input';
 import { GetAllContentDtoInput } from './dtos/get-all-content.dto.input';
+import { GetBySubjectDtoInput } from './dtos/get-by-subject.dto.input';
 import { UpdateStatusDTOInput } from './dtos/update-status.dto.input';
 import { SnapshotContentStatus } from './snapshot/snapshot-content-status.schema';
 
@@ -97,8 +98,9 @@ export class ContentController {
   })
   async getBySubject(
     @Param('subjectId') subjectId: string,
+    @Query() query: GetBySubjectDtoInput,
   ): Promise<Content[]> {
-    return await this.service.getBySubject(subjectId);
+    return await this.service.getBySubject(subjectId, query.status);
   }
 
   @Get(':id/populated')

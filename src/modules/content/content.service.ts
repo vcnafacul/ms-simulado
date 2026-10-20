@@ -45,8 +45,11 @@ export class ContentService {
     return await this.repository.findAllByFilter(param);
   }
 
-  async getBySubject(subjectId: string): Promise<Content[]> {
-    return await this.repository.getBySubject(subjectId);
+  async getBySubject(
+    subjectId: string,
+    status?: StatusContent,
+  ): Promise<Content[]> {
+    return await this.repository.getBySubject(subjectId, status);
   }
 
   async getDemands(

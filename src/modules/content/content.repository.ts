@@ -82,9 +82,24 @@ export class ContentRepository extends BaseRepository<Content> {
       .populate('file');
   }
 
-  async getBySubject(subjectId: string): Promise<Content[]> {
+  /**
+   * Conteúdos de um tema, na ordem. Com `status`, só os daquele status —
+   * é assim que a página do tema do aluno recebe só os aprovados.
+   *
+   * ⚠️ Sem `status` devolve TODOS (menos excluídos), como sempre devolveu:
+   * o painel admin pode depender disso.
+   */
+  async getBySubject(
+    subjectId: string,
+    status?: StatusContent,
+  ): Promise<Content[]> {
+    const where: Record<string, unknown> = {
+      subject: subjectId,
+      deleted: { $ne: true },
+    };
+    if (status !== undefined) where.status = status;
     return this.model
-      .find({ subject: subjectId, deleted: { $ne: true } })
+      .find(where)
       .populate({
         path: 'subject',
         populate: { path: 'frente' },
