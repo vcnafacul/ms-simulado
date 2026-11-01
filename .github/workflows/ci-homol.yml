@@ -43,6 +43,8 @@ jobs:
   PUSH:
     if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       # Checkout develop para a imagem refletir o estado da branch (evita “sumir” em homol)
       - uses: actions/checkout@v4
@@ -59,12 +61,22 @@ jobs:
         run: yarn build
       - name: Build Image
         run: docker build -t mssimulado -f ms.dockerfile .
+      # Tag do commit que virou imagem (o checkout é a ponta da develop): o
+      # deploy.sh do vcnafacul-stack sobe exatamente essa, e o rollback volta
+      # para a anterior (tickets/056, card 03).
+      - name: Tag do commit
+        id: tag
+        run: echo "tag=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: docker tags
-        run: docker tag mssimulado vcnafacul/simulado:latest
+        run: |
+          docker tag mssimulado vcnafacul/simulado:latest
+          docker tag mssimulado vcnafacul/simulado:${{ steps.tag.outputs.tag }}
       - name: docker login
         run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USER }} --password-stdin
       - name: Image Push
-        run: docker push vcnafacul/simulado:latest
+        run: |
+          docker push vcnafacul/simulado:${{ steps.tag.outputs.tag }}
+          docker push vcnafacul/simulado:latest
   DEPLOY_HOMOL:
     if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.base_ref == 'develop'
     needs: PUSH
@@ -76,6 +88,5 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST_HOMOL }}
           username: ${{ secrets.DEPLOY_USER_HOMOL }}
           password: ${{ secrets.DEPLOY_PASS_HOMOL }}
-          script: |
-            chmod +x ~/subir_ms.sh
-            ~/subir_ms.sh
+          # compose do vcnafacul-stack (tickets/056): troca só o ms-simulado e espera healthy
+          script: ~/stack/deploy.sh ms-simulado ${{ needs.PUSH.outputs.tag }}
