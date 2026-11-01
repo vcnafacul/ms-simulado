@@ -46,18 +46,20 @@ export class ValkeyQueueConsumer
       await this.ensureGroup(stream, group);
     }
     this.running = true;
-    this.poll().catch((err) =>
-      this.logger.error('Polling error:', err),
-    );
+    this.poll().catch((err) => this.logger.error('Polling error:', err));
   }
 
   onModuleDestroy() {
     this.running = false;
   }
 
+  // Grupo criado lendo do INÍCIO ('0'), não só do que chegar depois ('$'): o
+  // recoverPending republica os pendentes antes deste ponto, e um Redis
+  // recriado vazio pode já ter mensagem na fila. Mensagem processada é apagada
+  // (xdel), então ler do início não reprocessa nada.
   private async ensureGroup(stream: string, group: string) {
     try {
-      await this.redis.xgroup('CREATE', stream, group, '$', 'MKSTREAM');
+      await this.redis.xgroup('CREATE', stream, group, '0', 'MKSTREAM');
     } catch (err: any) {
       if (!err.message.includes('BUSYGROUP')) throw err;
     }
@@ -72,10 +74,39 @@ export class ValkeyQueueConsumer
         continue;
       }
       for (const reg of this.registrations) {
-        await this.readAndProcess(reg);
+        // Um erro de leitura não pode matar o laço: antes, uma exceção aqui
+        // subia até o poll().catch e a fila ficava sem leitor até reiniciar o
+        // ms (tickets/056 · 05b).
+        try {
+          await this.readAndProcess(reg);
+        } catch (err: any) {
+          await this.recoverFromReadError(reg, err);
+          continue;
+        }
         await this.reclaimStale(reg);
       }
     }
+  }
+
+  private async recoverFromReadError(reg: Registration, err: any) {
+    try {
+      if (String(err?.message).includes('NOGROUP')) {
+        // Redis recriado (ou stream apagado): o grupo sumiu.
+        this.logger.warn(
+          `Grupo ${reg.group} sumiu de ${reg.stream}; recriando`,
+        );
+        await this.ensureGroup(reg.stream, reg.group);
+        return;
+      }
+      this.logger.error(`Read error on ${reg.stream}:`, err);
+    } catch (recreateErr) {
+      this.logger.error(
+        `Could not recreate group on ${reg.stream}:`,
+        recreateErr,
+      );
+    }
+    // Redis fora do ar ou erro inesperado: pausa antes de tentar de novo.
+    await new Promise((r) => setTimeout(r, 1000));
   }
 
   private async readAndProcess({
