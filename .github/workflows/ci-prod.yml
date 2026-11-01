@@ -57,9 +57,9 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST_PROD }}
           username: ${{ secrets.DEPLOY_USER_PROD }}
           password: ${{ secrets.DEPLOY_PASS_PROD }}
-          script: |
-            chmod +x ~/subir_ms.sh
-            ~/subir_ms.sh
+          # compose do vcnafacul-stack (tickets/057): sobe a versão da tag e espera healthy;
+          # rollback no servidor: ~/stack/deploy.sh rollback ms-simulado
+          script: ~/stack/deploy.sh ms-simulado ${{ github.ref_name }}
 
   CREATE_RELEASE:
     needs: DEPLOY_PROD
